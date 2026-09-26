@@ -135,7 +135,7 @@ full. What bears on this record:
 
 ## Rank
 
-**Seventh**, after 069, 070, 052, 013, 068 and 065, and above 061, in the
+**Eighth**, after 069, 071, 070, 052, 013, 068 and 065, and above 061, in the
 Aerochrome work the queue now leads with (settled 2026-09-25). It sits below
 the white guard (069) and the rotation fix (070) because both change the sky it
 is measured against: 069 is the rule its clouds must meet if it replaces the sky

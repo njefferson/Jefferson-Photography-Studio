@@ -837,6 +837,18 @@ user-scalable=no.
   option the record held is now rejected; the record needs a new option,
   researched and written before anything is built. What each frame showed is in
   the record.
+- [ ] **The first launch after an update froze with nothing said, and every update fetches the whole app again** <!-- decision: 071 -->
+  **Shown as:** The first time the app opens after an update it can sit still for a minute with nothing on screen; the app will measure why, and an update will download only what changed.
+  Reported from the PC after v2.63.7: the start screen showed and nothing
+  answered for about a minute. Every release requests and re-stores the whole
+  app offline, 218 files and 28 MB, 25 MB of it the sticker library, with
+  nothing on screen while it runs; but the cause of the minute is not established, and the
+  editor building its picture code from scratch after a release that changed
+  it is the other candidate. Measured first, in the app: a start-up line in the
+  report and a cold compile on the test page. Two live defects in the same path
+  are fixed alongside: the host answers a missing file with the start page, and
+  the strip can offer an older version as new.
+  See `docs/decisions/071-the-first-launch-after-an-update-froze-with-nothing-said-and-every-update-downloads-the-whole-app.md`.
 - [ ] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
   **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
   `buildSkySelectionFrom` passes rotation 0 to the detector, so on a turned
@@ -851,12 +863,14 @@ user-scalable=no.
   stages is read off selection maps, not renders, so it waits for the white
   guard (069), and its renders are 069's cloud checks. 052's Option 1 would
   retire the path only for the three sky stages on the open photograph, so
-  this touches 052 rather than being superseded by it. Second, below the white
-  guard (069), which it needs. See
+  this touches 052 rather than being superseded by it. Third, below the white
+  guard (069), which it needs, and the update-path record (071), which shares
+  no ground with it. See
   `docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md`.
 - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
   **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
-  **Third from 2026-09-26, below the white guard (069) and the rotation fix
+  **Fourth from 2026-09-26, below the white guard (069), the update-path record
+  (071) and the rotation fix
   (070); led the queue from 2026-09-25, with the halo.** Under Aerochrome's Sky
   depth a light band stands beside every building and pylon, and the sky inside
   a pylon's lattice is not darkened: measured, it is this selection, wrong over

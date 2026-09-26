@@ -93,14 +93,28 @@
         <h2>Waiting on you</h2>
         <ul>
           <li>
-            <strong>Nothing to test on a device.</strong> The sky record's next
-            option comes to you with pictures once it is researched.
+            <strong>Nothing to test on a device yet.</strong> The sky record's next
+            option comes to you with pictures once it is researched. Two questions
+            about how an update reaches you are in the chat: whether the offline
+            copy catching up to the version already on screen takes over without a
+            press, and whether a new reader gets the stickers one at a time or all
+            at once.
           </li>
         </ul>
       </div>
 
       <h2>The stages</h2>
       <ul>
+        <li class="now"><span class="state">Investigating</span>
+          <strong>The first launch after the release froze for about a minute,
+          and nothing said why.</strong> Reported from the PC. Every release
+          requests and stores the whole offline copy again, 28 MB, 25 MB of it the
+          sticker library, which has not changed since July, and nothing on screen
+          says a download is running. Whether that download is what froze the page is not
+          established: the other candidate is the editor compiling its picture
+          code from scratch after a release that changed it. The app will measure
+          both on the device before either is called the cause.
+        </li>
         <li class="done"><span class="state">Stopped</span>
           <strong>The first answer to the sky sliders tinting clouds was built,
           and taken out.</strong> One rule for the three sky stages: what arrives
@@ -319,6 +333,23 @@
         They are written down so they are not re-discovered as new.
       </p>
       <ul>
+        <li>
+          <strong>The update strip can offer an older waiting version as new</strong>,
+          because it asks whether the waiting version is different, not whether it
+          is newer; taking it deletes the newer version's half-finished download.
+          Read from the code, not yet reproduced.
+        </li>
+        <li>
+          <strong>The host answers any missing file with the start page and a
+          success code</strong>, so a release landing in the middle of a download
+          can leave a page stored under a program file's name until the next
+          release. Checked against production.
+        </li>
+        <li>
+          <strong>Stickers placed on a photo whose edit is restored are missing from
+          its export until the Stickers tab has been opened</strong>, and the export says nothing. Read
+          from the code, not yet reproduced.
+        </li>
         <li>
           <strong>A faint vertical colour band sits at the same place on two
           different photographs under Aerochrome</strong>, x 5230–5270 of the

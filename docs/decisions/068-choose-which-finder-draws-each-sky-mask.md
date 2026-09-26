@@ -234,6 +234,7 @@ What exists that this item will use, so a second one does not get written:
 
 - needs 052 — until the look's sky stages read a reader-visible Sky mask, a finder the reader chooses on a mask never reaches the look's sky, and the photograph has two skies.
 - needs 069 — the comparison is judged through the look's sky stages, and until they have a guard against white, cloud in a Sky mask is turned blue-grey whichever finder drew it.
+- needs 071 — the learned finder downloads 23.5 MB of models on demand, and until the update path keeps on-demand files across releases they would be deleted and downloaded again after every release.
 - needs 070 — the Sky mask 052's Option 1 seeds would most naturally start from the look's own selection, which is built at rotation 0 on a turned photograph, and three of the six frames are turned; the Sky mask's own finder already reads the renderer's rotation, so the comparison waits until both paths agree which edge is up.
 - touches 013 — Sky colour smoothing is 013's stage and the comparison is judged through it; a mask with no stored choice is drawn by today's finder, so nothing built here moves what 013 tunes against.
 - touches 061 — NIR_3461's pylon steel arrives red on one face from the foliage band, so what the sky stages do to steel a Sky mask takes in is not the white guard's to fix.
@@ -310,7 +311,7 @@ default, and it draws a mask only when the reader chooses it there.
 
 ## Rank
 
-**Fifth: below 069, 070, 052 and 013, above 065.**
+**Sixth: below 069, 071, 070, 052 and 013, above 065.** 071 went in second on 2026-09-26, and this needs it.
 
 **The three it needs are reasons, not a sequence.** This record says only that
 all three come before it; the order they go in among themselves (069, then 070,

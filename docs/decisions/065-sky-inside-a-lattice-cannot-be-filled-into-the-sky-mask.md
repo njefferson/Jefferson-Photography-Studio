@@ -125,7 +125,7 @@ where the colour does.
 
 ## Rank
 
-**Re-ranked 2026-09-26: sixth, below 069, 070, 052, 013 and 068, above 066.**
+**Re-ranked 2026-09-26: seventh, below 069, 071, 070, 052, 013 and 068, above 066.** 071, the update path, shares no ground with this.
 The Aerochrome work leads the queue. It sits below the white guard (069) and
 the rotation fix (070) because both come before 052, and under a look what a
 fill adds reaches the sky stages only through 052, where 069 decides what those
