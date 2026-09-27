@@ -12585,7 +12585,12 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
     settleHistogram(); // the refreshes skipped during the load, paid once
   }
   updateSessionStrip();
-  await requestPersistentStorage(); // ask the OS to keep the session's bytes
+  // ASKED, NEVER AWAITED (decision 076). Firefox answers with a permission
+  // prompt and the promise waits for the reader's answer, so awaiting it here
+  // held every note below — a set cut short, the photos that could not be read
+  // — behind a question about something else. The bytes are protected just the
+  // same whenever the answer comes.
+  void requestPersistentStorage();
 
   const notes: string[] = [];
   if (quotaHit) notes.push("Storage filled up — some photos couldn't be added. Free space, or tap Done to end the session.");
@@ -16332,9 +16337,17 @@ function heapNearFull(): boolean {
  *  storage so a set survives a reload — did not, for as long as sessions have
  *  existed. Worth knowing why that went unnoticed: a search for
  *  `storage.persist` cannot see `storage?.persist?.()`, so the code was
- *  reported absent from a tree it was in. */
-async function requestPersistentStorage(): Promise<void> {
-  await Session.requestPersistence();
+ *  reported absent from a tree it was in.
+ *
+ *  ASKED, NEVER AWAITED (decision 076). Firefox answers `persist()` with a
+ *  permission prompt and its promise waits for the reader's answer — so a batch
+ *  that awaited it sat at "Processing 0 / N" until the prompt was answered, and
+ *  a set being added held its closing notes behind it. It returns nothing on
+ *  purpose, so there is nothing to await: the request goes out and the work goes
+ *  on. The diagnostic reads `navigator.storage.persisted()` itself, so nothing
+ *  needs the answer. */
+function requestPersistentStorage(): void {
+  void Session.requestPersistence();
 }
 
 /** A write that failed because the device is out of storage quota (as opposed
@@ -16404,7 +16417,7 @@ async function runBatch(files: File[]) {
   busyStop.hidden = false;
   recoverBtn.hidden = true;
   acquireWakeLock();
-  await requestPersistentStorage();
+  void requestPersistentStorage(); // never awaited — see the function (decision 076)
 
   try {
     // Frames already stored (an earlier stopped part, or accepted leftovers)
