@@ -370,6 +370,11 @@
             </div>
             <button id="stripHere" type="button" class="session-here" hidden title="Scroll the strip back to the photo you are viewing">&#8629; Back to current</button>
             <button id="sessionDone" type="button" class="session-done" title="End the session and free its storage">Done</button>
+            <!-- A file of the set still being read after its limit, once a photo
+                 is on screen: offered here rather than on a card over the editor
+                 (decision 075's review). Shown only by repaintSkip. AFTER Done, so
+                 on a phone it is the one that goes to a second line. -->
+            <button id="stripSkip" type="button" class="session-done session-skip" hidden></button>
           </div>
           <div id="sessionProgress" class="session-progress" hidden>
             <div id="sessionProgressBar" class="session-progress-bar"></div>
@@ -1223,7 +1228,24 @@
     <dialog id="busy" aria-label="Working">
       <div class="busy-card">
         <div class="spinner" id="busySpinner"></div>
-        <p id="busyText" role="status" aria-live="polite" aria-atomic="true">Exporting…</p>
+        <!-- tabindex -1: focusable by script only, where a Skip or the report
+             button that hides itself hands the focus (decision 075's review). -->
+        <p id="busyText" role="status" aria-live="polite" aria-atomic="true" tabindex="-1">Exporting…</p>
+        <!-- THE WAIT ON THE LAST SESSION'S DELETE (decision 075). The count is
+             for eyes only and sits OUTSIDE the live region above: spoken on
+             every change it would drown the sentence it counts for, the same
+             rule as the preparing line's seconds. The button is the way into
+             the report while this modal card covers every other. Both are
+             shown only by that wait. -->
+        <p id="busyCount" aria-hidden="true" hidden></p>
+        <button id="busyReport" type="button" hidden>What&rsquo;s happening? (show the report)</button>
+        <!-- A READ THAT HAS NOT FINISHED (decision 075's review): offered once a
+             file has taken longer than it should, never decided for the reader.
+             Pressing it gives that file up: an open of several goes on without
+             it and lists it as not opened; a lone photo or keep file ends the
+             open and says why; a skipped look says it was skipped. Once a set
+             has a photo on screen the offer is #stripSkip instead. -->
+        <button id="busySkip" type="button" hidden>Skip this file</button>
         <button id="busyStop" type="button" hidden>Stop &amp; save what's done</button>
         <div id="busyActions" hidden>
           <button id="busySave" type="button" class="primary">Save image</button>

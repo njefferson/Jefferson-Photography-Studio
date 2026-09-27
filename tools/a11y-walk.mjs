@@ -40,6 +40,9 @@
 //   5  decoration that paints has a box to paint in
 //   6  the (i) control, and orientation that is moved rather than copied
 //   7  the start screen while the editor is being prepared, and when it cannot be
+//   8  the busy card while a keep waits for the last session's delete
+//   9  the busy card offering to skip a file that has not finished reading
+//  10  the session strip offering to skip a later file of a set
 //
 // Feature-specific a11y probes stay in the scratchpad, per release. What makes
 // this one repo-worthy is the coverage assertion: it is the only thing here
@@ -50,11 +53,13 @@ import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, copyFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { repo, surfaces, allowed, check as checkSurfaces } from "./surfaces.mjs";
 import { sweepRenders } from "./palette-spec.mjs";
 import { slowBuild } from "./slow-build.mjs";
+import { slowStorage } from "./slow-storage.mjs";
 
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 // `--only=7` (or `--only=1,7`) runs those sections alone; section 0, the
@@ -744,6 +749,35 @@ try {
     }
     await page.close();
   }
+  /** axe over the page as it stands — serious and critical fail, the rest are
+   *  counted. Sections 7 and 8 measure states only a plant can reach, one page
+   *  at a time, so they share this rather than each carrying a copy. */
+  const axeLine = async (page, line) => {
+    await page.addScriptTag({ content: axeSrc });
+    const r = await page.evaluate(async (rules) => await window.axe.run(document, { runOnly: rules }), RULES);
+    const serious = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    if (serious.length) { fail(`${line}: ${serious.length} serious/critical`); for (const v of serious) for (const n of v.nodes) note(`[${v.impact}] ${v.id}: ${n.target.join(" ")}`); }
+    else ok(`${line}: nothing serious or critical${r.violations.length ? ` (${r.violations.length} minor)` : ""}`);
+  };
+  /** PRESS A SKIP BY KEYBOARD AND SAY WHERE THE FOCUS WENT (decision 075's
+   *  review). A Skip hides itself once its read is given up, and a hidden
+   *  button that still holds the focus leaves a keyboard or screen-reader
+   *  reader on the page's <body>. Read in the press's own task, right after the
+   *  app's handler: the browser moves focus off a hidden element only later, so
+   *  a focus still ON the pressed button, or on <body>, is the failure. */
+  const pressSkipByKeyboard = async (page, id) => {
+    await page.evaluate((id) => {
+      window.__afterSkip = null;
+      document.getElementById(id).addEventListener("click", () => {
+        const a = document.activeElement;
+        window.__afterSkip = { id: a?.id || a?.tagName || "(none)", same: a === document.getElementById(id), body: !a || a === document.body, shown: !!a && a.getClientRects().length > 0 };
+      }, { once: true });
+    }, id);
+    await page.focus(`#${id}`);
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => window.__afterSkip, null, { timeout: 5000 }).catch(() => {});
+    return page.evaluate(() => window.__afterSkip);
+  };
   // ── 7 ──────────────────────────────────────────────────
   // THE START SCREEN WHILE THE EDITOR IS BEING PREPARED (decision 071). The
   // start card gained a live region that speaks only when the build is slow, a
@@ -758,13 +792,6 @@ try {
     const html = await fetch(`${BASE}/ir.html`).then((r) => r.text());
     if (/<p id="preparing" role="status" aria-live="polite"><\/p>/.test(html)) ok("the preparing line is a live region, present and empty in the page as served");
     else fail("the preparing line is not an empty role=status live region in the page as served");
-    const axeLine = async (page, line) => {
-      await page.addScriptTag({ content: axeSrc });
-      const r = await page.evaluate(async (rules) => await window.axe.run(document, { runOnly: rules }), RULES);
-      const serious = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
-      if (serious.length) { fail(`${line}: ${serious.length} serious/critical`); for (const v of serious) for (const n of v.nodes) note(`[${v.impact}] ${v.id}: ${n.target.join(" ")}`); }
-      else ok(`${line}: nothing serious or critical${r.violations.length ? ` (${r.violations.length} minor)` : ""}`);
-    };
     for (const theme of THEMES) for (const size of SIZES) {
       const where = `[${theme} ${size.name}]`;
       // A FRESH PAGE HAS NO RECORD OF A BUILD, so this launch expects a cold
@@ -803,6 +830,181 @@ try {
         else ok(`[${theme} phone] #glBroken: all >= 44`);
       } finally { await page.close(); }
     }
+  }
+  // ── 8 ──────────────────────────────────────────────────
+  // THE BUSY CARD WHILE A KEEP WAITS FOR THE LAST SESSION'S DELETE (decision
+  // 075). It gains a count beside its sentence and a button into the report,
+  // shown only for as long as that wait lasts — which in a container is never,
+  // because a delete here takes milliseconds. tools/slow-storage.mjs holds the
+  // delete open and says the browser's allowance is spent, so the state
+  // measured is the real app's own, reached by real presses.
+  if (want(8)) console.log("\n8 — the busy card while a keep waits for the last session's delete");
+  if (want(8)) {
+    const tmp = mkdtempSync(join(tmpdir(), "a11y-8-"));
+    const cp = (names, off) => names.map((n, i) => { const to = join(tmp, n); copyFileSync(join(EX, ["canopy.jpg", "hillside.jpg", "lodge.jpg"][(i + off) % 3]), to); return to; });
+    const SET = cp(["e1.jpg", "e2.jpg"], 0), KEEP = cp(["k1.jpg", "k2.jpg"], 1);
+    try {
+      for (const theme of THEMES) for (const size of SIZES) {
+        const where = `[${theme} ${size.name}]`;
+        const page = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
+        page.on("dialog", (d) => d.accept());
+        try {
+          await page.addInitScript(slowStorage, { slow: 9000, estimate: "none" });
+          await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+          await page.setInputFiles("#file", SET);
+          await page.waitForFunction(() => { const t = [...document.querySelectorAll("#sessionThumbs .session-thumb")]; return t.length === 2 && t.every((x) => !x.disabled) && !document.getElementById("busy").open; }, null, { timeout: 120000 });
+          await page.waitForTimeout(800);
+          await page.click("#sessionDone");
+          await page.waitForFunction(() => document.getElementById("sessionStrip").hidden && !document.getElementById("busy").open, null, { timeout: 60000 });
+          await page.setInputFiles("#quickFiles", KEEP);
+          await page.waitForFunction(() => (document.getElementById("qlGrid")?.children.length ?? 0) >= 2 && !document.getElementById("qlKeep").disabled && !document.getElementById("qlGrid").dataset.busy, null, { timeout: 120000 });
+          await page.click("#qlKeep");
+          const up = await page.waitForFunction(() => document.getElementById("busyReport")?.hidden === false, null, { timeout: 8000 }).then(() => true).catch(() => false);
+          if (!up) { fail(`${where} the keep's wait never showed the card's report button`); continue; }
+          const card = await page.evaluate(() => { const r = document.getElementById("busyReport").getBoundingClientRect(); return { text: document.getElementById("busyText").textContent, count: document.getElementById("busyCount").textContent, w: Math.round(r.width), h: Math.round(r.height) }; });
+          note(`${where} busy card: "${card.text}" · "${card.count}" · report button ${card.w}x${card.h}`);
+          await axeLine(page, `ir.html ${where} busy card, waiting for the last session's delete`);
+          if (card.w >= 44 && card.h >= 44) ok(`${where} #busyReport: ${card.w}x${card.h}`);
+          else fail(`${where} #busyReport: ${card.w}x${card.h}, under 44`);
+          await page.click("#busyReport");
+          await page.waitForFunction(() => document.getElementById("verDlg")?.open, null, { timeout: 5000 }).catch(() => {});
+          await page.waitForTimeout(300);
+          // ON TOP, BY HIT TEST — `open` alone is true of a report stuck under
+          // the card, which is the state this check exists to refuse.
+          const onTop = await page.evaluate(() => { const d = document.getElementById("verDlg"); if (!d.open) return false; const r = d.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!hit && d.contains(hit); });
+          if (onTop) ok(`${where} pressing it opens the report above the card`);
+          else fail(`${where} pressing the card's report button did not bring the report above the card`);
+          // WHERE THE FOCUS GOES WHEN THE WAIT ENDS (decision 075's review), one
+          // ordering per theme. Dark: the report closed at once, the focus back
+          // on the button, and then the wait ends and hides it — read at that
+          // moment. Light: the report still open when the wait ends, and closed
+          // after — read once it has closed. <body>, or a hidden button, fails.
+          const live = () => page.evaluate(() => { const a = document.activeElement; const d = a?.closest("dialog"); return { id: a?.id || a?.tagName || "(none)", body: !a || a === document.body, shown: !!a && a.getClientRects().length > 0 && (!d || d.open) }; });
+          if (theme === "dark") {
+            await page.keyboard.press("Escape");
+            await page.waitForFunction(() => !document.getElementById("verDlg").open, null, { timeout: 5000 }).catch(() => {});
+            await page.waitForTimeout(200);
+            const back = await live();
+            await page.evaluate(() => {
+              window.__atHide = null;
+              const b = document.getElementById("busyReport");
+              new MutationObserver((_, mo) => { if (!b.hidden) return; const a = document.activeElement; window.__atHide = { id: a?.id || a?.tagName || "(none)", same: a === b, body: !a || a === document.body, shown: !!a && a.getClientRects().length > 0 }; mo.disconnect(); }).observe(b, { attributes: true, attributeFilter: ["hidden"] });
+            });
+            await page.waitForFunction(() => window.__atHide, null, { timeout: 60000 }).catch(() => {});
+            const at = await page.evaluate(() => window.__atHide);
+            if (back.id === "busyReport" && at && !at.same && !at.body && at.shown) ok(`${where} closing the report returns to its button, and when the wait ends and hides it the focus goes to #${at.id}, still on screen`);
+            else fail(`${where} the report button's focus at the end of the wait: back on ${back.id} after closing the report; when it hid, ${at ? (at.same ? "still on the hidden button" : at.body ? "on <body>" : `on ${at.id}, not on screen`) : "never hidden"}`);
+          } else {
+            await page.waitForFunction(() => document.getElementById("busyReport").hidden, null, { timeout: 60000 }).catch(() => {});
+            await page.waitForTimeout(500);
+            await page.keyboard.press("Escape");
+            await page.waitForFunction(() => !document.getElementById("verDlg").open, null, { timeout: 5000 }).catch(() => {});
+            await page.waitForTimeout(300);
+            const at = await live();
+            if (!at.body && at.shown) ok(`${where} the report still open when the wait ended: closing it puts the focus on #${at.id}, on screen`);
+            else fail(`${where} the report still open when the wait ended: closing it leaves the focus ${at.body ? "on <body>" : `on ${at.id}, not on screen`}`);
+          }
+        } finally { await page.close(); }
+      }
+    } finally { rmSync(tmp, { recursive: true, force: true }); }
+  }
+  // ── 9 ──────────────────────────────────────────────────
+  // THE BUSY CARD OFFERING TO SKIP A FILE THAT HAS NOT FINISHED READING
+  // (decision 075's review). Shown only once a file has taken longer than it
+  // should — never, in a container, where every read is local. A head read
+  // that never arrives is planted from outside, so the offer is the app's own.
+  if (want(9)) console.log("\n9 — the busy card offering to skip a file that has not finished reading");
+  if (want(9)) {
+    const tmp = mkdtempSync(join(tmpdir(), "a11y-9-"));
+    const SET = [["s1.jpg", "canopy.jpg"], ["s2-HANGSNIFF.jpg", "hillside.jpg"]].map(([n, from]) => { const to = join(tmp, n); copyFileSync(join(EX, from), to); return to; });
+    try {
+      for (const theme of THEMES) for (const size of SIZES) {
+        const where = `[${theme} ${size.name}]`;
+        const page = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
+        page.on("dialog", (d) => d.accept());
+        try {
+          await page.addInitScript(slowStorage, { hangSniff: "HANGSNIFF" });
+          await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+          await page.setInputFiles("#file", SET);
+          const up = await page.waitForFunction(() => document.getElementById("busySkip")?.hidden === false, null, { timeout: 20000 }).then(() => true).catch(() => false);
+          if (!up) { fail(`${where} a file whose head never arrived was never offered to be skipped`); continue; }
+          const card = await page.evaluate(() => { const r = document.getElementById("busySkip").getBoundingClientRect(); return { text: document.getElementById("busyText").textContent, label: document.getElementById("busySkip").textContent, w: Math.round(r.width), h: Math.round(r.height) }; });
+          note(`${where} busy card: "${card.text}" · "${card.label}" ${card.w}x${card.h}`);
+          await axeLine(page, `ir.html ${where} busy card, offering to skip a file`);
+          if (card.w >= 44 && card.h >= 44) ok(`${where} #busySkip: ${card.w}x${card.h}`);
+          else fail(`${where} #busySkip: ${card.w}x${card.h}, under 44`);
+          const went = await pressSkipByKeyboard(page, "busySkip");
+          if (went && !went.same && !went.body && went.shown) ok(`${where} pressing #busySkip by keyboard hands the focus to #${went.id}, still on screen`);
+          else fail(`${where} pressing #busySkip by keyboard leaves the focus ${went ? (went.same ? "on the hidden button" : went.body ? "on <body>" : `on ${went.id}, not on screen`) : "unread"}`);
+        } finally { await page.close(); }
+      }
+    } finally { rmSync(tmp, { recursive: true, force: true }); }
+  }
+  // ── 10 ─────────────────────────────────────────────────
+  // THE SESSION STRIP OFFERING TO SKIP A LATER FILE OF A SET (decision 075's
+  // review). Once a set has a photo on screen, a read past its limit is offered
+  // beside Done rather than on a card over the editor. The limit is a minute of
+  // visible time, so both shapes stall side by side and share it; each is then
+  // measured in both themes. The stalled read is planted from outside.
+  if (want(10)) console.log("\n10 — the session strip offering to skip a later file of a set");
+  if (want(10)) {
+    const tmp = mkdtempSync(join(tmpdir(), "a11y-10-"));
+    const SET = [["a1.jpg", "canopy.jpg"], ["b2-STALLMID.jpg", "hillside.jpg"], ["c3.jpg", "lodge.jpg"]].map(([n, from]) => { const to = join(tmp, n); copyFileSync(join(EX, from), to); return to; });
+    const lines = [];
+    const stalled = async (size) => {
+      const page = await browser.newPage({ ...size.opts, colorScheme: "dark", serviceWorkers: "block" });
+      page.on("dialog", (d) => d.accept());
+      try {
+        await page.addInitScript(slowStorage, { slowFullRead: { match: "STALLMID", ms: 600000 } });
+        await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+        await page.setInputFiles("#file", SET);
+        const up = await page.waitForFunction(() => document.getElementById("stripSkip")?.hidden === false, null, { timeout: 90000 }).then(() => true).catch(() => false);
+        if (!up) { lines.push(["fail", `[${size.name}] a later file past its limit was never offered in the strip`]); return; }
+        for (const theme of THEMES) {
+          const where = `[${theme} ${size.name}]`;
+          await page.emulateMedia({ colorScheme: theme });
+          await page.waitForTimeout(300);
+          const m = await page.evaluate(() => {
+            const b = document.getElementById("stripSkip"), d = document.getElementById("sessionDone");
+            const r = b.getBoundingClientRect(), q = d.getBoundingClientRect();
+            const inView = (x) => x.left >= 0 && x.right <= innerWidth + 0.5 && x.top >= 0 && x.bottom <= innerHeight + 0.5;
+            return { label: b.textContent, w: Math.round(r.width), h: Math.round(r.height), skipIn: inView(r), doneIn: inView(q), scroll: document.documentElement.scrollWidth > innerWidth, card: document.getElementById("busy").open };
+          });
+          lines.push(["note", `${where} strip: "${m.label}" ${m.w}x${m.h}; busy card ${m.card ? "UP" : "down"}`]);
+          await axeLine(page, `ir.html ${where} the session strip offering to skip a file`);
+          lines.push(m.w >= 44 && m.h >= 44 ? ["ok", `${where} #stripSkip: ${m.w}x${m.h}`] : ["fail", `${where} #stripSkip: ${m.w}x${m.h}, under 44`]);
+          lines.push(m.skipIn && m.doneIn && !m.scroll ? ["ok", `${where} Skip and Done both inside the window, no sideways scroll`] : ["fail", `${where} Skip ${m.skipIn ? "in" : "OUT OF"} view, Done ${m.doneIn ? "in" : "OUT OF"} view, sideways scroll ${m.scroll}`]);
+          lines.push(!m.card ? ["ok", `${where} no card over the editor while it is offered`] : ["fail", `${where} a card is up over the editor while the strip offers Skip`]);
+        }
+        const went = await pressSkipByKeyboard(page, "stripSkip");
+        lines.push(went && !went.same && !went.body && went.shown ? ["ok", `[${size.name}] pressing #stripSkip by keyboard hands the focus to #${went.id}, still on screen`] : ["fail", `[${size.name}] pressing #stripSkip by keyboard leaves the focus ${went ? (went.same ? "on the hidden button" : went.body ? "on <body>" : `on ${went.id}, not on screen`) : "unread"}`]);
+      } finally { await page.close(); }
+    };
+    // A SET OF TWO, where the Skip leaves one photo and the strip hides at the
+    // set's end: the control the Skip handed the focus to hides with it, and
+    // the focus must go somewhere still on screen, not to <body>.
+    const TWO = [SET[0], (() => { const to = join(tmp, "b9-STALLMID.jpg"); copyFileSync(join(EX, "lodge.jpg"), to); return to; })()];
+    const stalledTwo = async (size) => {
+      const page = await browser.newPage({ ...size.opts, colorScheme: "dark", serviceWorkers: "block" });
+      page.on("dialog", (d) => d.accept());
+      try {
+        await page.addInitScript(slowStorage, { slowFullRead: { match: "STALLMID", ms: 600000 } });
+        await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+        await page.setInputFiles("#file", TWO);
+        const up = await page.waitForFunction(() => document.getElementById("stripSkip")?.hidden === false, null, { timeout: 90000 }).then(() => true).catch(() => false);
+        if (!up) { lines.push(["fail", `[${size.name}, a set of two] the second file past its limit was never offered in the strip`]); return; }
+        await pressSkipByKeyboard(page, "stripSkip");
+        await page.waitForFunction(() => document.getElementById("sessionStrip").hidden && !document.getElementById("busy").open, null, { timeout: 30000 }).catch(() => {});
+        await page.waitForTimeout(500);
+        const at = await page.evaluate(() => { const a = document.activeElement; const d = a?.closest("dialog"); return { id: a?.id || a?.tagName || "(none)", body: !a || a === document.body, shown: !!a && a.getClientRects().length > 0 && (!d || d.open), strip: document.getElementById("sessionStrip").hidden }; });
+        lines.push(at.strip && !at.body && at.shown ? ["ok", `[${size.name}, a set of two] after the Skip the strip hid with one photo left, and the focus is on #${at.id}, on screen`] : ["fail", `[${size.name}, a set of two] after the Skip ${at.strip ? "the strip hid and" : "the strip is STILL up and"} the focus is ${at.body ? "on <body>" : `on ${at.id}, not on screen`}`]);
+      } finally { await page.close(); }
+    };
+    try {
+      // The axe lines print as they run; the rest are gathered and printed after.
+      await Promise.all([...SIZES.map((size) => stalled(size)), ...SIZES.map((size) => stalledTwo(size))]);
+      for (const [kind, line] of lines) (kind === "ok" ? ok : kind === "fail" ? fail : note)(line);
+    } finally { rmSync(tmp, { recursive: true, force: true }); }
   }
 } finally {
   await browser.close();

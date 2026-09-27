@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=79dd9b29e63e56ab
-diffhash=5d2cda983a312011
-verdict=IN-SCOPE: plan item 3 alone, the storage permission asked and never awaited in runBatch and at the end of adding photos
-# Plan item 3 alone: addToSession and runBatch call requestPersistentStorage() without await, and the function returns void so there is nothing to await; docs/ARCHITECTURE.md carries the regenerated line count for src/main.ts. Nothing from items 2 or 4 is present. Judged by a watcher subagent reading the plan by path and the diff.
+diffhash=d5d731bcc715aaaa
+verdict=IN-SCOPE: plan item 2 as revised, its pieces A to F, the in-scope fixes, and the fixes to defects they introduced
+# Plan item 2 as revised: the base (card before any wait, wait only when estimate() says the set will not fit, words and a count, a second open refused, the report's Freeing storage line), pieces A to F, the in-scope fix list, and the fixes to defects those pieces introduced through review round 5. tools/slow-storage.mjs is the walks' storage stand-in; the a11y walk's new sections cover the new card and strip surfaces. Judged by a watcher subagent reading the plan by path and the diff; nothing outside the plan found.

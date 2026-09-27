@@ -80,7 +80,6 @@ src/icc.ts:embedIccInJpeg
 src/iconpicker.ts:applyIconStyle
 src/import.ts:rawBrand
 src/import.ts:sniff
-src/import.ts:importFile
 src/import.ts:refineKind
 src/lensbackup.ts:backupState
 src/lensbackup.ts:backupSentence
@@ -182,10 +181,8 @@ src/session.ts:setThumb
 src/session.ts:setMark
 src/session.ts:getBytes
 src/session.ts:removePhoto
-src/session.ts:sweepSettled
 src/session.ts:sweepOrphans
 src/share.ts:isStandaloneApp
-src/share.ts:toast
 src/share.ts:setupInstalledShare
 src/share.ts:setupInstallFromApp
 src/sky.ts:buildSkyMask
