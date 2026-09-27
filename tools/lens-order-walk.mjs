@@ -1,8 +1,15 @@
 #!/usr/bin/env node
 // THE BALANCE IS MEASURED ON CORRECTED DATA — asserted, not assumed (decision 021).
+// AND A MATCHED LENS OPENS CORRECTED, AT THE STRENGTH CHOSEN FOR THE LENS (015).
 //
 //   python3 -m http.server 8131 --directory dist   (in another shell)
-//   node tools/lens-order-walk.mjs [--port=8131] [--file=/path/to.NEF] [--strength=1]
+//   node tools/lens-order-walk.mjs [--port=8131] [--file=A.NEF] [--second=B.NEF] [--third=C.NEF] [--chosen=0.3]
+//
+// Three raws from ONE lens that matches a shipped profile, the first two at
+// DIFFERENT apertures. They are real photographs and are NOT in the
+// repository; the defaults are a scratchpad set from a NIKKOR Z DX 50-250mm
+// (NIR_3703 f/5, NIR_3697 f/5.3, NIR_3700 f/8), and without them the walk
+// exits 2 — "did not run", never a pass.
 //
 // WHAT IT HOLDS. The measured lens curve is laid on the linear working copy at
 // decode, before the gray-world balance, the exposure, the denoise measurement
@@ -13,12 +20,27 @@
 // gray-world of the uncorrected decode, which is what the build before 021
 // measured. Made to fail first against that build.
 //
-// THE STRENGTH HAS TO BE REMEMBERED FIRST. A fresh page remembers no strength
-// for any lens, and a plan at strength 0 lays nothing; so the walk opens the
-// file, sets the shipped card's Strength (which the app remembers on change),
-// and opens the SAME file again — the second decode carries the plan. That is
-// also the reader's path: the strength they chose for a lens is what every
-// later photograph with that lens opens at.
+// (a) A FRESH PAGE'S FIRST OPEN IS CORRECTED. Nothing is remembered on a fresh
+// page, and a matched lens with nothing remembered opens at full strength
+// (decision 015, reversed 2026-09-26) — so the very first decode lays strength
+// 1 on the pixels, and the report's "Correction order" line says so. From
+// 2026-09-17 until then a fresh page laid nothing, which is why this walk used
+// to set the slider and open the same file twice before it could measure
+// anything. Red on that build.
+//
+// (b) A CHOSEN STRENGTH REACHES THE NEXT FRAME OF THE LENS AT ANOTHER APERTURE.
+// It was remembered per aperture (`shipped:50-250@5.0`), so a strength chosen
+// at f/5 opened nothing at f/5.3. Red on that build.
+//
+// (c) A CHOSEN 0 IS REMEMBERED, and the next open lays nothing. Absence means
+// full now, so a 0 that is not stored comes back as 1. This one CANNOT go red
+// on the build before, whose default was 0 — it was made to fail by planting
+// the old delete-at-0 back into `rememberStrength`.
+//
+// AND THE CARD SAYS WHAT THE PROFILE KNOWS: "colour only" for a profile with no
+// brightness curve, "brightness and colour" only when it has both. It said the
+// second of every colour profile. The expectation is read off the same matched
+// profile in node.
 //
 // AND THE RE-APPLY IS EXACT. Bypass on, then off, and the canvas hash returns
 // to what it was: the ratio pass against the gains already in the buffer, no
@@ -36,8 +58,16 @@ import { build } from "esbuild";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");
-const PORT = arg("port", "8131"), STRENGTH = Number(arg("strength", "1"));
-const RAW = arg("file", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/real/NIR_1376.NEF");
+const PORT = arg("port", "8131");
+// The strength a matched lens opens at when nothing is remembered.
+const STRENGTH = 1;
+// What the reader chooses on the first frame, for (b). Not 1 and not 0, so it
+// cannot be mistaken for either default.
+const CHOSEN = Number(arg("chosen", "0.3"));
+const SET = "/tmp/claude-0/-home-user/e7a820ad-44f5-555c-96b8-a4dcabafb549/scratchpad/towers";
+const RAW = arg("file", `${SET}/NIR_3703.NEF`);
+const RAW2 = arg("second", `${SET}/NIR_3697.NEF`);
+const RAW3 = arg("third", `${SET}/NIR_3700.NEF`);
 const TOL = 0.005; // 0.5% per channel
 // SET FROM BOTH BUILDS' READINGS on NIR_1376 at strength 1, corner over centre,
 // red/blue: the build before 021 (flat after the denoise) read 1.033 / 1.051;
@@ -48,7 +78,7 @@ const TOL = 0.005; // 0.5% per channel
 const RESIDUAL_MAX = Number(arg("residual", "1.025"));
 let failed = 0; const check = (n, ok, got) => { if (!ok) failed++; console.log(`${ok ? "ok  " : "FAIL"}  ${n} — ${got}`); };
 
-if (!existsSync(RAW)) { console.log(`\nno raw at ${RAW} — this walk needs a real raw whose lens matches a shipped profile\n`); process.exit(2); }
+for (const f of [RAW, RAW2, RAW3]) if (!existsSync(f)) { console.log(`\nno raw at ${f} — this walk needs three real raws from one lens that matches a shipped profile\n`); process.exit(2); }
 const serving = await fetch(`http://127.0.0.1:${PORT}/ir.html`).then((r) => r.ok).catch(() => false);
 if (!serving) { console.error(`\nNothing is serving dist on :${PORT}.\n\n    python3 -m http.server ${PORT} --directory dist\n`); process.exit(2); }
 
@@ -80,6 +110,18 @@ const short = A.Hotspot.shortFor(ex?.lens);
 const { colour, bump } = A.Hotspot.lensHalves(null, shipped);
 const curve = colour || bump ? { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined } : null;
 check("the raw's lens matches a shipped profile (the walk needs one)", !!curve, `${ex?.lens ?? "no lens"} → ${shipped ? "matched" : "no match"}`);
+// THE OTHER TWO FRAMES: same lens, and the second at a different aperture —
+// otherwise (b) says nothing about apertures and must not be allowed to pass.
+const exOf = (f) => A.readExifSubset(new Uint8Array(readFileSync(f)));
+const fOf = (e) => (e?.fNumber ? e.fNumber[0] / e.fNumber[1] : NaN);
+const ex2 = exOf(RAW2), ex3 = exOf(RAW3);
+const sameLens = [ex2, ex3].every((e) => A.Hotspot.shortFor(e?.lens) === short && !!A.Hotspot.findShipped(e));
+const apart = Math.abs(fOf(ex) - fOf(ex2)) > 0.05;
+console.log(`  frames — ${RAW.split("/").pop()} f/${fOf(ex).toFixed(1)} · ${RAW2.split("/").pop()} f/${fOf(ex2).toFixed(1)} · ${RAW3.split("/").pop()} f/${fOf(ex3).toFixed(1)} · lens ${short}`);
+if (!sameLens || !apart) { console.log(`\nthe three raws must share one matched lens and the first two differ in aperture (same lens ${sameLens}, apertures apart ${apart}) — the walk cannot see its own case\n`); process.exit(2); }
+// What the card should say each profile knows: both halves asked, the same
+// tests the report and the reader's own card use.
+const knows = (e) => { const p = A.Hotspot.findShipped(e); const c = A.Hotspot.hasColour(p); const b = !!p?.bump?.some((v) => v > 0); return c && b ? "brightness and colour" : c ? "colour only" : b ? "brightness only" : "nothing on this frame"; };
 const wbUncorrected = A.grayWorldWB(img);
 const gains = A.lensGains(curve, STRENGTH);
 const corrected = { ...img, linear: Float32Array.from(d.linear) };
@@ -114,27 +156,23 @@ async function report(p) {
   return { balance: row("Balance"), order: row("Correction order"), lens: row("Lens correction") };
 }
 const parseWb = (line) => { const m = (line || "").match(/white balance ([\d.]+) · ([\d.]+) · ([\d.]+)/); return m ? [1, 2, 3].map((i) => Number(m[i])) : null; };
+const card = (p) => p.evaluate(() => ({ status: document.getElementById("hsStatus")?.textContent || "", strength: document.getElementById("hsStrength")?.value ?? "", shown: !document.getElementById("hsCard")?.hidden }));
+const laid = (order) => { const m = (order || "").match(/strength ([\d.]+) laid on the pixels/); return m ? Number(m[1]) : (/nothing laid on the pixels/.test(order || "") ? 0 : null); };
 const setSlider = async (p, id, v) => { await p.evaluate(([i, x]) => { const el = document.getElementById(i); el.value = String(x); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }, [id, v]); await settle(p); };
 
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
 try {
   const p = await b.newPage({ viewport: { width: 1280, height: 950 } }); p.on("dialog", (d) => d.accept());
   await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
+  // (a) A FRESH PAGE, THE FIRST OPEN, NOTHING CHOSEN. The browser is new, so
+  // nothing is remembered for any lens; the decode must lay full strength.
   await open(p, RAW);
-  // 1. Choose a strength for this lens; the app remembers it on change.
-  await setSlider(p, "hsStrength", STRENGTH);
-  // 2. Open the same file again: the decode now carries the plan.
-  await open(p, RAW);
-  // The build before 021 opens at the remembered strength too — but in that
-  // build a strength of exactly 1 could never be remembered (it was stored as
-  // absence, from when absence meant full), so its second open lands at 0 and
-  // its Correction order line is missing either way. Set the slider once more
-  // so the residual and the Bypass checks below read a CORRECTED picture on
-  // both builds; on 021 this is a no-op, the pixels already carry it.
-  await setSlider(p, "hsStrength", STRENGTH);
   const r = await report(p);
-  console.log(`  app — ${r.order}\n        ${r.balance}`);
-  check("the report says the flat was laid on the linear raw at decode, at the chosen strength", /on the linear raw at decode/.test(r.order || "") && new RegExp(`strength ${STRENGTH} laid`).test(r.order || ""), r.order || "no Correction order line");
+  const c1 = await card(p);
+  console.log(`  app — ${r.order}\n        ${r.balance}\n        card: ${c1.status} · Strength ${c1.strength}`);
+  check(`(a) a fresh page's first open lays strength ${STRENGTH} on the linear raw at decode, with nothing chosen`, /on the linear raw at decode/.test(r.order || "") && laid(r.order) === STRENGTH, r.order || "no Correction order line");
+  check(`(a) and the shipped card's Strength says ${STRENGTH}`, c1.shown && Number(c1.strength) === STRENGTH, `card ${c1.shown ? "shown" : "hidden"}, Strength ${c1.strength}`);
+  check(`the card says what the profile knows: "${knows(ex)}"`, c1.status.includes(` · ${knows(ex)}`), c1.status || "no status");
   const wbApp = parseWb(r.balance);
   check("the report carries the balance", !!wbApp, r.balance || "no Balance line");
   const near = (a, b2) => !!a && a.every((x, i) => Math.abs(x - b2[i]) / b2[i] <= TOL);
@@ -163,5 +201,24 @@ try {
   const back = await p.evaluate(() => { const [a, b] = window.__lo; let maxD = 0, changed = 0, n = 0; for (let i = 0; i < a.length; i += 4) { n++; const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])); if (d) changed++; if (d > maxD) maxD = d; } delete window.__lo; return { maxD, changedShare: changed / n }; });
   check("Bypass changes the picture", h1 !== h0, `${h0} → ${h1}`);
   check("and Bypass off returns it to within one 8-bit step on under 1% of pixels (the re-apply is a ratio, not a second copy)", back.maxD <= 1 && back.changedShare < 0.01, `max step ${back.maxD} · pixels moved ${(100 * back.changedShare).toFixed(3)}%`);
+
+  // (b) CHOOSE A STRENGTH ON THIS FRAME, OPEN THE SAME LENS AT ANOTHER APERTURE.
+  // The slider's `change` is what remembers it, exactly as a finger lifting.
+  await setSlider(p, "hsStrength", CHOSEN);
+  await open(p, RAW2);
+  const r2 = await report(p), c2 = await card(p);
+  console.log(`  app — ${RAW2.split("/").pop()}: ${r2.order}\n        card: ${c2.status} · Strength ${c2.strength}`);
+  check(`(b) ${CHOSEN} chosen at f/${fOf(ex).toFixed(1)} is laid at decode on the next frame of the lens, at f/${fOf(ex2).toFixed(1)}`, laid(r2.order) === CHOSEN, r2.order || "no Correction order line");
+  check(`(b) and its Strength opens at ${CHOSEN}`, Number(c2.strength) === CHOSEN, `Strength ${c2.strength}`);
+
+  // (c) CHOOSE 0 — THE LENS OFF — AND OPEN A THIRD FRAME. Absence means full,
+  // so this holds only if a 0 is stored rather than dropped.
+  await setSlider(p, "hsStrength", 0);
+  await open(p, RAW3);
+  const r3 = await report(p), c3 = await card(p);
+  console.log(`  app — ${RAW3.split("/").pop()}: ${r3.order}\n        card: ${c3.status} · Strength ${c3.strength}`);
+  check("(c) a chosen 0 is remembered: the next frame of the lens lays nothing at decode", laid(r3.order) === 0, r3.order || "no Correction order line");
+  check("(c) and its Strength opens at 0", Number(c3.strength) === 0, `Strength ${c3.strength}`);
+  check(`the card says what this frame's profile knows too: "${knows(ex3)}"`, c3.status.includes(` · ${knows(ex3)}`), c3.status || "no status");
 } finally { await b.close(); }
 console.log(failed ? `\n${failed} failed` : "\nall checks passed"); process.exit(failed ? 1 : 0);

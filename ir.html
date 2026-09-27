@@ -935,10 +935,11 @@
                    under the slider is what this item exists to avoid — the card
                    is four controls deep inside a tab. So the sentence is here,
                    one press away, and what it says is the part no label can:
-                   the slider opens at 0 rather than at full, and where it is
-                   left is remembered per lens. -->
+                   the slider opens at full unless a strength was chosen for
+                   the lens, and where it is left is remembered per lens, at
+                   every aperture (decision 015, reversed 2026-09-26). -->
               <button type="button" class="inline-btn toggletip" data-tip="tipHsStrength" data-tip-for="hsStrength" aria-controls="tipHsStrength" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
-              <p class="tip-body" id="tipHsStrength" hidden>How much of the matched profile's correction this photograph gets. It opens at <strong>0</strong> &mdash; the correction waits to be asked for &mdash; <strong>1</strong> is the profile exactly as it was measured, and past 1 pushes further than the measurement, which a look that magnifies the hot-spot can want. What it can move depends on what the profile knows: the line above says <em>brightness only</em> or <em>brightness and colour</em>, and it also prints what the correction is doing to the middle of this frame right now. Where you leave it is remembered for that lens at that aperture and comes back on the next photograph taken with it.</p>
+              <p class="tip-body" id="tipHsStrength" hidden>How much of the matched profile's correction this photograph gets. It opens at <strong>1</strong>, the profile exactly as it was measured, unless you have chosen a strength for this lens; <strong>0</strong> takes the correction off, and past 1 pushes further than the measurement, which a look that magnifies the hot-spot can want. What it can move depends on what the profile knows: the line above says <em>brightness and colour</em>, <em>colour only</em> or <em>brightness only</em>, and it also prints what the correction is doing to the middle of this frame right now. Where you leave it is remembered for that lens, at every aperture, and comes back on the next photograph taken with it.</p>
               <button id="hsBypassBtn" type="button" class="toggle" aria-pressed="false">Bypass</button>
               <div id="hsPrompt" hidden>
                 <small class="note">Couldn't identify the lens from EXIF &mdash; pick it so the correction isn't skipped:</small>
@@ -960,7 +961,7 @@
                    above it, so it gets the same answer rather than a different
                    one (decision 024). -->
               <button type="button" class="inline-btn toggletip" data-tip="tipMyLensStrength" data-tip-for="myLensStrength" aria-controls="tipMyLensStrength" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
-              <p class="tip-body" id="tipMyLensStrength" hidden>How much of <em>your own</em> measurement this photograph gets. It opens at <strong>0</strong>, <strong>1</strong> is the profile exactly as you measured it, and past 1 pushes further than the measurement. Whether it moves the colour as well as the brightness depends on how the measurement was made &mdash; the line above says which, and why. Where you leave it is remembered against your profile and comes back on the next photograph taken with that lens. While this card is here it owns the correction outright: the shipped profile's card is put away rather than left with a second slider that moves nothing.</p>
+              <p class="tip-body" id="tipMyLensStrength" hidden>How much of <em>your own</em> measurement this photograph gets. It opens at <strong>1</strong>, the profile exactly as you measured it, unless you have chosen a strength for it; <strong>0</strong> takes it off, and past 1 pushes further than the measurement. Whether it moves the colour as well as the brightness depends on how the measurement was made &mdash; the line above says which, and why. Where you leave it is remembered against your profile and comes back on the next photograph taken with that lens. While this card is here it owns the correction outright: the shipped profile's card is put away rather than left with a second slider that moves nothing.</p>
               <button id="myLensBypass" type="button" class="toggle" aria-pressed="false">Bypass</button>
               <button id="myLensForget" type="button">Forget this profile</button>
             </div>

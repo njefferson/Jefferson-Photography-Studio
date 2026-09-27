@@ -1,8 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=63bc0e468fac2e3c
-diffhash=f0127a168bbc4d87
-verdict=IN-SCOPE: plan item 1, the start screen says what it is doing, repaired for a browser whose every build is slow
-# Repairs plan item 1's "The start screen says what it is doing" (built in c403331) on a device defect: Firefox 156 on a PC, same picture-code key recorded, no parallel compile, 44.8 s held with no words. main.ts stores the last build's duration beside the key and treats a last build of 1 s or more as likely slow; buildStartedAt and the graphicsReady write only measure and persist it. build-wait-walk.mjs gains arm 5b (a second start after a slow one, seen failing against 23cc31e and passing now), and arms 1 to 4 are adjusted to the new record shape. Nothing else touched.
-# 
-# The generated docs/ARCHITECTURE.md is regenerated for main.ts's new line count, which the watcher named in advance as the one generated file this change may touch.
+planhash=242728e917f78b73
+diffhash=fdd3642158a0f076
+verdict=IN-SCOPE: plan item 1, the lens correction opens on at full strength, remembered per lens, with its card wording, preview bump and walk
+# Plan item 1, the lens correction opens on (015). One function, lensStrengthAtOpen, decides the at-open strength and is routed through lensPlanFor, initMyLens, initHotspot, makeThumb, batchParamsFor and establishFreshEdit's as-opened baseline; showUntouched zeroes the strengths explicitly so the bare-decode hold is unchanged. The memory is per lens and stores 0; the card says "colour only" without a brightness curve; ir.html's toggletips match; PREVIEW_PIPELINE is 64, and the preview gate now hashes lensPlanFor and lensStrengthAtOpen so the bump is enforced for the new rule. lens-order-walk is item 1's verification (failed six times against 7ba1432, passes now). No normalisation, no curve/matcher/decode change, nothing from items 2 or 3.
