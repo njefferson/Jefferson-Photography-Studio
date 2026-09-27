@@ -21,12 +21,24 @@ let toastTimer = 0;
 
 /** A small, self-styled confirmation (used for the copy-link fallback and the
  *  look-sharing flows), so it looks the same on every surface regardless of
- *  that page's stylesheet. */
+ *  that page's stylesheet.
+ *
+ *  Takes `msg`, the words, and `ms`, how long they stay. Returns nothing; it
+ *  mounts one reused element and fades it out after `ms`. What callers rely
+ *  on: the words land somewhere the reader can SEE, which with a modal open
+ *  means inside the modal on top — see the host choice below. */
 export function toast(msg: string, ms = 2200): void {
   // A modal <dialog> paints in the top layer, ABOVE any fixed element — a
   // toast confirming a copy made from inside Help was invisible (review find,
   // 2026-07-15). Mount the toast inside the open dialog when there is one.
-  const host = document.querySelector<HTMLElement>("dialog[open]") ?? document.body;
+  //
+  // AND THE ONE ON TOP when two are open, which is the one holding the focus: a
+  // modal makes everything under it inert, so focus can only be in the top one.
+  // The first open dialog in DOCUMENT order is not that — a Keep refused while
+  // the busy card was up put its toast inside the busy card, under the Quick
+  // look the reader was pressing it in (decision 075).
+  const focused = document.activeElement?.closest<HTMLElement>("dialog[open]");
+  const host = focused ?? document.querySelector<HTMLElement>("dialog[open]") ?? document.body;
   if (toastEl && toastEl.parentElement !== host) { toastEl.remove(); toastEl = null; }
   if (!toastEl) {
     toastEl = document.createElement("div");

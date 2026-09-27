@@ -68,6 +68,31 @@ function open(): Promise<IDBDatabase> {
   });
 }
 
+/** THE ERROR A FAILED WRITE ACTUALLY CARRIES (decision 075's review).
+ *
+ *  Takes `ev`, the error event as it reaches the transaction, `t`, the
+ *  transaction, and `fallback`, the words to use when neither says anything.
+ *  Returns the failed REQUEST's own error first. A request's error event
+ *  bubbles to the transaction BEFORE the transaction's own `error` is set — the
+ *  specification sets that only when the abort that follows is processed — so
+ *  reading `t.error` in `onerror` gives null. WebKit refuses a write for room at
+ *  the request itself ("Failed to PutOrAdd in database because not enough space
+ *  for domain"), so on an iPad every such refusal arrived as a bare "write
+ *  failed" that nothing could recognise as the device being full.
+ *
+ *  EXCEPT an AbortError. When a transaction is aborted for a reason of its own
+ *  while requests are still queued, the abort sets `t.error` to that reason
+ *  FIRST and then fails each queued request with a bare AbortError — so there
+ *  the transaction's error is the one that says what happened.
+ *
+ *  What callers rely on: a QuotaExceededError comes back AS a
+ *  QuotaExceededError, whichever engine reported it and whichever way. */
+function writeError(ev: Event | null, t: IDBTransaction, fallback: string): unknown {
+  const fromRequest = (ev?.target as IDBRequest | null)?.error ?? null;
+  if (fromRequest && fromRequest.name !== "AbortError") return fromRequest;
+  return t.error ?? fromRequest ?? new Error(fallback);
+}
+
 function req<T>(rq: IDBRequest): Promise<T> {
   return new Promise((res, rej) => {
     rq.onsuccess = () => res(rq.result as T);
@@ -119,7 +144,7 @@ export async function addPhoto(meta: PhotoMeta, bytes: Uint8Array): Promise<void
       const t = db.transaction([META, CHUNKS], "readwrite", { durability: "strict" } as IDBTransactionOptions);
       t.oncomplete = () => res();
       t.onabort = () => rej(t.error ?? new Error("write aborted"));
-      t.onerror = () => rej(t.error ?? new Error("write failed"));
+      t.onerror = (ev) => rej(writeError(ev, t, "write failed"));
       t.objectStore(META).add(meta);
       const cs = t.objectStore(CHUNKS);
       for (let i = 0, idx = 0; i < bytes.length; i += CHUNK, idx++) {
@@ -140,8 +165,8 @@ export async function setEdit(id: string, edit: string | null): Promise<void> {
   try {
     await new Promise<void>((res, rej) => {
       const t = db.transaction(META, "readwrite", { durability: "strict" } as IDBTransactionOptions);
-      t.onerror = () => rej(t.error);
-      t.onabort = () => rej(t.error);
+      t.onerror = (ev) => rej(writeError(ev, t, "write failed"));
+      t.onabort = () => rej(t.error ?? new Error("write aborted"));
       const store = t.objectStore(META);
       const g = store.get(id);
       g.onsuccess = () => {
@@ -277,7 +302,7 @@ export async function setThumb(id: string, thumb: ArrayBuffer): Promise<void> {
       const t = db.transaction(META, "readwrite", { durability: "strict" } as IDBTransactionOptions);
       t.oncomplete = () => res();
       t.onabort = () => rej(t.error ?? new Error("write aborted"));
-      t.onerror = () => rej(t.error ?? new Error("write failed"));
+      t.onerror = (ev) => rej(writeError(ev, t, "write failed"));
       const store = t.objectStore(META);
       const rq = store.get(id);
       rq.onsuccess = () => {
@@ -300,16 +325,18 @@ export async function setMark(id: string, mark: PhotoMeta["mark"]): Promise<void
   notePending(id, mark);
   const db = await open();
   try {
+    let found = false;
     await new Promise<void>((res, rej) => {
       const t = db.transaction(META, "readwrite", { durability: "strict" } as IDBTransactionOptions);
       t.oncomplete = () => res();
       t.onabort = () => rej(t.error ?? new Error("write aborted"));
-      t.onerror = () => rej(t.error ?? new Error("write failed"));
+      t.onerror = (ev) => rej(writeError(ev, t, "write failed"));
       const store = t.objectStore(META);
       const rq = store.get(id);
       rq.onsuccess = () => {
         const meta = rq.result as PhotoMeta | undefined;
-        if (!meta) return; // photo removed under us — nothing to mark
+        if (!meta) return; // no row (yet) — nothing to mark
+        found = true;
         // Written as an ABSENT field rather than undefined-valued, so a cleared
         // verdict and one that was never made are the same row.
         const next = { ...meta };
@@ -318,7 +345,11 @@ export async function setMark(id: string, mark: PhotoMeta["mark"]): Promise<void
         store.put(next);
       };
     });
-    clearPending(id, mark); // the row is really on the disk now
+    // ONLY WHEN IT LANDED ON A ROW (decision 075's review). A photo whose own
+    // write was refused for room has no row until it is written again, and a
+    // press in between used to clear the safety copy here although nothing had
+    // been stored — so the verdict survived neither the retry nor a reload.
+    if (found) clearPending(id, mark); // the row is really on the disk now
   } finally {
     db.close();
   }
@@ -356,12 +387,24 @@ export async function removePhoto(id: string): Promise<void> {
     await new Promise<void>((res, rej) => {
       const t = db.transaction([META, CHUNKS], "readwrite");
       t.oncomplete = () => res();
-      t.onerror = () => rej(t.error);
+      t.onerror = (ev) => rej(writeError(ev, t, "delete failed"));
+      t.onabort = () => rej(t.error ?? new Error("delete aborted")); // a commit that failed: see forgetSession
       t.objectStore(META).delete(id);
       t.objectStore(CHUNKS).delete(IDBKeyRange.bound([id, 0], [id, Infinity]));
     });
   } finally {
     db.close();
+  }
+}
+
+/** THE DATABASE COULD NOT BE REACHED AT ALL (decision 075's review) — not a
+ *  clear that failed, but no connection to clear with: WebKit's "Connection to
+ *  Indexed Database server lost" after the page sat in the background, or a
+ *  backing store that will not open. Nothing stored can be reached, so nothing
+ *  can be mixed into; `cause` is the browser's own error. */
+export class StorageUnreachable extends Error {
+  constructor(readonly cause: unknown) {
+    super(`this device's storage could not be reached (${(cause as Error)?.message ?? String(cause)})`);
   }
 }
 
@@ -386,15 +429,35 @@ export async function removePhoto(id: string): Promise<void> {
  *  costs space until the next launch, never correctness.
  *
  *  Returns the ids it forgot, so the sweep can go straight to them instead of
- *  looking for orphans. */
+ *  looking for orphans. Rejects with a `StorageUnreachable` when the database
+ *  cannot be opened or read at all — there is then nothing this page can
+ *  reach to clear, or to mix a new set into — and with the clear's own error
+ *  when the index was reached but could not be cleared (a request failed or
+ *  the commit aborted). It always settles, which is what `resetSessionState`
+ *  — and every open waiting behind it — relies on, and the two rejections are
+ *  what it tells apart. */
 export async function forgetSession(): Promise<string[]> {
-  const db = await open();
+  let db: IDBDatabase;
+  let ids: string[];
   try {
-    const ids = await req<string[]>(db.transaction(META).objectStore(META).getAllKeys() as IDBRequest);
+    db = await open();
+  } catch (err) {
+    throw new StorageUnreachable(err);
+  }
+  try {
+    try {
+      ids = await req<string[]>(db.transaction(META).objectStore(META).getAllKeys() as IDBRequest);
+    } catch (err) {
+      throw new StorageUnreachable(err);
+    }
     await new Promise<void>((res, rej) => {
       const t = db.transaction(META, "readwrite");
       t.oncomplete = () => res();
-      t.onerror = () => rej(t.error);
+      t.onerror = (ev) => rej(writeError(ev, t, "delete failed"));
+      // A CLEAR THAT FAILS AT THE COMMIT fires `abort` and nothing else — no
+      // request failed — and without this the promise never settled: a Keep or
+      // Done on a full disk waited for ever with the one-open guard held.
+      t.onabort = () => rej(t.error ?? new Error("delete aborted"));
       t.objectStore(META).clear();
     });
     void dropBytes(ids); // not awaited: this is the whole point of the split
@@ -407,13 +470,50 @@ export async function forgetSession(): Promise<string[]> {
   }
 }
 
+let sweeping: Promise<void> | null = null;
 /** The one sweep, and the promise anything that needs it finished can await.
  *  A second call while one is running joins it rather than starting a rival —
  *  two sweeps deleting the same ranges is wasted work at best and a pair of
- *  transactions fighting over one store at worst. */
-let sweeping: Promise<void> | null = null;
+ *  transactions fighting over one store at worst.
+ *
+ *  Takes nothing. Returns a promise that settles when every sweep started so
+ *  far has finished — at once when none is running — and never rejects, so an
+ *  `await` on it cannot throw into the path that waits. What that path relies
+ *  on: once it settles, `sweepProgress()` reads null until the next sweep. */
 export function sweepSettled(): Promise<void> {
   return sweeping ?? Promise.resolve();
+}
+
+/** HOW FAR THE SWEEP HAS GOT, for anything that has to wait on it (decision 075).
+ *
+ *  The delete ran for minutes on a reader's PC and nothing could say so: one
+ *  transaction per photo, no progress, no words, and the report printed "none in
+ *  progress" throughout. This is the count that lets a wait say how far along it
+ *  is, and lets the report say it too. */
+export interface SweepProgress {
+  /** Photos whose delete has finished — or given up, which a later sweep finds
+   *  again — since this run of sweeps began. */
+  done: number;
+  /** Photos this run of sweeps has been asked to free, joined sweeps included. */
+  total: number;
+  /** `performance.now()` when this run began. */
+  since: number;
+}
+let progress: SweepProgress | null = null;
+
+/** Read the sweep's progress while it runs.
+ *
+ *  Takes nothing and changes nothing. Returns a COPY of the running count — so
+ *  a caller holding it cannot move the real one — or null when no sweep is
+ *  running. Sweeps started while one is running are one run: their photos join
+ *  `total`, and the count is cleared only when the last of them settles.
+ *
+ *  What it has to satisfy: `done <= total` at every read, and non-null exactly
+ *  while `sweepSettled()` is still pending. `addToSession` in main.ts polls it
+ *  to write "N of M" into the busy card while it waits, and the diagnostic's
+ *  "Freeing storage" line reads it; both read null as "nothing to free". */
+export function sweepProgress(): SweepProgress | null {
+  return progress ? { ...progress } : null;
 }
 
 /** Delete the chunks of photos that are no longer in the index.
@@ -424,28 +524,43 @@ export function sweepSettled(): Promise<void> {
  *  queues behind it. */
 function dropBytes(ids: string[]): Promise<void> {
   if (!ids.length) return sweepSettled();
+  // Counted from the moment it is ASKED FOR, not when it starts: a sweep queued
+  // behind another is still space the reader is waiting to get back.
+  progress ??= { done: 0, total: 0, since: performance.now() };
+  progress.total += ids.length;
   const run = (async () => {
-    await sweepSettled(); // never two at once on the same store
-    const db = await open();
+    let left = ids.length;
     try {
-      for (const id of ids) {
-        await new Promise<void>((res) => {
-          const t = db.transaction(CHUNKS, "readwrite");
-          t.oncomplete = () => res();
-          // A failed delete costs space, not correctness — the next sweep finds
-          // it again. Never reject: one unlucky row must not strand the rest.
-          t.onerror = () => res();
-          t.onabort = () => res();
-          t.objectStore(CHUNKS).delete(IDBKeyRange.bound([id, 0], [id, Infinity]));
-        });
+      await sweepSettled(); // never two at once on the same store
+      const db = await open();
+      try {
+        for (const id of ids) {
+          await new Promise<void>((res) => {
+            const t = db.transaction(CHUNKS, "readwrite");
+            t.oncomplete = () => res();
+            // A failed delete costs space, not correctness — the next sweep finds
+            // it again. Never reject: one unlucky row must not strand the rest.
+            t.onerror = () => res();
+            t.onabort = () => res();
+            t.objectStore(CHUNKS).delete(IDBKeyRange.bound([id, 0], [id, Infinity]));
+          });
+          left--;
+          if (progress) progress.done++;
+        }
+      } finally {
+        db.close();
       }
     } finally {
-      db.close();
+      // Photos this run never reached (the database would not open) are neither
+      // freed nor still coming, so they leave the total rather than hold the
+      // count short of it for ever. The next start's sweep finds them.
+      if (left && progress) progress.total -= left;
     }
   })();
   // Clear the slot only if it is still OURS: a sweep started after this one
-  // owns it by then, and blanking it would let a third start alongside.
-  const mine: Promise<void> = run.catch(() => {}).finally(() => { if (sweeping === mine) sweeping = null; });
+  // owns it by then, and blanking it would let a third start alongside. The
+  // count goes with the slot, for the same reason: it belongs to the last one.
+  const mine: Promise<void> = run.catch(() => {}).finally(() => { if (sweeping === mine) { sweeping = null; progress = null; } });
   sweeping = mine;
   return mine;
 }

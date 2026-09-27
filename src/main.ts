@@ -18,7 +18,7 @@ import "./style.css";
 // The shared chrome stylesheet. The editor does not use verdlg.ts yet — see the
 // note there — but it uses .more-row, which now lives beside it.
 import "./verdlg.css";
-import { importFile, sniff, refineKind, isZip, type ImportedFile, type ImageKind } from "./import";
+import { importFile, sniff, refineKind, isZip, readLimitMs, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, lumNormalize } from "./decode";
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
@@ -330,7 +330,8 @@ function sayReady(): void {
 async function editorReady(): Promise<void> {
   if (renderer.built) return;
   if (graphicsFailure !== null) throw new EditorUnavailable(graphicsFailure);
-  if (busy.open) busyText.textContent = PREPARING_OPEN;
+  if (openOwnsCard()) sayOpen(PREPARING_OPEN); // the open's card: its sentence, until the next
+  else if (busy.open) busyText.textContent = PREPARING_OPEN;
   else showBusy(PREPARING_OPEN);
   try {
     await graphicsReady;
@@ -3476,6 +3477,12 @@ function wireVersionMenu() {
   document.getElementById("verClose")!.addEventListener("click", () => dlg.close());
   const open = async () => {
     text.value = "Gathering…";
+    // ON TOP, EVEN WHEN IT IS ALREADY OPEN (decision 075's review). showModal on
+    // an open modal returns without moving it, so a report left open under a
+    // busy card raised later stayed under it, and the card's own "What's
+    // happening?" did nothing a reader could see. Closed and opened again, it
+    // goes to the top of the stack; closing it returns to the card.
+    if (dlg.open) dlg.close();
     dlg.showModal();
     // Counts only. What is open is useful; WHICH photos is nobody's business
     // but the reader's, and a report that carries a filename is a report that
@@ -3587,7 +3594,11 @@ function wireVersionMenu() {
       // with nothing anywhere saying why. Reported from a PC on 2026-09-18 as
       // thumbnails not coming across; the strip's own line said "adding 12 of
       // 47" off the edge of the screenshot, and the report said nothing.
-      { k: "Adding photos", v: adding ? `reading ${adding.index} of ${adding.total} — ${adding.name} · ${((performance.now() - adding.since) / 1000).toFixed(0)}s on this file so far` : "none in progress" },
+      { k: "Adding photos", v: addWaiting ? `${addWaiting.says} · ${((performance.now() - addWaiting.since) / 1000).toFixed(0)}s so far` : adding ? `reading ${adding.index} of ${adding.total} — ${adding.name} · ${((performance.now() - adding.since) / 1000).toFixed(0)}s on this file so far` : "none in progress" },
+      // THE LAST SESSION'S DELETE, while it runs (decision 075). It is what a
+      // keep straight after ending a session can wait on, and on a reader's PC
+      // it ran for minutes with this report saying nothing at all about it.
+      { k: "Freeing storage", v: freeingLine() },
       { k: "File pickers", v: pickerLine() },
       // Kept rather than shown once and lost — see recordFailure.
       { k: "Last failure", v: lastFailure },
@@ -3605,6 +3616,31 @@ function wireVersionMenu() {
   // version number: the report carries what the driver said, and that panel is
   // where the reader who needs it is standing. The dialog opens above it.
   document.getElementById("glBrokenReport")?.addEventListener("click", () => void open());
+  // AND FROM THE BUSY CARD WHILE IT WAITS ON THE LAST SESSION'S DELETE (decision
+  // 075). That card is modal and has no other button, so for as long as the
+  // delete runs — minutes, on the PC that reported it — it covers the version
+  // number and the (i) alike. The report opens above it; closing the report
+  // goes back to the card, still counting.
+  //
+  // THE WAY BACK FROM THE REPORT (decision 075's review). The report returns
+  // the focus to this button, and the wait it belongs to often ends while the
+  // report is being read: the button is hidden, the card may be down, and the
+  // focus fell to <body>. When the report closes with the focus nowhere, it
+  // goes to the card while the card is up — its other offer, or its sentence —
+  // and otherwise to where the reader was before the card rose, or failing
+  // that the editor's own chrome (`focusLive`).
+  document.getElementById("busyReport")?.addEventListener("click", () => {
+    const opener = busyOpener;
+    const onClose = () => {
+      if (dlg?.open) return; // the close of open()'s own reopen, arriving late
+      dlg?.removeEventListener("close", onClose);
+      if (!focusLost()) return;
+      if (busy.open) focusLive([busySkip, busyReport, busyText]);
+      else focusLive([opener, sessionDone, sessionReject, sessionPick, sessionThumbs.querySelector(".session-thumb:not([disabled])")]);
+    };
+    dlg?.addEventListener("close", onClose);
+    void open();
+  });
   copyBtn.addEventListener("click", async () => {
     const was = copyBtn.textContent;
     try {
@@ -11426,6 +11462,13 @@ const sessionProgressBar = $("sessionProgressBar") as HTMLDivElement;
 // flickering strip after that. `adding` makes the progress the strip's subject
 // for as long as it lasts.
 let adding: { done: number; total: number; index: number; name: string; since: number } | null = null;
+// A SET WAITING ON SOMETHING OTHER THAN A READ, in words (decision 075). Before
+// the first file a keep can wait for the editor and for the last session's
+// delete, and part-way through a set a photo whose write failed while that
+// delete ran waits for it to finish before it is written again. The report said "none
+// in progress", or named a file it was not reading, through all of it — which
+// is what a reader's report said while the delete ran for minutes.
+let addWaiting: { says: string; since: number } | null = null;
 // Photos whose bytes are still being written to storage. They are in the strip
 // and on screen already — measured, the strict-durability commit is ~70% of the
 // time it takes to open a set, and it does not have to be waited on before the
@@ -12092,17 +12135,61 @@ function embeddedPreview(bytes: Uint8Array, kind: ImageKind): Uint8Array | null 
  *  Callers: `openPicked`, which must ask this BEFORE the zip import path, since
  *  a keep file is a perfectly valid zip and would otherwise be opened as an
  *  archive of raws and fail with the wrong message. */
-async function isKeepFile(f: File): Promise<boolean> {
+async function isKeepFile(f: File, read: ReadBytes = plainRead): Promise<boolean> {
   if (f.size < 64) return false;
-  return sniffKeep(new Uint8Array(await f.slice(0, KEEP_SNIFF_BYTES).arrayBuffer()));
+  return sniffKeep(new Uint8Array(await read(f.slice(0, KEEP_SNIFF_BYTES))));
 }
 
+/** How a sniff or a look reads its bytes: plainly, or through `readOrSkip`. */
+type ReadBytes = (b: Blob) => Promise<ArrayBuffer>;
+const plainRead: ReadBytes = (b) => b.arrayBuffer();
+
+/** WHEN A HEAD-SNIFF THAT HAS NOT FINISHED OFFERS A WAY OUT (decision 075). A
+ *  handful of bytes off the front of a file; ten seconds of visible time is far
+ *  beyond any read that is going to finish soon. After it the busy card names
+ *  the file and offers to skip it — it never decides for the reader. A sniff
+ *  that timed out used to count as "not a keep file", and a keep file still
+ *  downloading then opened as its bare original, its edit unread. */
+const SNIFF_OFFER_MS = 10_000;
+/** The reader a sniff inside an open uses: the offer, named for the file. */
+const sniffRead = (name: string): ReadBytes => (b) => readOrSkip(b, name, SNIFF_OFFER_MS);
+
 /** A cheap head-sniff: is this picked file a shared look (.ipslook JSON)?
- *  Reads only the first bytes; anything big is not a look. */
-async function isLookFile(f: File): Promise<boolean> {
+ *  Reads only the first bytes, through `read`; anything big is not a look. */
+async function isLookFile(f: File, read: ReadBytes = plainRead): Promise<boolean> {
   if (f.size === 0 || f.size > 64 * 1024) return false;
-  const head = new Uint8Array(await f.slice(0, 32).arrayBuffer());
+  const head = new Uint8Array(await read(f.slice(0, 32)));
   return sniffLook(head);
+}
+
+/** A look file's text, through `read` — a look is at most 64 KB. */
+async function lookText(f: File, read: ReadBytes = plainRead): Promise<string> {
+  return new TextDecoder().decode(await read(f));
+}
+
+/** The words for a look that did not come in, or null when it did — the
+ *  receive dialog is open by then. Takes the look `f` and how to `read` it. */
+async function receiveLookFile(f: File, read: ReadBytes): Promise<string | null> {
+  try {
+    const p = parseLookText(await lookText(f, read));
+    if (p) { openLookReceive(p); return null; }
+    return "That look file couldn't be read — it may be damaged or cut short.";
+  } catch (err) {
+    return err instanceof SkippedRead
+      ? `${f.name} was skipped — it had not finished reading.`
+      : "That look file could not be read — it may still be downloading.";
+  }
+}
+
+/** Several things to say about one drop, said ONCE: `toast` keeps one message,
+ *  and three calls in one task paint only the last. Longer for more. */
+function toastAll(said: string[]): void {
+  if (said.length) toast(said.join(" "), 3200 + 1600 * (said.length - 1));
+}
+
+/** The files an open could not read, said in the words the end of an open uses. */
+function sayUnread(unread: string[]): void {
+  if (unread.length) alert(`${unread.length} couldn't be opened:\n` + unread.join("\n"));
 }
 
 /** Route the text of a shared look (from a file, link, or pasted code) into
@@ -12135,16 +12222,189 @@ function inShutterOrder(files: File[]): File[] {
  *  forty and arrived at a session where nothing was picked. */
 type ReadyFile = { thumb?: ArrayBuffer; mark?: SessionPhoto["mark"] };
 
+/** ONE OPEN AT A TIME (decision 075). Taken for the whole of an open — from
+ *  the press to the last photo of a set stored — by every path that replaces
+ *  or fills the session: `openPicked` (the two pickers, a drop, a paste and the
+ *  Quick look's Keep), `openGalleryPhoto` (a practice photo) and
+ *  `resumeSession`. Each takes it before its first await and releases it in a
+ *  `finally`, so a throw or an early return cannot leave it set.
+ *
+ *  Why it exists: a Keep that sat silent behind the last session's delete was
+ *  pressed again, and the second press queued a second whole open behind the
+ *  first. When the delete finished both ran, and the session held every photo
+ *  twice. Two opens at once share `adding`, `sessionPhotos` and the busy card,
+ *  and nothing in either was written to have a twin — and a practice photo or
+ *  a resume landing under a set still being stored reset the session beneath
+ *  the loop that was writing it, which then wrote the ended set back.
+ *
+ *  `openingSays` is what the refusal tells the reader, set by whoever took it
+ *  and made more exact by `addToSession` once a set is known to be going in. */
+let openingSet = false;
+let openingSays = "";
+/** Until the kind of open is known: a drop may turn out to be one photo, a keep
+ *  file, a look or a set, and the refusal must not name one it is not. */
+const SAYS_OPENING = "Already opening files — wait for this to finish.";
+/** From the moment a set is known to be going in (the top of `addToSession`). */
+const SAYS_ADDING = "Already adding photos — wait for this set to finish.";
+const SAYS_PRACTICE = "Already opening a practice photo — wait for it to finish.";
+const SAYS_RESUMING = "Already resuming your session — wait for it to finish.";
+/** A drop or paste while ANOTHER flow's card is up and WORKING — a batch, a
+ *  scan, Done, a photo's "Loading…" — none of which holds the one-open guard. */
+const SAYS_BUSY = "Wait for what is running to finish.";
+/** WHETHER THE LAST `openPicked` STOPPED BEFORE ANYTHING BEGAN — refused, the
+ *  question dismissed, or the last session not cleared — so a caller holding
+ *  work of its own (the Quick look's picks) can hand it back rather than lose
+ *  it. Cleared at the top of every `openPicked`. */
+let openNotBegun = false;
+/** Called once, the moment an open passes its last way of stopping without
+ *  touching anything (`openBegins`), and then forgotten — set by a caller that
+ *  holds work to let go of only then (the Quick look's Keep). */
+let whenOpenBegins: (() => void) | null = null;
+/** The open has begun for real: run and forget `whenOpenBegins`. */
+function openBegins(): void {
+  const f = whenOpenBegins;
+  whenOpenBegins = null;
+  f?.();
+}
+
+/** THE REFUSAL FOR A DROP OR PASTE WHILE ANOTHER FLOW'S CARD IS UP, in words
+ *  that match the card (decision 075's review). Takes nothing; returns the
+ *  sentence. A card with its spinner is working, and the reader is told to
+ *  wait (`SAYS_BUSY`); a card showing its own buttons — a finished batch or
+ *  export waiting on Save, a part-saved batch offering Continue — is waiting
+ *  on the READER, and "wait" was a silent wait of the kind 075 exists to end. */
+function busyRefusal(): string {
+  if (busyActions.hidden) return SAYS_BUSY;
+  if (!busySave.hidden) return pendingSaveIsBatch ? "Save the batch first, or close it." : "Save the image first, or close it.";
+  if (!busyContinue.hidden) return "Continue the batch first, or close it.";
+  return "Close what is on screen first.";
+}
+
+/** Refuse a second open while one is running, and say so.
+ *
+ *  Takes nothing. Returns true — after a toast saying what is running, in the
+ *  words of whoever holds the guard — when an open is in flight, in which case
+ *  the caller must change NOTHING and return; false when the caller may go on.
+ *  Asked at the top of `openPicked` (every picker, drop and paste, looks
+ *  included: a look is refused like anything else), `openGalleryPhoto` and
+ *  `resumeSession` (before any confirm), and by `keepQuickLook` BEFORE it
+ *  closes the Quick look, so a refused Keep leaves the reader's picks where
+ *  they were. The one place a refusal is said. While a set's read is offered
+ *  for skipping in the strip, the refusal names that way out too: the strip is
+ *  hidden in full view and under the Quick look, which is where a refusal can
+ *  still be met, and "wait" is no answer to a read that may never arrive. */
+function refuseSecondOpen(): boolean {
+  if (!openingSet) return false;
+  const names = skipInStrip ? [...stalledReads].map((r) => r.name) : [];
+  const way = names.length ? ` Or skip ${names.length === 1 ? names[0] : `${names[0]} and ${names.length - 1} more`} — it's beside Done.` : "";
+  toast((openingSays || SAYS_OPENING) + way, way ? 4800 : 3200);
+  return true;
+}
+
+/** Take the one-open guard, saying what a refused second open will be told.
+ *  Called synchronously, before the caller's first await; always paired with
+ *  `releaseOpen` in a `finally`. */
+function takeOpen(says: string): void {
+  openingSet = true;
+  openingSays = says;
+}
+
+/** Release the one-open guard. Only ever from the `finally` of whoever took it. */
+function releaseOpen(): void {
+  openingSet = false;
+  openingSays = "";
+}
+
+/** Open a picked set, unless one is already being opened (see `openingSet`).
+ *
+ *  @param files  what was picked, dropped, pasted or kept.
+ *  @param ready  what the Quick look already made of each file, when it came
+ *  from there.
+ *  @returns once the whole set is in — or at once, when another open is
+ *  running, after `refuseSecondOpen` has said so, or when another flow's busy
+ *  card is up, after saying what that card is (`busyRefusal`): everything in
+ *  the drop is refused, a
+ *  look included, nothing is read and that card is left alone. The flag is
+ *  taken before the first await, so two presses in the same moment cannot both
+ *  get past it. */
 async function openPicked(files: File[], ready?: Map<File, ReadyFile>) {
+  openNotBegun = false;
+  if (refuseSecondOpen()) { openNotBegun = true; return; }
+  // ANOTHER FLOW'S CARD (decision 075's review). No open holds the guard, so a
+  // card that is up is a batch's, a scan's, Done's or a photo's "Loading…",
+  // working — or a finished batch or export waiting on the reader's Save — and
+  // a drop or paste reaches here through that modal card. The open took it
+  // over: a look dropped during a batch closed the batch's card, its Stop and,
+  // at the end, its Save. The pickers cannot fire under a modal card, and the
+  // Quick look's Keep runs with none up, so this refuses only a drop or paste,
+  // in words that say what the card is (`busyRefusal`).
+  if (busy.open) { toast(busyRefusal(), 3200); openNotBegun = true; return; }
+  // NEUTRAL WORDS UNTIL THE KIND OF OPEN IS KNOWN (decision 075's review): this
+  // may be one photo, a keep file or a look, and "adding photos" said while one
+  // photo opened was untrue. `addToSession` names a set once there is one.
+  takeOpen(SAYS_OPENING);
+  let card = -1;
+  try {
+    return await openPickedNow(files, ready, (e) => { card = e; });
+  } finally {
+    // The card this open raised for its first reads, if nothing has taken it
+    // over since — a look, a keep file or a question answered "not now" leaves
+    // it up, and a card another flow raised is that flow's to close.
+    if (busy.open && busyEpoch === card) hideBusy();
+    releaseOpen();
+  }
+}
+
+/** The open itself — looks and keep files peeled off, then a lone photo or a
+ *  session (the paragraph above `ReadyFile`). Reached only through
+ *  `openPicked`, which holds `openingSet` around it; `cardRaised` is told the
+ *  card this raises before its first read, so `openPicked` can take it down on
+ *  any way out that leaves it up. */
+async function openPickedNow(files: File[], ready: Map<File, ReadyFile> | undefined, cardRaised: (epoch: number) => void) {
   files = inShutterOrder(files);
-  const parts = await Promise.all(files.map(async (f) => ({ f, isLook: await isLookFile(f).catch(() => false) })));
-  const lookFiles = parts.filter((p) => p.isLook).map((p) => p.f);
-  files = parts.filter((p) => !p.isLook).map((p) => p.f);
+  // THE CARD BEFORE THE FIRST READ (decision 075's review). The sniffs below
+  // read the head of every file, and a head that has not arrived — a cloud
+  // placeholder — needs somewhere to say so and to offer a way past it.
+  showOpenCard(`Opening ${files.length} file${files.length === 1 ? "" : "s"}…`);
+  cardRaised(busyEpoch);
+  // A FILE THE READER SKIPPED IS NEVER GUESSED AT. A sniff that has not
+  // finished offers Skip (readOrSkip); a skipped file leaves the set and is
+  // listed as one that could not be opened. It is never taken for a photo —
+  // a keep file still downloading used to open as its bare original that way.
+  const unread: string[] = [];
+  const sniffed = async (f: File, sniffer: (f: File, r: ReadBytes) => Promise<boolean>): Promise<"yes" | "no" | "skipped"> => {
+    try {
+      return (await sniffer(f, sniffRead(f.name))) ? "yes" : "no";
+    } catch (err) {
+      if (err instanceof SkippedRead) { unread.push(`${f.name} (${err.message})`); return "skipped"; }
+      return "no"; // a read that FAILED is the photo read's to report, with its own words
+    }
+  };
+  const lookSniff = await Promise.all(files.map((f) => sniffed(f, isLookFile)));
+  const lookFiles = files.filter((_, i) => lookSniff[i] === "yes");
+  files = files.filter((_, i) => lookSniff[i] === "no");
+  // Everything there is to say about the looks in this drop, said ONCE
+  // (`toastAll`) — and only once the card that would swallow it is down: here
+  // when nothing else is left to open, otherwise wherever the open takes its
+  // card down (`openSorted`, `addToSession`, the question's Escape).
+  const said: string[] = [];
   if (lookFiles.length) {
-    // One receive dialog at a time; extra look files are announced honestly.
-    receiveLookText(await lookFiles[0].text(), "look file");
-    if (lookFiles.length > 1) toast(`Opened 1 of ${lookFiles.length} look files — import the others one at a time.`, 3200);
-    if (!files.length) return;
+    // One receive dialog at a time; extra look files are announced honestly —
+    // and never as "opened 1 of" when the first did not open.
+    const why = await receiveLookFile(lookFiles[0], sniffRead(lookFiles[0].name));
+    if (why) said.push(why);
+    if (lookFiles.length > 1) {
+      const n = lookFiles.length - 1;
+      said.push(why
+        ? `The other ${n} look file${n === 1 ? " was" : "s were"} not opened — import each one on its own.`
+        : `Opened 1 of ${lookFiles.length} look files — import the others one at a time.`);
+    }
+    // FILES STILL TO READ: the card goes back over the look dialog NOW, before
+    // the next sniff, as it did before the card rose ahead of the first read.
+    // Under the dialog, a stalled read's Skip could be neither seen nor pressed,
+    // and the dialog's Try applied the look to the photo being replaced.
+    // Restacked directly, not through showBusy, so whose card it is stays put.
+    if (files.length && lookRecvDlg.open && busy.open) { busy.close(); busy.showModal(); }
   }
   // KEEP FILES ARE PEELED OFF FOR THE SAME REASON LOOKS ARE (decision 043): a
   // keep file is not a photograph, it is a photograph AND the edit made of it,
@@ -12157,13 +12417,33 @@ async function openPicked(files: File[], ready?: Map<File, ReadyFile>) {
   // `.ipskeep` be picked at all, so the name changed; and a reader may rename a
   // file they own, which is the point of owning it. The manifest is the
   // archive's first entry precisely so this costs 64 bytes.
-  const keepSniff = await Promise.all(files.map(async (f) => await isKeepFile(f).catch(() => false)));
-  const keepFiles = files.filter((_, i) => keepSniff[i]);
-  if (keepFiles.length) {
-    files = files.filter((_, i) => !keepSniff[i]);
-    await openKeepFile(keepFiles[0]);
-    if (keepFiles.length > 1) toast(`Opened 1 of ${keepFiles.length} saved photos — open the others one at a time.`, 3200);
-    if (!files.length) return;
+  const keepSniff = await Promise.all(files.map((f) => sniffed(f, isKeepFile)));
+  const keepFiles = files.filter((_, i) => keepSniff[i] === "yes");
+  files = files.filter((_, i) => keepSniff[i] === "no");
+  // A KEEP FILE OPENS ONLY WHEN IT IS THE WHOLE DROP (decision 075's review).
+  // Opening one replaces the session on screen without asking; dropped together
+  // with photos it did exactly that, the "add or start new" question below was
+  // then skipped because the session it would have asked about was gone, and the
+  // photos that followed started a new session over it — deleting the stored
+  // one, its edits and its verdicts. So in a mixed drop it is not opened: it is
+  // named, and the photos go through the question against the real session.
+  if (keepFiles.length && (files.length || lookFiles.length)) {
+    for (const k of keepFiles) unread.push(`${k.name} (a saved photo — open it on its own)`);
+  }
+  const keepAlone = keepFiles.length > 0 && !files.length && !lookFiles.length;
+  if (!files.length) {
+    openBegins(); // nothing is left to stop for: the drop is dealt with here
+    // THE CARD FIRST, THEN THE WORDS: a toast mounts in the dialog holding the
+    // focus, and the card this open raised closes in the same task — so a look
+    // that could not be read said so inside a closed dialog, and was never seen.
+    if (!keepAlone && openOwnsCard()) hideBusy();
+    // THE ALERT BEFORE ANY TOAST: a toast raised just before an alert runs out
+    // its time behind it, unseen — the look's words here, and a keep file's
+    // "Opened".
+    sayUnread(unread);
+    toastAll(said);
+    if (keepAlone) await openKeepFile(keepFiles[0], keepFiles.length - 1);
+    return;
   }
   let append = false;
   if (sessionPhotos.length >= 2) {
@@ -12175,7 +12455,16 @@ async function openPicked(files: File[], ready?: Map<File, ReadyFile>) {
       "Add to this session",
       "Start a new session",
     );
-    if (ans === "dismiss") return; // Escape — change nothing (an exit confirm() never offered)
+    // Escape — change nothing (an exit confirm() never offered); the files this
+    // drop could not open are still named, a saved photo among them, and a
+    // look's words are said once the card is down.
+    if (ans === "dismiss") {
+      if (openOwnsCard()) hideBusy();
+      sayUnread(unread); // the alert first: a toast raised just before it runs out its time behind it
+      toastAll(said);
+      openNotBegun = true;
+      return;
+    }
     append = ans === "ok";
   }
 
@@ -12187,42 +12476,71 @@ async function openPicked(files: File[], ready?: Map<File, ReadyFile>) {
   // leave the screen held for the rest of the session.
   const releaseOpenWake = keepAwake();
   try {
-    return await openSorted(files, append, ready);
+    return await openSorted(files, append, ready, unread, said);
   } finally {
     releaseOpenWake();
   }
 }
 
-async function openSorted(files: File[], append: boolean, ready?: Map<File, ReadyFile>) {
+/** Open what is left of a drop once its looks and keep files are peeled off:
+ *  one photo on its own (ephemeral), or a set into the session.
+ *
+ *  Takes the photo `files`, whether to `append` them to the open session, what
+ *  the Quick look already made of each (`ready`), `unread` — the files the
+ *  drop set aside, each with why — and `said`, the drop's words about its
+ *  looks. Returns when the photo or the set is in. What callers rely on: every
+ *  way out, a throw included, names `unread` and says `said` once the open's
+ *  card is down, so nothing the drop set aside goes unmentioned. */
+async function openSorted(files: File[], append: boolean, ready?: Map<File, ReadyFile>, unread: string[] = [], said: string[] = []) {
   // Single file, not adding to a session → the fast, ephemeral path of old.
   if (files.length === 1 && !append) {
-    // THE EDITOR BEFORE THE RESET (decision 071). A photo picked while the
-    // editor is still being prepared waits here, and if it cannot be prepared
-    // the reset below never runs: a session left from last time stays there to
-    // resume, instead of being deleted for a photo that can never be shown.
-    await editorReady();
-    await resetSessionState(true); // drop a lone photo or un-resumed leftovers
-    hint.textContent = "Loading…";
-    hint.hidden = false;
-    // A 20-megapixel RAW takes seconds to decode; the welcome screen looked
-    // untouched for all of them. The spinner names the file so it is obvious
-    // WHICH photo is being read, not just that something is.
-    showBusy(`Opening ${files[0].name}…`);
     try {
-      return await openSingle(files[0]);
+      // THE EDITOR BEFORE THE RESET (decision 071). A photo picked while the
+      // editor is still being prepared waits here, and if it cannot be prepared
+      // the reset below never runs: a session left from last time stays there to
+      // resume, instead of being deleted for a photo that can never be shown.
+      await editorReady();
+      // Drop a lone photo or un-resumed leftovers. A clear the device refused
+      // does not stop a lone photo, which stores nothing and so can mix into
+      // nothing: the memory is reset alone, the old session stays on the device
+      // to resume, and the reader is told so in one line.
+      const reset = await resetSessionState(true);
+      if (!reset.ok) {
+        await resetSessionState(false);
+        said.push(notClearedWords(reset.err, " to resume"));
+      }
+      openBegins();
+      hint.textContent = "Loading…";
+      hint.hidden = false;
+      // A 20-megapixel RAW takes seconds to decode; the welcome screen looked
+      // untouched for all of them. The spinner names the file so it is obvious
+      // WHICH photo is being read, not just that something is.
+      showOpenCard(`Opening ${files[0].name}…`);
+      await openSingle(files[0]);
     } finally {
+      // EVERY WAY OUT, a throw included: a saved photo set aside in a mixed drop
+      // and a file skipped at its sniff were named only when this photo opened.
       hideBusy();
+      sayUnread(unread); // the alert first, the toast after it (see openPickedNow)
+      toastAll(said);
     }
+    return;
   }
 
-  await addToSession(files, append, ready);
+  await addToSession(files, append, ready, unread, said);
 }
+
+/** THE READ EVERY PATH HOLDING THE ONE-OPEN GUARD USES (decision 075): the
+ *  file's bytes, offered for skipping once `readLimitMs` of visible time has
+ *  passed without them — on the busy card, or in the session strip once a set
+ *  has a photo on screen (`repaintSkip`). Never a verdict — see `readOrSkip`. */
+const guardedRead = (f: File): Promise<ArrayBuffer> => readOrSkip(f, f.name, readLimitMs(f.size));
 
 /** The lone-photo open: ephemeral, not persisted (there is nothing to resume
  *  from a single edit). Split out of openPicked so the spinner around it has
  *  one exit rather than five. */
 async function openSingle(file: File) {
-  const imported = guardLocation(await importFile(file));
+  const imported = guardLocation(await importFile(file, guardedRead));
   if (imported.looksTranscoded) {
     hideBusy(); // the explanation must not land behind a spinner
     const msg =
@@ -12258,8 +12576,38 @@ async function openSingle(file: File) {
 
 /** Wipe in-memory session state (revoking thumbnails) and, unless appending,
  *  the stored session too — so storage always mirrors the live session and no
- *  orphaned photos linger to reappear on the next resume. */
-async function resetSessionState(clearStorage: boolean) {
+ *  orphaned photos linger to reappear on the next resume.
+ *
+ *  Takes `clearStorage`, whether the stored index goes too. Returns
+ *  `{ ok: true, reached }` once the session is gone from memory — `reached`
+ *  false when this page could not reach the device's storage at all
+ *  (`Session.StorageUnreachable`): there is then nothing it can clear, and
+ *  nothing reachable a new set could be mixed into, so the reset goes on as it
+ *  always did. Returns `{ ok: false, err }` — having touched NOTHING, in memory
+ *  or on the device — when the index was reached but the clear itself failed
+ *  (decision 075's review). What callers rely on: on `ok: false` the session is
+ *  still there, on the device and on screen. A set must not be written into
+ *  that index — written after a failed clear, it came back mixed with the old
+ *  one on the next resume — and nothing may say it was cleared. A lone or
+ *  practice photo, which stores nothing, may still open after a memory-only
+ *  reset, leaving the old session on the device to resume. */
+async function resetSessionState(clearStorage: boolean): Promise<{ ok: true; reached: boolean } | { ok: false; err: unknown }> {
+  // ONLY THE INDEX IS AWAITED, and FIRST. Forgetting the session is a few
+  // kilobytes and has to be done before the start screen returns, or a session
+  // that was just ended would still offer to resume; the photographs' bytes are
+  // unreachable from that moment and are swept in the background. What used to
+  // be here awaited both, so ending a session made the reader watch a delete
+  // measured at about 110 MB per second. It comes before the memory is wiped so
+  // that a clear the device refuses leaves the session exactly as it was.
+  let reached = true;
+  if (clearStorage) {
+    try {
+      await Session.forgetSession();
+    } catch (err) {
+      if (!(err instanceof Session.StorageUnreachable)) return { ok: false, err };
+      reached = false;
+    }
+  }
   for (const p of sessionPhotos) if (p.thumbUrl) URL.revokeObjectURL(p.thumbUrl);
   sessionPhotos = [];
   activePhotoId = null;
@@ -12274,23 +12622,430 @@ async function resetSessionState(clearStorage: boolean) {
   // them is the Done button.
   const standing = defaultLook();
   if (standing) sessionLook = standing;
-  // ONLY THE INDEX IS AWAITED. Forgetting the session is a few kilobytes and
-  // has to be done before the start screen returns, or a session that was just
-  // ended would still offer to resume; the photographs' bytes are unreachable
-  // from that moment and are swept in the background. What used to be here
-  // awaited both, so ending a session made the reader watch a delete measured
-  // at about 110 MB per second.
-  if (clearStorage) await Session.forgetSession().catch(() => {});
+  return { ok: true, reached };
+}
+
+/** THE WORDS FOR A CLEAR THE DEVICE REFUSED (`resetSessionState` returned
+ *  `ok: false`). Takes `err`, the clear's own error, and `after`, what happened
+ *  because of it. Returns the sentence: the last session is still on this
+ *  device, then `after` — and "free some space" only when the error says the
+ *  device is out of room, since nothing else does. */
+function notClearedWords(err: unknown, after: string): string {
+  return `The last session could not be cleared from this device, so it is still there${after}.${isQuotaError(err) ? " Free some space and try again." : ""}`;
+}
+
+/** HOW MUCH OF THE BROWSER'S ALLOWANCE A NEW SET NEEDS before it is written
+ *  beside a session whose bytes are still being deleted — as a multiple of the
+ *  set's own size (decision 075). Below this the keep waits for the delete;
+ *  above it, it goes straight on.
+ *
+ *  THE ALLOWANCE IS NOT FREE SPACE, and nothing on the web reports free space.
+ *  Every engine sets the figure `estimate()` returns from the disk's TOTAL
+ *  size, so that it cannot be used to fingerprint the device: Firefox's
+ *  temporary-storage limit is half the disk's capacity
+ *  (`GetTemporaryStorageLimit`, dom/quota/ActorsParent.cpp), WebKit's quota is
+ *  a ratio of the volume's capacity, and Chromium reports usage plus a fixed
+ *  10 GiB; MDN's "Storage quotas and eviction criteria" says the same. So this
+ *  check can only stop a keep that the BROWSER would refuse. A disk that is
+ *  nearly full while the allowance says otherwise is caught one step later, by
+ *  the retry in `addToSession`: a write that FAILS while the old bytes are
+ *  still being freed — whatever the error is called — waits for them, with
+ *  words, and is written again once. Whatever it is called, because WebKit
+ *  reports a full disk as an UnknownError ("Unable to store record in object
+ *  store"; its quota check compares usage with the capacity-based allowance
+ *  and never with free space), and only Chromium names it QuotaExceededError.
+ *
+ *  TWICE, because the set's own bytes are not all that lands:
+ *  - every write passes through the database's log before it reaches the file.
+ *    Firefox's IndexedDB runs SQLite in write-ahead mode and checkpoints every
+ *    5000 pages (`kMaxWALPages`, dom/indexedDB/ActorsParent.cpp); Chromium's
+ *    LevelDB keeps a log it compacts later. Space in use runs ahead of the data.
+ *  - each 30 KB chunk is a row with a key around it, each photo a meta row with
+ *    its thumbnail, and the background pass that follows stores the strip's
+ *    pictures as well;
+ *  - `estimate()` is an estimate by specification, and a browser may round it. */
+const SWEEP_ROOM_MARGIN = 2;
+
+/** How long the room check may take before it counts as not answering. A check
+ *  that does not answer is treated like a missing one — the keep waits for the
+ *  delete, with words — rather than becoming a new silent wait of its own. */
+const ROOM_CHECK_MS = 2000;
+
+/** Whether a set of `incoming` bytes fits in what the browser still allows
+ *  this site — its ALLOWANCE, not the disk's free space (SWEEP_ROOM_MARGIN).
+ *
+ *  @param incoming  the picked files' total bytes.
+ *  @returns `fits` — true only when `estimate()`'s quota less its usage is at
+ *  least SWEEP_ROOM_MARGIN times `incoming`, false when it is less, and null
+ *  when the browser cannot say (no estimate, a throw, no numbers, or no answer
+ *  within ROOM_CHECK_MS) — with `said`, the same verdict in words for the
+ *  report's "Last keep" line, which names the allowance as an allowance, never
+ *  as free space, names the figure it was compared with (SWEEP_ROOM_MARGIN
+ *  times the set), and says "no room" when nothing is left of it. Never throws.
+ *
+ *  What the caller relies on: only `fits === true` lets a keep skip the wait.
+ *  Unknown is the safe side, never the fast one. */
+async function roomForSet(incoming: number): Promise<{ fits: boolean | null; said: string }> {
+  const size = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(0)} MB` : b >= 1e3 ? `${Math.round(b / 1e3)} KB` : `${Math.round(b)} bytes`);
+  let timer = 0;
+  try {
+    if (!navigator.storage?.estimate) return { fits: null, said: "this browser has no room check" };
+    const est = await Promise.race([
+      navigator.storage.estimate(),
+      new Promise<null>((res) => { timer = window.setTimeout(() => res(null), ROOM_CHECK_MS); }),
+    ]);
+    if (!est) return { fits: null, said: `the room check did not answer in ${ROOM_CHECK_MS / 1000}s` };
+    if (typeof est.quota !== "number" || typeof est.usage !== "number") return { fits: null, said: "the room check came back without numbers" };
+    const left = est.quota - est.usage;
+    const fits = left >= incoming * SWEEP_ROOM_MARGIN;
+    // THE FIGURE COMPARED IS NAMED (decision 075's review): the keep asks for
+    // SWEEP_ROOM_MARGIN times its size, and a verdict that printed only the set
+    // read "1.2 GB more, not enough for 750 MB", contradicting itself.
+    const asked = `${SWEEP_ROOM_MARGIN === 2 ? "twice" : `${SWEEP_ROOM_MARGIN} times`} its size, ${size(incoming * SWEEP_ROOM_MARGIN)}`;
+    const said = left <= 0
+      ? `the browser allows no room for ${size(incoming)}`
+      : `the browser allows ${size(left)} more, ${fits ? "enough" : "not enough"} for ${size(incoming)} — a keep asks for ${asked}`;
+    return { fits, said };
+  } catch {
+    return { fits: null, said: "the room check failed" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The words for the wait on the last session's delete, spoken once. */
+const FREEING_WORDS = "Freeing the space the last session used…";
+
+/** WHICH USE OF THE BUSY CARD IS SPEAKING (decision 075's review). Bumped by
+ *  every `showBusy`, so a wait can tell the card it raised or adopted from a
+ *  card another flow has put up since — a photo's "Loading…", a scan — and
+ *  never write its words, its count or its buttons onto that one. */
+let busyEpoch = 0;
+/** The epoch of the card the running open raised for itself (`showOpenCard`).
+ *  A wait inside the open may adopt that card; any other is not its to speak on. */
+let openCardEpoch = -1;
+/** THE OPEN'S OWN SENTENCE, the one its card goes back to (decision 075's
+ *  review). Every wait that speaks on the open's card borrows it; when the last
+ *  one lets go, this is what the card says again. A copy each wait took when
+ *  it began was stale by the time it gave it back — claims do not end in the
+ *  order they began — and the card said it was freeing space after the space
+ *  was free. Written only through `showOpenCard` and `sayOpen`. */
+let openSays = "";
+/** Raise (or rewrite) the busy card as the running open's own. */
+function showOpenCard(text: string): void {
+  showBusy(text);
+  openCardEpoch = busyEpoch;
+  openSays = text;
+}
+/** Whether the card up now is the running open's own. */
+const openOwnsCard = (): boolean => busy.open && busyEpoch === openCardEpoch;
+/** A new sentence for the open, written on its card when the card is its own
+ *  and no wait is speaking there, and remembered either way for the moment the
+ *  last wait lets go. */
+function sayOpen(text: string): void {
+  openSays = text;
+  if (openOwnsCard() && !speaking.some((c) => c.epoch === busyEpoch)) busyText.textContent = text;
+}
+
+/** A WAIT THAT MUST BE SEEN, AND THE CARD IT SPEAKS ON.
+ *
+ *  Takes `words`, what the wait says, and `adopt`, whether the card up now is
+ *  the caller's own to speak on. Adopts it then; raises a card of its own when
+ *  none is up; and when another flow's card is up, leaves it alone. `tick()`
+ *  keeps the claim: when the card this wait was speaking on has been closed by
+ *  someone else it raises its own again — a wait gone silent because another
+ *  flow tidied up its card is the defect 075 exists to end — and it answers
+ *  whether the card up now is this wait's to write on. `owns()` answers the
+ *  same without raising anything, for a wait that is ending. `say()` writes only
+ *  there. `release()` takes down a card the wait raised; an adopted card it
+ *  gives back the words of the latest wait still speaking there, else — on the
+ *  open's own card — the open's sentence as it is NOW (`openSays`), else what
+ *  that card said before. A card that is someone else's by then is left alone.
+ *  What callers rely on: every claim is released exactly once, and a release
+ *  never puts back words that stopped being true while the claim was held. */
+function claimCard(words: string, adopt: boolean): { tick(): boolean; owns(): boolean; say(text: string): void; release(): void } {
+  let epoch = -1;
+  let raised = false;
+  let prior = "";
+  const me = { epoch: -1, text: words };
+  speaking.push(me);
+  const raise = () => { showBusy(words); epoch = me.epoch = busyEpoch; raised = true; };
+  if (busy.open && adopt) { epoch = me.epoch = busyEpoch; prior = busyText.textContent ?? ""; busyText.textContent = words; }
+  else if (!busy.open) raise();
+  const mine = () => busy.open && busyEpoch === epoch;
+  return {
+    tick() { if (!busy.open) raise(); return mine(); },
+    owns: mine,
+    say(text: string) { if (!mine()) return; me.text = text; if (busyText.textContent !== text) busyText.textContent = text; },
+    release() {
+      const at = speaking.indexOf(me);
+      if (at >= 0) speaking.splice(at, 1);
+      if (!mine()) return;
+      if (raised) { hideBusy(); return; }
+      const under = speaking.filter((c) => c.epoch === epoch).pop();
+      busyText.textContent = under ? under.text : epoch === openCardEpoch ? openSays : prior;
+    },
+  };
+}
+/** Every claim not yet released, in the order made, with the card it speaks on
+ *  and its words — so a release can hand the card back to whoever is still
+ *  speaking there rather than to a copy taken when it began. */
+const speaking: { epoch: number; text: string }[] = [];
+
+/** Wait for the last session's delete, SAYING so (decision 075).
+ *
+ *  Takes `adopt`: true when the card up now is the caller's own (the open's
+ *  card, before its first photo), false otherwise. Claims a card for the wait
+ *  (`claimCard`) and, while the card is its own:
+ *  - says FREEING_WORDS in the card's live region ONCE;
+ *  - counts "N of M old photos freed" from `Session.sweepProgress()` into
+ *    `#busyCount` — its own unit, so it cannot be read as the progress of a
+ *    file named in the sentence above it when a skip offer shares the card — a
+ *    line OUTSIDE the live region and hidden from assistive technology, every
+ *    250 ms. A count spoken on every change would drown the sentence it counts
+ *    for — the preparing line's seconds follow the same rule;
+ *  - shows `#busyReport`, the way into the §7f report, because the card is
+ *    modal and covers every other way in for as long as the wait lasts.
+ *  Under another flow's card it writes nothing, and raises its own again as
+ *  soon as that card closes. Returns when `Session.sweepSettled()` does, which
+ *  never rejects, with the count and the button taken off and a card it raised
+ *  taken down. */
+async function waitSayingFreeing(adopt: boolean): Promise<void> {
+  const card = claimCard(FREEING_WORDS, adopt);
+  const count = () => {
+    if (!card.tick()) return;
+    const p = Session.sweepProgress();
+    if (!p) return;
+    const n = `${p.done} of ${p.total} old photos freed`;
+    if (busyCount.textContent !== n) busyCount.textContent = n;
+    busyCount.hidden = false;
+    busyReport.hidden = false;
+  };
+  count();
+  const timer = window.setInterval(count, 250);
+  try {
+    await Session.sweepSettled();
+  } finally {
+    clearInterval(timer);
+    if (card.owns()) { busyCount.hidden = true; busyCount.textContent = ""; focusOffBeforeHiding(busyReport); busyReport.hidden = true; }
+    card.release();
+  }
+}
+
+/** Take the freeing count, the report button and the skip offer off the busy
+ *  card. Called by showBusy and hideBusy, so no other use of the card ever
+ *  inherits them; each wait puts back its own on its next tick. */
+function hideBusyExtras(): void {
+  busyCount.hidden = true;
+  busyCount.textContent = "";
+  focusOffBeforeHiding(busyReport);
+  busyReport.hidden = true;
+  focusOffBeforeHiding(busySkip);
+  busySkip.hidden = true;
+}
+
+/** A BUTTON ABOUT TO HIDE ITSELF GIVES THE FOCUS ON (decision 075's review).
+ *
+ *  Takes `btn`, one of the offers that come and go — the card's report and
+ *  Skip, the strip's Skip. Changes nothing unless it holds the focus; then
+ *  moves the focus, before it is hidden, to a control that is still there: on
+ *  the card, its other offer or else its sentence (`#busyText`, focusable by
+ *  script only); in the strip, Done, else the verdicts, else a stored tile.
+ *  What it prevents: a keyboard or screen-reader reader who pressed Skip, or
+ *  was resting on it when the read landed, was left on the page's <body>. The
+ *  card's own close still returns the focus to whatever raised it. */
+function focusOffBeforeHiding(btn: HTMLButtonElement): void {
+  if (document.activeElement !== btn) return;
+  const to = btn === stripSkip
+    ? [sessionDone, sessionReject, sessionPick].find((b) => !b.disabled && !b.hidden) ?? sessionThumbs.querySelector<HTMLButtonElement>(".session-thumb:not([disabled])")
+    : [busySkip, busyReport].find((b) => b !== btn && !b.hidden) ?? busyText;
+  to?.focus({ preventScroll: true });
+}
+
+/** Whether `el` can hold the focus where a reader can see it: connected, not
+ *  disabled, drawn, and not inside a dialog that has closed. */
+function isLive(el: Element | null | undefined): el is HTMLElement {
+  if (!(el instanceof HTMLElement) || !el.isConnected) return false;
+  if ((el as HTMLButtonElement).disabled) return false;
+  if (!el.getClientRects().length) return false;
+  const dlg = el.closest("dialog");
+  return !dlg || dlg.open;
+}
+/** Whether the focus has landed nowhere a reader can see: the page itself, or
+ *  an element that has been hidden or whose dialog has closed. */
+function focusLost(): boolean {
+  const a = document.activeElement;
+  return !a || a === document.body || !isLive(a);
+}
+/** Put the focus on the first of `candidates` that is live (`isLive`), else on
+ *  the editor's own chrome — Home, the ⓘ, the version tag — which is always
+ *  drawn. Takes the candidates in order of preference; returns nothing. */
+function focusLive(candidates: (Element | null | undefined)[]): void {
+  const to = [...candidates, $("homeBtn"), $("infoBtn"), $("verTag")].find(isLive);
+  to?.focus({ preventScroll: true });
+}
+
+/** A READ THE READER CHOSE TO SKIP, never taken for something it was not. It is
+ *  listed by the path whose read it was: as not opened for a sniff or a first
+ *  read, as not stored for a parked photo's re-read (it had opened), and as
+ *  "was skipped" for a look (`receiveLookFile`). */
+class SkippedRead extends Error {}
+
+/** The reads that have passed their time without finishing, each with the way
+ *  to give it up. The busy card offers them while there are any — or, once a
+ *  set has a photo on screen, the session strip does (`skipInStrip`). */
+const stalledReads = new Set<{ name: string; skip: () => void }>();
+let skipCard: ReturnType<typeof claimCard> | null = null;
+let skipTimer = 0;
+/** WHILE A SET HAS A PHOTO ON SCREEN, A SLOW READ IS OFFERED IN THE STRIP
+ *  (decision 075's review). Set by `addToSession` where it takes its card down
+ *  for the first photo, cleared in its `finally`. A modal card raised then, for
+ *  the seventeenth file of forty, made an editor that was working inert and
+ *  offered only Skip — pressure to give up a photo that was on its way. */
+let skipInStrip = false;
+
+/** Put the skip offer where it belongs, or take it off, to match `stalledReads`.
+ *
+ *  Takes nothing and returns nothing. With no stalled read, the offer is taken
+ *  off both places and a card it raised taken down. Otherwise, while
+ *  `skipInStrip` is set, the offer is `#stripSkip` beside Done — a button, never
+ *  a card — and the strip's own status line says a file is still being read;
+ *  before that, the offer is on the busy card (`claimCard`), and its claim is
+ *  RENEWED whenever the card up is the running open's own: the open raises its
+ *  card again between its waits, and a claim left on the old card offered
+ *  nothing for the rest of a read that might never finish. What callers rely on:
+ *  whenever `stalledReads` is not empty, one of the two offers is in place —
+ *  the card's, which comes back within 250 ms of another flow's card closing,
+ *  or the strip's, which is not visible while full view or the Quick look
+ *  covers the strip and shows again the moment either closes; a refused open
+ *  meanwhile names it (`refuseSecondOpen`). That is the way out `readOrSkip`
+ *  promises. A Skip that hides itself hands the focus on first. */
+function repaintSkip(): void {
+  const wasInStrip = !stripSkip.hidden;
+  if (!stalledReads.size || skipInStrip) {
+    clearInterval(skipTimer);
+    skipTimer = 0;
+    if (skipCard) {
+      if (skipCard.owns()) { focusOffBeforeHiding(busySkip); busySkip.hidden = true; }
+      skipCard.release();
+      skipCard = null;
+    }
+  }
+  if (!stalledReads.size) {
+    focusOffBeforeHiding(stripSkip);
+    stripSkip.hidden = true;
+    if (wasInStrip) updateSessionStrip();
+    return;
+  }
+  const names = [...stalledReads].map((r) => r.name);
+  if (skipInStrip) {
+    const label = names.length === 1 ? `Skip ${names[0]}` : `Skip ${names[0]} and ${names.length - 1} more`;
+    if (stripSkip.textContent !== label) stripSkip.textContent = label;
+    stripSkip.hidden = false;
+    if (!wasInStrip) updateSessionStrip(); // the status line says a file is still being read
+    return;
+  }
+  focusOffBeforeHiding(stripSkip);
+  stripSkip.hidden = true;
+  const words = names.length === 1 ? `Still reading ${names[0]}…` : `Still reading ${names[0]} and ${names.length - 1} more…`;
+  if (!skipCard) skipCard = claimCard(words, openOwnsCard());
+  if (!skipTimer) skipTimer = window.setInterval(repaintSkip, 250);
+  if (!skipCard.tick()) {
+    if (!openOwnsCard()) return; // another flow's card is up: offer again once it closes
+    // THE OPEN RAISED ITS OWN CARD AGAIN over this claim: adopt the new one. The
+    // old claim owns nothing any more; releasing it only takes it off the list
+    // of claims still speaking.
+    skipCard.release();
+    skipCard = claimCard(words, true);
+  }
+  skipCard.say(words);
+  const label = names.length === 1 ? "Skip this file" : `Skip these ${names.length} files`;
+  if (busySkip.textContent !== label) busySkip.textContent = label;
+  busySkip.hidden = false;
+}
+
+/** READ A FILE, OR A SLICE OF ONE, AND OFFER A WAY OUT RATHER THAN GIVING UP
+ *  (decision 075's review).
+ *
+ *  Takes `blob`, what to read; `name`, the file it belongs to, as the reader
+ *  knows it; `limitMs`, how much VISIBLE time may pass before the offer; and
+ *  `signal`, optionally, for a caller that may stop wanting the bytes before
+ *  they come — an open that failed before its loop gives up its head start
+ *  this way, so no offer is ever made for an open that has already ended.
+ *  Returns the bytes whenever they arrive — however long that is — or rejects
+ *  with the read's own error, or with a `SkippedRead` if the reader presses
+ *  "Skip", which appears only once `limitMs` has passed, or once `signal` is
+ *  aborted.
+ *
+ *  An offer, never a verdict: a fully hydrating cloud placeholder delivers no
+ *  bytes until the whole file is local, so nothing in the timing tells a slow
+ *  read from a dead one, and a limit that gave up lost photographs that were on
+ *  their way — a whole set, on a slow link. Time counts only while the page is
+ *  visible: a hidden spell, or a page frozen by the system (a jump of more than
+ *  two seconds between ticks), starts the clock again, so a reader who switches
+ *  away and back is not offered to skip a local file iOS merely suspended.
+ *
+ *  What callers rely on: it settles once the read does, the reader skips or
+ *  `signal` aborts, and the reader always has that way out (`repaintSkip`: on
+ *  the card, or beside Done once a set has a photo on screen — hidden, then,
+ *  only while full view or the Quick look covers the strip), so a guard
+ *  released in a caller's `finally` is always released. Used only on paths
+ *  that hold the one-open guard; the Quick look and a batch read plainly. */
+function readOrSkip(blob: Blob, name: string, limitMs: number, signal?: AbortSignal): Promise<ArrayBuffer> {
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    let settled = false;
+    let used = 0;
+    let last = performance.now();
+    let sawHidden = false;
+    const entry = { name, skip: () => settle(() => reject(new SkippedRead("skipped — it had not finished reading"))) };
+    const onVisibility = () => { sawHidden = true; };
+    const onAbort = () => settle(() => reject(new SkippedRead("given up — the open it was for had already ended")));
+    document.addEventListener("visibilitychange", onVisibility);
+    signal?.addEventListener("abort", onAbort);
+    const clock = window.setInterval(() => {
+      const now = performance.now();
+      const d = now - last;
+      last = now;
+      if (document.visibilityState !== "visible") return;
+      if (sawHidden || d > 2000) { sawHidden = false; used = 0; return; } // away, or frozen: start again
+      used += d;
+      if (used >= limitMs && !stalledReads.has(entry)) { stalledReads.add(entry); repaintSkip(); }
+    }, 500);
+    const settle = (finish: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(clock);
+      document.removeEventListener("visibilitychange", onVisibility);
+      signal?.removeEventListener("abort", onAbort);
+      if (stalledReads.delete(entry)) repaintSkip();
+      finish();
+    };
+    if (signal?.aborted) { onAbort(); return; }
+    blob.arrayBuffer().then((b) => settle(() => resolve(b)), (err) => settle(() => reject(err)));
+  });
 }
 
 /** Persist and append a set of files to the current session, showing the first
  *  new photo as soon as it's ready. Decoding is sequential with yields so the
  *  UI stays usable; only one decode is in RAM at a time. */
-async function addToSession(files: File[], append: boolean, ready?: Map<File, ReadyFile>) {
+async function addToSession(files: File[], append: boolean, ready?: Map<File, ReadyFile>, unread: string[] = [], said: string[] = []) {
   // READ AND CLEARED HERE, so a set opened by any other route is never reported
   // as a keep and a second open cannot inherit the first one's clock.
   const pressedAt = keepPressedAt;
   keepPressedAt = 0;
+  // A SET IS GOING IN, so a refused second open can say so now; until here the
+  // guard held neutral words (`SAYS_OPENING`).
+  if (openingSet) openingSays = SAYS_ADDING;
+  // THE CARD BEFORE ANY WAIT (decision 075). Everything between the press and
+  // the first file being read — the editor, ending the last session, and the
+  // wait for its delete — used to happen with nothing on screen, and the delete
+  // alone ran for minutes on a reader's PC. The card rises here and each wait
+  // below writes what it is waiting for into it.
+  const addingWords = (n: number) => `Adding ${n} photo${n === 1 ? "" : "s"}…`;
+  showOpenCard(addingWords(files.length));
+  const notRead = (on: string) => `${files.length} photo${files.length === 1 ? "" : "s"} not read yet — ${on}`;
+  const waiting = { says: notRead("waiting for the editor"), since: performance.now() };
+  addWaiting = waiting;
   // A HEAD START ON THE ONE FILE THE READER IS WAITING FOR.
   //
   // The two lines below touch STORAGE and nothing else: ending the last
@@ -12308,12 +13063,16 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   // here would be an unhandled one — and the loop below raises them at the
   // point it would have raised its own.
   let headStart: Promise<{ imported: ImportedFile; img: DecodedImage; read: number; decode: number } | { err: unknown }> | null = null;
+  // GIVEN UP IF THE OPEN FAILS BEFORE ITS LOOP: nothing awaits the head start
+  // then, and its read, left running, offered to skip a file for an open that
+  // had already ended — a modal card over the panel explaining the failure.
+  const headWanted = new AbortController();
   if (!append && files.length) {
     const f0 = files[0];
     headStart = (async () => {
       const a = performance.now();
       try {
-        const imported = guardLocation(await importFile(f0));
+        const imported = guardLocation(await importFile(f0, (f) => readOrSkip(f, f.name, readLimitMs(f.size), headWanted.signal)));
         const b = performance.now();
         const img = await decodeWithLens(imported, { front: true, sky: true });
         return { imported, img, read: b - a, decode: performance.now() - b };
@@ -12328,24 +13087,84 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   // prepared, the reset below never runs, and a session left from last time is
   // still there to resume. Timed on its own, because the reader waited for it
   // and none of the parts after it contain it.
-  const tEditor = performance.now();
-  await editorReady();
-  const msEditor = performance.now() - tEditor;
-  const tReset = performance.now();
-  if (!append) await resetSessionState(true); // fresh session — clear leftovers
-  // THE ONE PLACE THE DELETE IS STILL WORTH WAITING FOR. Ending a session and
-  // immediately opening another is the only collision: the old bytes are still
-  // on the device, so writing the new set on top of them is what would run the
-  // device out of room. Waiting here puts that wait where a wait is already
-  // expected and shown, rather than on a press that has nothing left to do.
-  const tSweep = performance.now();
-  await Session.sweepSettled();
-  const msReset = tSweep - tReset;
-  const msSweep = performance.now() - tSweep;
+  let msEditor = 0, msReset = 0, msRoom = 0, msSweep = 0;
+  let cleared = true;
+  let clearError: unknown = null;
+  let room = "nothing was being freed";
+  // THE CARD IS UP, SO A THROW MUST TAKE IT DOWN. `editorReady` throws for a
+  // build the driver refused, before it touches the card; left up, a modal
+  // spinner with no way out would cover the panel that explains why.
+  try {
+    const tEditor = performance.now();
+    await editorReady();
+    msEditor = performance.now() - tEditor;
+    sayOpen(addingWords(files.length)); // it may have said it was preparing the editor
+    waiting.says = notRead("ending the last session");
+    const tReset = performance.now();
+    // A fresh session clears the leftovers first — and a device that will not
+    // clear them stops the set here, before anything is planned or written:
+    // written now, it went into the old session's index and came back mixed
+    // with it on the next resume.
+    if (!append) {
+      const reset = await resetSessionState(true);
+      if (!reset.ok) { cleared = false; clearError = reset.err; }
+    }
+    msReset = performance.now() - tReset;
+    // THE DELETE IS WAITED FOR ONLY WHERE IT CAN COLLIDE (decision 075). Ending
+    // a session and at once opening another leaves the old bytes on the device
+    // while the new ones are written; on a device short of room that is what
+    // runs it out. Everywhere else the wait buys nothing — the device that
+    // reported it waited minutes with an allowance of over a hundred gigabytes
+    // — so the browser is asked first, and a keep inside its allowance goes
+    // straight on while the delete finishes beside it. Where it does wait, the
+    // card says so, with a count. The allowance is not free disk space (see
+    // SWEEP_ROOM_MARGIN): a disk that fills anyway is met by the retry in the
+    // loop below. The check and the wait are timed apart, so the report never
+    // blames the delete for time the browser took to answer.
+    if (cleared && Session.sweepProgress()) {
+      const tRoom = performance.now();
+      const check = await roomForSet(files.reduce((n, f) => n + f.size, 0));
+      msRoom = performance.now() - tRoom;
+      room = check.said;
+      if (check.fits !== true) {
+        waiting.says = notRead("freeing the space the last session used");
+        const tSweep = performance.now();
+        await waitSayingFreeing(true);
+        msSweep = performance.now() - tSweep;
+        sayOpen(addingWords(files.length));
+      }
+    }
+  } catch (err) {
+    addWaiting = null;
+    headWanted.abort();
+    hideBusy();
+    // What the drop set aside is named on this way out too, before the caller
+    // says why the open itself failed — the alert first, the toast after it.
+    sayUnread(unread);
+    toastAll(said);
+    throw err;
+  }
+  if (!cleared) {
+    addWaiting = null;
+    headWanted.abort();
+    hideBusy();
+    // The alerts first, the toast after: a toast raised just before an alert
+    // runs out its time behind it, unseen.
+    alert(notClearedWords(clearError, " and nothing new was opened"));
+    sayUnread(unread);
+    toastAll(said);
+    openNotBegun = true;
+    return;
+  }
+  openBegins(); // the last session is gone, or this set joins it: the set has begun
   let msRead = 0, msDecode = 0, msShow = 0;
-  const skipped: string[] = [];
+  const skipped: string[] = [...unread]; // files skipped before the set began are listed with the rest
+  // OPENED BUT NOT STORED: a photo read and shown whose bytes the device would
+  // not keep. Never listed as one that could not be opened — it was.
+  const notStored: string[] = [];
   let firstNewId: string | null = null;
   let quotaHit = false;
+  let saidOut = false; // whether the drop's words about its looks have been said
 
   // --- Every tile, up front. The picker has already told us the name and size
   // of each file, so the whole set can be on screen before a single byte is
@@ -12378,7 +13197,10 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
     });
     files = fresh;
     if (!files.length) {
-      toast(`All ${reopened.length} of those are already in this session.`, 3200);
+      addWaiting = null;
+      hideBusy(); // before the toast, or it is mounted inside a card about to close
+      toastAll([...said, `All ${reopened.length} of those are already in this session.`]);
+      sayUnread(unread);
       return;
     }
   }
@@ -12398,6 +13220,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   }));
   for (const p of planned) { sessionPhotos.push(p); pendingStore.add(p.id); }
   adding = { done: 0, total: files.length, index: 1, name: files[0]?.name ?? "" , since: performance.now() };
+  addWaiting = null; // `adding` speaks for the set from here
   updateSessionStrip();
   // OWNERSHIP, because this loop outlives its own dialog. It raises the spinner
   // to cover the wait for the FIRST photo and hides it the moment one is on
@@ -12408,7 +13231,11 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   // they asked for: "Adding 360 photos — reading 41 of 360". Asking for one
   // thing and being told about another is worse than no message at all.
   let ownsBusy = true;
-  showBusy(`Adding ${files.length} photo${files.length === 1 ? "" : "s"}…`);
+  // The count may have been filtered since. REWRITTEN IN PLACE while the card is
+  // still the open's own: raising it again starts a new use of the card, and a
+  // skip offer speaking on it for a read still running lost its claim with it.
+  if (openOwnsCard()) sayOpen(addingWords(files.length));
+  else showOpenCard(addingWords(files.length));
 
   /** Drop a planned tile that never became a photo. */
   const dropPlanned = (id: string) => {
@@ -12432,22 +13259,124 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   // The ceiling is what it costs in RAM: STORE_LANES photos' source bytes, and
   // nothing decoded, so three is ~75 MB of Z50 NEFs rather than a set of forty.
   const STORE_LANES = 3;
-  const inFlight = new Map<string, { p: Promise<void>; name: string }>();
-  /** Wait until fewer than `n` writes are outstanding, settling each as it lands. */
+  /** One photo's write: the promise, and what it takes to write it AGAIN — the
+   *  row and the picked File, never the bytes, so a lane still costs one copy of
+   *  a photo in memory and not two. `again` marks a second write, counted as
+   *  stored again only if it lands, and never parked: its failure is final;
+   *  `refusedWhileFreeing` — the write failed, for any reason, while the last
+   *  session's delete was running — is noted when the write settles, not when
+   *  a lap of `drainTo` gets round to it. */
+  type StoreWrite = { p: Promise<void>; name: string; meta: Session.PhotoMeta; file: File; again: boolean; refusedWhileFreeing: boolean };
+  const inFlight = new Map<string, StoreWrite>();
+  /** START ONE PHOTO'S WRITE, and note at the moment it fails whether the
+   *  last session's delete was running then (decision 075's review). `drainTo`
+   *  only attaches to a write on a lap, which can be seconds of reading later —
+   *  by which time the delete may have finished, and a refusal it caused read
+   *  as a device truly full: the set was cut short and the photo on screen
+   *  dropped, just as the space came back. This catch is attached first, so it
+   *  runs before any lap's handler; it also marks the rejection as handled. */
+  const startWrite = (base: { name: string; meta: Session.PhotoMeta; file: File }, bytes: Uint8Array, again: boolean): StoreWrite => {
+    const w: StoreWrite = { ...base, again, refusedWhileFreeing: false, p: Session.addPhoto(base.meta, bytes) };
+    w.p.catch(() => { if (Session.sweepProgress()) w.refusedWhileFreeing = true; });
+    return w;
+  };
+  // FAILED WHILE THE LAST SESSION'S BYTES WERE STILL BEING FREED (decision 075).
+  // The room check before the loop can only see the browser's allowance, which
+  // every engine sets from the disk's total size, so on a disk that is nearly
+  // full a keep can go straight on and have its writes refused while the old
+  // set is still being deleted — the collision the wait existed for. Such a
+  // write is not a lost photo: it is parked here, the loop waits for the delete
+  // with the card up and counting, and then it is written again, ONCE. Parked
+  // whatever the error is called, because WebKit calls a full disk an
+  // UnknownError (see SWEEP_ROOM_MARGIN); a second failure is final, so a fault
+  // that is not about room ends as "couldn't be stored" and cannot loop. Only a
+  // write refused for room with NO delete running, or refused a second time,
+  // means the device is truly full, and only that sets `quotaHit`.
+  const parked = new Map<string, StoreWrite>();
+  let keepProfile: KeepProfile | null = null;
+  /** Wait until fewer than `n` writes are outstanding, settling each as it
+   *  lands, and writing again, once, any that failed while the last session's
+   *  bytes were still being freed. Each write is settled ONCE: this
+   *  runs on every lap of the loop and a write still in flight collects a
+   *  handler per lap, so the handlers stand down for an entry no longer theirs. */
   async function drainTo(n: number): Promise<void> {
     while (inFlight.size > n) {
       const entries = [...inFlight.entries()];
       await Promise.race(entries.map(([id, w]) => w.p.then(
-        () => { inFlight.delete(id); pendingStore.delete(id); },
-        (err) => {
+        () => {
+          if (inFlight.get(id) !== w) return;
           inFlight.delete(id);
+          pendingStore.delete(id);
+          // STORED AGAIN ONLY WHEN IT LANDED — a second write refused as well
+          // is a photo dropped, and the report must not say otherwise.
+          if (w.again && keepProfile) keepProfile.storedAgain++;
+        },
+        (err) => {
+          if (inFlight.get(id) !== w) return;
+          inFlight.delete(id);
+          if (!w.again && (w.refusedWhileFreeing || Session.sweepProgress())) { parked.set(id, w); return; }
+          // No `nextOrder--`: orders after this one are already given out, and
+          // handing this one out again made two photos share it. A gap is
+          // harmless — the stored order is only ever sorted on.
           dropPlanned(id);
-          nextOrder--;
           if (isQuotaError(err)) quotaHit = true;
-          else skipped.push(`${w.name} (${(err as Error).message})`);
+          else notStored.push(`${w.name} (${(err as Error).message})`);
         },
       )));
+      if (parked.size) await writeAgainAfterFreeing();
       updateSessionStrip();
+    }
+  }
+
+  /** WAIT FOR THE LAST SESSION'S DELETE, SAYING SO, THEN WRITE THE PARKED PHOTOS
+   *  AGAIN. The wait speaks on a card of its own — raised if the first photo has
+   *  already taken the set's card down, since a set that has stopped arriving
+   *  must say why — and never over another flow's card (`waitSayingFreeing`).
+   *  The photo ON SCREEN is written again from the bytes already in memory —
+   *  the same bytes its first write had, which the reader is editing — and is
+   *  never read again: a file changed or gone since would have dropped a photo
+   *  still being edited. Any other is read again from its File through the same
+   *  offer as the first read. Each row is built from the photo AS IT IS NOW: a
+   *  verdict pressed or an edit made while its first write was refused went to
+   *  a row that did not exist yet, and the row kept from the first attempt
+   *  carried neither. One that cannot be read again is listed as not stored,
+   *  never as not opened — it opened. */
+  async function writeAgainAfterFreeing(): Promise<void> {
+    while (parked.size) {
+      if (Session.sweepProgress()) {
+        // BY WHAT IS KNOWN: the write failed while the old bytes were being freed,
+        // which is not always a lack of room (see `parked`).
+        addWaiting = { says: `${parked.size} photo${parked.size === 1 ? "" : "s"} waiting to be stored again — ${parked.size === 1 ? "it" : "they"} could not be stored while the last session's space was being freed`, since: performance.now() };
+        const own = ownsBusy && busy.open && busyEpoch === openCardEpoch;
+        try {
+          await waitSayingFreeing(own);
+        } finally {
+          addWaiting = null;
+          if (own) sayOpen(addingWords(files.length));
+        }
+      }
+      for (const [id, w] of [...parked]) {
+        parked.delete(id);
+        let bytes: Uint8Array;
+        // A parked tile cannot be switched to, so the photo on screen being this
+        // one means `currentFile` came from this photo's own first read.
+        if (id === activePhotoId && currentFile) bytes = currentFile.bytes;
+        else {
+          try {
+            bytes = guardLocation(await importFile(w.file, guardedRead)).bytes;
+          } catch (err) {
+            dropPlanned(id);
+            notStored.push(`${w.name} (${(err as Error).message})`);
+            continue;
+          }
+        }
+        const slot = sessionPhotos.find((p) => p.id === id);
+        if (!slot) continue; // gone from the session meanwhile — nothing to store
+        const meta: Session.PhotoMeta = { ...w.meta, edit: slot.edit ?? null };
+        if (slot.mark) meta.mark = slot.mark;
+        else delete meta.mark;
+        inFlight.set(id, startWrite({ name: w.name, meta, file: w.file }, bytes, true));
+      }
     }
   }
 
@@ -12457,7 +13386,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       const f = files[i];
       const slot = planned[i];
       adding = { done: i, total: files.length, index: i + 1, name: f.name , since: performance.now() };
-      if (ownsBusy && busy.open) busyText.textContent = `Adding ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`;
+      if (ownsBusy) sayOpen(`Adding ${files.length} photos — reading ${i + 1} of ${files.length}: ${f.name}`);
       updateSessionStrip();
       let imported: ImportedFile;
       const tRead = performance.now();
@@ -12466,7 +13395,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
       const head = i === 0 ? await headStart : null;
       try {
         if (head && "err" in head) throw head.err;
-        imported = head ? head.imported : guardLocation(await importFile(f));
+        imported = head ? head.imported : guardLocation(await importFile(f, guardedRead));
         if (!firstNewId) msRead += head ? head.read : performance.now() - tRead;
       } catch (err) {
         skipped.push(`${f.name} (${(err as Error).message})`);
@@ -12534,20 +13463,15 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
 
       await drainTo(STORE_LANES - 1); // make room in the write lanes
       if (quotaHit) { for (const p of planned.slice(i)) dropPlanned(p.id); break; }
-      inFlight.set(slot.id, {
-        name: f.name,
-        p: Session.addPhoto(
-          {
-            id: slot.id, name: imported.name, kind: imported.kind, size: imported.bytes.length,
-            srcName: f.name, srcSize: f.size, order: nextOrder++, addedAt: Date.now(),
-            thumb: new ArrayBuffer(0), edit: null,
-            // Spread rather than `mark: undefined`, so an undecided photo's row
-            // has no such field at all — the same shape a cleared verdict leaves.
-            ...(done?.mark ? { mark: done.mark } : {}),
-          },
-          imported.bytes,
-        ),
-      });
+      const meta: Session.PhotoMeta = {
+        id: slot.id, name: imported.name, kind: imported.kind, size: imported.bytes.length,
+        srcName: f.name, srcSize: f.size, order: nextOrder++, addedAt: Date.now(),
+        thumb: new ArrayBuffer(0), edit: null,
+        // Spread rather than `mark: undefined`, so an undecided photo's row
+        // has no such field at all — the same shape a cleared verdict leaves.
+        ...(done?.mark ? { mark: done.mark } : {}),
+      };
+      inFlight.set(slot.id, startWrite({ name: f.name, meta, file: f }, imported.bytes, false));
       if (!firstNewId) {
         firstNewId = slot.id;
         const tShow = performance.now();
@@ -12561,15 +13485,19 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
         // bottom of the loop: this is the line where the editor appears and
         // the spinner goes, and the loop runs on for the rest of the set.
         if (pressedAt) {
-          lastKeepProfile = {
+          lastKeepProfile = keepProfile = {
             kept: files.length,
             carried: ready ? [...ready.values()].filter((r) => r.thumb && r.thumb.byteLength).length : 0,
-            editor: msEditor, reset: msReset, sweep: msSweep, read: msRead, decode: msDecode, show: msShow,
-            total: performance.now() - pressedAt,
+            editor: msEditor, reset: msReset, room: msRoom, roomSaid: room, sweep: msSweep, read: msRead, decode: msDecode, show: msShow,
+            total: performance.now() - pressedAt, storedAgain: 0,
           };
         }
         ownsBusy = false;
+        skipInStrip = true; // a slow read from here on is offered beside Done, not over the editor
         hideBusy(); // there is a photo on screen — nothing left to wait for
+        if (stalledReads.size) repaintSkip();
+        toastAll(said); // the drop's words about its looks, now that no card can swallow them
+        saidOut = true;
         thumbIdleGate = false; // a set's FIRST tiles are never delayed
         void realThumbnails(); // from here it runs beside the loop, not after it
       }
@@ -12581,7 +13509,12 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   } finally {
     await drainTo(0); // a throw must not strand a write (or a tile) mid-flight
     adding = null;
-    hideBusy();
+    skipInStrip = false;
+    repaintSkip(); // every read of this set has settled: the strip's offer comes off
+    // ONLY THIS SET'S OWN CARD. After the first photo the card up is a batch's,
+    // a photo's "Loading…" or a scan's, and closing it cleared a finished batch's
+    // Save and took "Loading…" down under a photo still decoding.
+    if (openOwnsCard()) hideBusy();
     settleHistogram(); // the refreshes skipped during the load, paid once
   }
   updateSessionStrip();
@@ -12595,12 +13528,16 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   const notes: string[] = [];
   if (quotaHit) notes.push("Storage filled up — some photos couldn't be added. Free space, or tap Done to end the session.");
   if (skipped.length) notes.push(`${skipped.length} couldn't be opened:\n` + skipped.join("\n"));
+  if (notStored.length) notes.push(`${notStored.length} opened but couldn't be stored on this device:\n` + notStored.join("\n"));
   // Say it, rather than leaving a set that quietly came up short of what was
   // picked. Skipping is the right thing and an unexplained shortfall is not.
-  if (reopened.length) {
-    toast(`${reopened.length} of those ${reopened.length === 1 ? "was" : "were"} already in this session and ${reopened.length === 1 ? "was" : "were"} not read again.`, 3600);
-  }
+  const reopenedWords = `${reopened.length} of those ${reopened.length === 1 ? "was" : "were"} already in this session and ${reopened.length === 1 ? "was" : "were"} not read again.`;
+  const sayLooks = !saidOut && said.length > 0; // no photo came in to say them at
+  if (reopened.length && !sayLooks) toast(reopenedWords, 3600);
   if (notes.length) alert(notes.join("\n\n"));
+  // The drop's look words AFTER the alert: raised before it, a toast runs out its
+  // time behind the alert, unseen.
+  if (sayLooks) toastAll(reopened.length ? [...said, reopenedWords] : said);
   if (!sessionPhotos.length) {
     setStartScreen(true);
     hint.hidden = false;
@@ -13084,7 +14021,10 @@ let lastStripMs = 0;
 function writeSessionMeta(real: SessionPhoto[], idx: number, total: number): void {
   if (adding) {
     const viewing = idx >= 0 ? `viewing ${idx + 1} · ` : "";
-    sessionMeta.textContent = `${viewing}adding ${adding.index} of ${adding.total} — ${adding.name}`;
+    // A READ OFFERED FOR SKIPPING is said here, in the strip's own status line,
+    // because the offer beside Done is a button that appears without a word.
+    const stalled = stripSkip.hidden ? "" : ` — still reading ${stripSkip.textContent?.replace(/^Skip /, "")}, which can be skipped`;
+    sessionMeta.textContent = `${viewing}adding ${adding.index} of ${adding.total} — ${adding.name}${stalled}`;
     return;
   }
   const picked = real.reduce((n, p) => n + (p.mark === "pick" ? 1 : 0), 0);
@@ -13185,6 +14125,10 @@ function updateSessionStrip() {
   // The strip is for switching — only meaningful from two photos up. While a
   // set is still coming in it is also the progress report, so it stays.
   if (real.length < 2 && !adding) {
+    // A FOCUS INSIDE THE STRIP GOES FIRST (decision 075's review): a set that
+    // a Skip left with one photo hides the strip under the control the Skip had
+    // handed the focus to, and the focus fell to <body>.
+    if (sessionStrip.contains(document.activeElement)) focusLive([]);
     sessionStrip.hidden = true;
     sessionThumbs.replaceChildren();
     sessionProgress.hidden = true;
@@ -13452,9 +14396,13 @@ document.addEventListener("keydown", (e) => {
 });
 
 /** End the session: free its storage and reset all session state, returning to
- *  the start screen. */
-async function endSession() {
-  await resetSessionState(true);
+ *  the start screen. Returns `resetSessionState`'s result: on `ok: false` the
+ *  session is still open, on screen and on the device, and nothing else was
+ *  done; on `reached: false` it has ended though the device's storage could not
+ *  be reached to clear. */
+async function endSession(): Promise<Awaited<ReturnType<typeof resetSessionState>>> {
+  const reset = await resetSessionState(true);
+  if (!reset.ok) return reset;
   updateSessionStrip(); // hides the strip and gives the stage back to the photo
   current = null;
   currentFile = null;
@@ -13472,6 +14420,7 @@ async function endSession() {
   updateWelcomeReturn(); // current is null now → hide the ✕ / Back controls
   renderMaskOverlay();
   updateSessionResume();
+  return reset;
 }
 
 /** The last export's own timing, for the diagnostic — one line, no filenames. */
@@ -13543,10 +14492,23 @@ function keepSplit(): string {
   if (!p) return "none this session";
   const t = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)}s`);
   return (
-    `${p.kept} kept in ${t(p.total)} — waiting for the editor ${t(p.editor)}, ending the last session ${t(p.reset)}, waiting on its delete ${t(p.sweep)}` +
+    `${p.kept} kept in ${t(p.total)} — waiting for the editor ${t(p.editor)}, ending the last session ${t(p.reset)}` +
+    `, asking the browser for room ${t(p.room)} (${p.roomSaid}), waiting on its delete ${t(p.sweep)}` +
     `, reading the first file ${t(p.read)}, decoding it ${t(p.decode)}, first paint ${t(p.show)}` +
-    `; ${p.carried} of ${p.kept} arrived with a picture already rendered`
+    `; ${p.carried} of ${p.kept} arrived with a picture already rendered` +
+    (p.storedAgain ? `; ${p.storedAgain} stored again after the last session's space was freed` : "")
   );
+}
+
+/** THE LAST SESSION'S DELETE, FOR THE REPORT (decision 075).
+ *
+ *  Takes nothing; reads `Session.sweepProgress()`. Returns "N of M photos'
+ *  bytes deleted, running Xs" while a sweep runs, and "nothing to free" when
+ *  none does — counts only, never a name. */
+function freeingLine(): string {
+  const p = Session.sweepProgress();
+  if (!p) return "nothing to free";
+  return `${p.done} of ${p.total} photos' bytes deleted, running ${((performance.now() - p.since) / 1000).toFixed(0)}s`;
 }
 
 /** How many photos are holding a full working state in memory, against how many
@@ -13580,12 +14542,20 @@ sessionDone.addEventListener("click", async () => {
   // happening, then say it finished — ending a session throws work away, and
   // silence is the wrong confirmation for that.
   showBusy(`Ending the session — freeing ${n} photo${n === 1 ? "" : "s"}…`);
+  let ended: Awaited<ReturnType<typeof endSession>> | null = null;
   try {
-    await endSession();
+    ended = await endSession();
   } finally {
     hideBusy();
   }
-  toast(`Session ended — ${n} photo${n === 1 ? "" : "s"} cleared from this device.`, 3000);
+  // NEVER "cleared" when it was not: a clear the device refused leaves the
+  // session open, and says so; storage that could not be reached at all ends
+  // the session on screen and says nothing was cleared from the device; and
+  // only an error that says so is called a lack of room.
+  if (!ended) return;
+  if (!ended.ok) toast(`This session could not be cleared from this device — it is still open.${isQuotaError(ended.err) ? " Free some space and try again." : ""}`, 4000);
+  else if (!ended.reached) toast("Session ended — this device's storage did not answer, so nothing was cleared from it.", 4000);
+  else toast(`Session ended — ${n} photo${n === 1 ? "" : "s"} cleared from this device.`, 3000);
 });
 
 // Resume a session left in storage by a previous visit (close, crash, or the
@@ -13609,6 +14579,12 @@ async function updateSessionResume() {
 }
 
 async function resumeSession() {
+  // ONE OPEN AT A TIME (decision 075). A drop or a paste during the resume used
+  // to reach `openPicked`, ask to start a new session over the one being
+  // resumed, and leave the editor on a photo from the session it had just
+  // forgotten.
+  if (refuseSecondOpen()) return;
+  takeOpen(SAYS_RESUMING);
   showBusy("Resuming session…");
   try {
     const metas = await Session.listPhotos();
@@ -13647,6 +14623,7 @@ async function resumeSession() {
     alert("Couldn't resume the session: " + (err as Error).message);
   } finally {
     hideBusy();
+    releaseOpen();
   }
 }
 
@@ -14043,9 +15020,14 @@ function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: 
 /** OPEN A KEEP FILE THE READER PICKED — decision 043's other door.
  *
  *  @param f  the picked keep file, whatever it has been named.
- *  @returns nothing. Reports through the usual dialog when the package cannot
- *  be opened; `readKeepFile` refuses a damaged or future-format one with a
- *  message worth showing, so nothing here has to guess.
+ *  @param others  how many more keep files came in the same drop and were not
+ *  opened — they are named in the ONE thing this says, never in a second toast
+ *  that would paint over it in the same task.
+ *  @returns nothing. Says "Opened “NAME”" once the photograph is on screen, and
+ *  only then; reports through the usual dialog when the package cannot be
+ *  opened — `readKeepFile` refuses a damaged or future-format one with a
+ *  message worth showing, so nothing here has to guess — and never says a file
+ *  opened when none did.
  *
  *  THE KIND IS DERIVED, NOT STORED. `refineKind(sniff(bytes), name)` is exactly
  *  what a normal import does, so a photograph opened out of a keep file is
@@ -14057,10 +15039,14 @@ function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: 
  *  a stored edit is laid onto a freshly decoded photograph — see that function
  *  for the five steps and why their order is load-bearing.
  */
-async function openKeepFile(f: File): Promise<void> {
-  showBusy("Opening\u2026");
+async function openKeepFile(f: File, others = 0): Promise<void> {
+  const rest = others ? `the other ${others} saved photo${others === 1 ? "" : "s"}` : "";
+  showOpenCard("Opening\u2026");
   try {
-    const { manifest, original, editJson, parts } = await readKeepFile(await f.arrayBuffer());
+    // Read as any photo in an open is (decision 075): an open holds the
+    // one-open guard until this settles, so a read that does not finish offers
+    // the reader a way past it rather than holding the guard for ever.
+    const { manifest, original, editJson, parts } = await readKeepFile(await guardedRead(f));
     const imported: ImportedFile = {
       name: manifest.original,
       kind: refineKind(sniff(original), manifest.original),
@@ -14071,11 +15057,15 @@ async function openKeepFile(f: File): Promise<void> {
     await editorReady();
     showDecoded(img, imported);
     showLoneWithEdit(manifest.original, imported.kind, original.length, editJson, readKeepBytes(editJson, parts));
-    toast(`Opened \u201c${manifest.name}\u201d`, 2000);
+    // THE CARD FIRST, THEN THE WORDS. A toast mounts in the dialog holding the
+    // focus, which here is the busy card the `finally` closes a moment later —
+    // so the confirmation was mounted inside a closed dialog and never painted.
+    hideBusy();
+    toast(rest ? `Opened \u201c${manifest.name}\u201d — open ${rest} one at a time.` : `Opened \u201c${manifest.name}\u201d`, rest ? 3200 : 2000);
   } catch (err) {
     if (err instanceof EditorUnavailable) return; // its own panel says so
     recordFailure("opening a keep file", err);
-    await noticeDialog("That file could not be opened", (err as Error).message);
+    await noticeDialog("That file could not be opened", (err as Error).message + (rest ? ` ${rest[0].toUpperCase()}${rest.slice(1)} ${others === 1 ? "was" : "were"} not opened — open each on its own.` : ""));
   } finally {
     hideBusy();
   }
@@ -14220,8 +15210,13 @@ const quickLook = $("quickLook") as HTMLDialogElement;
 // Close button; closeQuickLook empties quickItems BEFORE calling close(), so
 // this listener no-ops for programmatic closes (no recursion).
 quickLook.addEventListener("close", () => {
-  if (quickItems.length) closeQuickLook();
+  if (quickItems.length && !quickLookSetAside) closeQuickLook();
 });
+/** THE QUICK LOOK HIDDEN FOR A KEEP, NOT YET DISMANTLED (decision 075's
+ *  review): its items and picks are kept until the set has begun, so a Keep
+ *  that stops first — the last session not cleared, the question dismissed —
+ *  can hand them back (`keepQuickLook`). */
+let quickLookSetAside = false;
 const qlGrid = $("qlGrid") as HTMLDivElement;
 const qlCount = $("qlCount") as HTMLSpanElement;
 const qlKeep = $("qlKeep") as HTMLButtonElement;
@@ -14495,21 +15490,33 @@ let lastQuickProfile: QuickProfile | null = null;
 /** WHERE THE SECONDS AFTER **Keep** WENT, the other half of the same report.
  *
  *  `sweep` is the previous session's chunk delete, which `addToSession` waits
- *  for before it reads a byte — a cost that scales with the set being REPLACED
- *  rather than the one being opened, which is why it has its own field and is
- *  not folded into "before the first file". `show` is the first paint: GL
+ *  for before it reads a byte when the device may be short of room (decision
+ *  075; zero otherwise, and `roomSaid` says which) — a cost that scales with
+ *  the set being REPLACED rather than the one being opened, which is why it has
+ *  its own field and is not folded into "before the first file". `show` is the first paint: GL
  *  upload and the rest of `showDecoded`. `editor` is the wait for the editor's
  *  picture code to finish building (decision 071): nothing before the first
  *  release of 071 waited for it here, and none of the other parts contains it.
  *
  *  `carried` is how many of the kept photographs arrived with a picture from
- *  the grid, against `kept`. Record 014 turns on that pair. */
+ *  the grid, against `kept`. Record 014 turns on that pair.
+ *
+ *  `roomSaid` is why the sweep was or was not waited for (decision 075): the
+ *  browser's ALLOWANCE against the set — never free disk space, which no
+ *  browser reports — or why there was none; `room` is how long the browser
+ *  took to answer, timed apart from `sweep` so the delete is never blamed for
+ *  it. `storedAgain` counts photos whose write failed while the old session was
+ *  still being deleted, written again once it was — counted after
+ *  the first photo, so it can grow after the rest of this record is written. */
 interface KeepProfile {
   kept: number;
   carried: number;
   editor: number;
   reset: number;
   sweep: number;
+  room: number;
+  roomSaid: string;
+  storedAgain: number;
   read: number;
   decode: number;
   show: number;
@@ -14885,6 +15892,7 @@ if (cmpDlg) {
 let closingQuickLook = false;
 
 function closeQuickLook() {
+  quickLookSetAside = false;
   quickGen++;
   delete qlGrid.dataset.busy; // a run abandoned mid-way is not still going
   closingQuickLook = true;
@@ -14902,6 +15910,11 @@ function closeQuickLook() {
 /** Promote the selected previews into a real session (or a lone open, for one).
  *  The picked Files are still alive, so this is just the normal open path. */
 async function keepQuickLook() {
+  // BEFORE ANYTHING IS CLOSED OR CLEARED (decision 075). `openPicked` refuses a
+  // second open too, but by the time it is reached this function has closed
+  // the Quick look and thrown its previews away — a refusal there would cost
+  // the reader every pick they had just made.
+  if (refuseSecondOpen()) return;
   const picks = quickPickCount() > 0;
   const keeping = quickItems.filter((it) => willKeep(it, picks));
   const files = keeping.map((it) => it.file);
@@ -14916,15 +15929,32 @@ async function keepQuickLook() {
   // THE CLOCK STARTS AT THE PRESS, not where the work starts, because the wait
   // being reported is the reader's and it begins when they press the button.
   keepPressedAt = performance.now();
-  closeQuickLook();
+  // SET ASIDE, NOT DISMANTLED, until the set has begun: an open that stops
+  // before anything begins — the last session could not be cleared, or the
+  // "add or start new" question was dismissed — hands the Quick look back with
+  // every pick and reject where the reader left them, so "try again" is one
+  // more press of Keep, not a folder culled a second time.
+  if (cmpDlg?.open) cmpDlg.close();
+  quickLookSetAside = true;
+  if (quickLook.open) quickLook.close();
+  whenOpenBegins = () => closeQuickLook(); // dismantled the moment the set begins
   try {
     await openPicked(files, ready);
   } catch (err) {
+    whenOpenBegins = null;
+    closeQuickLook();
     setStartScreen(true);
     hint.hidden = false;
     hint.textContent = "Could not open these files: " + (err as Error).message;
     updateWelcomeReturn();
+    return;
   }
+  whenOpenBegins = null;
+  if (!quickLookSetAside) return; // dismantled when the set began
+  if (openNotBegun && quickItems.length) {
+    quickLookSetAside = false;
+    quickLook.showModal();
+  } else closeQuickLook();
 }
 
 // Same shape as openFromInput above: the header button drives `quickInput`
@@ -15433,14 +16463,35 @@ function setBundledSource(v: boolean) {
   ($("exWmNote") as HTMLParagraphElement).hidden = !v;
 }
 
-let galleryGen = 0; // bumped per open — a double-tap aborts the older load (the quickGen pattern)
+let galleryGen = 0; // bumped per open — an older load that is somehow still running stands down (the quickGen pattern)
+/** Open a practice photo, unless another open is running (decision 075).
+ *
+ *  Takes the tile's `key`. Refuses at once, with words, while a set is still
+ *  being stored, a session is resuming or another practice photo is loading —
+ *  BEFORE the confirm, because a practice photo resets the session, and one
+ *  reset under a set still being written ended the set and then had it written
+ *  back. Otherwise asks, takes the one-open guard, loads, and releases the
+ *  guard whatever happens. Returns when the photo is on screen or has failed. */
 async function openGalleryPhoto(key: string) {
   const tile = GALLERY.find((t) => t.key === key);
   if (!tile) return;
+  if (refuseSecondOpen()) return;
   // A live multi-photo session is real work — ask before replacing it, the
   // same courtesy every other replace path extends (review find, 2026-07-15).
   if (sessionPhotos.length > 1 && !confirm(`Opening a practice photo ends your session (${sessionPhotos.length} photos, edits included). Continue?`)) return;
+  takeOpen(SAYS_PRACTICE);
+  try {
+    await loadGalleryPhoto(key, tile);
+  } finally {
+    releaseOpen();
+  }
+}
+
+/** The practice photo's download, decode and show. Reached only through
+ *  `openGalleryPhoto`, which holds the one-open guard around it. */
+async function loadGalleryPhoto(key: string, tile: GalleryTile) {
   const gen = ++galleryGen;
+  let notCleared: string | null = null; // said once the card is down
   if (library.open) library.close(); // a library pick heads straight into the editor
   showBusy("Loading photo…");
   // The RAW practice files are ~10 MB each and cached for offline use — ask the
@@ -15465,14 +16516,18 @@ async function openGalleryPhoto(key: string) {
     const img = await decodeWithLens(imported);
     if (gen !== galleryGen) return;
     // AND THE EDITOR READY, before the previous session is torn down (decision
-    // 071): a second practice tap during the wait wins, and a build that fails
-    // leaves the session where it was.
+    // 071): a build that fails leaves the session where it was. (A second
+    // practice tap during the wait is refused now — decision 075.)
     await editorReady();
     if (gen !== galleryGen) return;
     // Only NOW — with a decodable photo in hand — end the previous session.
     // Tearing it down before the download/decode succeeded meant a failed
     // open destroyed the user's session (review find, 2026-07-15).
-    await resetSessionState(true);
+    // A clear the device refused does not stop a practice photo, which stores
+    // nothing: the memory is reset alone, the old session stays on the device
+    // to resume, and the reader is told so once the photo is up.
+    const reset = await resetSessionState(true);
+    if (!reset.ok) await resetSessionState(false);
     if (gen !== galleryGen) return;
     showDecoded(img, imported); // sets a fresh view; clears learn mode
     // RAW practice files export with the corner mark ADDED (raw can't carry
@@ -15497,6 +16552,7 @@ async function openGalleryPhoto(key: string) {
     // Last, so establishFreshEdit's fold-everything doesn't undo the expand.
     setLearnMode(true);
     showLesson(tile.lesson ?? 0);
+    if (!reset.ok) notCleared = notClearedWords(reset.err, " to resume");
   } catch (err) {
     if (gen !== galleryGen || err instanceof EditorUnavailable) return;
     // The download succeeded, so this is not a connection problem — say so.
@@ -15504,6 +16560,8 @@ async function openGalleryPhoto(key: string) {
   } finally {
     if (gen === galleryGen) hideBusy();
   }
+  // Once the card is down, or it is mounted in the card and closed with it.
+  if (notCleared && gen === galleryGen) toast(notCleared, 4000);
 }
 
 // Export & save to device.
@@ -15546,18 +16604,42 @@ busy.addEventListener("cancel", (e) => e.preventDefault());
 const busyText = $("busyText") as HTMLParagraphElement;
 const busySpinner = $("busySpinner") as HTMLDivElement;
 const busyActions = $("busyActions") as HTMLDivElement;
+// THE WAIT ON THE LAST SESSION'S DELETE (decision 075): its count, outside the
+// live region and hidden from assistive technology, and the one way into the
+// report while the card covers every other. Both shown only by
+// waitSayingFreeing; its press opens the report, wired in wireVersionMenu.
+const busyCount = $("busyCount") as HTMLParagraphElement;
+const busyReport = $("busyReport") as HTMLButtonElement;
+// A READ THAT HAS NOT FINISHED (decision 075's review): shown by readOrSkip's
+// offer only, and pressing it gives up every read being offered.
+const busySkip = $("busySkip") as HTMLButtonElement;
+busySkip.addEventListener("click", () => { for (const r of [...stalledReads]) r.skip(); });
+// THE SAME OFFER ONCE A SET HAS A PHOTO ON SCREEN (`skipInStrip`): in the
+// session strip beside Done, a button rather than a card over the editor.
+const stripSkip = $("stripSkip") as HTMLButtonElement;
+stripSkip.addEventListener("click", () => { for (const r of [...stalledReads]) r.skip(); });
 const busySave = $("busySave") as HTMLButtonElement;
 const busyClose = $("busyClose") as HTMLButtonElement;
 let pendingSave: { blob: Blob; name: string } | null = null;
 
+/** The control that had the focus when the card last rose — where a dialog
+ *  opened over the card gives the focus back if the card has gone first. */
+let busyOpener: HTMLElement | null = null;
+
 function showBusy(text: string) {
+  busyEpoch++; // a new use of the card: whatever was speaking on it before is not, now
   busyText.textContent = text;
   busySpinner.hidden = false;
   busyActions.hidden = true;
-  if (!busy.open) busy.showModal();
+  hideBusyExtras();
+  if (!busy.open) {
+    busyOpener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    busy.showModal();
+  }
 }
 
 function hideBusy() {
+  hideBusyExtras();
   if (busy.open) busy.close();
   pendingSave = null;
   pendingSaveIsBatch = false;
@@ -16952,6 +18034,25 @@ function openLookReceive(p: { look: SavedLook; name?: string }) {
   lookRecvSlots.hidden = true;
   lookRecvSlots.replaceChildren();
   hint.textContent = `Look received: ${p.name ?? "untitled"}`; // start-screen live region
+  // OPENED OVER THE BUSY CARD (an open's card rises before its first read), the
+  // dialog's return target is that card — which has usually closed by the time
+  // the reader answers, and focus then fell to <body>. Give it to the control
+  // that raised the card instead, and only when focus has landed nowhere.
+  if (busy.open) {
+    const opener = busyOpener;
+    const onClose = () => {
+      if (lookRecvDlg.open) return; // the close of the look this one replaced, arriving late
+      lookRecvDlg.removeEventListener("close", onClose);
+      if (busy.open) return; // the card is still up: the dialog's own return to it is right
+      // Nowhere: the page, or still the button just pressed inside the dialog
+      // that has closed — the browser moves focus off it only at its next
+      // update, after this event.
+      const at = document.activeElement;
+      const inClosed = !!at?.closest("dialog") && !at.closest("dialog")?.open;
+      if ((!at || at === document.body || inClosed) && opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+    lookRecvDlg.addEventListener("close", onClose);
+  }
   lookRecvDlg.showModal();
 }
 

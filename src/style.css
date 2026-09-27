@@ -1607,6 +1607,24 @@ body.dropping::after {
 }
 .session-done:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .session-done[disabled] { opacity: 0.6; cursor: default; }
+/* A slow read offered beside Done (decision 075's review). Done's own pill and
+   44px floor; a long file name ends in an ellipsis, and the whole name stays in
+   the button's accessible name. WHILE IT SHOWS the row may wrap: at 402px there
+   is no room for it beside Done, and measured there it pushed Done 10px past
+   the edge of the window — so it takes a second line, at the right edge under
+   Done, and the row without it is exactly as it was. */
+.session-head:has(> #stripSkip:not([hidden])) { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
+/* ...and the status line is sized from nothing, as it effectively is on one
+   line, so its own length never claims a whole line and pushes Done down. */
+.session-head:has(> #stripSkip:not([hidden])) > #sessionMeta { flex: 1 1 0; }
+.session-skip {
+  flex: 0 1 auto;
+  min-width: 5.5em;
+  max-width: 16em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* THE VERDICT, REACHABLE BY FINGER. The keys are the fast way and they are a
    keyboard's way; this app is used on a tablet, and a decision that can only be
    made by pressing P is a decision most of its readers cannot make at all.
@@ -2705,6 +2723,10 @@ button.toggletip {
   box-shadow: var(--shadow);
 }
 .busy-card p { margin: 12px 0 0; color: var(--txt); }
+/* The freeing count (decision 075): a quieter second line under the sentence,
+   in the calibrated secondary text token, figures that do not jostle. */
+.busy-card #busyCount { margin-top: 4px; color: var(--txt-2); font-variant-numeric: tabular-nums; }
+#busyReport, #busySkip { margin-top: 16px; }
 .spinner {
   width: 28px;
   height: 28px;
