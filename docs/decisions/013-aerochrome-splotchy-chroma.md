@@ -70,6 +70,13 @@ grain sheets. The floor is not the answer here — raising a luma-guided bilater
 far enough to flatten chroma patches smears the leaf texture, which is the
 trade the sources describe and warn against.
 
+## Depends
+
+- needs 015 — from 2026-09-17 to 2026-09-26 the lens correction opened off.
+  Frames opened for this record in that window carried the lens's centre
+  drift, unless the correction was set by hand, as one render in "Looked at"
+  was. Its numbers are read again once 015 opens on.
+
 ## Options
 
 **THE SHEET IS RENDERED, 2026-09-17, AND IT SPLITS THE DEFECT IN TWO.** Five
@@ -307,6 +314,8 @@ already), and a fix that works is one that acts on a SELECTION. The gravel
 needs its own.
 
 ## Rank
+
+**Below 015 as well, from 2026-09-26**, which it now needs (Depends): the lens correction opening on moves the population this stage smooths.
 
 **Re-ranked 2026-09-26: fifth, below 069, 071, 070 and 052.** 071, the update path, shares no ground with this. It sits below the white guard (069) and the rotation fix (070) because the guard changes what this stage does to every pale pixel in the sky, and the rotation moves the selection this stage smooths through on a turned photograph. The Aerochrome work leads the queue; this sits below 052 because 052 changes the sky population this stage smooths, and above 066 because 066's film model is tuned against the chroma this stage leaves. The round discs along wires and round pylons, seen at full resolution on NIR_3461 in both the shipped and the tuned look, are this stage's own texels averaging a wire's colour in.
 
