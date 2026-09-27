@@ -3224,6 +3224,27 @@ the strongest published statement against a fixed stored strength.
 lens, 85 edited and shared, and **hot-spot correction applied to 4 of them**.
 This app corrects every raw file the table matches, at full strength.
 
+**MEASURED ON THIS APP'S OWN CAMERA, 2026-09-26: THE COLOUR HALF CUTS THE OTHER
+WAY.**
+- **What the quotes are about.** The cases above are the hot spot's
+  brightness, which moves with the light in the scene.
+- **What the colour half is.** The colour half of this app's correction is
+  measured per lens, aperture and focal length.
+- **What 22 frames showed.** Rendered off and on, 22 frames of one set from the
+  NIKKOR Z DX 50-250mm at f/5 to f/8 behaved alike:
+  - In most, the sky's centre came out near-grey or red-grey at strength 0 and
+    blue at 1.
+  - The foliage's centre came out redder than the rest at 0. At 1 the centre
+    lost that cast and the edges warmed slightly, so the two moved toward each
+    other.
+  - Decision 015, "Looked at", has the frames.
+- **What was actually applying.** 19 of those 22 profiles carry no brightness
+  curve, so what applied was the colour half alone.
+- **So the correction opens on again** (015, reversed).
+- **What the scene dependence still argues for.** It argues for 015's
+  normalisation and a per-image check. It does not argue for leaving the lens's
+  colour drift in every frame.
+
 **THE HOT SPOT IS A WHITE-BALANCE SHIFT, AND THAT IS ALSO THE TEST.** *"A hot
 spot can change your exposure but can actually also change the white balance of
 the shot and affect colors and saturation."* The detection method given is to click the

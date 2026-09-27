@@ -87,6 +87,32 @@ last word" is the one source still unreachable, recorded as unread in §9f; it i
 the only one likely to carry a measurement of how the spot scales with scene
 brightness, which is what the per-image strength turns on.
 
+## Built already
+
+What exists that the next step on this record, the normalisation, will use, so a
+second one does not get written (LESSONS 330):
+
+- **The stage, twice.** The lens stage is in `src/pipeline.ts`: `lensFix`, the
+  `LensCurve` and the arithmetic near `const lensFix = p.lensBypass ? 0 …`.
+  The same arithmetic is in `src/gl.ts`. `tools/agreement-walk.mjs` checks that
+  the two compute the same picture.
+- **The pass at decode.** The flat laid on the linear raw before the balance
+  and the selection (021) is in `src/lensflat.ts`, `src/decode.worker.ts` and
+  `src/decodeClient.ts`. It is planned by `lensPlanFor` in `src/main.ts`.
+- **The strength at open.** `lensStrengthAtOpen` in `src/main.ts` is the one
+  rule every path that renders a photograph as it opens takes its strength
+  from. It is per lens, with 1 when nothing is remembered.
+- **The curves and the matcher.**
+  - `src/lensstore.ts`: `matchIn`, `bumpFrom`, `bumpProblem`, `colourProblem`.
+  - `src/hotspot.ts`: `findShipped`, `hasColour`.
+  - `src/hotspotProfiles.ts`: the table measured on 2026-09-12.
+- **The checks.**
+  - `tools/lens-order-walk.mjs`: the fresh open, memory across apertures, a
+    remembered 0, the card's wording.
+  - `tools/lens-store-check.mjs`: the curve rules held both ways.
+  - `tools/preview-version-check.mjs`: it hashes `lensPlanFor` and
+    `lensStrengthAtOpen`.
+
 ## Weighed against
 
 **013, "Aerochrome is the right colour and comes out splotchy"**, owns the
@@ -110,9 +136,9 @@ correction, and this record is the second time the same thing has been reported.
 
 ## Depends
 
-- needs 013 — 013 owns the chroma-noise half of what the same look does to a
-  frame, and its work changes what this stage gets measured against. That is
-  this record's own stated argument for ranking behind it.
+- touches 013 — both act on the centre's colour under the look. The edge
+  turned round on 2026-09-26: 013 now declares that it needs this, because its
+  population was measured with this correction off at open.
 
 ## Options
 
@@ -149,6 +175,35 @@ automatic must be visible and undoable, which this one never was.
 `PREVIEW_PIPELINE` moves with it, because a cached quick-look tile was rendered
 through the correction and is keyed on that number.
 
+**REVERSED, 2026-09-26: IT OPENS ON AGAIN, AT FULL STRENGTH, REMEMBERED PER
+LENS.**
+- **The frames.** Twenty-two NEFs of one set (NIKKOR Z DX 50-250mm, f/5 to f/8,
+  53 to 250 mm) were rendered through the app's own export under Aerochrome, at
+  strength 0 and at strength 1.
+- **The curves cover them.** Every frame matched a curve measured from the
+  owner's flat frames on 2026-09-12.
+- **Off, the centre drifts.** At 0, on most of the frames, the centre of the
+  sky is near-grey or red-grey where the edges are blue: NIR_3703's is flat
+  grey, and NIR_3700's is a red-grey blotch above centre. The centre of the
+  foliage is redder than the rest of the frame: a red disc on NIR_3716.
+- **On, centre and edge move toward each other.** At 1 the centre loses that
+  cast and moves the most, up to 17 ΔE00, though under 4 on three frames. The
+  edges move less, 2 to 8, and warm slightly: NIR_3716's edge grass is a little
+  redder at 1. On one frame of the 22 the centre barely changes. Of the 22
+  sheets, five were opened.
+- **This record predicted it.** That is its own Rejected entry, turning the
+  correction off by default, measured on a set of frames rather than argued
+  from one.
+- **Readers were covering it by hand.** The grey patch a reader had been hiding
+  with a Sky mask's highlights pushed toward blue was this drift, uncorrected.
+- **The memory is now per lens.** A strength chosen at f/5.3 never reached an
+  f/5 frame, so 19 of the 22 opened uncorrected after one had been set. Every
+  chosen value is stored, 0 included, because absence now means full.
+- **The card says what the profile does.** It said "brightness and colour" on
+  profiles with no brightness curve; it says "colour only" there now.
+- **What stays open.** The normalisation above, which answers the wash-out this
+  record was opened for. It still moves only with pictures, as it always said.
+
 ## Rejected
 
 **The centre anchor, as RawTherapee uses it.** It is a published normalisation
@@ -175,6 +230,8 @@ frame's sky, the centre-to-edge colour range goes from 1.30 uncorrected to 0.83
 corrected. Discarding that to save the foliage trades one defect for another, and
 the references do not say the correction is wrong — they say it is normalised,
 smoothed, clip-controlled and scaled per image, none of which this one is.
+Chosen anyway on 2026-09-17 as a stopgap, and reversed on 2026-09-26 on this
+paragraph's own grounds (Options).
 
 **Doing the whole re-architecture in one go** — clip control, a per-image
 strength, and moving the stage out of the creative chain. All three are supported
@@ -194,19 +251,16 @@ not worth having to prop up an automatic nobody in the field runs.
 
 ## Rank
 
-**Fourth.** Below 012, which takes the photograph away from the reader. Below
-013, whose chroma work changes what this stage gets measured against and which is
-feedback on a look that shipped this week. Below 014, a device-reported defect
-with a cheaper first step. Above everything under it, because those are unscoped
-design directions and this is a defect with a known remedy: a published formula
-implemented with one term missing, on a stage that is on by default for every raw
-file the table matches.
+**First, by the dependency test (2026-09-26).** Every colour item above it was
+measured with this correction off at open. 069's grey patch in the sky is this
+lens drift, uncorrected, and 013's splotchy Aerochrome was tuned on frames that
+opened without it. Turning it on moves what those items measure, so it goes
+before them. The normalisation that remains is the next step on this record,
+shown in pictures first. Earlier it ranked fourth (2026-09-17), behind 013 on
+the argument this reverses.
 
-**What comes next is now one thing, not three.** With the correction no longer
-applied at open, clip control and the pipeline position stop being urgent — they
-are properties of a stage that is off unless asked for. What remains is telling
-the reader the hot spot is THERE: measure the frame's own white balance at the
-centre against the edge, which is Rob Shea's own test and reads roughly 1000K
-apart on a visible hot spot, and say so in words beside the slider that fixes
-it. That is the version that matches both the field and this app's promise, and
-it needs its own record and its own pictures.
+## Looked at
+
+- NIR_3700, 2026-09-26: strength 0 against 1 under Aerochrome, the app's own export: whole frame, 2x centre and corner, and the difference. A red-grey blotch in the sky above centre at 0, an even blue-grey at 1; the seed heads pink-red at 0, white at 1; the corner barely moves.
+- NIR_3703, 2026-09-26: the same sheet. The sky's centre at 2x is flat grey at 0 and blue at 1; the foliage corner is unchanged.
+- NIR_3716, 2026-09-26: the same sheet. A red disc over the centre foliage at 0 that is gone at 1; the bottom-left grass is a little redder at 1 than at 0.

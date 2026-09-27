@@ -208,7 +208,28 @@ What exists that this item will use, so a second one does not get written
 - touches 052 — 052 rejected a whiteness weight as a selection fix, and its Option 1 puts every cloud the Sky mask holds under these stages; this is what those clouds meet there.
 - touches 023 — the Sky mask's colour grow takes cloud into the sky on purpose, and under 052 that cloud reaches these stages.
 - touches 066 — a film model renders cloud white from the film's own behaviour; this rule is what its clouds must meet if it replaces these stages.
+- needs 015 — the grey patch these stages were being tuned against is, on the
+  cell-tower set, the lens's uncorrected centre drift (015, Looked at). With
+  015 on at open, what arrives at these stages changes.
 - distinct-from 061 — both are about NIR_3461's steel under the look, and they are different pixels: 061's steel arrives red from the foliage band and its discs are sky moved toward red wire, neither of which this guard reaches; this record's are the steel and cloud that arrive without colour.
+
+## Found on the device, 2026-09-26
+
+- **A hand remedy for the grey patch.** In a Sky mask, moving the grade's
+  highlights toward blue, with a larger amount, removes the grey blobs from the
+  sky.
+  - It is a grade applied by hand over a mask the reader drew.
+  - It is evidence for what the sky should arrive as — the sky's colour, not
+    white — and not an option in itself.
+  - Looked at, 2026-09-26: the reader's own export with that grade, on
+    NIR_3698, from the 2026-09-26 cell-tower set.
+    - The sky is an even blue, lighter toward the treeline, with no grey patch.
+    - What is left is a fine mottle of grain, reddish in the upper left.
+- **And what it was.** The same frame rendered by the app at lens correction 0
+  and 1 has a near-grey sky centre at 0 and a blue one at 1: chroma 6.3 against
+  20.3. The blob the grade covered is the lens's centre drift, left uncorrected
+  because the correction opened off (015). What reaches these stages changes
+  once it opens on, so this record needs 015.
 
 ## Options
 
@@ -398,6 +419,8 @@ whether the hot spot is corrected, not on these stages.
 
 ## Rank
 
+**Second, after 015 (2026-09-26)**, which it now needs (Depends): turning the lens correction on at open changes what reaches these stages. Below that, the order argued here stands.
+
 **It holds no standing option as of 2026-09-26**, so what waits on it waits on
 research, not on a build.
 Option 8 put what is left of it in the selection rather than the map or the
@@ -405,7 +428,7 @@ stages: the one frame it failed on fails where the selection holds treetops,
 which is 073's and 052's ground. The rank stands because the rotation still
 needs this record's answer, whatever that answer turns out to act on.
 
-**First, above the rotation (070) and 052.** Argued by what would be redone,
+**Above the rotation (070) and 052.** Argued by what would be redone,
 not by severity.
 
 - **The rotation needs it**, and says so in its own record: built at their
@@ -452,3 +475,4 @@ is the argument that puts it above 052.
 - NIR_3466, 2026-09-26: the sky-map sheet, the pale cloud streak at upper left, and B's gate round the building and along the horizon.
 - NIR_1644, 2026-09-26: the sky-map sheet, B's gate in a band down the right side.
 - NIR_0627, 2026-09-26: the sky-map sheet, B's gate on every outline of the blurred background.
+- NIR_3698, 2026-09-26: the reader's own export with the Sky mask's highlights pushed toward blue (above); and the app's own export at lens correction 0 and 1, whose sky centre is near-grey at 0 and blue at 1.
