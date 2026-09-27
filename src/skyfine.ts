@@ -23,7 +23,7 @@
 
 import type { BrushMask } from "./pipeline";
 import { linearAt, type DecodedImage, type SkySelection } from "./decode";
-import { buildSkyMask } from "./sky";
+import { buildSkyMask, skyTurn } from "./sky";
 import { BRUSH_MAX_EDGE, sampleBrush } from "./pipeline";
 
 /** Working scale cap for the refined mask: its longer edge, in pixels. A
@@ -223,19 +223,25 @@ export interface SkySource {
   srcW: number;
   srcH: number;
   cam: number[] | null;
+  /** Which edge is up (sky.ts `skyTurn`, 0..3). The selection is seeded from
+   *  the edge this puts at the top, so it is part of what the selection IS. */
+  turn: number;
 }
 
 /**
  * Take the small copy the selection is built from.
  * @param img  the decoded photograph, its buffers still present.
+ * @param turn  which edge is up, as sky.ts `skyTurn` gives it; omitted, the
+ *   file's own turn (`img.rotate`), which is how a photograph opens.
  * @returns a SkySource at SKY_FINE_EDGE on the long edge, each pixel the box
  *   mean of its source block, read straight from the linear buffer when there
- *   is one and through `linearAt` otherwise.
+ *   is one and through `linearAt` otherwise, carrying `turn`.
  * What the result must satisfy: it is complete before the decode's buffer is
  * transferred — the worker calls this first and posts the picture second —
- * and it carries enough for `buildSkySelectionFrom` to need nothing else.
+ * and it carries enough for `buildSkySelectionFrom` to need nothing else,
+ * including the turn: a copy taken at one turn builds that turn's sky.
  */
-export function prepareSkySource(img: DecodedImage): SkySource {
+export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): SkySource {
   const { width: srcW, height: srcH } = img;
   const sc = Math.min(1, SKY_FINE_EDGE / Math.max(srcW, srcH));
   const w = Math.max(1, Math.round(srcW * sc)), h = Math.max(1, Math.round(srcH * sc));
@@ -255,20 +261,24 @@ export function prepareSkySource(img: DecodedImage): SkySource {
       if (n) { rgb[o] = r / n; rgb[o + 1] = g / n; rgb[o + 2] = b / n; }
     }
   }
-  return { w, h, rgb, srcW, srcH, cam: img.camMatrix ?? null };
+  return { w, h, rgb, srcW, srcH, cam: img.camMatrix ?? null, turn: skyTurn(turn) };
 }
 
 /**
  * Build the sky selection from a SkySource.
  * @param src  from prepareSkySource, for THIS photograph.
  * @param refine  false to stop at the coarse bitmap (a tile needs no more).
- * @returns the coarse bitmap (null when buildSkyMask finds no clear sky) and
- *   its refinement (null with it, and null when `refine` is false). Gray-world
- *   gains are taken from the copy itself, the same statistic the main thread
- *   computes over the full frame.
+ * @returns the coarse bitmap (null when buildSkyMask finds no clear sky), its
+ *   refinement (null with it, and null when `refine` is false), and the turn
+ *   both were found at, which is `src.turn`. Gray-world gains are taken from
+ *   the copy itself, the same statistic the main thread computes over the full
+ *   frame.
  * What the result must satisfy: it is the selection `DecodedImage.skySel`
  * carries and every sky-aware stage reads — built at gray-world balance and
- * nothing else, so it never moves as the photograph is graded.
+ * nothing else, so it never moves as the photograph is graded; and seeded from
+ * the edge `src.turn` puts at the top, the same turn the reader's Sky mask is
+ * built at (decision 070), so the two never disagree about which edge is up.
+ * A caller showing the picture at another turn must not use it.
  */
 export function buildSkySelectionFrom(src: SkySource, refine = true): SkySelection {
   const { w, h, rgb } = src;
@@ -280,11 +290,15 @@ export function buildSkySelectionFrom(src: SkySource, refine = true): SkySelecti
   const cl = (v: number) => Math.max(0.02, Math.min(16, v));
   const wb: [number, number, number] = [cl(mean / r / l), cl(mean / g / l), cl(mean / b / l)];
   const sample = (x: number, y: number): [number, number, number] => { const o = (y * w + x) * 3; return [rgb[o], rgb[o + 1], rgb[o + 2]]; };
-  const res = buildSkyMask(sample, w, h, 0, src.cam, wb, BRUSH_MAX_EDGE, 1, 0.5);
-  if (!res.found) return { mask: null, fine: null };
-  if (!refine) return { mask: res.mask, fine: null };
+  // AT THE TURN THE PICTURE IS SHOWN AT (070). This was a literal 0: the border
+  // runs down each column from the display's top edge, so on a photograph
+  // turned on its side the look's sky was seeded from a side of the picture.
+  const turn = skyTurn(src.turn ?? 0);
+  const res = buildSkyMask(sample, w, h, turn, src.cam, wb, BRUSH_MAX_EDGE, 1, 0.5);
+  if (!res.found) return { mask: null, fine: null, turn };
+  if (!refine) return { mask: res.mask, fine: null, turn };
   const guide = buildSkyGuide(sample, w, h, wb);
-  return { mask: res.mask, fine: refineSkyMask(res.mask, guide) };
+  return { mask: res.mask, fine: refineSkyMask(res.mask, guide), turn };
 }
 
 /** Outer colour tolerance for the grow, in units of the sky's own chroma

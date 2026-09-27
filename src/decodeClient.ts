@@ -225,7 +225,7 @@ function decodeOnThisThread(
   file: ImportedFile, onTiming: ((t: DecodeTiming) => void) | undefined, queuedAt: number, depth: number, sky?: boolean, lens?: LensPlan | null,
 ): Promise<DecodedImage> {
   const startedAt = performance.now();
-  const p = decodeHere(file).then((img) => { applyLensPlan(img, lens ?? null); return img; }).then((img) => { if (sky) img.skySelReady = requestSkySelection(prepareSkySource(img)).then((sel) => { if (sel) img.skySel = sel; return sel; }); return img; });
+  const p = decodeHere(file).then((img) => { applyLensPlan(img, lens ?? null); return img; }).then((img) => { if (sky) img.skySelReady = requestSkySelection(prepareSkySource(img, img.rotate ?? 0)).then((sel) => { if (sel) img.skySel = sel; return sel; }); return img; });
   if (onTiming) {
     const done = () => onTiming({ queued: startedAt - queuedAt, run: performance.now() - startedAt, depth, offThread: false });
     p.then(done, done);

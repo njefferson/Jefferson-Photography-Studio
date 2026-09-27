@@ -23,6 +23,10 @@ import type { BrushMask } from "./pipeline";
 export interface SkySelection {
   mask: BrushMask | null;
   fine: BrushMask | null;
+  /** The turn it was found at (sky.ts `skyTurn`, 0..3): which edge of the file
+   *  was taken as up. A picture shown at any other turn must not read it
+   *  (decision 070) — its sky is on a different edge. */
+  turn: number;
 }
 
 export interface DecodedImage {
