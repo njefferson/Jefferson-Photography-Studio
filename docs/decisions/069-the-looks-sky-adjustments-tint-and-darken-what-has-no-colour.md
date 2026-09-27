@@ -419,7 +419,7 @@ whether the hot spot is corrected, not on these stages.
 
 ## Rank
 
-**Second, after 015 (2026-09-26)**, which it now needs (Depends): turning the lens correction on at open changes what reaches these stages. Below that, the order argued here stands.
+**After 015 (2026-09-26)**, which it now needs (Depends): turning the lens correction on at open changes what reaches these stages. 075 and 076 sit between (2026-09-27): they are the open path's two silent waits, share no ground with these stages, and were built beside 015. Below that, the order argued here stands.
 
 **It holds no standing option as of 2026-09-26**, so what waits on it waits on
 research, not on a build.
