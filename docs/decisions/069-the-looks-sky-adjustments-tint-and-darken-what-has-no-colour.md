@@ -198,8 +198,9 @@ What exists that this item will use, so a second one does not get written
   it"**: a film model makes cloud white from the film's own curves. If it
   replaces these stages, this rule is the one its clouds must meet, and the
   guard goes only with the stage it sits in.
-- The rotation (070) declares its relation from its own side: it cannot ship
-  before this.
+- The rotation (070) declares its relation from its own side. It said it
+  could not ship before this until 2026-09-27; it touches this now, and ranks
+  above it (070, Rank).
 
 ## Depends
 
@@ -428,14 +429,15 @@ stages: the one frame it failed on fails where the selection holds treetops,
 which is 073's and 052's ground. The rank stands because the rotation still
 needs this record's answer, whatever that answer turns out to act on.
 
-**Above the rotation (070) and 052.** Argued by what would be redone,
-not by severity.
+**Below the rotation (070) from 2026-09-27, and above 052.** Argued by what
+would be redone, not by severity.
 
-- **The rotation needs it**, and says so in its own record: built at their
-  rotation, the look's selection maps take NIR_1651's cloud and most of
-  NIR_1644's band in, and these stages turned such cloud blue-grey on
-  2026-09-26. That is a prediction from the maps; the render that confirms it
-  is 070's acceptance.
+- **The rotation no longer waits for this.** It did, on the prediction that
+  built at the turn shown the look's selection takes NIR_1651's cloud and most
+  of NIR_1644's band in, under stages that turned such cloud blue-grey on
+  2026-09-26. Upright photographs already take their cloud under these stages,
+  so the rotation makes turned ones behave as upright ones do and goes first;
+  its renders of those two frames are this record's cloud checks.
 - **052's Option 1 puts every cloud the reader's Sky mask holds under these
   stages.** Built first, it would ship blue cloud, or be judged against stages
   about to change.

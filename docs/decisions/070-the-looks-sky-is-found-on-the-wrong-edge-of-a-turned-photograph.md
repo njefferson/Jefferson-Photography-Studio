@@ -77,6 +77,8 @@ band in. Under the learned selection the same stages turned such cloud
 blue-grey, so this is expected to put blue-grey cloud on turned photographs
 with cloud in the sky unless 069 is in. No export with the selection built at
 their rotation has been made; the renders are this item's acceptance.
+Rendered on 2026-09-27 (Looked at): the cloud does take a cyan tint, as the
+clouds of upright photographs already do.
 
 ## Looked up
 
@@ -152,11 +154,15 @@ What exists that this item will use, so a second one does not get written
 - **013, "Aerochrome is the right colour and comes out splotchy"**: it tunes the
   sky the look renders, and NIR_1651 and NIR_1644, both turned, are among the
   frames the sky's chroma has been measured on.
-- The white guard (069) is declared below: this cannot ship before it.
+- The white guard (069) is declared below. It was "needs" until 2026-09-27,
+  when it became "touches": upright photographs already take their cloud under
+  the sky stages, so fixing the turn makes a turned photograph behave as an
+  upright one does and never worse, and 069's cloud checks are run on these
+  frames once this has landed.
 
 ## Depends
 
-- needs 069 — built at its rotation, the look's selection map takes NIR_1651's cloud and most of NIR_1644's band in; under the learned selection the same stages turned such cloud blue-grey, so fixed alone this is expected to ship blue-grey cloud on turned photographs with cloud in the sky. A prediction from the selection maps, not a render; the renders are this item's acceptance.
+- touches 069 — upright photographs already take their cloud under the sky stages, so building the turned ones' sky at the turn shown makes them behave as upright ones do, never worse; it brings NIR_1651's cloud and most of NIR_1644's band inside the selection, which is 069's subject, and 069's cloud checks are run on those frames after this.
 - touches 052 — its Option 1 retires this path for the three sky stages on the open photograph but not for tiles, a batch, the lift or the shadow cast, and its seeded mask would start from this pair; whichever lands first, the other is measured on what it leaves.
 - touches 029 — the seed is 029's subject, and this decides which edge it is seeded from on a turned photograph.
 - touches 023 — 023 fixed the same zero in its probe; the app's own path kept it.
@@ -189,13 +195,39 @@ What exists that this item will use, so a second one does not get written
      gallery), builds at `renderer.rotation`.
    - One rule: every path that means the sky builds it from the same inputs as
      the reader's Sky mask, so the two never disagree about which edge is up.
-   - **Before it ships**, NIR_1651 and NIR_1644 are rendered through
-     `tools/look-sheet.mjs` with 069 in, and opened whole frame and at 1:1: the
-     look's sky reaches the clear sky right of NIR_1651's tree and down to
-     NIR_1644's crowns, and the cloud stays white, with no seam where it meets
-     clear sky. These are 069's cloud checks, which cannot run before this.
-     `tools/rotation-walk.mjs` gains the check that the look's sky follows a
-     quarter-turn.
+   - **Four more places, found by the audit of 2026-09-27**, each of which
+     ignored the turn or the flip, are part of this option:
+     - **The vertical flip.** `toggleFlip` rebuilt the reader's Sky masks, but
+       the detector never read the flip, so the rebuild was identical. The
+       look's pair and the reader's Sky masks now take one turn with the mirror
+       folded in (`skyTurn` in `src/sky.ts`), so a flipped photograph's sky is
+       found at its displayed top.
+     - **At-open solves that ran before the turn was set.** A stored edit's
+       restore ran `establishFreshEdit`, and with it the lift, before
+       `applyView` put the stored turn back, and `openGalleryPhoto` set an
+       example's fixed turn after `activateCurrent`. Both set the turn first.
+     - **Undo and Redo after Rotate.** The re-detection a turn makes settles
+       into history, so Undo straight after a Rotate put back Sky-mask bitmaps
+       found at the old turn. Each bitmap now records the turn it was found
+       at, and a snapshot put back at another turn re-finds it.
+     - **A new Gradient mask's default.** It ran top-down in the file, so on a
+       turned photograph it arrived from one side. It now starts at the top of
+       the picture as shown.
+   - **Not part of it:** a saved mask carried between photographs at different
+     turns, and Level the horizon under a mirror. The second is checked by
+     `tools/rotation-walk.mjs` (check 13) and was found reversed: on a made
+     frame with one straight edge 4 degrees off level it answered -4 degrees
+     both as shown and mirrored left to right, on the build before this and
+     after it.
+   - **Before it ships**, NIR_1651, NIR_1644 and NIR_0627 are rendered whole
+     frame through `tools/look-sheet.mjs` under Aerochrome, the build before
+     against the fixed one, and opened: the look's sky reaches the clear sky
+     right of NIR_1651's tree and down to NIR_1644's crowns, with no seam where
+     cloud meets clear sky, and NIR_0627, with no sky, does not change. The
+     cloud those skies now take in is 069's to keep white.
+     `tools/rotation-walk.mjs` gains the checks that the look's sky follows a
+     quarter-turn, a stored turn and a flip, that the lift and a tile read the
+     sky shown, and Undo after Rotate.
 2. The file's own rotation only, taken at decode.
 3. Wait for 052's Option 1 to retire the path.
 4. Find the up edge from the picture: run the detector from all four edges and
@@ -209,31 +241,47 @@ What exists that this item will use, so a second one does not get written
 
 ## Rank
 
-**Third, below the white guard (069) and the update-path record (071), and above 052.** 071 went in second on 2026-09-26 because it shares no ground with this and was the next item that could be built. Argued by what
-would be redone.
+**First (2026-09-27): directly below 076, which is on staging, and above the
+white guard (069), the update-path record (071), 052, 013 and 066.** Argued by
+what would be redone.
 
-- **It needs the guard.** Fixed alone, the selection maps show it bringing
-  NIR_1651's cloud and most of NIR_1644's band into the look's own selection,
-  under stages that turned such cloud blue-grey under the learned selection.
-  That is a prediction, and the render is this item's acceptance.
+- **It no longer waits for the guard.** It was third, below 069 which it
+  needed, on the prediction that it would put blue-grey cloud into turned
+  photographs. Upright photographs already take their cloud under the same
+  stages, so fixing the turn makes a turned photograph behave as an upright
+  one does, never worse; the edge is "touches" now, and 069's cloud checks are
+  run on these frames after this lands rather than before.
+- **Above 069**, whose cloud checks are NIR_1651's cloud and NIR_1644's band:
+  on the build before this those clouds were largely outside the look's
+  selection (all of NIR_1651's, most of NIR_1644's band) because the selection
+  was found on the wrong edge, so a guard judged there would be judged on
+  clouds its stages never reached.
+- **Above 071**, which shares no ground with this and went in second on
+  2026-09-26 only because this was waiting on the guard.
 - **Above 052**, because 052's Option 1 is built and measured over this
   selection on turned photographs; the mask its Option 1 seeds would start from
   this pair; and this path survives 052 for tiles, a batch, the lift and the
   shadow cast. Fixed after 052, 052's acceptance on every turned frame would be
   measured again.
 - **Above 013 and 066**, which tune the look's sky over frames that include
-  turned ones.
+  turned ones: three of the seven frames Aerochrome's sky depth was solved on
+  are stored turned (NIR_1651, NIR_1644 and NIR_0627), so anything tuned on
+  them before this would be tuned again.
 - **Above the finder choice (068)**, which compares the two finders on Sky
   masks after 052's Option 1, on practice frames neither finder was developed
   on. The mask Option 1 seeds would start from this pair, so any of those
   frames that is turned would be seeded on the wrong edge until this lands.
 
-It costs a parameter, a rotation on `skyMaskFor`'s cache and `shadowCastFor`'s,
-and a rebuild when the rotation changes; nothing ranked above it changes shape
-because of it.
+It costs a parameter, a turn on `skyMaskFor`'s cache and `shadowCastFor`'s, a
+rebuild when the turn shown changes, and the audit's four places; nothing
+ranked below it changes shape because of it, only what it is measured on.
 
 ## Looked at
 
 - NIR_1651, 2026-09-26: the look's selection built at rotation 0 and at the frame's own rotation, each drawn in yellow over the frame as displayed, full frame side by side; and the whole-frame exports through today's selection and the learned one, side by side.
 - NIR_1644, 2026-09-26: the same two sheets; where each selection stops above the crowns, against the band of white cloud in the exports.
 - NIR_0627, 2026-09-26: the two selections, full frame side by side.
+- NIR_1651, 2026-09-27: whole frame under Aerochrome through `tools/look-sheet.mjs`, the build before this against the fixed one, side by side. Before: the look's blue only in the upper left and down the left edge, the cloud neutral grey-white, and the clear sky right of the tree a flat slate grey, so two different skies either side of the tree. Fixed: deep teal-blue clear sky on both sides, darkening toward the lower right; the cloud tinted cyan, most along its lower right edge, its densest parts near white; no hard seam where cloud meets clear sky. The cyan cloud is the cost 069 is about.
+- NIR_1651, 2026-09-27: `tools/rotation-walk.mjs`'s pictures (checks 8 to 15), the frame opened as stored, from an upright copy, from a copy stored upside down turned once, and from a copy stored mirrored flipped back. On the build before this each disagreed with the upright copy in its sky; the flipped copy showed the whole sky grey and a saturated red blob at the foot of the tree, where the look had taken the bottom of the picture as its sky. Fixed, all four show the same picture. The upright copy itself, on the build before this, already shows its cloud tinted cyan along the top and its lower right edge: what the fix gives the turned frame is what the upright one had. The strip tiles of the frame and of its upright copy, neither opened yet, show the same sky; both show the tree paler pink than the open photograph, which is not about the turn.
+- NIR_1644, 2026-09-27: whole frame under Aerochrome, before against fixed, side by side. Before: the band of white cloud behind the crowns mostly white, a pale rim hugging the tallest crown. Fixed: the band cyan-blue on its left third and paler cyan to the right, the deep blue sky above it unchanged; no seam at the crowns.
+- NIR_0627, 2026-09-27: whole frame under Aerochrome, before against fixed, side by side. No visible difference: red blurred background, white flower spikes, grey ground, the same small pale-blue disc by the top flower.

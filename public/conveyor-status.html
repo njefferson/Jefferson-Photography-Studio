@@ -83,9 +83,9 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.63.7: a picked mask takes its own settings, the LUT grid, None for looks, and the fixes that came with them. Promoted on your go on 2026-09-26, by pull request with the tree unchanged. Checked on the live site: its offline copy is named for 2.63.7, and the Gates run and the deploy for that commit both passed.</span></li>
-        <li><b>On staging</b> <span>v2.63.26, pushed 2026-09-27: the lens correction opens on again, Keep straight after Done says what it is doing and waits only when the device needs the space, a batch no longer waits on the browser's storage question, and a browser that rebuilds the editor at every start says so every time, on top of v2.63.21's update fixes. The Gates run and the deploy for 0e9dcdc both passed, and staging's offline worker was read naming it as ips-2.63.26.</span></li>
-        <li><b>Next</b> <span>The rotation defect (070): on a photo turned on its side, every look that uses the sky finds it on the wrong edge. It goes to the top of the queue; its plan is built from the audit already done.</span></li>
-        <li><b>Last verified green</b> <span><code>0e9dcdc</code>, on staging: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>On staging</b> <span>v2.63.28, pushed 2026-09-27: a photo turned on its side or flipped gets the look's sky at the top as shown; the lens correction opens on again; Keep straight after Done says what it is doing and waits only when the device needs the space; a batch no longer waits on the browser's storage question; and a browser that rebuilds the editor at every start says so every time, on top of v2.63.21's update fixes. The Gates run and the deploy for 52eaac4 both passed, and staging's offline worker was read naming it as ips-2.63.28.</span></li>
+        <li><b>Next</b> <span>The look's sky stages tinting clouds (069), now that turned photos take their sky as upright ones do.</span></li>
+        <li><b>Last verified green</b> <span><code>52eaac4</code>, on staging: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63 is production's number. The next release that adds something takes 2.64.</span></li>
       </ul>
 
@@ -101,6 +101,11 @@
             should start at once.
           </li>
           <li>
+            <strong>On the iPad, first:</strong> open NIR_1651 or any photo shot on
+            its side and choose Aerochrome. The look's sky should be even across
+            the whole sky, with no grey half beside the tree.
+          </li>
+          <li>
             <strong>On the iPad:</strong> open one of the cell-tower NEFs. The lens
             card should name the profile, and the middle of the sky should be
             blue, not grey.
@@ -110,14 +115,17 @@
 
       <h2>The stages</h2>
       <ul>
-        <li class="now"><span class="state">Next</span>
-          <strong>On a photo turned on its side, the look's sky is found on the
+        <li class="waiting"><span class="state">On staging</span>
+          <strong>On a photo turned on its side, the look's sky was found on the
           wrong edge.</strong> Every look that uses the sky works it out on the
           unturned frame: sky colour smoothing, sky depth, sky saturation, the
           depth lift, shadow light, and the tiles and batch exports made with
           them. White balance, exposure, lens correction, the hue bands and your
           own Sky masks get the turn right. Three of the seven frames Aerochrome's
-          sky depth was tuned on are stored turned. It goes first.
+          sky depth was tuned on are stored turned. Fixed in v2.63.28 for the
+          open photo, its tiles and a batch, with a flip, Undo after a turn, a new
+          Gradient and Level on a mirrored photo. Clouds inside the look's sky on
+          a turned photo now take the cyan tint upright photos already get (069).
         </li>
         <li class="waiting"><span class="state">On staging</span>
           <strong>Keep straight after Done sat silent for minutes, and a second
@@ -395,6 +403,10 @@
           <strong>The confirmation after applying a LUT from the manager, and
           after saving without location, is never seen.</strong> It is put inside
           a dialog that closes on the next line.
+        </li>
+        <li>
+          <strong>A strip tile of a photo not yet opened shows Aerochrome's
+          foliage pale pink</strong> where the opened photo is red.
         </li>
         <li>
           <strong>One saved photo opened on its own while a session is open
