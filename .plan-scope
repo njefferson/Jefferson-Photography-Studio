@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=79dd9b29e63e56ab
-diffhash=d5d731bcc715aaaa
-verdict=IN-SCOPE: plan item 2 as revised, its pieces A to F, the in-scope fixes, and the fixes to defects they introduced
-# Plan item 2 as revised: the base (card before any wait, wait only when estimate() says the set will not fit, words and a count, a second open refused, the report's Freeing storage line), pieces A to F, the in-scope fix list, and the fixes to defects those pieces introduced through review round 5. tools/slow-storage.mjs is the walks' storage stand-in; the a11y walk's new sections cover the new card and strip surfaces. Judged by a watcher subagent reading the plan by path and the diff; nothing outside the plan found.
+diffhash=3d137570797e6bf2
+verdict=IN-SCOPE: plan item 4, the rest: 075 and 076 recorded and ranked after 015, the staging entry and the status page
+# Plan item 4, the rest: the 075 record with its as-built section and the rejected alternatives, the 076 record, both ranked directly after 015 in NOTES with 069's and 071's rank text brought into line, the v2.63.26 staging entry with the correction to the 2.63.21 Firefox reading, and the status page. Judged by a watcher subagent reading the plan by path and the diff.

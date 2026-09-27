@@ -213,7 +213,7 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
 
 ## Rank
 
-**Second, directly below 069.** Argued by what would be redone, not by severity.
+**Directly below 069.** Argued by what would be redone, not by severity.
 
 - **It invalidates nothing above it.** The sky work touches none of the update
   path, the precache or the start-up.

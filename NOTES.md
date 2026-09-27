@@ -54,60 +54,52 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**v2.63.21 at https://staging.jefferson-photo-studio.pages.dev, pushed
-2026-09-26 (23cc31e).** Decision 071's fix, both halves, on top of v2.63.12's
-three commits and the stickers export fix, replacing it. VERSION stays 2.63:
-one is faster, the rest are fixes. The Gates run and the deploy for 23cc31e
-both passed, and staging's worker was read naming 23cc31e exactly, with
-offline copy `ips-2.63.21`.
+**v2.63.26 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-27 (0e9dcdc).** Production is v2.63.7. The Gates run and the deploy for
+0e9dcdc both passed, and staging's offline worker was read naming it, as
+`ips-2.63.26`. VERSION stays 2.63: every change since 2.63.7 is a fix.
 
-What a reader gets, beyond v2.63.12's three:
+What a reader gets beyond production, newest first:
 
-- Fixed: stickers on a photo you return to after resuming a session are in
-  its export;
-- Fixed: the test page shows what building the editor's graphics costs a
-  launch, not an average;
-- Faster: an update downloads only the files that changed, and never the
-  sticker library again;
-- Fixed: after an update the start screen answers and says it is preparing
-  the editor, and a photo you choose opens when it is ready.
+- Fixed: Keep straight after Done shows at once what it is doing, waits only
+  when the device needs the space, says so with a count, and never adds the
+  set twice (075);
+- Fixed: a batch no longer waits for the answer to the browser's question
+  about keeping data (076);
+- Fixed: a photograph from a lens the app knows opens with its lens correction
+  on again (015);
+- Fixed: a browser that rebuilds the editor at every start says so every time;
+- Fixed: after an update the start screen answers and says it is preparing the
+  editor;
+- Faster: an update downloads only the files that changed;
+- the three fixes of v2.63.12 below, and stickers kept in an export after
+  resuming a session.
 
-**What the device pass is.** The PC first, then the iPad.
+**What the device pass is.**
 
-1. Open https://staging.jefferson-photo-studio.pages.dev/ir.html. The notice
-   at the top should say "Downloading the update… N of M" and then that a new
-   version is ready. This one download is still the whole app, because
-   2.63.12's copy carries no labels to reuse. Press Update now.
-2. The first start after it builds the editor's picture code from scratch.
-   On the PC, "Preparing the editor…" should show with a count of seconds, and
-   Help on the start screen should open while it counts. Note whether it does.
-3. When it says the editor is ready, tap the version number, press "Copy the
-   report", and send the lines that start "Start-up" and "Offline worker".
-4. The next staging update after this one should count only a handful of
-   files.
+1. On the PC in Firefox, end a large session with Done, then open a few photos
+   in the Quick look and press Keep. A card should say what it is doing at
+   once. If it waits, it says "Freeing the space the last session used…" with
+   a count. Copy the report and send the lines starting "Freeing storage" and
+   "Last keep".
+2. In the same browser, start a batch. It should start at once, whether or not
+   the browser's question about keeping data has been answered.
+3. On the iPad, open one of the 2026-09-26 cell-tower NEFs. The lens card
+   should name the profile, and the middle of the sky should be blue, not grey.
 
-**The first reading, 2026-09-26, a PC in Firefox 156 (GTX 980 through
-Direct3D, 12 cores), a session of 222.** The update worked as built: "its
-install kept 211 files already on this device and downloaded 7, every sticker
-on the device". The install took 45.4 s, and the cause is not known. The
-start did not: "graphics built 0.15 s–44.25 s (44.11 s; the page waited —
-longest pause 44.10 s; no way to build off the page offered)", with no
-"said it was preparing". So the page froze for 44 seconds in silence.
-Firefox offers no way to build off the page (Mozilla bug 1736076). The
-missing words mean an earlier launch of the same picture code in this browser
-had finished and been recorded, so this launch expected a quick build and
-got 44 s. This Firefox keeps no built copy that it reuses, and pays the build
-on every start. The one-second fallback cannot fire while the page is held.
-**Defect, fixed next:** the launch remembers how long the last build took,
-and a browser whose last build was slow says so before it starts. Making the
-build itself faster is the other half, which the next plan carries.
+**Correction to main's v2.63.21 entry:** the Firefox reading there names a GTX
+980. That is Firefox's rounded name for the same PC's GTX 1650, reported that
+way to resist fingerprinting; the Firefox and Edge readings are one PC.
 
-What was verified here: the offline walk (25 checks, including an update that
-changed one file making 2 requests, and 0 of 162 stickers fetched on a second
-release), the new build-wait walk (seen failing 17 checks against the old
-build), the journey walk and the full accessibility walk, all in headless
-Chromium. Whether Edge on the PC builds off the page once asked is not known
-until step 3's Start-up line.
+**Found on the way and not fixed, all pre-existing:**
+- the confirmation after applying a LUT from the manager, and after saving
+  without location, is never seen, because it is put inside a dialog that closes
+  on the next line;
+- one saved photo opened on its own while a session is open replaces that
+  session without asking;
+- `tools/build-wait-walk.mjs` fails about one run in two on "the report admits
+  the page waited": `heldDuring` in `src/startup.ts` ignores a pause that began
+  just before the build did.
 
 **v2.63.12 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-26 (f763bee).** Decision 071's first step: measure the frozen first
@@ -1002,6 +994,26 @@ user-scalable=no.
   memory was per aperture, so 19 of 22 opened uncorrected. **Ranked first by the
   dependency test:** 069's grey patch is this drift, and 013 was tuned with it
   off.
+
+- [ ] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
+  **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.
+  Reported 2026-09-26 from a PC in Firefox: after ending a session of 222
+  photos, Keep on 22 more did nothing for minutes, and the report said nothing
+  was in progress. Keep waited on the old session's delete with nothing on
+  screen, and a second press added the set twice. On staging from 2026-09-27
+  (0e9dcdc): the card rises at once; the wait happens only when the browser
+  says the set will not fit, and says so with a count; a photo refused for room
+  meanwhile is stored again; a slow file is offered to be skipped; a second open
+  is refused in words. Found and fixed with it: a saved photo dropped together
+  with photos deleted an open session without asking.
+  See `docs/decisions/075-keeping-photos-after-ending-a-large-session-waits-on-the-old-sessions-delete.md`.
+
+- [ ] **Batch export and adding photos wait for the browser's storage permission** <!-- decision: 076 -->
+  **Shown as:** A batch starts, and a set finishes, without waiting for you to answer the browser's question about keeping data.
+  Firefox answers the storage request with a prompt, and a batch sat at
+  "Processing 0" until it was answered. On staging from 2026-09-27 (01eec90):
+  the request is made and never waited on.
+  See `docs/decisions/076-batch-export-and-adding-photos-wait-for-the-browsers-storage-permission.md`.
 
 - [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
   **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.
