@@ -52,6 +52,12 @@ const DIRS = ["src/raw"];  // the raw decoders, every file
 const REGIONS = [
   ["src/main.ts", "async function makeThumb("],   // the picture itself
   ["src/main.ts", "function lensCurveFor("],      // which correction it is rendered through
+  // AND AT WHAT STRENGTH. Since 015 was reversed (2026-09-26) every raw preview
+  // is decoded with the correction laid at the strength these two decide, and
+  // this list named neither: a change to the at-open rule alone would have kept
+  // serving tiles rendered under the old one.
+  ["src/main.ts", "function lensPlanFor("],       // the flat laid at decode
+  ["src/main.ts", "function lensStrengthAtOpen("],// and the strength it is laid at
 ];
 
 /** The function that starts at `marker`, to its matching closing brace. */
