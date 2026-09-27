@@ -54,13 +54,17 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**v2.63.26 at https://staging.jefferson-photo-studio.pages.dev, pushed
-2026-09-27 (0e9dcdc).** Production is v2.63.7. The Gates run and the deploy for
-0e9dcdc both passed, and staging's offline worker was read naming it, as
-`ips-2.63.26`. VERSION stays 2.63: every change since 2.63.7 is a fix.
+**v2.63.28 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-27 (52eaac4).** Production is v2.63.7. The Gates run and the deploy for
+52eaac4 both passed, and staging's offline worker was read naming it, as
+`ips-2.63.28`. VERSION stays 2.63: every change since 2.63.7 is a fix.
 
 What a reader gets beyond production, newest first:
 
+- Fixed: a photo turned on its side or flipped gets the look's sky at the top
+  of the picture as shown, in the open photo, its tiles and a batch; a Sky mask
+  stays on the sky after Undo following a turn; a new Gradient starts at the
+  top as shown; Level turns the right way on a mirrored photo (070);
 - Fixed: Keep straight after Done shows at once what it is doing, waits only
   when the device needs the space, says so with a count, and never adds the
   set twice (075);
@@ -77,6 +81,10 @@ What a reader gets beyond production, newest first:
 
 **What the device pass is.**
 
+0. On the iPad, open NIR_1651 or any photo shot on its side and choose
+   Aerochrome. The look's sky should be even across the whole sky, with no
+   grey half beside the tree. Clouds inside it now take the cyan tint upright
+   photos already get; that is 069, next in the queue.
 1. On the PC in Firefox, end a large session with Done, then open a few photos
    in the Quick look and press Keep. A card should say what it is doing at
    once. If it waits, it says "Freeing the space the last session used…" with
@@ -92,6 +100,9 @@ What a reader gets beyond production, newest first:
 way to resist fingerprinting; the Firefox and Edge readings are one PC.
 
 **Found on the way and not fixed, all pre-existing:**
+- a strip tile of a photo not yet opened shows Aerochrome's foliage pale pink
+  where the opened photo is red, with Restore depth off; the same on the build
+  before the rotation fix;
 - the confirmation after applying a LUT from the manager, and after saving
   without location, is never seen, because it is put inside a dialog that closes
   on the next line;
@@ -1015,6 +1026,26 @@ user-scalable=no.
   the request is made and never waited on.
   See `docs/decisions/076-batch-export-and-adding-photos-wait-for-the-browsers-storage-permission.md`.
 
+- [ ] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
+  **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
+  `buildSkySelectionFrom` passes rotation 0 to the detector, so on a turned
+  photograph the look's own sky is seeded from a side of the picture: NIR_1651
+  reads 18.2% of the frame against 52.2% at its rotation. The reader's Sky mask
+  already passes the renderer's rotation. The chosen shape builds the look's
+  selection at the turn the picture is shown at, mirror included, on every
+  path: the open photograph and its export, `skyMaskFor`'s cache and
+  `shadowCastFor`'s for tiles, the lift and the shadow cast, a batch, and the
+  main-thread build for a photo picked on its own or opened from the gallery;
+  and again when the turn changes. With it go the audit's four places: a
+  vertical flip, the at-open solves run before the turn was set, Undo after
+  Rotate, and a new Gradient's default direction. First (2026-09-27): upright
+  photographs already take their cloud under the sky stages, so fixing the
+  turn makes turned ones behave as upright ones do, never worse, and 069, 052,
+  013 and 066 all tune or measure over turned frames. It touches the white
+  guard (069) rather than needing it, and 052's Option 1 would retire the path
+  only for the three sky stages on the open photograph, so it touches 052
+  rather than being superseded by it. See
+  `docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md`.
 - [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
   **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.
   Sky colour smoothing pulls a white or grey pixel inside the sky toward the
@@ -1030,9 +1061,9 @@ user-scalable=no.
   with colour and stay 061's and 013's. It must pass the whiteness weight's
   three measured failures (052) and keep 013's speckle gone, and if the
   speckle comes back the option fails rather than gaining a width tuned on the
-  practice frames. Its cloud checks wait for the rotation fix (070). First: the
-  rotation fix needs it, and 052's Option 1 brings every cloud the Sky mask
-  holds under these stages.
+  practice frames. Its cloud checks wait for the rotation fix (070), ranked
+  above it from 2026-09-27. Above 052, whose Option 1 brings every cloud the
+  Sky mask holds under these stages.
   See `docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md`.
   **Built 2026-09-26 and failed.** The one rule brought 013's speckle back at
   the look's own settings on NIR_3406, snowed its sky with pale dots under Sky
@@ -1071,24 +1102,6 @@ user-scalable=no.
   report's Start-up line answers on the first launch; the busy card has no
   count while it waits; and making the code compile faster on Direct3D.
   See `docs/decisions/071-the-first-launch-after-an-update-froze-with-nothing-said-and-every-update-downloads-the-whole-app.md`.
-- [ ] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
-  **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
-  `buildSkySelectionFrom` passes rotation 0 to the detector, so on a turned
-  photograph the look's own sky is seeded from a side of the picture: NIR_1651
-  reads 18.2% of the frame against 52.2% at its rotation. The reader's Sky mask
-  already passes the renderer's rotation. The chosen shape builds the look's
-  selection at the rotation the picture is shown at, on every path: the open
-  photograph and its export, `skyMaskFor`'s cache and `shadowCastFor`'s for
-  tiles, the lift and the shadow cast, a batch, and the main-thread build for a
-  photo picked on its own or opened from the gallery; and again when the turn
-  changes. That it then brings NIR_1651's and NIR_1644's clouds under the sky
-  stages is read off selection maps, not renders, so it waits for the white
-  guard (069), and its renders are 069's cloud checks. 052's Option 1 would
-  retire the path only for the three sky stages on the open photograph, so
-  this touches 052 rather than being superseded by it. Third, below the white
-  guard (069), which it needs, and the update-path record (071), which shares
-  no ground with it. See
-  `docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md`.
 - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
   **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
   **Fourth from 2026-09-26, below the white guard (069), the update-path record
