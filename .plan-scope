@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=242728e917f78b73
-diffhash=e77c3e5592f82859
-verdict=IN-SCOPE: plan item 4, 015 reversed and ranked first, 9h amended, 069's device note, with the edges and sections the decision gate requires
-# Plan item 4's first bullets: 015 gains the reversal with the 22-frame evidence and moves to the top of NOTES' queue; IR-SCIENCE 9h is amended; 069 gains the device note naming NIR_3698. Needed by those bullets: 015's edge with 013 turns round (013 and 069 now declare needs 015), 015 gains the Built already section the decision gate requires of the top-ranked record, and 015 and 069 gain Looked at entries for the frames they name. The watcher's four accuracy findings are corrected in this diff: "every frame / matched at 1" narrowed to what the data and the five opened sheets show (centre and edge move toward each other; NIR_3716's edge grass is redder at 1; one frame's centre barely changes), the range stated as up to 17 with three under 4, 013's dependency qualified for the one hand-set render, and 069's and 013's Rank sections brought into line with 015 first.
+planhash=79dd9b29e63e56ab
+diffhash=5d2cda983a312011
+verdict=IN-SCOPE: plan item 3 alone, the storage permission asked and never awaited in runBatch and at the end of adding photos
+# Plan item 3 alone: addToSession and runBatch call requestPersistentStorage() without await, and the function returns void so there is nothing to await; docs/ARCHITECTURE.md carries the regenerated line count for src/main.ts. Nothing from items 2 or 4 is present. Judged by a watcher subagent reading the plan by path and the diff.
