@@ -79,6 +79,30 @@ const SKY_TOP_BAND = 0.06;
 const SKY_TOP_BAND_SMOOTH = 0.045;
 const SKY_TOP_BAND_SHARE = 0.12;
 
+/**
+ * WHICH EDGE IS UP, as the turn every sky stage takes (decision 070).
+ * @param rotate  the picture's display rotation, quarter-turns clockwise (any
+ *   integer; the renderer's `rotation`, a file's `rotate`).
+ * @param flip  the renderer's SOURCE-space mirror bits: 1 mirrors source x,
+ *   2 mirrors source y (gl.ts `u_flip`). 0 for a picture never mirrored.
+ * @returns 0..3, the turn whose display-top edge is the edge SHOWN at the top:
+ *   `rotate` itself, or the opposite edge of the file when the mirror runs
+ *   across the edge that turn puts at the top.
+ * What the result must satisfy: `buildSkyMask`, `skyPrepare` and every cache
+ * of a selection are handed THIS and never the bare rotation, so the reader's
+ * Sky mask and the look's own selection agree about which edge is up under a
+ * mirror as well as a turn. A left-right mirror as shown never moves it and a
+ * top-bottom one always does; a flip that changed nothing here would make the
+ * rebuild after it identical to what it replaced, which is what it was.
+ */
+export function skyTurn(rotate: number, flip = 0): number {
+  const r = ((Math.trunc(rotate) % 4) + 4) % 4;
+  // Turns 0 and 2 put the file's top or bottom at the top of the picture, so a
+  // source-y mirror swaps it; turns 1 and 3 put its left or right there, so a
+  // source-x mirror does.
+  const across = r % 2 === 0 ? flip & 2 : flip & 1;
+  return across ? (r + 2) % 4 : r;
+}
 
 /** The two stages of the selection that depend on the PHOTOGRAPH ALONE — the
  *  small grid and the horizon drawn on it. Neither reads Reach or Feather, so a
@@ -144,31 +168,6 @@ export interface SkyResult {
   horizon: SkyHorizon | null;
 }
 
-/**
- * Build a sky-weight bitmap for one image.
- * @param sample  linear camera-native RGB at full-res image pixel (x,y).
- * @param srcW,srcH  full image dimensions.
- * @param rotate  display rotation in 90° CW steps (0..3) — picks the top edge.
- * @param cam  camera-native -> linear sRGB 3x3 row-major (or null for already-
- *             profiled sources; then the raw channels are used directly).
- * @param wb  gray-world white-balance gains (auto, NOT the user's live WB — the
- *            mask must not drift as the photo is graded).
- * @param maxEdge  working/output resolution cap (share BRUSH_MAX_EDGE so the
- *            bitmap packs with brush masks, which must all be one size).
- * @param reach  growth aggressiveness (1 = calibrated default).
- * @param feather  0..1 soft-edge width (blurs the final bitmap).
- * @param prep  the photograph-only half from `skyPrepare`, when the caller is
- *   holding one; omitted, it is built here.
- * @returns the bitmap, whether a sky was found, its coverage, and the horizon
- *   the selection was seeded from.
- * What the result must satisfy — and it is a REAL hazard rather than a
- * formality: a `prep` passed in must have been built with the SAME `rotate`,
- * `cam`, `wb` and `maxEdge` as this call. The border it carries is measured
- * down from the display's top edge, and `depthOf` below measures depth from
- * that same edge using the `rotate` argument; hand it a prep from a quarter
- * turn ago and the two disagree about which edge is up, silently, with a
- * plausible-looking mask as the result.
- */
 /** The photograph as the sky stages read it: one small grid, three channels
  *  and their gradient, built once and shared by the border search and the
  *  colour fill so the two cannot disagree about what the picture is. */
@@ -264,6 +263,32 @@ export function skyFields(
   return { w: W, h: H, ln: Ln, cx: CX, cy: CY, g: G };
 }
 
+/**
+ * Build a sky-weight bitmap for one image.
+ * @param sample  linear camera-native RGB at full-res image pixel (x,y).
+ * @param srcW,srcH  full image dimensions.
+ * @param rotate  which edge is up, 0..3 — picks the top edge. Callers pass
+ *   `skyTurn(rotation, flip)`, never a bare rotation, so a mirror is honoured.
+ * @param cam  camera-native -> linear sRGB 3x3 row-major (or null for already-
+ *             profiled sources; then the raw channels are used directly).
+ * @param wb  gray-world white-balance gains (auto, NOT the user's live WB — the
+ *            mask must not drift as the photo is graded).
+ * @param maxEdge  working/output resolution cap (share BRUSH_MAX_EDGE so the
+ *            bitmap packs with brush masks, which must all be one size).
+ * @param reach  growth aggressiveness (1 = calibrated default).
+ * @param feather  0..1 soft-edge width (blurs the final bitmap).
+ * @param prep  the photograph-only half from `skyPrepare`, when the caller is
+ *   holding one; omitted, it is built here.
+ * @returns the bitmap, whether a sky was found, its coverage, and the horizon
+ *   the selection was seeded from.
+ * What the result must satisfy — and it is a REAL hazard rather than a
+ * formality: a `prep` passed in must have been built with the SAME `rotate`,
+ * `cam`, `wb` and `maxEdge` as this call. The border it carries is measured
+ * down from the display's top edge, and `depthOf` below measures depth from
+ * that same edge using the `rotate` argument; hand it a prep from a quarter
+ * turn ago and the two disagree about which edge is up, silently, with a
+ * plausible-looking mask as the result.
+ */
 export function buildSkyMask(
   sample: (x: number, y: number) => [number, number, number],
   srcW: number,
@@ -280,8 +305,9 @@ export function buildSkyMask(
   const { w: W, h: H, ln: Ln, cx: CX, cy: CY, g: G } = fields;
   const N = W * H;
 
-  // "depth" = distance in texels from the display-top edge (the sky edge). Only
-  // this depends on rotation; adjacency and gradient are orientation-free.
+  // "depth" = distance in texels from the display-top edge (the sky edge).
+  // Adjacency and gradient are orientation-free; the rotation also reaches the
+  // horizon search and the seed band, through `skyPrepare` and `skyAxes`.
   const depthOf = (x: number, y: number): number => {
     switch (((rotate % 4) + 4) % 4) {
       case 1: return x;              // display-top ↔ image left

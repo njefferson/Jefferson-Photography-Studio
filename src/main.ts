@@ -49,7 +49,7 @@ import { buildSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, SKY_DEPTH_GREY_L
 import { prepareSkySource, buildSkySelectionFrom, buildSkyGuide, refineSkyMask, growSkyByColour, type SkyGuide } from "./skyfine";
 import { makeRowDenoiser } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
-import { buildSkyMask, skyPrepare, SKY_MIN_COVERAGE, type SkyPrep } from "./sky";
+import { buildSkyMask, skyPrepare, skyTurn, SKY_MIN_COVERAGE, type SkyPrep } from "./sky";
 import { measureShadowCast, type ShadowCast } from "./shadowcast";
 import { buildDiagnostic } from "./diagnostic";
 import { Tiff } from "./raw/tiff";
@@ -1939,26 +1939,61 @@ let skyBitmap: BrushMask | null = null;
 /** The current photograph's sky bitmap REFINED to its edges (skyfine.ts), for
  *  `skyDepth`; null with no sky. Built once at open beside `skyBitmap`. */
 let skyFine: BrushMask | null = null;
+/** THE TURN `skyBitmap` AND `skyFine` WERE FOUND AT (sky.ts `skyTurn`), so a
+ *  turn or a flip can tell whether the pair on screen still has its sky on the
+ *  edge that is up (decision 070). Null while the sky worker's pair is still on
+ *  its way: that arrival reads the turn shown when it lands. */
+let lookSkyTurn: number | null = 0;
+/** WHICH EDGE IS UP ON SCREEN NOW, as every sky stage takes it: the renderer's
+ *  quarter-turn with its mirror folded in (sky.ts `skyTurn`). Takes nothing;
+ *  returns 0..3. The reader's Sky mask and the look's selection both build at
+ *  this, which is what keeps them agreeing about where the sky is. */
+function shownSkyTurn(): number {
+  return skyTurn(renderer.rotation, renderer.flip);
+}
 /** The sky bitmap of any decoded photograph, built on first ask and kept for
  *  the photograph's life — the tile path needs it for a look that carries
  *  sky smoothing or depth, and a set of forty tiles must not grow forty of
  *  them twice. Same inputs as the open path: gray-world balance, never the
- *  live edit. */
-const skyMaskOf = new WeakMap<DecodedImage, BrushMask | null>();
-function skyMaskFor(img: DecodedImage): BrushMask | null {
-  if (img.skySel) return img.skySel.mask;
-  if (skyMaskOf.has(img)) return skyMaskOf.get(img) ?? null;
+ *  live edit. KEYED ON THE TURN AS WELL AS THE IMAGE (070), as `skyPrepFor`
+ *  is: the open photograph asks at the turn it is shown at and its own tiles
+ *  at the file's, and one entry per image would rebuild on every alternation. */
+const skyMaskOf = new WeakMap<DecodedImage, Map<number, BrushMask | null>>();
+/** THE TURN EACH SKY MASK'S BITMAP WAS FOUND AT (070), keyed on the bitmap
+ *  itself. Undo snapshots share a mask's bitmaps by reference and a
+ *  regeneration always allocates new ones, so the bitmap is the one thing that
+ *  still says which turn it belongs to after a snapshot has been put back. */
+const skyMaskTurnOf = new WeakMap<BrushMask, number>();
+/** The look's coarse sky for `img` as a picture shown at `turn`.
+ *  Takes the photograph and the turn its picture is shown at: the open
+ *  photograph's `shownSkyTurn()`, a tile's or a batch frame's `img.rotate`,
+ *  which is the turn `makeThumb` lays a tile out at and `runBatch` exports at.
+ *  Returns the 384 px bitmap, or null when no clear sky was found there.
+ *  What the caller relies on: `img.skySel` is handed back only when it was
+ *  found at that same turn, so no path reads a sky seeded from a side of the
+ *  picture it shows (decision 070); anything else is built here from the same
+ *  1024 px copy the decode worker uses, so the bytes match what the worker
+ *  would have built at that turn. The lift and the shadow cast read this. */
+function skyMaskFor(img: DecodedImage, turn: number): BrushMask | null {
+  const t = skyTurn(turn);
+  if (img.skySel && img.skySel.turn === t) return img.skySel.mask;
+  let held = skyMaskOf.get(img);
+  if (!held) skyMaskOf.set(img, (held = new Map()));
+  if (held.has(t)) return held.get(t) ?? null;
   // Built the way the decode worker builds it — from the same 1024 px copy —
   // so a tile's bitmap and the opened photograph's are the same bytes.
-  const m = buildSkySelectionFrom(prepareSkySource(img), false).mask;
-  skyMaskOf.set(img, m);
+  const m = buildSkySelectionFrom(prepareSkySource(img, t), false).mask;
+  held.set(t, m);
   return m;
 }
 /** WHAT THIS PHOTOGRAPH'S OWN SHADOWS ARE LIT BY (decision 034), measured once
- *  and kept for the photograph's life.
+ *  per turn and kept for the photograph's life.
  *
- *  Takes `img`, a decoded photograph. Returns its `ShadowCast` — unity when
- *  there is no measurable cast, so a caller may use it unconditionally.
+ *  Takes `img`, a decoded photograph, and `turn`, the turn its picture is shown
+ *  at (`shownSkyTurn()` for the open one). Returns its `ShadowCast` — unity
+ *  when there is no measurable cast, so a caller may use it unconditionally.
+ *  Keyed on the turn as well as the image (070): the sky it takes out is found
+ *  from the edge that is up, and a quarter-turn moves which edge that is.
  *
  *  ON A COARSE GRID, not every pixel: the answer is two population means and a
  *  24-megapixel walk would cost seconds to say the same number. 512 on the long
@@ -1973,10 +2008,11 @@ function skyMaskFor(img: DecodedImage): BrushMask | null {
  *  What the caller relies on: it reads `img.linear` through `linearAt` and
  *  never the displayed pixel, so the answer is a property of the light the
  *  photograph was taken in and does not re-key under a look. */
-function shadowCastFor(img: DecodedImage): ShadowCast {
+function shadowCastFor(img: DecodedImage, turn: number): ShadowCast {
+  const t = skyTurn(turn);
   const hit = shadowCastOf.get(img);
-  if (hit) return hit;
-  const sky = skyMaskFor(img);
+  if (hit && hit.turn === t) return hit.cast;
+  const sky = skyMaskFor(img, t);
   const N = 512;
   const sx = Math.max(1, Math.floor(img.width / N));
   const sy = Math.max(1, Math.floor(img.height / N));
@@ -1988,10 +2024,10 @@ function shadowCastFor(img: DecodedImage): ShadowCast {
     gh,
     (x, y) => !!sky && sampleBrush(sky, (x * sx + 0.5) / img.width, (y * sy + 0.5) / img.height) > 0.5,
   );
-  shadowCastOf.set(img, cast);
+  shadowCastOf.set(img, { turn: t, cast });
   return cast;
 }
-const shadowCastOf = new WeakMap<DecodedImage, ShadowCast>();
+const shadowCastOf = new WeakMap<DecodedImage, { turn: number; cast: ShadowCast }>();
 
 /** ONE LINE FOR THE REPORT, saying what this frame's shadows are lit by.
  *
@@ -2005,7 +2041,7 @@ const shadowCastOf = new WeakMap<DecodedImage, ShadowCast>();
  *  row. */
 function shadowCastDiagnostic(): string {
   if (!current) return "nothing open";
-  const c = shadowCastFor(current);
+  const c = shadowCastFor(current, shownSkyTurn());
   if (!c.measured) return `not measurable on this frame — ${c.shadePx} shaded and ${c.sunPx} sunlit samples, below the floor either way`;
   const g = c.gain.map((v) => v.toFixed(3)).join(" · ");
   // IT REPORTS THE MEASUREMENT AND SUGGESTS NOTHING. Measured on the real
@@ -2037,10 +2073,12 @@ function syncSkyMap(): void {
     // First edit with a depth on this photograph: the coarse bitmap's feather
     // is fine under a chroma blend and a pale rim under a luma multiplier.
     const img = current;
-    const sel = buildSkySelectionFrom(prepareSkySource(img));
+    // AT THE TURN SHOWN (070), the turn the reader's Sky mask is built at.
+    const sel = buildSkySelectionFrom(prepareSkySource(img, shownSkyTurn()));
     img.skySel = sel;
     skyBitmap = sel.mask;
     skyFine = sel.fine;
+    lookSkyTurn = sel.turn;
     renderer.setSkyFine(skyFine);
   }
   if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0)) {
@@ -2694,6 +2732,9 @@ function applySnapshot(s: Snapshot) {
   lookDenoise = s.lookDenoise ?? null;
   lookTexture = s.lookTexture ?? null;
   if (selectedMask >= params.masks.length) selectedMask = params.masks.length - 1;
+  // Before the panel reads them: a snapshot can carry Sky masks found at a turn
+  // the picture is no longer shown at (070).
+  refindTurnedSkyMasks();
   syncToUI();
   updateLookUI();
   updateMaskUI();
@@ -3944,7 +3985,7 @@ function applyLift(withColour: boolean): { pull: number; foliage: number; sky: n
   // is built here if the worker's selection has not landed yet, so the answer
   // at open is the same answer a moment later.
   const base = liftBaseFor(current, withColour ? activeLook : null);
-  const solved = solveLift(withColour, current, params, withColour ? skyMaskFor(current) : null, base);
+  const solved = solveLift(withColour, current, params, withColour ? skyMaskFor(current, shownSkyTurn()) : null, base);
   if (!solved) { liftApplied = null; liftState(false, withColour); return null; }
   const r = scaleLift(solved, liftAmount, base);
   const noop = r.pull === 0 && r.foliage[1] === base.foliage[1] && r.skySat === base.skySat;
@@ -6829,6 +6870,25 @@ function bitmapMaskCount(): number {
   return params.masks.reduce((n, m) => n + (m.type === 2 || m.type === 4 ? 1 : 0), 0);
 }
 
+/** WHERE A POINT OF THE PICTURE AS SHOWN LIES IN THE FILE.
+ *  Takes `du`, `dv`: a point in the uncropped picture as displayed, 0..1 from
+ *  its top-left. Returns the same point in image-uv, the space a mask's
+ *  geometry is stored in, through the renderer's turn and then its mirror.
+ *  What it must satisfy: it is the vertex stage's own mapping in gl.ts (turn
+ *  first, the source-space mirror innermost) without the crop and straighten,
+ *  so a point placed with it lands where the reader sees it on the whole
+ *  frame; `addMask` relies on that for a gradient's default direction. */
+function shownToImageUv(du: number, dv: number): [number, number] {
+  const r = ((renderer.rotation % 4) + 4) % 4;
+  let u = du, v = dv;
+  if (r === 1) { u = dv; v = 1 - du; }
+  else if (r === 2) { u = 1 - du; v = 1 - dv; }
+  else if (r === 3) { u = 1 - dv; v = du; }
+  if (renderer.flip & 1) u = 1 - u;
+  if (renderer.flip & 2) v = 1 - v;
+  return [u, v];
+}
+
 function addMask(type: 0 | 1 | 2 | 3 | 4) {
   if (!current || params.masks.length >= MAX_MASKS) return;
   // Brush/sky are limited further by the shared bitmap texture's 4 channels.
@@ -6842,6 +6902,13 @@ function addMask(type: 0 | 1 | 2 | 3 | 4) {
   // moved. Its area still shows while it is placed: the renderer uploads the
   // mask the coverage tint is showing even when it changes nothing (gl.ts).
   const m = neutralMask(type);
+  // A GRADIENT STARTS AT THE TOP OF THE PICTURE AS SHOWN (070). Its geometry is
+  // image-uv, so the default "from the top, fading down" was the FILE's top: on
+  // a photograph turned on its side it arrived running in from one side.
+  if (type === 1) {
+    [m.cx, m.cy] = shownToImageUv(m.cx, m.cy);
+    [m.lx, m.ly] = shownToImageUv(m.lx, m.ly);
+  }
   if (type === 2) {
     const s = Math.min(1, BRUSH_MAX_EDGE / Math.max(current.width, current.height));
     const bw = Math.max(1, Math.round(current.width * s));
@@ -6919,19 +6986,25 @@ function skyPrepFor(img: DecodedImage, rot: number): SkyPrep {
 
 function regenerateSkyMask(m: MaskLayer) {
   if (!current) return;
+  // THE TURN SHOWN, MIRROR INCLUDED (070). The bare rotation ignored a flip, so
+  // a top-bottom mirror rebuilt exactly the mask it replaced, with the sky now
+  // at the bottom of the picture; `shownSkyTurn` is also what the look's own
+  // selection is built at, so the two agree about which edge is up.
+  const turn = shownSkyTurn();
   const res = buildSkyMask(
     (x, y) => linearAt(current!, x, y),
     current.width,
     current.height,
-    renderer.rotation,
+    turn,
     current.camMatrix ?? null,
     grayWorldWB(current),
     BRUSH_MAX_EDGE,
     m.reach ?? 1,
     m.feather,
-    skyPrepFor(current, renderer.rotation),
+    skyPrepFor(current, turn),
   );
   m.brush = res.mask; // fresh buffer from buildSkyMask — safe for copy-on-write
+  skyMaskTurnOf.set(res.mask, turn);
   // AND THE SAME SEED REFINED TO THE PICTURE'S EDGES (018). The reader's reach
   // and feather still shape the seed exactly as before; the guided filter then
   // snaps that seed's boundary to the photograph's own edges, which is what the
@@ -8257,6 +8330,64 @@ function rebuildSkyMasks(): boolean {
   return rebuilt;
 }
 
+/** SKY MASKS PUT BACK FROM ANOTHER TURN, FOUND AGAIN FOR THIS ONE (070).
+ *
+ *  Takes nothing; reads `params.masks` and the turn shown. Returns whether any
+ *  mask was re-detected, for the caller's status line.
+ *
+ *  A turn is view state and never an undo step, but the re-detection it causes
+ *  is a change to the mask and settles into history. So Undo straight after a
+ *  Rotate stepped back over the re-detection and put back the bitmaps found for
+ *  the turn the picture had left — a sky seeded from a side of the picture
+ *  now on screen. The same holds for Redo across a turn made since.
+ *
+ *  What the caller relies on: a mask whose bitmap was found at the turn shown,
+ *  or whose turn is not known (nothing here built it), is left exactly as it
+ *  is; only one found at a DIFFERENT turn is rebuilt, with its own reach,
+ *  feather and hand corrections, exactly as a Rotate rebuilds it. */
+function refindTurnedSkyMasks(): boolean {
+  const turn = shownSkyTurn();
+  let rebuilt = false;
+  for (const m of params.masks) {
+    if (!regeneratedAtOpen(m) || !m.brush) continue;
+    const at = skyMaskTurnOf.get(m.brush);
+    if (at !== undefined && at !== turn) { regenerateSkyMask(m); rebuilt = true; }
+  }
+  return rebuilt;
+}
+
+/** THE LOOK'S SKY, MOVED TO THE EDGE THAT IS UP NOW (decision 070).
+ *
+ *  Takes nothing; reads `current` and the turn shown. Returns whether the pair
+ *  was rebuilt, so a caller knows a redraw has something new to show.
+ *
+ *  The reader's Sky masks have always been rebuilt on a turn
+ *  (`rebuildSkyMasks`); the look's own pair was built once, at the file's
+ *  turn, and kept — so after a quarter-turn, a stored edit's turn or a gallery
+ *  example's fixed one, the look deepened a side of the picture as its sky.
+ *  This is the rebuild beside that one: the coarse half now, from the cache
+ *  `skyMaskFor` keeps per turn, and the refined half on the next draw that
+ *  needs it (`syncSkyMap`), exactly as a photograph opened without a worker
+ *  gets it.
+ *
+ *  What the caller relies on: afterwards `skyBitmap`, `skyFine` and the sky
+ *  map were all found at `shownSkyTurn()`, or the worker's pair is still on its
+ *  way and will read the turn itself when it lands. It changes no edit value,
+ *  so it adds no undo step. */
+function followSkyTurn(): boolean {
+  if (!current || lookSkyTurn === null) return false;
+  const turn = shownSkyTurn();
+  if (turn === lookSkyTurn) return false;
+  const img = current;
+  const sel = img.skySel && img.skySel.turn === turn ? img.skySel : null;
+  skyBitmap = sel ? sel.mask : skyMaskFor(img, turn);
+  skyFine = sel ? sel.fine : null;
+  lookSkyTurn = turn;
+  renderer.setSkyFine(skyFine);
+  skyMapKey = "";
+  return true;
+}
+
 /** DOES THIS MASK GET ITS BITMAP BACK FROM THE PHOTOGRAPH, or is the bitmap the
  *  only copy there is?
  *
@@ -8285,7 +8416,9 @@ $("rotateBtn").addEventListener("click", () => {
   renderer.setRotation(renderer.rotation + 1);
   resetZoom();
   // A sky mask keys off the display-top edge, so a rotation re-detects it to
-  // stay glued to the sky in the new orientation.
+  // stay glued to the sky in the new orientation — and the look's own sky
+  // moves with it (070).
+  followSkyTurn();
   if (rebuildSkyMasks()) updateSkyStatus();
   draw();
 });
@@ -8297,10 +8430,15 @@ $("rotateBtn").addEventListener("click", () => {
 function toggleFlip(displayVertical: boolean) {
   if (!current) return;
   const sourceBit = ((renderer.rotation & 1) ? !displayVertical : displayVertical) ? 2 : 1;
+  const before = shownSkyTurn();
   renderer.setFlip(renderer.flip ^ sourceBit);
   resetZoom();
-  if (displayVertical) {
-    // The sky moved to the other display edge — re-detect, like rotate does.
+  // A top-bottom mirror puts the other edge of the file at the top, and the
+  // sky with it: re-detect, like rotate does. Asked of the turn itself rather
+  // than of the button (070) — the detector reads the mirror now, so the
+  // rebuild finds the sky at the top shown instead of rebuilding what it had.
+  if (shownSkyTurn() !== before) {
+    followSkyTurn();
     if (rebuildSkyMasks()) updateSkyStatus();
   }
   draw();
@@ -10154,7 +10292,13 @@ function levelHorizon() {
   // of those is negative is a fact about this pipeline's geometry and is
   // asserted end to end rather than reasoned about, by levelling a frame that
   // was deliberately tilted and measuring what came out.
-  const put = Math.max(-45, Math.min(45, Math.round(-found.degrees * 10) / 10));
+  // AND A MIRROR TURNS IT (070). `findTilt` reads the file's own pixels and the
+  // straighten applies to the picture as shown, so one mirror, either way,
+  // shows the lean reversed; two mirrors are a half-turn and reverse nothing.
+  // Quarter-turns keep the lean's sense and need nothing.
+  const mirrored = ((renderer.flip & 1) ^ ((renderer.flip >> 1) & 1)) === 1;
+  const lean = mirrored ? -found.degrees : found.degrees;
+  const put = Math.max(-45, Math.min(45, Math.round(-lean * 10) / 10));
   // IT DOES NOT OPEN THE STRAIGHTEN TOOL. Arming a geometry tool takes over the
   // stage — the crop pill, the alignment grid, the panel pulled aside — and
   // pressing a button in the panel is not asking for that. The angle lands on
@@ -10811,17 +10955,28 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
     // (a path that does not open the photograph for editing) the bitmap is
     // built here as before and the refinement on the first edit that needs
     // it (syncSkyMap).
-    if (img.skySel) {
+    //
+    // EVERY BRANCH TAKES THE TURN SHOWN (070). Here that is the file's own,
+    // which is what the worker built at; a stored edit's turn or a gallery
+    // example's arrives afterwards through `applyView`, and a pair still on its
+    // way reads the turn shown when it lands rather than the one it left at.
+    const turn = shownSkyTurn();
+    if (img.skySel && img.skySel.turn === turn) {
       skyBitmap = img.skySel.mask;
       skyFine = img.skySel.fine;
-    } else if (img.skySelReady) {
+      lookSkyTurn = turn;
+    } else if (!img.skySel && img.skySelReady) {
       skyBitmap = null;
       skyFine = null;
+      lookSkyTurn = null;
       const waited = img;
       void img.skySelReady.then((sel) => {
         if (current !== waited) return;
-        skyBitmap = sel ? sel.mask : skyMaskFor(waited);
-        skyFine = sel ? sel.fine : null;
+        const now = shownSkyTurn();
+        const fits = !!sel && sel.turn === now;
+        skyBitmap = fits ? sel!.mask : skyMaskFor(waited, now);
+        skyFine = fits ? sel!.fine : null;
+        lookSkyTurn = now;
         renderer.setSkyFine(skyFine);
         skyMapKey = "";
         // DRAWN AGAIN ONLY WHEN SOMETHING ON SCREEN USES IT. With no sky stage
@@ -10836,8 +10991,9 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
         }
       });
     } else {
-      skyBitmap = skyMaskFor(img);
+      skyBitmap = skyMaskFor(img, turn);
       skyFine = null;
+      lookSkyTurn = turn;
     }
     renderer.setSkyFine(skyFine);
     skyMapKey = "";
@@ -11355,6 +11511,9 @@ function applyView(rot: number | undefined, flip: number | undefined): void {
   // The frame's shape on screen may have changed, so the fit has to be taken
   // again — the same thing the Rotate button does after turning it.
   resetZoom();
+  // And the look's sky found at the turn now shown (070): the open path built
+  // it at the file's own, which this has just replaced.
+  followSkyTurn();
 }
 
 /** A LOOK BELONGS TO THE SESSION, AND A GRADE YOU MADE BELONGS TO THE PHOTO.
@@ -11571,12 +11730,25 @@ function activateCurrent(id: string) {
     restoreLiveEdit(st);
     carryLook(); // the session's look reaches a photo you have not graded yourself
   } else {
-    establishFreshEdit();
     const view = sessionPhotos.find((p) => p.id === id);
+    type StoredEdit = Snapshot & { lookMark?: LookMark | null; rot?: number; flip?: number; lutRef?: { id?: unknown; strength?: unknown } | null };
+    let stored: StoredEdit | null = null;
     if (view?.edit) {
       try {
-        const stored = JSON.parse(view.edit) as Snapshot & { lookMark?: LookMark | null; rot?: number; flip?: number; lutRef?: { id?: unknown; strength?: unknown } | null };
-        applyView(stored.rot, stored.flip);
+        stored = JSON.parse(view.edit) as StoredEdit;
+      } catch {
+        stored = null; // corrupt stored edit — keep the fresh baseline
+      }
+    }
+    // THE TURN BEFORE THE BASELINE (070). establishFreshEdit solves the lift
+    // under the session's look, and the lift measures the sky by place — so run
+    // after the turn, it measured the sky found on the file's own up edge while
+    // the photograph was about to be shown on another. That baseline is what
+    // Reset returns to, so the wrong sky outlived the restore.
+    if (stored) applyView(stored.rot, stored.flip);
+    establishFreshEdit();
+    if (stored) {
+      try {
         applySnapshot(stored);
         // The stored mark, not the one establishFreshEdit just made: the grade
         // on screen is the stored one now, so the question "has this been
@@ -12044,7 +12216,9 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, o
   }
   if (autoLift && !own) {
     const base = liftBaseFor(img, activeLook);
-    const solved = solveLift(activeLook !== null, img, p, activeLook !== null ? skyMaskFor(img) : null, base);
+    // A TILE IS LAID OUT AT THE FILE'S OWN TURN (below), so its sky is found
+    // at that turn too (070) — the lift's sky population with it.
+    const solved = solveLift(activeLook !== null, img, p, activeLook !== null ? skyMaskFor(img, img.rotate ?? 0) : null, base);
     const lift = solved && scaleLift(solved, liftAmount, base);
     if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; p.skySat = lift.skySat; }
   }
@@ -12071,7 +12245,7 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, o
   // finer of the two. Without this a tile under Aerochrome would show a sky
   // half again as bright as the photograph's, and the agreement walk would
   // say so.
-  const tileSky = ((p.skySmooth ?? 0) > 0 || (p.skyDepth ?? 0) > 0 || (p.skySat ?? 0) > 0) ? skyMaskFor(img) : null;
+  const tileSky = ((p.skySmooth ?? 0) > 0 || (p.skyDepth ?? 0) > 0 || (p.skySat ?? 0) > 0) ? skyMaskFor(img, rot) : null;
   const tileSample = (x: number, y: number) => linearAt(img, Math.min(img.width - 1, Math.floor(x / s)), Math.min(img.height - 1, Math.floor(y / s)));
   const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileSky) : null;
   const edit = compileEdit(p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileMap, tileSky);
@@ -16539,13 +16713,14 @@ async function loadGalleryPhoto(key: string, tile: GalleryTile) {
     sessionPhotos = [{ id: "lone", name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "", thumbState: "real" }];
     nextOrder = 0;
     liveEdits.clear();
-    activateCurrent("lone");
     // Some RAW examples need a fixed display rotation (the decoder can't infer
-    // it); apply it after the edit is established, then repaint.
-    if (tile.rotate) {
-      renderer.setRotation(tile.rotate);
-      draw();
-    }
+    // it). BEFORE the edit is established (070), not after: establishing it
+    // solves the lift under the session's look, which measures the sky by
+    // place, and it measured the sky found at the file's turn while the
+    // example was then shown at this one. `applyView` moves the look's sky too.
+    if (tile.rotate) applyView(tile.rotate, undefined);
+    activateCurrent("lone");
+    if (tile.rotate) draw();
     updateSessionStrip();
     // Now raise the lesson rail and open the tile's home lesson — Lesson 1
     // unless the tile names one (the dust frame opens on Dust & spots).
@@ -17359,7 +17534,8 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   // gets the tonal half alone, matching a bare open.
   if (autoLift) {
     const base: LiftBase = hasLook ? { foliage: [...look.foliage] as [number, number, number], sky: [...look.sky] as [number, number, number], skySat: look.skySat ?? 0 } : liftBaseNeutral();
-    const solved = solveLift(hasLook, img, p, hasLook ? skyMaskFor(img) : null, base);
+    // At the file's own turn, which is the turn `runBatch` exports at (070).
+    const solved = solveLift(hasLook, img, p, hasLook ? skyMaskFor(img, img.rotate ?? 0) : null, base);
     const lift = solved && scaleLift(solved, liftAmount, base);
     if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; p.skySat = lift.skySat; }
   }
@@ -17538,7 +17714,11 @@ async function runBatch(files: File[]) {
         // stage; a batch is developed at full size, where the coarse
         // bitmap's rim would be at its widest, so the refinement matters here.
         const wantSky = (batchP.skySmooth ?? 0) > 0 || (batchP.skyDepth ?? 0) > 0 || (batchP.skySat ?? 0) > 0;
-        const batchSel = wantSky ? (img.skySel ?? (await img.skySelReady) ?? buildSkySelectionFrom(prepareSkySource(img))) : null;
+        // AT THE TURN THE FRAME EXPORTS AT, its own (070): the worker's pair is
+        // built at that turn, and one that is not is built again here.
+        const batchTurn = skyTurn(img.rotate ?? 0);
+        const workerSel = wantSky ? (img.skySel ?? (await img.skySelReady) ?? null) : null;
+        const batchSel = wantSky ? (workerSel && workerSel.turn === batchTurn ? workerSel : buildSkySelectionFrom(prepareSkySource(img, batchTurn))) : null;
         const batchSkyMask = batchSel?.mask ?? null;
         const batchSkyFine = batchSel && ((batchP.skyDepth ?? 0) > 0 || (batchP.skySat ?? 0) > 0) ? batchSel.fine : null;
         const result = await exportImage(

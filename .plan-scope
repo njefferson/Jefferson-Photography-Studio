@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=79dd9b29e63e56ab
-diffhash=3d137570797e6bf2
-verdict=IN-SCOPE: plan item 4, the rest: 075 and 076 recorded and ranked after 015, the staging entry and the status page
-# Plan item 4, the rest: the 075 record with its as-built section and the rejected alternatives, the 076 record, both ranked directly after 015 in NOTES with 069's and 071's rank text brought into line, the v2.63.26 staging entry with the correction to the 2.63.21 Firefox reading, and the status page. Judged by a watcher subagent reading the plan by path and the diff.
+planhash=a4b94ab6879b282e
+diffhash=02daeb8ad9314908
+verdict=IN-SCOPE: 070's Option 1 with the flip, at-open order, undo, gradient and Level's mirror sign, its checks and its record edits
+# Record 070's Option 1 (the look's sky pair, its caches and every caller at the turn shown; tiles and batch at the file's turn), the flip folded into the turn for the look's pair and the reader's Sky masks, at-open solves after the turn is set, Sky masks re-found after Undo or Redo following a turn, a new Gradient starting top-down as shown, PREVIEW_PIPELINE 65, Level's sign under a mirror, the rotation walk's checks, and the 069/070/NOTES record edits. Judged by a watcher subagent reading the plan by path and the whole diff; nothing outside the plan.

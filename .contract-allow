@@ -185,7 +185,6 @@ src/session.ts:sweepOrphans
 src/share.ts:isStandaloneApp
 src/share.ts:setupInstalledShare
 src/share.ts:setupInstallFromApp
-src/sky.ts:buildSkyMask
 src/stamp.ts:fnv1a
 src/sticker.ts:makeStickerAsset
 src/sticker.ts:stickerWorldCorners

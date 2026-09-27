@@ -609,8 +609,8 @@ cannot describe something the code does not say about itself.
 - **`src/cubeimport.ts`** (136 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (247 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 - **`src/debug.ts`** (1604 lines) — The test page behind the version number.
-- **`src/decode.ts`** (394 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
-- **`src/decode.worker.ts`** (57 lines) — Decoding, off the main thread.
+- **`src/decode.ts`** (398 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
+- **`src/decode.worker.ts`** (59 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (293 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (258 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
@@ -647,7 +647,7 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (19207 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (19387 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
 - **`src/pipeline.ts`** (2515 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
@@ -665,10 +665,10 @@ cannot describe something the code does not say about itself.
 - **`src/session.ts`** (599 lines) — Crash-safe store for a photo SESSION — the set you opened and are moving between, each photo keeping its own edit.
 - **`src/shadowcast.ts`** (225 lines) — THE SHADOW'S OWN ILLUMINANT, MEASURED FROM THIS PHOTOGRAPH (decision 034).
 - **`src/share.ts`** (156 lines) — Share / copy-link for the INSTALLED (standalone) app.
-- **`src/sky.ts`** (634 lines) — Classical sky detection (mask type 4).
+- **`src/sky.ts`** (660 lines) — Classical sky detection (mask type 4).
 - **`src/sky.worker.ts`** (31 lines) — The sky selection, built off the main thread on a lane of its own.
 - **`src/skyClient.ts`** (62 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
-- **`src/skyfine.ts`** (606 lines) — The sky selection refined to the picture's own edges.
+- **`src/skyfine.ts`** (620 lines) — The sky selection refined to the picture's own edges.
 - **`src/skyhorizon.ts`** (589 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
 - **`src/skymap.ts`** (257 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
 - **`src/stamp.ts`** (27 lines) — ONE HASH, BECAUSE THE SECOND COPY IS WHERE THE TWO ANSWERS COME FROM.

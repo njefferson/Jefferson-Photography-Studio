@@ -44,7 +44,9 @@ self.onmessage = async (e: MessageEvent<Job>) => {
     // THE FLAT FIRST, THEN THE SELECTION'S COPY: the selection and every
     // automatic the main thread measures read corrected pixels (decision 021).
     applyLensPlan(img, lens ?? null);
-    const skySrc = sky ? prepareSkySource(img) : null;
+    // AT THE FILE'S OWN TURN (decision 070): the turn a photograph opens at. A
+    // picture then shown at another one rebuilds its sky on the main thread.
+    const skySrc = sky ? prepareSkySource(img, img.rotate ?? 0) : null;
     const transfer: Transferable[] = [];
     if (img.pixels) transfer.push(img.pixels.buffer);
     if (img.linear) transfer.push(img.linear.buffer);
