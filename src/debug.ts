@@ -212,55 +212,84 @@ async function graphics(): Promise<void> {
  *  stored copy can answer, three times, and then the first of them once more,
  *  unchanged, to show what a warm launch pays. Each is drawn once into a
  *  16-pixel frame so the driver has to finish it; nothing is kept. */
-async function buildingThePictureCode(): Promise<void> {
-  const p = note("Building the editor's picture code…");
+/** A 16-pixel WebGL2 frame with a full-screen triangle bound, for timing builds
+ *  of the editor's picture code. Takes nothing; gives back the context and the
+ *  buffer to delete afterwards, or null where WebGL2 is unavailable. What it
+ *  returns is what `timedBuild` expects to be handed. */
+function buildFrame(): { gl: WebGL2RenderingContext; tri: WebGLBuffer } | null {
   const cv = document.createElement("canvas");
   cv.width = 16; cv.height = 16;
   const gl = cv.getContext("webgl2");
-  if (!gl) { p.remove(); row("Building the picture code", "WebGL2 unavailable", "The editor cannot run on this device."); return; }
-  const parallel = !!gl.getExtension("KHR_parallel_shader_compile");
+  if (!gl) return null;
   const tri = gl.createBuffer()!;
   gl.bindBuffer(gl.ARRAY_BUFFER, tri);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  return { gl, tri };
+}
+
+/** The editor's fragment program made unique by `tag`. Takes a fragment source
+ *  and a number; gives back the source with a branch no pixel takes carrying
+ *  that number, so no stored copy of an earlier build can answer.
+ *  Not a comment: a shader translator may drop comments before the driver's
+ *  own cache is consulted (inferred, not measured on a device), and then every
+ *  "cold" build would be answered from the copy the editor already made. A
+ *  unique constant in a branch no pixel takes survives translation and changes
+ *  nothing that is drawn; in the container it read 19-25 ms cold against 3 ms
+ *  warm, so it does defeat the cache there. */
+function uniqueFrag(src: string, tag: number): string {
+  return src.replace("void main() {",
+    `void main() {\n  if (gl_FragCoord.x < -${tag}.0) { frag = vec4(${tag}.0 / 1e9); return; }`);
+}
+
+/** ONE BUILD OF A PROGRAM, TIMED THE WAY A LAUNCH PAYS IT (decision 071). Takes a
+ *  context from `buildFrame`, a vertex and a fragment source; builds them,
+ *  then draws once so the driver has to finish. Gives back the build and the
+ *  first picture in milliseconds, and throws if the program did not build.
+ *  `buildingThePictureCode` and `whatMakesTheBuildSlow` both read these two
+ *  numbers against each other's, so they must stay one measurement.
+ *  Everything queued before a run is finished first, so no run is billed for
+ *  the one before it — the first version of this row was, and read 20 ms for
+ *  its first build and 350 for the next two.
+ *  BUILT, THEN DRAWN, timed apart: some drivers finish the picture code only
+ *  when it first draws, so the build alone can look cheap while the first
+ *  picture pays for it. */
+function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string): { link: number; draw: number } {
   const px = new Uint8Array(4);
-  // Everything queued before a run is finished first, so no run is billed for
-  // the one before it — the first version of this row was, and read 20 ms for
-  // its first build and 350 for the next two.
   const drain = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-  // Not a comment: a shader translator may drop comments before the driver's
-  // own cache is consulted (inferred, not measured on a device), and then every
-  // "cold" build would be answered from the copy the editor already made. A
-  // unique constant in a branch no pixel takes survives translation and changes
-  // nothing that is drawn; in the container it read 19-25 ms cold against 3 ms
-  // warm, so it does defeat the cache there.
-  // BUILT, THEN DRAWN, timed apart: some drivers finish the picture code only
-  // when it first draws, so the build alone can look cheap while the first
-  // picture pays for it.
-  const build = (tag: number): { link: number; draw: number } => {
-    drain();
-    const t0 = performance.now();
-    const mk = (type: number, src: string) => { const s = gl.createShader(type)!; gl.shaderSource(s, src); gl.compileShader(s); return s; };
-    const vs = mk(gl.VERTEX_SHADER, VERT);
-    const fs = mk(gl.FRAGMENT_SHADER, FRAG.replace("void main() {",
-      `void main() {\n  if (gl_FragCoord.x < -${tag}.0) { frag = vec4(${tag}.0 / 1e9); return; }`));
-    const prog = gl.createProgram()!;
-    gl.attachShader(prog, vs); gl.attachShader(prog, fs);
-    gl.linkProgram(prog);
-    // Reading the status is what makes the page wait, exactly as the editor's
-    // own start does.
-    const ok = gl.getProgramParameter(prog, gl.LINK_STATUS);
-    const t1 = performance.now();
-    if (!ok) throw new Error("the editor's picture code did not build on this device");
-    gl.useProgram(prog);
-    const loc = gl.getAttribLocation(prog, "a_pos");
-    if (loc >= 0) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0); }
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    drain();
-    const t2 = performance.now();
-    gl.useProgram(null);
+  drain();
+  const t0 = performance.now();
+  const mk = (type: number, src: string) => { const s = gl.createShader(type)!; gl.shaderSource(s, src); gl.compileShader(s); return s; };
+  const vs = mk(gl.VERTEX_SHADER, vert);
+  const fs = mk(gl.FRAGMENT_SHADER, frag);
+  const prog = gl.createProgram()!;
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  // Reading the status is what makes the page wait, exactly as the editor's
+  // own start does.
+  const ok = gl.getProgramParameter(prog, gl.LINK_STATUS);
+  const t1 = performance.now();
+  if (!ok) {
     gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
-    return { link: t1 - t0, draw: t2 - t1 };
-  };
+    throw new Error("the editor's picture code did not build on this device");
+  }
+  gl.useProgram(prog);
+  const loc = gl.getAttribLocation(prog, "a_pos");
+  if (loc >= 0) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0); }
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  drain();
+  const t2 = performance.now();
+  gl.useProgram(null);
+  gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
+  return { link: t1 - t0, draw: t2 - t1 };
+}
+
+async function buildingThePictureCode(): Promise<void> {
+  const p = note("Building the editor's picture code…");
+  const frame = buildFrame();
+  if (!frame) { p.remove(); row("Building the picture code", "WebGL2 unavailable", "The editor cannot run on this device."); return; }
+  const { gl, tri } = frame;
+  const parallel = !!gl.getExtension("KHR_parallel_shader_compile");
+  const build = (tag: number) => timedBuild(gl, VERT, uniqueFrag(FRAG, tag));
   try {
     const stamp = 1000 + Math.floor(Math.random() * 8e8);
     const cold: { link: number; draw: number }[] = [];
@@ -285,6 +314,105 @@ async function buildingThePictureCode(): Promise<void> {
   } catch (err) {
     p.remove();
     row("Building the picture code", "failed", (err as Error).message);
+  } finally {
+    gl.deleteBuffer(tri);
+  }
+}
+
+/** A loop whose count the compiler can read off its header, `for (int dy = -3;
+ *  dy <= 3;`. Direct3D's compiler (FXC) unrolls every such loop ANGLE does not
+ *  mark, and ANGLE marks only loops that take a gradient (decision 071, Looked
+ *  up). The count of these, and of `MASK_LOOP`, is printed with each variant. */
+const COUNTED_LOOP = /for \(int (\w+) = (-?\d+); \1 (<=?) (-?\d+);/g;
+/** A loop over the photograph's masks, which indexes the mask uniform arrays
+ *  with its loop variable: the shape ANGLE issue 3682 records as slow for FXC. */
+const MASK_LOOP = /; (\w+) < u_maskCount;/g;
+
+/** The editor's fragment program with every counted loop given a count the
+ *  compiler cannot see: `<= 3` becomes `<= 3 + u_dbgZero`, an unset uniform,
+ *  so 0. Takes a fragment source; gives back the rewritten source and how many
+ *  loops it changed. The loops do the same work; only unrolling is taken away.
+ *  A count of zero means the program has changed shape and the variant must not
+ *  be timed, because it would be the program as shipped under another name. */
+function hideLoopCounts(src: string): { src: string; loops: number } {
+  let loops = 0;
+  const s = src.replace(COUNTED_LOOP, (_m, v: string, a: string, op: string, b: string) => {
+    loops++;
+    return `for (int ${v} = ${a}; ${v} ${op} ${b} + u_dbgZero;`;
+  });
+  return { src: s.replace("void main() {", "uniform int u_dbgZero;\nvoid main() {"), loops };
+}
+
+/** The editor's fragment program with every mask loop run zero times, so the
+ *  compiler drops it. Takes a fragment source; gives back the rewritten source
+ *  and how many loops it changed, zero meaning the same as in `hideLoopCounts`. */
+function dropMaskLoops(src: string): { src: string; loops: number } {
+  let loops = 0;
+  const s = src.replace(MASK_LOOP, (_m, v: string) => { loops++; return `; ${v} < 0;`; });
+  return { src: s, loops };
+}
+
+/** WHICH PART OF THE PICTURE CODE THE 44 SECONDS IS (decision 071). The PC in
+ *  Firefox took 44,527 ms to build it on v2.63.34, and changing how its loops
+ *  sample did nothing, because ANGLE already did that itself. The sources name
+ *  two causes: FXC unrolling every loop it can count, and FXC's slowness with
+ *  loops that index uniform arrays. This builds the editor's own program four
+ *  ways, once each, in one context, after a tiny program has started the
+ *  driver: as shipped, with the counts hidden, with the mask loops dropped, and
+ *  both. None of the four is ever drawn by the editor; they are only timed.
+ *  The variant that drops the most is the cause, and the fix differs by which. */
+async function whatMakesTheBuildSlow(): Promise<void> {
+  const p = note("Building the editor's picture code four ways… this takes about four builds, which on a Windows PC can be three minutes.");
+  const frame = buildFrame();
+  if (!frame) { p.remove(); row("What makes the build slow", "WebGL2 unavailable", "The editor cannot run on this device."); return; }
+  const { gl, tri } = frame;
+  const tot = (r: { link: number; draw: number }) => r.link + r.draw;
+  try {
+    timedBuild(gl,
+      "#version 300 es\nin vec2 a_pos;\nvoid main() { gl_Position = vec4(a_pos, 0.0, 1.0); }",
+      "#version 300 es\nprecision mediump float;\nout vec4 frag;\nvoid main() { frag = vec4(1.0); }");
+    await tick();
+    const hidden = hideLoopCounts(FRAG);
+    const dropped = dropMaskLoops(FRAG);
+    const both = dropMaskLoops(hidden.src);
+    const variants: { name: string; src: string; changed: string; ok: boolean }[] = [
+      { name: "As shipped", src: FRAG, changed: "nothing changed", ok: true },
+      { name: "…with every loop's count hidden from the compiler", src: hidden.src,
+        changed: `${hidden.loops} loops given a count it cannot see`, ok: hidden.loops > 0 },
+      { name: "…with the mask loops taken out", src: dropped.src,
+        changed: `${dropped.loops} mask loops run zero times`, ok: dropped.loops > 0 },
+      { name: "…with both", src: both.src,
+        changed: `${hidden.loops} counts hidden and ${both.loops} mask loops taken out`, ok: hidden.loops > 0 && both.loops > 0 },
+    ];
+    const stamp = 1000 + Math.floor(Math.random() * 8e8);
+    const timed: { name: string; t: number }[] = [];
+    for (let i = 0; i < variants.length; i++) {
+      const v = variants[i];
+      if (!v.ok) {
+        row(v.name, "not run",
+          "No loop of that kind was found, so the picture code has changed shape since this test was written. Timing it would time the program as shipped under another name.");
+        continue;
+      }
+      try {
+        const r = timedBuild(gl, VERT, uniqueFrag(v.src, stamp + i));
+        timed.push({ name: v.name, t: tot(r) });
+        row(v.name, ms(tot(r)), `Built once, from nothing: ${v.changed}.`, `${ms(r.link)} + ${ms(r.draw)} (built + first picture)`);
+      } catch (err) {
+        row(v.name, "did not build", `${(err as Error).message}, with ${v.changed}.`);
+      }
+      await tick();
+    }
+    p.remove();
+    const shipped = timed.find((t) => t.name === variants[0].name);
+    const rest = timed.filter((t) => t !== shipped);
+    if (shipped && rest.length) {
+      const best = rest.reduce((a, b) => (b.t < a.t ? b : a));
+      row("What saved the most", `${best.name.replace(/^…with /, "")}: ${ms(shipped.t - best.t)} of ${ms(shipped.t)}`,
+        "The variant that builds fastest names what the compiler spends its time on. The editor's own program is unchanged; this only timed copies of it.");
+    }
+  } catch (err) {
+    p.remove();
+    row("What makes the build slow", "failed", (err as Error).message);
   } finally {
     gl.deleteBuffer(tri);
   }
@@ -1565,6 +1693,19 @@ async function fullResolutionPreview(): Promise<void> {
   const was = btn.textContent;
   btn.textContent = "Running…";
   await readingFromABigStore();
+  btn.textContent = was;
+  btn.disabled = false;
+  const copyBtn = $("dCopyAll") as HTMLButtonElement;
+  copyBtn.hidden = false;
+  copyBtn.onclick = () => copy(textArea.value + "\nSpeed\n" + out.join("\n") + "\n", copyBtn, "Copy the results");
+});
+
+($("dSlowBuild") as HTMLButtonElement).addEventListener("click", async (e) => {
+  const btn = e.currentTarget as HTMLButtonElement;
+  btn.disabled = true;
+  const was = btn.textContent;
+  btn.textContent = "Running…";
+  await whatMakesTheBuildSlow();
   btn.textContent = was;
   btn.disabled = false;
   const copyBtn = $("dCopyAll") as HTMLButtonElement;
