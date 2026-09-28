@@ -1,0 +1,72 @@
+# THE PRACTICE-FRAME BACKLOG — "Looked at" entries that name no file of the owner's.
+#
+# Hub LESSONS 369. tools/decisions-check.mjs requires every "Looked at" entry to
+# name the file that was opened, with its extension, from
+# tools/owner-images.json: the photographs the owner shared for testing, opened
+# in the app so their EXIF, camera and lens fix apply. The 44 practice DNGs in
+# public/examples/ have none of that, and these entries were written on them
+# (or name a frame with no file at all) before the rule existed.
+#
+# One row per entry: the record, then the entry up to its first colon. Checked
+# BOTH WAYS and printed on every run, so it can only shrink. A row here is an
+# admission that a record reports a look at something that was not the
+# owner's photograph. Take one off by opening the owner's own file and
+# writing what it showed.
+
+013-aerochrome-splotchy-chroma.md NIR_3461, 2026-09-25
+015-lens-correction-against-the-reference.md NIR_3700, 2026-09-26
+015-lens-correction-against-the-reference.md NIR_3703, 2026-09-26
+015-lens-correction-against-the-reference.md NIR_3716, 2026-09-26
+042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md NIR_3461 again, 2026-09-24, night
+042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md NIR_3463, 2026-09-25
+042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md NIR_3461, 2026-09-25
+042-a-mask-is-a-place-and-most-controls-should-work-inside-one.md NIR_3467, 2026-09-25
+052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md NIR_3466, 2026-09-25
+052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md NIR_3461, 2026-09-25
+052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md NIR_1651, 2026-09-25
+052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md NIR_1827, 2026-09-25
+052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md NIR_0627, 2026-09-25
+052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md NIR_1644, 2026-09-26
+052-the-looks-sky-adjustments-read-a-selection-the-reader-cannot-see.md NIR_1827, 2026-09-26
+065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md NIR_3461, 2026-09-25, in Aerochrome with the lens profile at 1
+066-aerochrome-is-rendered-from-a-model-of-the-film.md NIR_3461, 2026-09-25
+066-aerochrome-is-rendered-from-a-model-of-the-film.md NIR_3466, 2026-09-25
+068-choose-which-finder-draws-each-sky-mask.md NIR_3461, 2026-09-26
+068-choose-which-finder-draws-each-sky-mask.md NIR_3466, 2026-09-26
+068-choose-which-finder-draws-each-sky-mask.md NIR_1651, 2026-09-26
+068-choose-which-finder-draws-each-sky-mask.md NIR_1644, 2026-09-26
+068-choose-which-finder-draws-each-sky-mask.md NIR_1827, 2026-09-26
+068-choose-which-finder-draws-each-sky-mask.md NIR_0627, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1651, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1644, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_3461, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1827, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_3406, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_3466, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1703, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_0627, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_3698, 2026-09-26
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1651, 2026-09-27
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1644, 2026-09-27
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1827, 2026-09-27
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_3461, 2026-09-27
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_3406, 2026-09-27
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1661, 2026-09-27
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1651, 2026-09-28
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1644, 2026-09-28
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1827, 2026-09-28
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_1661, 2026-09-28
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_3461, 2026-09-28
+069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md NIR_3406, 2026-09-28
+070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md NIR_1651, 2026-09-26
+070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md NIR_1644, 2026-09-26
+070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md NIR_0627, 2026-09-26
+070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md NIR_1651, 2026-09-27
+070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md NIR_1644, 2026-09-27
+070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md NIR_0627, 2026-09-27
+072-a-photograph-shot-well-under-opens-grainier-than-a-normal-one.md NIR_3471, 2026-09-26
+072-a-photograph-shot-well-under-opens-grainier-than-a-normal-one.md NIR_3472, 2026-09-26
+072-a-photograph-shot-well-under-opens-grainier-than-a-normal-one.md NIR_3473, 2026-09-26
+072-a-photograph-shot-well-under-opens-grainier-than-a-normal-one.md NIR_3474, 2026-09-26
+073-on-a-darker-frame-the-looks-sky-selection-takes-in-a-tree-and-sky-saturation-paints-it-scarlet.md NIR_3471, 2026-09-26
+073-on-a-darker-frame-the-looks-sky-selection-takes-in-a-tree-and-sky-saturation-paints-it-scarlet.md NIR_3472, 2026-09-26
