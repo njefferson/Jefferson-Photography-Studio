@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=a71f8b952603d745
-diffhash=e9a937584de399e3
-verdict=IN-SCOPE: all hunks document either the approved 069 option 10 research (measurements, Looked up sources, full Looked at section with render descriptions, Rank placement) or the approved items 1-2 staging build, with no additions beyond plan scope.
-# IN-SCOPE: all hunks document either the approved 069 option 10 research (measurements, Looked up sources, full Looked at section with render descriptions, Rank placement) or the approved items 1-2 staging build, with no additions beyond plan scope.
+planhash=3d9769a64c0e9ca1
+diffhash=48764c91a56e0ec3
+verdict=IN-SCOPE: the diff adds only items 1–4 (index, door tool, three gate updates with backlog file, and two lesson sections) with no src/ code touched.
+# IN-SCOPE: the diff adds only items 1–4 (index, door tool, three gate updates with backlog file, and two lesson sections) with no src/ code touched.

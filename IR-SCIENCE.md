@@ -2943,6 +2943,11 @@ changes additionally sweep all 44 practice raws.
   17 tags, no SubIFDs, no Exif, no MakerNote, no `AsShotNeutral`. They are
   useful for decode and geometry and useless for any question about camera
   metadata. A metadata feature tested only against them is untested.
+  **And useless for colour, the lens or the look**, because with no EXIF the app
+  opens them with no camera and no lens fix. Decision 069's options were judged
+  on them, and option 10's white-balance conclusion came from two of them with
+  the lens fix off. The originals of 27 are among the owner's own files in
+  `tools/owner-images.json`; those are what colour work uses (hub LESSONS 369).
 - **They carry no embedded preview**, which is why some fixtures elsewhere are
   bare decodes rather than camera renderings.
 - **A real camera file is needed for metadata work** and is not in the repo.

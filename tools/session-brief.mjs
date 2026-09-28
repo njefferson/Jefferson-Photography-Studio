@@ -65,6 +65,15 @@ const arch = read("docs/ARCHITECTURE.md");
 const mods = (arch.match(/^- \*\*`src\//gm) || []).length;
 if (mods) say(`\nMODULE MAP: ${mods} modules, docs/ARCHITECTURE.md — generated from each file's own\n  opening comment and held to it by tools/architecture-check.mjs. Read it\n  instead of grepping; it cannot be out of date.`);
 
+// 4b. THE OWNER'S TEST PHOTOGRAPHS (hub LESSONS 369). Printed so a session
+// starts knowing they exist and where the door is, instead of searching
+// scratch folders and calibrating on the practice DNGs.
+if (existsSync(join(repo, "tools", "owner-images.mjs"))) {
+  const { summary } = await import(join(repo, "tools", "owner-images.mjs"));
+  say("");
+  for (const l of summary()) say(l);
+}
+
 // 5. THE GATES THAT REFUSE A COMMIT, from the declaration rather than memory.
 const gates = (read(".branch-guard").match(/^also=(.+)$/gm) || []).map((l) => l.slice(5));
 say(`\nEVERY COMMIT RUNS ${gates.length} GATES: ${gates.map((g) => g.replace("tools/", "").replace(".mjs", "")).join(", ")}`);
