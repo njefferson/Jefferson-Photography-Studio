@@ -20,11 +20,9 @@
 // the sky while it fixes the foliage — belongs in the report beside the pictures.
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
-// BEFORE THE BROWSER: this renders through the build in `dist`, and a stale one
-// renders the PREVIOUS build's pictures. See tools/fresh-dist.mjs.
-requireFreshDist();
 import { mkdirSync, existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { resolve as ownerImage } from "./owner-images.mjs";
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");
 const PORT = arg("port", "8131");
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -32,7 +30,16 @@ const BASE = `http://127.0.0.1:${PORT}`;
 // file: a JPEG takes the other side of every per-kind split in `aero` and opens
 // unbalanced by design. The 44 practice DNGs are minimal hand-written files
 // (IR-SCIENCE.md section 7) and are the wrong instrument for a colour question.
-const FILE = arg("file", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/real/NIR_1376.NEF");
+// ONLY THE OWNER'S OWN FILES, through the one door (hub LESSONS 369): a
+// practice DNG opens with no camera and no lens fix, so a look judged on one
+// is judged on something no reader ever sees. A name is fetched from the
+// owner's shared folders on first use.
+const FILE = await ownerImage(arg("file", "NIR_1376.NEF"));
+// BEFORE THE BROWSER, and after the file: this renders through the build in
+// `dist`, and a stale one renders the PREVIOUS build's pictures. See
+// tools/fresh-dist.mjs. The file is checked first because refusing a practice
+// DNG needs no build.
+requireFreshDist();
 const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/looksheet");
 
 // Each candidate: a name, a one-line note on what it is reaching for, and the

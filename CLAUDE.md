@@ -377,6 +377,17 @@ numbers produced the identical stamp — `tools/stamp-check.mjs` refuses that
 now, reading both lists out of the source.
 
 ## Verify before claiming fixed
+- **ONLY THE OWNER'S OWN PHOTOGRAPHS, AND ONLY THE ONES THEY SHARED (hub
+  LESSONS 369).** Calibration, look tuning and every render a record reports
+  are done on the files in `tools/owner-images.json`: 444 files in the Drive
+  folders shared for testing, the originals of 27 practice frames among them.
+  Get them with `node tools/owner-images.mjs --list` and `--fetch`, and open
+  them in the app so their EXIF, camera and lens fix apply. The practice DNGs
+  in `public/examples/` carry no EXIF and are for decode and geometry only.
+  **Never search Drive for more**: the connector can see all of it, and that is
+  access, not permission. A scratch harness fetches through `resolve()` in the
+  same tool; `tools/look-sheet.mjs` and `tools/decisions-check.mjs` refuse
+  anything else.
 - Headless Chromium harness: `npm install --no-save esbuild playwright-core`;
   the browser binary is the `/opt/pw-browsers/chromium` symlink.
 - Scratch harnesses live OUTSIDE the repo, in the session scratchpad.

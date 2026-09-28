@@ -288,6 +288,53 @@ for (const [f, frames] of allowed) {
   const stale = [...frames].filter((n) => !cited.has(n)).sort();
   if (stale.length) fail(`.looked-allow excuses ${f} for ${stale.join(", ")}, which it no longer cites. Remove the row.`);
 }
+// EVERY "LOOKED AT" ENTRY NAMES ONE OF THE OWNER'S OWN FILES (hub LESSONS 369).
+// What a record reports seeing is only worth something if it was seen on a
+// photograph the app treats the way it treats the reader's: a raw with its
+// EXIF, so its camera and lens fix apply. The 44 practice DNGs have neither,
+// and decision 069's ten options were judged on them while the owner's own
+// originals sat in the folders shared for testing. So an entry names the file
+// that was opened, with its extension, and that file is in
+// tools/owner-images.json. The entries that predate this are declared in
+// .owner-images-allow, checked both ways and printed on every run, so the
+// list can only shrink: an entry there is an admission that a record reports
+// a look at something that was not the owner's photograph.
+const OWNER = JSON.parse(readFileSync(join(DIR, "..", "..", "tools", "owner-images.json"), "utf8"));
+const ownerNames = new Set(OWNER.files.map((x) => x.name));
+const OALLOW = join(DIR, "..", "..", ".owner-images-allow");
+const oAllowed = new Set();
+if (existsSync(OALLOW)) {
+  for (const line of readFileSync(OALLOW, "utf8").split("\n")) {
+    const t = line.replace(/#.*$/, "").trim();
+    if (t) oAllowed.add(t);
+  }
+}
+const oSeen = new Set();
+for (const [k, f] of byKey) {
+  if (!claimed.has(k)) continue;
+  const looked = body(readFileSync(join(DIR, f), "utf8"), "Looked at");
+  if (!looked) continue;
+  for (const line of looked.split("\n")) {
+    if (!/^- \S/.test(line)) continue;
+    const head = line.slice(2).split(":")[0].trim();
+    const ref = head.split(",")[0].trim();
+    // Only entries about a photograph: a frame number or an image file. An
+    // entry about a screen of the app (047's buttons) is not this rule's.
+    if (!/^(NIR|DSC|IMG)_\d+/i.test(ref) && !/\.(dng|nef|jpe?g|heic|tiff?|png)$/i.test(ref)) continue;
+    if (ownerNames.has(ref)) continue;
+    const key = `${f} ${head}`;
+    if (oAllowed.has(key)) { oSeen.add(key); continue; }
+    fail(`docs/decisions/${f}: the "Looked at" entry "${head}" does not name one of the owner's files. `
+       + `Name the file that was opened, with its extension, from tools/owner-images.json (for example NIR_1651.NEF), `
+       + `never a practice DNG; list them with node tools/owner-images.mjs --list (hub LESSONS 369).`);
+  }
+}
+for (const key of oAllowed) {
+  if (!oSeen.has(key)) fail(`.owner-images-allow excuses "${key}", which no "Looked at" entry carries any more. Remove the row.`);
+}
+if (oAllowed.size) {
+  console.log(`\n  practice-frame backlog: ${oAllowed.size} "Looked at" entries name no file of the owner's (.owner-images-allow, only shrinks)`);
+}
 if (allowRows.length) {
   console.log(`\n  unlooked backlog (${allowRows.length} record${allowRows.length === 1 ? "" : "s"}) — cited from measurement, never opened:`);
   for (const r of allowRows) console.log(`    ${r}`);
