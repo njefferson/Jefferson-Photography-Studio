@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=b0381777fa291d30
-diffhash=c061529f24eebc34
-verdict=IN-SCOPE: all hunks update only NOTES.md and public/conveyor-status.html to reflect step 5 (production is v2.63.36 from 62ffe5f, staging points at the same commit, status page and roadmap items updated accordingly).
-# IN-SCOPE: all hunks update only NOTES.md and public/conveyor-status.html to reflect step 5 (production is v2.63.36 from 62ffe5f, staging points at the same commit, status page and roadmap items updated accordingly).
+planhash=ee87a45c2d4d5933
+diffhash=4e460cbef29ed0d4
+verdict=IN-SCOPE: All hunks—the new button in debug.html, the refactored build-timing helpers (buildFrame, uniqueFrag, timedBuild) in src/debug.ts, the loop-rewrite functions (hideLoopCounts, dropMaskLoops), the whatMakesTheBuildSlow function with its four variants and row handling, and the button event listener—stay within debug.html and src/debug.ts and implement the plan's approved feature without touching the editor.
+# IN-SCOPE: All hunks—the new button in debug.html, the refactored build-timing helpers (buildFrame, uniqueFrag, timedBuild) in src/debug.ts, the loop-rewrite functions (hideLoopCounts, dropMaskLoops), the whatMakesTheBuildSlow function with its four variants and row handling, and the button event listener—stay within debug.html and src/debug.ts and implement the plan's approved feature without touching the editor.
