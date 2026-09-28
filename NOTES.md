@@ -54,6 +54,15 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**Nothing is waiting to be promoted, 2026-09-28.** v2.63.33 went to production
+on the go the same day, by pull request, rebase-merged as 62ffe5f, with the code
+the walks passed on staging. Production serves the offline copy `ips-2.63.36`,
+read off the live site naming 62ffe5f, and the Gates run and the deploy for
+62ffe5f both passed; staging points at the same commit. The number reads .36
+rather than .33 because the count includes the three docs commits since. The
+device pass below now runs on production. What v2.63.33 carried stays below as
+the record.
+
 **v2.63.33 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-28 (ae43050).** Production is v2.63.7. The Gates run and the deploy for
 ae43050 both passed, and staging's offline worker was read naming it, as
@@ -1078,8 +1087,8 @@ user-scalable=no.
   Reported 2026-09-26 from a PC in Firefox: after ending a session of 222
   photos, Keep on 22 more did nothing for minutes, and the report said nothing
   was in progress. Keep waited on the old session's delete with nothing on
-  screen, and a second press added the set twice. On staging from 2026-09-27
-  (0e9dcdc): the card rises at once; the wait happens only when the browser
+  screen, and a second press added the set twice. On production from 2026-09-28:
+  the card rises at once; the wait happens only when the browser
   says the set will not fit, and says so with a count; a photo refused for room
   meanwhile is stored again; a slow file is offered to be skipped; a second open
   is refused in words. Found and fixed with it: a saved photo dropped together
@@ -1089,7 +1098,7 @@ user-scalable=no.
 - [ ] **Batch export and adding photos wait for the browser's storage permission** <!-- decision: 076 -->
   **Shown as:** A batch starts, and a set finishes, without waiting for you to answer the browser's question about keeping data.
   Firefox answers the storage request with a prompt, and a batch sat at
-  "Processing 0" until it was answered. On staging from 2026-09-27 (01eec90):
+  "Processing 0" until it was answered. On production from 2026-09-28:
   the request is made and never waited on.
   See `docs/decisions/076-batch-export-and-adding-photos-wait-for-the-browsers-storage-permission.md`.
 
@@ -1158,8 +1167,8 @@ user-scalable=no.
   the strip can offer an older version as new.
   **Measured 2026-09-26: the minute was the compile**, 42 s on the PC and
   557 ms on the iPad; the PC's connection makes each 28 MB release a second
-  cost of about two and a half minutes. **Both halves built the same day and
-  on staging in v2.63.21.** An update keeps every file the device already has
+  cost of about two and a half minutes. **Both halves built the same day, and
+  on production from 2026-09-28.** An update keeps every file the device already has
   and downloads only the rest, the sticker library once per device. The strip
   counts the files. The build of the same version on screen takes over by
   itself in one window. The editor's picture code builds without holding the
@@ -1172,7 +1181,7 @@ user-scalable=no.
 - [ ] **The open photo's edits are lost on a reload or a closed tab** <!-- decision: 077 -->
   **Shown as:** Your edits to the open photo are kept if the page reloads or the tab is closed.
   The edit was written only when you moved to another photo, went Home or
-  applied a LUT. On staging from 2026-09-28: it is also written when the page
+  applied a LUT. On production from 2026-09-28: it is also written when the page
   is hidden and a second after each edit settles.
   See `docs/decisions/077-the-open-photos-edits-are-lost-on-a-reload-or-a-closed-tab.md`.
 

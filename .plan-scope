@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=b0381777fa291d30
-diffhash=9d4707e1110d442d
-verdict=IN-SCOPE: All hunks restore main's docs content (NOTES v2.63.21 entry, 069 option 8 with Rejected entry, 071 settled questions and BUILT sections, 072 word change) beside the branch's additions, plus approved cross-reference and stale-bullet corrections, touching only docs files per step 1.
-# IN-SCOPE: All hunks restore main's docs content (NOTES v2.63.21 entry, 069 option 8 with Rejected entry, 071 settled questions and BUILT sections, 072 word change) beside the branch's additions, plus approved cross-reference and stale-bullet corrections, touching only docs files per step 1.
+diffhash=c061529f24eebc34
+verdict=IN-SCOPE: all hunks update only NOTES.md and public/conveyor-status.html to reflect step 5 (production is v2.63.36 from 62ffe5f, staging points at the same commit, status page and roadmap items updated accordingly).
+# IN-SCOPE: all hunks update only NOTES.md and public/conveyor-status.html to reflect step 5 (production is v2.63.36 from 62ffe5f, staging points at the same commit, status page and roadmap items updated accordingly).
