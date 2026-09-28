@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=a71f8b952603d745
-diffhash=6c702f1f5127ff1d
-verdict=IN-SCOPE: The diff contains two confirmations fixes in src/main.ts (reordering toast and dialog close calls) and one heldDuring overlap test fix in src/startup.ts, matching plan items 1 and 2 exactly; the ARCHITECTURE.md changes are generated line-count updates.
-# IN-SCOPE: The diff contains two confirmations fixes in src/main.ts (reordering toast and dialog close calls) and one heldDuring overlap test fix in src/startup.ts, matching plan items 1 and 2 exactly; the ARCHITECTURE.md changes are generated line-count updates.
+diffhash=e9a937584de399e3
+verdict=IN-SCOPE: all hunks document either the approved 069 option 10 research (measurements, Looked up sources, full Looked at section with render descriptions, Rank placement) or the approved items 1-2 staging build, with no additions beyond plan scope.
+# IN-SCOPE: all hunks document either the approved 069 option 10 research (measurements, Looked up sources, full Looked at section with render descriptions, Rank placement) or the approved items 1-2 staging build, with no additions beyond plan scope.

@@ -2703,6 +2703,33 @@ view is a downscale: it averages away per-pixel structure and can suggest
 structure that is not there. The sky beside the crown needs the raw or a 1:1 crop
 before anything further is claimed about that photograph.
 
+### 4c-xxiv. THE CLOUD'S CYAN IS THE WHITE POINT'S, AND THE LOOK MULTIPLIES IT
+
+Traced stage by stage on 2026-09-28 (decision 069, option 10).
+
+- **Where it enters.** At open, before any look, NIR_1651's cloud and its clear
+  sky carry the same cast: hue 173–175, saturation 0.09, in three places across
+  the frame. A cast that is the same everywhere is a white point, not a lens.
+- **What the look does with it.** Aerochrome's mapping takes the cloud to 0.15,
+  and its three sky stages take it to 0.36–0.38. NIR_3461's dense cloud arrives
+  at 0.03 and leaves at 0.03.
+- **Why that white point.** It is gray-world over the whole frame. Gray-world's
+  documented failure is a scene dominated by one colour, which puts the opposite
+  colour on what is neutral (Stanford Psych221, "Color Balancing Algorithms";
+  US patent 9007484). In infrared the dominant colour is bright foliage.
+- **The field's white point is set on something neutral.** Rob Shea, "White
+  Balancing Color Infrared Photography" (2025): *"click on a neutral element in
+  your image, such as clouds or pavement."* Clouds are near spectrally flat
+  (section 4b-ix).
+- **Moving it alone is small, and it breaks the look.** The white point from
+  each frame's cloud is 3–7% on NIR_1651 and NIR_1644. Under the look as it
+  ships, the clouds turn white. The clear skies lose their blue (NIR_1651's hue
+  goes from 204 to 4), the foliage loses its highlights, and red haze spreads
+  from a crown into its cloud. The look's numbers were derived at gray-world's
+  white point (4c-v). **A neutral white point needs the look derived again at
+  it; either one moved alone is wrong.** The same 3–7% sensitivity is why two
+  frames with the same cloud can render it white on one and cyan on the other.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480

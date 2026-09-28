@@ -54,6 +54,19 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**v2.63.42 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-28 (d71f8e8).** v2.63.40 below, plus two fixes. "LUT applied — …" after
+Apply in the colour-file manager, and "Saved without location.", were both put
+inside a dialog that closed on the next line, so neither was ever seen. The
+dialog now closes first; a scratch check found the words hidden on 4b5c5f9 and
+visible on this build. And the report's start-up line now counts a pause that
+began just before the editor's graphics were built; the build-wait walk passed
+three runs in a row where it failed about one in two. Staging's offline worker
+was read naming d71f8e8 as `ips-2.63.42`, and the Gates run and the deploy for
+it both passed. The accessibility walk passed all 205 checks. **The device
+pass** is v2.63.40's, below, and on the iPad: apply a colour file from the
+manager, and the confirmation should show over the photo.
+
 **v2.63.40 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-28 (4b5c5f9).** Production is v2.63.36 and the editor is the same; the
 difference is the test page. Its new button, "What makes the picture code slow
@@ -1169,6 +1182,15 @@ user-scalable=no.
   It failed on NIR_1703, where every disagreeing cell traces to red crown tips
   that the look's selection itself scores as sky. What is left is that
   selection holding what is not sky (073, 052), not the map.
+  **Option 10, 2026-09-28: the cloud's cyan is the white point's.** Traced
+  stage by stage, NIR_1651's cloud is already cyan at open, 0.09 saturation. It
+  sits at the same hue as its clear sky, so the cast is the white point
+  (gray-world, pulled by bright foliage) and not the lens. The look's mapping
+  takes it to 0.15 and the sky stages to 0.38. A white point from the cloud
+  itself, the field's practice, is a 3–7% move and turns the clouds white. It
+  also takes the blue out of the clear sky and spreads red haze from the crown,
+  because the look's numbers were derived at gray-world's white point. So it
+  needs the look derived again at a neutral white point, which is 066's ground.
 - [ ] **The first launch after an update froze with nothing said, and every update fetches the whole app again** <!-- decision: 071 -->
   **Shown as:** After an update the start screen answers and says it is preparing the editor, an update downloads only what changed, and the editor's picture code no longer unrolls its loops on Direct3D; waiting to be confirmed on the PC where the minute was measured.
   Reported from the PC after v2.63.7: the start screen showed and nothing
