@@ -153,20 +153,28 @@ export const HEX_WORDS = new Set([
  *  What the caller relies on: each returned string is VERBATIM from the input,
  *  because the ledger test is a substring search and a normalised token would
  *  be searched for in text that never contained it. De-duplication is by
- *  lower-cased form, so one token is named once however it was cased. */
+ *  lower-cased form, so one token is named once however it was cased.
+ *
+ *  A token is a WHOLE WORD of hex: nothing alphanumeric touches either end.
+ *  Measured 2026-09-28: the first version took seven hex letters from inside
+ *  an ordinary English word (the past tense of "succeed") and refused the call.
+ *  Two boundaries count as a word's edge although they touch letters: a `0x`
+ *  prefix, and a JSON escape such as `\n`, because the input is serialised and
+ *  a SHA that starts a line arrives as `\n` followed by the SHA. */
 export function hexTokens(serialised) {
   const s = String(serialised ?? '');
   const seen = new Set();
   const out = [];
-  for (const m of s.matchAll(/[0-9a-f]{7,}/gi)) {
-    const tok = m[0];
+  for (const m of s.matchAll(/(?:(?<![0-9a-z])|(?<=\\[nrtbf]))(?:0x)?([0-9a-f]{7,})(?![0-9a-z])/gi)) {
+    const tok = m[1];
+    const at = m.index + m[0].length - tok.length;
     const low = tok.toLowerCase();
     if (HEX_WORDS.has(low)) continue;
     // `#rrggbbaa`. The six-digit form is already under the floor; the
     // eight-digit one is not, and this repository's stylesheets use it. Narrow
     // on purpose: exactly eight, and the `#` immediately before it. A forty-
     // character SHA cannot hide behind this.
-    if (low.length === 8 && s[m.index - 1] === '#') continue;
+    if (low.length === 8 && s[at - 1] === '#') continue;
     if (seen.has(low)) continue;
     seen.add(low);
     out.push(tok);
