@@ -2755,6 +2755,8 @@ const redoStack: Snapshot[] = []; // undone states, waiting to be redone; any ne
 let settled: Snapshot | null = null; // last recorded state (advances on settle)
 let baseline: Snapshot | null = null; // fresh-open automatic baseline (Reset target)
 let recordTimer = 0;
+/** The pending save of the open photo's edit (decision 077; `persistOpenEditSoon`). */
+let editSaveTimer = 0;
 /** From the first tap on a LUT tile until the reader does anything else (062).
  *  Declared here rather than beside the grid because `draw()` asks `recordSoon`
  *  on every frame from start-up, before the grid's block has run. */
@@ -2785,6 +2787,7 @@ function flushRecord() {
     redoStack.length = 0; // a genuinely new edit abandons the redo future
     settled = now;
     updateEditButtons();
+    persistOpenEditSoon(); // and the durable copy follows it (decision 077)
   }
 }
 
@@ -2806,6 +2809,7 @@ function undo() {
   clearTimeout(recordTimer);
   recordTimer = 0;
   updateEditButtons();
+  persistOpenEditSoon();
 }
 
 function redo() {
@@ -2819,12 +2823,14 @@ function redo() {
   clearTimeout(recordTimer);
   recordTimer = 0;
   updateEditButtons();
+  persistOpenEditSoon();
 }
 
 function resetEdit() {
   if (!baseline || !current) return;
   flushRecord(); // settle current edits so Reset itself is undoable
   applySnapshot(baseline);
+  persistOpenEditSoon();
 }
 
 undoBtn.addEventListener("click", undo);
@@ -11676,6 +11682,8 @@ function editToJson(): string {
  *  `switchToPhoto`, which must not let go of a photo's working state until the
  *  saved copy it will be rebuilt from is really on the disk. */
 function captureActiveEdit(): Promise<void> {
+  clearTimeout(editSaveTimer); // this writes it now; a pending save must not land on the next photo
+  editSaveTimer = 0;
   if (!activePhotoId) return Promise.resolve();
   flushRecord(); // settle any in-flight slider drag first
   const id = activePhotoId;
@@ -11697,6 +11705,70 @@ function captureActiveEdit(): Promise<void> {
   saved.catch(() => {}); // callers that do not want it must not see an unhandled rejection
   return saved;
 }
+
+/** SAVE THE OPEN PHOTO'S EDIT WITHOUT LEAVING IT (decision 077).
+ *
+ *  The durable copy used to be written only when the reader switched photos,
+ *  went Home or applied a LUT, so a slider moved on the photo that is open was
+ *  in memory and nowhere else: a reload, a closed tab, or iPadOS discarding a
+ *  tab in the background took it. This writes the same row a switch writes
+ *  (`editToJson` into `Session.setEdit`), so a resume already reads it, and it
+ *  leaves the in-memory history alone.
+ *
+ *  Takes nothing. Writes only for a photo of a stored session — never the photo
+ *  opened on its own, which is ephemeral by design — and only when the edit
+ *  differs from the copy already held. Returns nothing; a write that fails costs
+ *  what it cost before this existed, and the next switch writes again. */
+function persistOpenEdit(): void {
+  clearTimeout(editSaveTimer);
+  editSaveTimer = 0;
+  if (!activePhotoId || activePhotoId === "lone" || !current) return;
+  const id = activePhotoId;
+  const view = sessionPhotos.find((p) => p.id === id);
+  if (!view) return;
+  const json = editToJson();
+  if (view.edit === json) return;
+  view.edit = json;
+  Session.setEdit(id, json).catch(() => {});
+}
+
+/** The same save, within a second of a change — the case no event announces,
+ *  a tab killed outright. Called on the READER'S changes only: a control's own
+ *  input or change event, a new undo step, Undo, Redo and Reset. Never on a
+ *  redraw: redraws also run while a photo opens or a session resumes, and a
+ *  save then wrote the photo's fresh starting edit over its stored one. A save
+ *  still pending when a photo is left is written and cancelled there
+ *  (`captureActiveEdit`), and nowhere else: cancelling it in `activateCurrent`
+ *  too lost the edit whenever a resume re-activated the open photo after it. It is NOT held off while a set is
+ *  still being stored: the reader edits the first photo during that tail, and a
+ *  version that waited on the one-open guard never saved those edits. It does
+ *  NOT restart on each call, because a slider drag is a stream of inputs and the
+ *  history's own timer restarts on every redraw (measured, a save hung on it
+ *  came 2.5 to 5.5 s late); the first change schedules one write a second out
+ *  and it takes the edit as it stands then. */
+function persistOpenEditSoon(): void {
+  if (editSaveTimer) return;
+  editSaveTimer = window.setTimeout(persistOpenEdit, 1000);
+}
+
+// THE LAST EVENT A PAGE CAN RELY ON is the page becoming hidden (Chrome for
+// Developers, "Page Lifecycle API"; MDN, "visibilitychange"): a tab closed from
+// the switcher on a phone or tablet often fires no pagehide or unload at all.
+// So an in-flight gesture is settled and the edit is written there, with
+// pagehide as a second chance where it does fire.
+// A control the reader moved. Programmatic writes (syncToUI) fire no events, so
+// this is the reader's hand and nothing else.
+document.addEventListener("input", persistOpenEditSoon, true);
+document.addEventListener("change", persistOpenEditSoon, true);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "hidden") return;
+  flushRecord();
+  persistOpenEdit();
+});
+window.addEventListener("pagehide", () => {
+  flushRecord();
+  persistOpenEdit();
+});
 
 /** Restore a photo's full in-memory edit state onto the live editor. */
 function restoreLiveEdit(st: LiveEdit) {

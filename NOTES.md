@@ -1109,6 +1109,13 @@ user-scalable=no.
   report's Start-up line answers on the first launch; the busy card has no
   count while it waits; and making the code compile faster on Direct3D.
   See `docs/decisions/071-the-first-launch-after-an-update-froze-with-nothing-said-and-every-update-downloads-the-whole-app.md`.
+- [ ] **The open photo's edits are lost on a reload or a closed tab** <!-- decision: 077 -->
+  **Shown as:** Your edits to the open photo are kept if the page reloads or the tab is closed.
+  The edit was written only when you moved to another photo, went Home or
+  applied a LUT. On staging from 2026-09-28: it is also written when the page
+  is hidden and a second after each edit settles.
+  See `docs/decisions/077-the-open-photos-edits-are-lost-on-a-reload-or-a-closed-tab.md`.
+
 - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
   **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
   **Fourth from 2026-09-26, below the white guard (069), the update-path record

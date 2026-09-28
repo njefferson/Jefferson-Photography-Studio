@@ -133,6 +133,73 @@ try {
   await page.waitForTimeout(1500);
   check("4 clearing a verdict survives the same race", `${before4} -> ${await marks(page)}`, "-,Pick,Reject,- -> -,-,Reject,-");
 
+  // 5 AND 6 — AN EDIT ON THE OPEN PHOTO, WITHOUT LEAVING IT (decision 077).
+  // The durable copy used to be written only on a switch, Home or a LUT, so a
+  // slider moved on the photo that is open was in memory and nowhere else.
+  // 5 kills the tab after the edit has settled and a second has passed, with no
+  // event of any kind, which is what a discarded tab is; 6 hides the page and
+  // closes it 300 ms later, before any timer could have written it, so only
+  // the hidden handler can have saved it.
+  const resume = async () => {
+    page = await ctx.newPage();
+    page.on("pageerror", (e) => { console.log(`FAIL  page error: ${e.message}`); failed++; });
+    await page.goto(`${BASE}/ir.html`);
+    await page.waitForSelector("#resumeSession:not([hidden])", { timeout: 120000 });
+    await page.click("#resumeSession");
+    await settled(page, FOUR.length);
+    await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+    await page.waitForTimeout(1500);
+  };
+  const setExpo = (v) => page.evaluate((v) => {
+    const el = document.getElementById("expo");
+    el.value = String(v);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }, v);
+  const expoOn = async (n) => {
+    await page.click(`#sessionThumbs .session-thumb:nth-child(${n})`);
+    await page.waitForTimeout(1500);
+    return page.evaluate(() => Number(document.getElementById("expo").value));
+  };
+  await page.click("#sessionThumbs .session-thumb:nth-child(3)");
+  await page.waitForTimeout(1500);
+  const expo5 = await page.evaluate(() => { const el = document.getElementById("expo"); return Math.round((Number(el.min) + (Number(el.max) - Number(el.min)) * 0.8) / Number(el.step || 0.01)) * Number(el.step || 0.01); });
+  await setExpo(expo5);
+  // WAIT FOR THE DRAWN FRAME, NOT A CLOCK. This container draws in software,
+  // and an exposure change on a session holds the page for about 3.4 s from the
+  // NEXT frame on. A fixed 2.5 s, and then a check that the page was free, both
+  // killed the tab while it was still drawing, before the save's timer could
+  // run, and both read as the save failing (measured 2026-09-28 with the save's
+  // own log: scheduled at the change, never run before the kill). Two animation
+  // frames resolve only after the frame that draws the change has finished;
+  // the save's second, with room, follows.
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await page.waitForTimeout(1500);
+  await page.close({ runBeforeUnload: false });
+  await resume();
+  const got5 = await expoOn(3);
+  check(`5 an exposure moved on the open photo survives the tab being killed once it has settled\n        set ${expo5}, read back ${got5}`, Math.abs(got5 - expo5) < 1e-6, true);
+
+  await page.click("#sessionThumbs .session-thumb:nth-child(4)");
+  await page.waitForTimeout(1500);
+  const expo6 = await page.evaluate(() => { const el = document.getElementById("expo"); return Math.round((Number(el.min) + (Number(el.max) - Number(el.min)) * 0.25) / Number(el.step || 0.01)) * Number(el.step || 0.01); });
+  await setExpo(expo6);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { get: () => "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  // The hide's own save cancels the pending one-second save, so from here
+  // nothing but the hide can have written this edit. The page is only told it
+  // is hidden, so unlike a hidden page on the device it goes on drawing the
+  // change in software for seconds; the kill waits for that frame, or it lands
+  // before the write can commit and measures the container (2026-09-28).
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await page.waitForTimeout(300);
+  await page.close({ runBeforeUnload: false });
+  await resume();
+  const got6 = await expoOn(4);
+  check(`6 and one moved just before the page was hidden is written by the hide itself\n        set ${expo6}, read back ${got6}`, Math.abs(got6 - expo6) < 1e-6, true);
+
   await ctx.close();
 } finally {
   await browser.close();
