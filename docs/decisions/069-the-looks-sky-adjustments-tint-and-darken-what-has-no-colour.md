@@ -170,6 +170,18 @@ film decides what the guard keeps: a cloud comes out white.
     whether to act at all come from the photograph through those two
     statistics.
 
+- **Where the infrared field puts the white point** (read 2026-09-28): Rob
+  Shea, "White Balancing Color Infrared Photography" (2025): *"Use the white
+  balance picker and click on a neutral element in your image, such as clouds
+  or pavement. Color neutral elements will not have a color cast."* Kolari
+  Vision's custom DNG tutorial exists for the same reason: an infrared raw's
+  white point sits outside the converter's range and is set on the picture.
+- **Gray-world's documented failure** (Stanford Psych221, "Color Balancing
+  Algorithms"; US patent 9007484, "Alleviating dominant color failure in
+  automatic white balance"): a scene dominated by one colour pulls the average
+  toward it, and the correction puts the opposite colour on what is neutral. In
+  infrared the dominant population is bright foliage.
+
 ## Built already
 
 What exists that this item will use, so a second one does not get written
@@ -231,7 +243,7 @@ What exists that this item will use, so a second one does not get written
 - touches 013 — Sky colour smoothing is 013's stage and its sky half works by giving pale grain the sky's colour back; a guard that reads grain as colourless undoes it.
 - touches 052 — 052 rejected a whiteness weight as a selection fix, and its Option 1 puts every cloud the Sky mask holds under these stages; this is what those clouds meet there.
 - touches 023 — the Sky mask's colour grow takes cloud into the sky on purpose, and under 052 that cloud reaches these stages.
-- touches 066 — a film model renders cloud white from the film's own behaviour; this rule is what its clouds must meet if it replaces these stages.
+- touches 066 — a film model renders cloud white from the film's own behaviour; this rule is what its clouds must meet if it replaces these stages. Option 10 (2026-09-28) found the cloud's cyan is gray-world's white point amplified by a look derived at it, and a look derived at a neutral white point is 066's ground.
 - needs 015 — the grey patch these stages were being tuned against is, on the
   cell-tower set, the lens's uncorrected centre drift (015, Looked at). With
   015 on at open, what arrives at these stages changes.
@@ -407,6 +419,36 @@ What exists that this item will use, so a second one does not get written
      passes the clear sky and fails the cloud: both clouds are cyan as today
      (below).
 
+10. **MEASURED AND RENDERED 2026-09-28, open, not built: the cloud's colour is
+    the white point's, and the look multiplies it.** Traced stage by stage on
+    NIR_1651, NIR_1644, NIR_3406 and NIR_3461 ("Measured and rendered,
+    2026-09-28", below).
+    - **Where it enters.** At open, before any look, NIR_1651's cloud and its
+      clear sky carry one cast: hue 173–175, saturation 0.09, in three places
+      across the frame. A cast that is the same everywhere is a white point,
+      not a lens. The look's mapping takes the cloud to 0.15, and the three sky
+      stages to 0.36–0.38. NIR_3461's dense cloud arrives at 0.03 and stays
+      there through every stage.
+    - **What decides it.** The white point is gray-world over the whole frame
+      (`grayWorldWB`, `src/decode.ts`). The field's documented failure of
+      gray-world is a scene dominated by one colour, which takes the opposite
+      colour onto everything neutral. The field's own infrared practice sets the
+      white point on something neutral, clouds or pavement (Looked up).
+    - **What moving it alone does.** A white point taken from each frame's cloud
+      is a small move: 3% less red and 7% more blue on NIR_1651, 4% and 8% on
+      NIR_1644, nothing on NIR_3461. Under the look as it ships, the clouds turn
+      white. And the look turns over:
+      - NIR_1651's clear sky goes from blue (hue 204) to a reddish grey (hue 4);
+      - NIR_1644's upper sky drops from saturation 0.85 to 0.53;
+      - the foliage loses its white highlights (0.80 to 0.96, 0.56 to 0.90);
+      - on NIR_1651, red haze spreads from the crown into the cloud and down
+        beside the trunk.
+    - **What that says.** The look's numbers were derived at gray-world's white
+      point (IR-SCIENCE 4c-v), so a white point that is right for the cloud is
+      wrong for the look. And a 3–7% move in the white point swings the sky
+      from blue to grey. So the white point cannot be fixed under today's look,
+      only with the look derived again at it, which is 066's ground (Depends).
+
 ## Rejected
 
 - **1, one rule read on each pixel as it arrives — built 2026-09-26, and failed.** Read per pixel it cannot tell 013's speckle from a cloud, which is the risk this record named before it was built. At the look's own settings NIR_3406's sky filled with rust-coloured blotches at 1:1 where today's is even; with Sky depth at 0.5 that whole sky snowed with pale dots; NIR_3461 and NIR_3466 took grain above the horizon and dotted cloud edges; NIR_1651's small cloud mottled. Moving its gate or reading it over a width chosen on these frames is 2.
@@ -418,6 +460,7 @@ What exists that this item will use, so a second one does not get written
 - **8, the map from sky samples only — measured off the map, and failed before a render.** It is 7's missing half, researched and built in the scratch harness: each texel averages only the taps the refined selection scores as sky, and a texel with less than one such tap is filled from its neighbours. Against bars fixed before the run, the edge disagreement fell from 31–83% to 0–14%, and it passed on six of seven frames with sky. On NIR_1703 the edge band stays at 14.4%, and every disagreeing cell there traces to red crown tips the selection itself scores as sky, which the fill then spreads. What it cannot fix is what the selection holds (073, 052), so it was not rendered and it is not built.
 
 - **9, the cloud guard, built in two forms 2026-09-27 and 2026-09-28, and taken out.** Brightness alone turned NIR_1651's and NIR_1644's cloud white and greyed the pale low clear sky on NIR_1661, NIR_3406 and NIR_3461. Brightness with colour read at the sky map's scale kept those skies blue and lost the cloud: on these frames a cloud arrives at the sky stages with MORE saturation (0.10 to 0.15 on NIR_1651) than a pale clear sky (0.07 to 0.09 on NIR_3406), and a wispy band's texel mixes cloud with the blue between the wisps. So neither brightness nor arriving saturation separates cloud from pale clear sky on these frames; whatever does is not in the colour a pixel arrives with.
+- **10 as rendered, the cloud's white point under today's look (2026-09-28).** It turns the cloud white on NIR_1651 and NIR_1644. It also takes the blue out of their clear skies, the white highlights out of their foliage, and on NIR_1651 spreads red haze from the crown into the cloud. The white point is right and the look is not derived at it; 10 stays open for the two together.
 - **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
 
 ## Built and measured, 2026-09-26
@@ -599,9 +642,53 @@ nearly so) and fails the cloud half: NIR_1651's and NIR_1644's cloud do not
 stay white. As written, the refinement undoes the first form everywhere
 except NIR_3406's low sky.
 
+## Measured and rendered, 2026-09-28 (option 10: where the cloud's colour enters)
+
+**The instrument.** A scratch harness through today's build (d71f8e8's code),
+the view at three stages per frame: A as opened, with no look; B the Aerochrome
+chip with smoothing, Sky depth and Sky saturation at 0; C the chip as it ships
+(smoothing 1, Sky saturation 2, or 1.8 on NIR_1644). Every sheet was opened
+before a box was chosen, and each box is a region seen in it. Then a fourth
+render, D: the white balance moved at A until the frame's cloud box reads
+neutral (a measured Newton step on the two ratios, because a gain moves every
+displayed channel), the opening balance restored, the chip chosen, and the
+same offset applied to the chip's sliders, as a reader would.
+
+**Saturation of each box, A, B, C:**
+
+- NIR_1651: dense cloud 0.09, 0.15, 0.38; thin cloud 0.09, 0.15, 0.36; clear
+  sky 0.09, 0.08, 0.33. At A all three sit at hue 172–175.
+- NIR_1644: upper sky 0.20, 0.41, 0.85. Its cloud box for D is on the band's
+  bright right end; its first box landed on crowns and is not used.
+- NIR_3406, no cloud: low sky 0.05, 0.08, 0.13; upper sky 0.05, 0.09, 0.18.
+- NIR_3461: dense cloud 0.03, 0.03, 0.03; clear sky 0.08, 0.16, 0.37.
+
+**D, the white point from the cloud, against C:**
+
+- NIR_1651: slider offset red −5, blue +10 (gains ×0.967, ×1.069). Clouds
+  0.38 and 0.36 to 0.02; clear sky hue 204 to 4 at 0.33; foliage 0.80 to 0.96.
+- NIR_1644: red −6, blue +12 (×0.961, ×1.084). Cloud band 0.33 to 0.03; upper
+  sky 0.85 to 0.53; foliage 0.56 to 0.90.
+- NIR_3461: red 0, blue +2. Cloud 0.03 to 0.02; clear sky 0.37 to 0.26.
+
+**What the pictures show.** C beside D, whole frame:
+
+- **NIR_1651.** D's cloud is white-grey with no cyan. Red haze fills the cloud
+  round the crown, and runs as a band down the clear sky right of the trunk.
+  The clear sky is flat slate where C's is deep blue. The tree is solid
+  orange-red, with none of C's pink-white tips.
+- **NIR_1644.** D's band behind the crowns is white. The sky above is dark
+  slate-blue where C's is blue, and the forest is solid orange-red.
+- **NIR_3461.** Nearly the same, the clear sky a little less blue.
+
 ## Rank
 
 **After 015 (2026-09-26)**, which it now needs (Depends): turning the lens correction on at open changes what reaches these stages. 075 and 076 sit between (2026-09-27): they are the open path's two silent waits, share no ground with these stages, and were built beside 015. Below that, the order argued here stands.
+
+**Option 10 (2026-09-28) moves the question upstream, not the rank.** The
+cloud's cyan is the white point's, and fixing it needs the look derived again at
+a neutral white point, which is 066's ground. So what waits here waits on that
+derivation, and this record's cloud checks become 066's.
 
 **It holds no standing option as of 2026-09-26**, so what waits on it waits on
 research, not on a build.
@@ -671,3 +758,7 @@ is the argument that puts it above 052.
 - NIR_1661, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. The low clear sky blue as today.
 - NIR_3461, 2026-09-28: the same three, whole frame and at 1:1 at the same three places. The clear band blue and the red glows back, as today.
 - NIR_3406, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. The low sky a little paler than today, without the first form's mottle.
+- NIR_1651, 2026-09-28: the three stages side by side, as opened, the look with its sky stages off, and the look as it ships; then the look as it ships beside the same with the white point from the cloud. The cloud cyan only at C; white at D, with red haze round the crown and a slate clear sky.
+- NIR_1644, 2026-09-28: the same four renders. The band behind the crowns cyan at C and white at D; the upper sky slate at D.
+- NIR_3406, 2026-09-28: the three stages. The sky a faint cool grey at A, pale blue at C.
+- NIR_3461, 2026-09-28: the same four renders. The dense cloud near-white at every stage and in D; the clear sky a little less blue in D.
