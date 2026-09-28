@@ -83,15 +83,20 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.63.7: a picked mask takes its own settings, the LUT grid, None for looks, and the fixes that came with them. Promoted on your go on 2026-09-26, by pull request with the tree unchanged. Checked on the live site: its offline copy is named for 2.63.7, and the Gates run and the deploy for that commit both passed.</span></li>
-        <li><b>On staging</b> <span>v2.63.31, pushed 2026-09-28: the editor's picture code no longer unrolls its loops on Direct3D; a photo turned on its side or flipped gets the look's sky at the top as shown; the lens correction opens on again; Keep straight after Done says what it is doing; a batch no longer waits on the browser's storage question; and Firefox says it is preparing the editor at every start. The Gates run and the deploy for 107ba14 both passed, and staging's offline worker was read naming it as ips-2.63.31.</span></li>
+        <li><b>On staging</b> <span>v2.63.33, pushed 2026-09-28: your edits to the open photo survive a reload or a closed tab; the editor's picture code no longer unrolls its loops on Direct3D; a photo turned on its side or flipped gets the look's sky at the top as shown; the lens correction opens on again; Keep straight after Done says what it is doing; a batch no longer waits on the browser's storage question. The Gates run and the deploy for ae43050 both passed, and staging's offline worker was read naming it as ips-2.63.33.</span></li>
         <li><b>Next</b> <span>Your PC's reading of the picture code's build time decides whether 071 is done. Clouds under the look's sky stages (069) are back to research: both forms of a cloud guard were built, rendered and taken out.</span></li>
-        <li><b>Last verified green</b> <span><code>107ba14</code>, on staging: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
+        <li><b>Last verified green</b> <span><code>ae43050</code>, on staging: the Gates run and the deploy for that exact commit both passed. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63 is production's number. The next release that adds something takes 2.64.</span></li>
       </ul>
 
       <div class="yours">
         <h2>Waiting on you</h2>
         <ul>
+          <li>
+            <strong>On the iPad:</strong> in a session, edit a photo, switch to
+            another app, close the tab from the switcher, then reopen and resume.
+            The edit should be there.
+          </li>
           <li>
             <strong>On the PC, first, in Edge and then Firefox:</strong> open
             staging's test page, press "Run the speed tests", and send the row
@@ -121,6 +126,13 @@
 
       <h2>The stages</h2>
       <ul>
+        <li class="waiting"><span class="state">On staging</span>
+          <strong>Edits to the open photo were lost if the page reloaded or the
+          tab was closed before you moved to another photo.</strong> They were
+          saved only on a switch, Home or a LUT. Now they are also saved when the
+          page goes to the background and within a second of each change. In
+          v2.63.33.
+        </li>
         <li class="waiting"><span class="state">On staging</span>
           <strong>On a photo turned on its side, the look's sky was found on the
           wrong edge.</strong> Every look that uses the sky works it out on the
@@ -450,13 +462,7 @@
           a dark frame starts with more. Raise Noise reduction by hand for now.
           The one design tried was refuted before it was built.
         </li>
-        <li>
-          <strong>Edits to the photo that is open are lost if the page is
-          reloaded or the tab is closed before you move to another photo.</strong>
-          A session saves a photo's edits when you leave it, so the one on screen
-          has not been saved yet. Found while testing the sticker fix; the next
-          plan records and fixes it.
-        </li>
+
         <li>
           <strong>Stickers on a photo you returned to after resuming a session
           were missing from its export</strong> until the Stickers tab was opened.
