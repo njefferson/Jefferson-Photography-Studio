@@ -158,17 +158,22 @@ export const HEX_WORDS = new Set([
  *  A token is a WHOLE WORD of hex: nothing alphanumeric touches either end.
  *  Measured 2026-09-28: the first version took seven hex letters from inside
  *  an ordinary English word (the past tense of "succeed") and refused the call.
- *  Two boundaries count as a word's edge although they touch letters: a `0x`
- *  prefix, and a JSON escape such as `\n`, because the input is serialised and
- *  a SHA that starts a line arrives as `\n` followed by the SHA. */
+ *  Three boundaries count as a word's edge although they touch letters: a `0x`
+ *  prefix; a JSON escape such as `\n`, because the input is serialised and a
+ *  SHA that starts a line arrives as `\n` followed by the SHA; and the `-g` of
+ *  git's describe form, which git resolves to the commit after it. A run of
+ *  decimal digits alone is a number, not an identifier: the first version
+ *  refused 3600000, a byte count and a date. A forty-character SHA with no
+ *  letter in it has odds near seven in a billion. */
 export function hexTokens(serialised) {
   const s = String(serialised ?? '');
   const seen = new Set();
   const out = [];
-  for (const m of s.matchAll(/(?:(?<![0-9a-z])|(?<=\\[nrtbf]))(?:0x)?([0-9a-f]{7,})(?![0-9a-z])/gi)) {
+  for (const m of s.matchAll(/(?:(?<![0-9a-z])|(?<=\\[nrtbf])|(?<=-g))(?:0x)?([0-9a-f]{7,})(?![0-9a-z])/gi)) {
     const tok = m[1];
     const at = m.index + m[0].length - tok.length;
     const low = tok.toLowerCase();
+    if (/^\d+$/.test(tok)) continue;
     if (HEX_WORDS.has(low)) continue;
     // `#rrggbbaa`. The six-digit form is already under the floor; the
     // eight-digit one is not, and this repository's stylesheets use it. Narrow
