@@ -98,7 +98,11 @@ const took = (n: number) => (n < 1000 ? `${n.toFixed(0)} ms` : `${(n / 1000).toF
  *  reader feels, and is reported as the page waiting. */
 function heldDuring(from: number, to: number): string {
   let worst = 0;
-  for (const [a, b] of gaps) if ((a >= from && a < to) || (a < from && b > to)) worst = Math.max(worst, b - a);
+  // ANY pause that overlaps the build, including one that began just before
+  // it: the old test counted only a pause starting inside the build or
+  // spanning all of it, and missed the page already held when the build began,
+  // which is how the build-wait walk failed about one run in two.
+  for (const [a, b] of gaps) if (a < to && b > from) worst = Math.max(worst, b - a);
   // An unfinished pause: the page has not drawn since before the build ended.
   if (lastFrame < to && to - lastFrame > worst && lastFrame >= from) worst = to - lastFrame;
   const wasHidden = hidden.some(([a, b]) => a < to && b > from) || (hiddenSince !== null && hiddenSince < to);
