@@ -146,6 +146,29 @@ film decides what the guard keeps: a cloud comes out white.
   and the ones with no fitted constant take their scale either from a
   structure already computed or from the data's own spread. In this app that
   structure is the sky map.
+- **For option 9, looked up 2026-09-27: the brightness route.**
+  - Fstoppers, *Everything You Need to Know About Lightroom Masking (Part 2)*:
+    the way to darken a blue sky and keep its clouds white is the sky mask
+    intersected with a luminosity range that removes the white clouds.
+  - photographylife.com, *Range Masks Explained*: the same route, a local
+    adjustment restricted to the pixels of its mask that fall inside a
+    luminance range.
+  - darktable user manual, *mask refinement & additional controls*: a mask is
+    refined with guided-filter feathering, which makes it follow the edges of
+    the picture itself.
+  - Otsu, *A threshold selection method from gray-level histograms* (IEEE
+    Transactions on Systems, Man and Cybernetics, 1979): the standard
+    threshold for a picture holding two populations, placed where the
+    between-class variance is greatest, with no parameter to set.
+  - Ashman's D (Ashman, Bird and Zepf, *Detecting bimodality in astronomical
+    datasets*, 1994): sqrt(2)·|mu1 − mu2| / sqrt(s1² + s2²), the standard
+    measure of whether two classes are separate populations; D > 2 is the
+    standard condition for a clean separation.
+  - So the field's answer and this app's gap are the same shape: Lightroom's
+    reader chooses the luminance range by eye for each photograph, and this
+    app's look has no reader choosing it, so the two ends and the decision
+    whether to act at all come from the photograph through those two
+    statistics.
 
 ## Built already
 
@@ -308,19 +331,67 @@ What exists that this item will use, so a second one does not get written
    with no render, and its texels disagree along every edge of the selection
    ("Measured before a render" below). Nothing is chosen, and the record holds
    no option that stands.
-8. **MEASURED OFF THE MAP, 2026-09-26, and not rendered: build each texel from
-   sky samples only.** A tap counts as sky where the refined selection scores it
-   above one half (the level the refinement already cuts at); a texel with less
-   than one sample of sky is filled from its neighbours ring by ring (pull-push
-   fill, Gortler et al. 1996); the photograph's depth key and the grey guard's
-   reference keep today's samples, so Sky depth is unchanged. Against bars fixed
-   and hashed before the run: edge disagreement fell from 31–83% to 0–14% and
-   passes on six of seven frames with sky; it created at most 3 red-ward texels
-   on any frame; the key is bit-identical to today on every frame. It fails on
-   NIR_1703, whose edge band stays at 14.4%, and every disagreeing cell there
-   traces to red crown tips the refined selection itself scores as sky, which the
-   fill then spreads. What is left of this record is the look's selection
-   holding what is not sky (073, 052), not the map.
+9. **REJECTED after renders, 2026-09-28: a cloud guard, bright AND
+   colourless, with its ends taken from the photograph.** Numbered after
+   main's 8 (the map from sky samples only), which is recorded there. Both of
+   its forms were built, rendered beside today's build, opened, and taken out;
+   neither passed its checks ("Built and rendered" below, and Rejected, 9).
+   - **What the field does.** Lightroom's standard answer to "darken a blue
+     sky, keep the clouds white" is the sky mask intersected with a luminance
+     range that removes the bright tones, and darktable refines such a mask
+     with a guided filter so it follows the picture's own edges (Looked up).
+     The mask says where; the range says which pixels, by their brightness.
+   - **Why brightness alone was not enough.** The first form spared every
+     bright pixel, and a pale clear sky low toward the horizon is bright too:
+     on NIR_1661, NIR_3406 and NIR_3461's clear band it lost its blue.
+     Brightness cannot tell pale low sky from cloud. A cloud is bright AND
+     colourless; a pale low sky is bright and still blue.
+   - **One weight, 1 − bright × colourless**, and all three stages multiply
+     by it: the smoothing's amount, the sky-saturation boost and the
+     sky-depth factor. Every existing gate stays: the smoothing's distance
+     gate that spares branches, 019's saturation gate, and Sky depth's key
+     and grey guard.
+   - **Bright is read on the pixel's luma as it ARRIVES at the sky block**,
+     before the smoothing moves anything, as smoothstep(sky class mean, cloud
+     class mean, luma). The two ends come from the photograph, not from
+     constants fitted to frames (Rejected, 2): inside the look's selection,
+     where the sky map already samples each photograph (`buildSkyMap`), the
+     arriving luma is split in two by Otsu's method, the standard threshold
+     for a picture with two populations. That the brighter class is the
+     cloud is the film's physics, not a fit: clear skylight carries little
+     infrared, so a clear sky renders dark and a cloud near-white (IR-SCIENCE
+     4b-viii). Bright is 0 everywhere unless Ashman's D between the two
+     classes is above 2, the standard condition for a clean separation.
+   - **Colourless is read at the sky map's scale, never per pixel.** Per
+     pixel, chroma is 013's speckle, and that is option 1's failure. Each
+     texel of the map carries its mean HSV saturation over ALL its selected
+     samples as they arrive (`SkyMap.sat`, one byte per texel), not the sky
+     target colour the map already stores; a texel with no selected sample
+     carries the photograph's mean. Colourless is that mean read through
+     019's `SKY_SAT_GATE_LO..HI`, the existing definition of colourless in
+     the sky, so there is no new constant.
+   - **Why it is not option 1 again.** Option 1 read chroma per pixel, the
+     small residual the look multiplies by thirteen (4c-xxi). Here the only
+     per-pixel reading is luma, the large number, and a speckle dot is pale
+     in colour, not bright; the colour is read over a texel's footprint.
+     That is the argument; the renders are the test.
+   - **Where it lives.** The split rides the sky map (`SkyMap.cloud`) to the
+     shader as two uniforms, and the texel means as an R8 texture sampled
+     with the same bilinear read `sampleSkyMap` makes; `compileEdit` reads
+     the same numbers, so export and screen agree. The report's "Sky map"
+     line prints D, whether the guard is on, and the two ends. The
+     selection, the Sky mask and every other stage are unchanged.
+   - **Its checks** are the ones the plan named, each rendered and opened:
+     NIR_1651's cloud white with its clear sky unchanged; NIR_1644's band of
+     cloud behind the crowns white with no seam at the crowns; NIR_1827's sun
+     haze as today with no grain at the horizon; NIR_3406, 013's speckle frame,
+     with no rust blotches at 1:1; NIR_3461's horizon without grain; and a
+     clear sky with no cloud, NIR_1661, identical to today. After the first
+     form's renders, the check that decides it: NIR_1661, NIR_3406 and
+     NIR_3461's clear band unchanged from today, while NIR_1651's and
+     NIR_1644's cloud stay white. Rendered 2026-09-28, the refined form
+     passes the clear sky and fails the cloud: both clouds are cyan as today
+     (below).
 
 ## Rejected
 
@@ -330,7 +401,7 @@ What exists that this item will use, so a second one does not get written
 - **4, the infrared axis.** It is the one reading known to have kept NIR_1651's cloud white, and it stays the comparison the first render is checked against. As the rule it tests whether a pixel is sky, which is the selection's question put in the stages' place; it needs the linear axis carried past the grade to stages that run after it; a camera-rendered file has no such axis; and its +0.04 was fitted on seven frames.
 - **5, the smoothing alone.** Sky depth darkens a cloud grey with no tint at all, and the film leaves it near-white. Half the rule is a second place for the other half to be forgotten.
 - **7, read the surroundings at the sky map's scale — designed, measured off the map, and rejected before a render.** The texels along the selection's edge average the sky with whatever the bitmap's feather took in, so they disagree with their neighbours on every frame: 31% to 83% of the cells along the edge, against 0% to 8% inside the sky. A rule that acts where the neighbours disagree therefore acts in a band about two texels wide along every treeline, roofline and horizon, and there it hands the stages to the pixel's own reading, which is Option 1's grain in the place Option 1 grained. None of the three rules reaches the inside of a cloud wider than two texels either. What would make the surroundings readable is a map whose edge texels carry the sky's colour; that is a change to how the map is built, not to the stages, and it is not an option here until it is researched.
-- **8, the map from sky samples only — measured off the map, and failed before a render.** It is 7's missing half, researched and built in the scratch harness: each texel averages only the taps the refined selection scores as sky, and a texel with less than one such tap is filled from its neighbours. Against bars fixed before the run, the edge disagreement fell from 31–83% to 0–14%, and it passed on six of seven frames with sky. On NIR_1703 the edge band stays at 14.4%, and every disagreeing cell there traces to red crown tips the selection itself scores as sky, which the fill then spreads. What it cannot fix is what the selection holds (073, 052), so it was not rendered and it is not built.
+- **9, the cloud guard, built in two forms 2026-09-27 and 2026-09-28, and taken out.** Brightness alone turned NIR_1651's and NIR_1644's cloud white and greyed the pale low clear sky on NIR_1661, NIR_3406 and NIR_3461. Brightness with colour read at the sky map's scale kept those skies blue and lost the cloud: on these frames a cloud arrives at the sky stages with MORE saturation (0.10 to 0.15 on NIR_1651) than a pale clear sky (0.07 to 0.09 on NIR_3406), and a wispy band's texel mixes cloud with the blue between the wisps. So neither brightness nor arriving saturation separates cloud from pale clear sky on these frames; whatever does is not in the colour a pixel arrives with.
 - **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
 
 ## Built and measured, 2026-09-26
@@ -418,6 +489,100 @@ to how the map is built. And Sky depth's half of this record, clouds kept
 white, cannot be separated by colour from an uncorrected hot spot; it turns on
 whether the hot spot is corrected, not on these stages.
 
+## Built and rendered, 2026-09-27 (option 9, first form: brightness alone)
+
+**What was built.** Option 9 as written, in `buildSkyMap`, the shader and
+`compileEdit`, on the work branch and not committed. Nothing reached staging,
+and the code was taken out on 2026-09-28 after the refined form's renders.
+
+**How it was rendered.** Today's build (7d21a73) beside the candidate, under
+the Aerochrome chip at its own settings (smoothing 1, Sky saturation as the
+report printed it, Sky depth 0), with lens correction as the app opened each
+file: off on the four practice files, on at 1 on NIR_3406 and NIR_3461. The
+whole frame is the screen's canvas through a scratch copy of
+`tools/look-sheet.mjs`, and the 1:1 crops are from the full-size export of the
+same edit. Sky depth at 0.5 was not rendered.
+
+**What the report's "Sky map" line printed.** The guard engaged on all six:
+
+- NIR_1651: D 6.32, on; sky 0.309, cloud 0.768.
+- NIR_1644: D 4.06, on; sky 0.360, cloud 0.767.
+- NIR_1827: D 2.87, on; sky 0.426, cloud 0.748; its depth key is 0.
+- NIR_3461: D 2.63, on; sky 0.345, cloud 0.617.
+- NIR_3406: D 2.48, on; sky 0.510, cloud 0.786. Its sky has no cloud.
+- NIR_1661: D 2.47, on; sky 0.290, cloud 0.498. Its sky has faint wisps and
+  no cloud bank.
+
+**What the pictures show, opened whole and at 1:1:**
+
+- NIR_1651: better. Today the cloud is cyan; with the guard it is white, pale
+  blue only where it thins, with no seam where it meets the clear sky and no
+  grain. The clear sky under it and beside the tree is the same.
+- NIR_1644: better. The band of cloud behind the crowns goes from cyan to
+  white; the crowns' edges are the same in both, with no seam or halo; the
+  dark blue above is the same.
+- NIR_1827: better. The red haze in the pale sky and the red halo along the
+  treetops are much fainter; the sun haze is near-white in both; no grain at
+  the horizon.
+- NIR_3461: mixed. The round red glows round the far pylon and beside the
+  near pylon's leg are gone. But the clear sky between the cloud and the
+  horizon goes from blue to a grey-blue, smooth, without grain.
+- NIR_3406: worse. The lower half of its cloudless sky goes from pale blue to
+  a near-white grey, and at 1:1 it carries a faint warm mottle where today's
+  is even. The upper sky and the roofline are the same.
+- NIR_1661: worse. The lower half of the sky goes from blue to slate grey,
+  the clear sky and not only its wisps; the red halos round the treetops are
+  fainter.
+
+**What it shows.** Where a sky holds a real bank of cloud, D is 4 and more
+and the guard does what it is for. Where a sky is clear and pales toward the
+horizon, D read 2.47 to 2.63, just over the bar, so the bimodality test did
+not hold the guard off, and the ramp between the two class means spared the
+pale low sky and took its colour. That is the check this option named for a
+clear sky, and it fails it on three frames. Moving the bar to where these
+six frames would pass is Rejected 2.
+
+## Built and rendered, 2026-09-28 (option 9, refined: bright × colourless)
+
+**What was built.** The design now written as option 9: `SkyMap.sat`, each
+texel's mean arriving saturation over its selected samples, clamped to the
+display range, uploaded as an R8 texture; the weight 1 − bright ×
+colourless, in the shader and `compileEdit` alike. Uncommitted, on the work
+branch; nothing reached staging. Rendered as the first form was, on the same
+six frames, with today's renders reused (the same build, 7d21a73) and the
+first form beside them. D and the two ends are the first form's: that half
+did not change.
+
+**What the pictures show, whole and at 1:1:**
+
+- NIR_1651: the same as today. The cloud is cyan again; the first form's
+  white is gone.
+- NIR_1644: the same as today. The band behind the crowns is cyan again.
+- NIR_1827: the same as today, red haze and treetop halo included.
+- NIR_1661: the same as today. The low clear sky keeps its blue.
+- NIR_3461: the same as today. The clear band keeps its blue, and the round
+  red glows by the pylons are back.
+- NIR_3406: between today and the first form. The low sky is a little paler
+  than today's pale blue, with none of the first form's warm mottle.
+
+**Why, measured.** On the first form's exports, where a pixel brighter than
+its photograph's cloud mean passed through all three stages untouched and so
+shows its arriving colour, NIR_1651's cloud reads HSV saturation 0.10 to
+0.15, the top of 019's gate (0.05 to 0.13) and above it, while NIR_3406's
+pale clear sky reads 0.07 to 0.09, inside it. NIR_1644's brightest cloud
+reads about 0.05, but the band is wispy and a texel's footprint mixes it
+with the blue between the wisps. So the look's cloud arrives carrying more
+colour than a pale clear sky does, and 019's gate, read at the map's scale,
+calls the cloud coloured and the pale sky partly colourless. Across these
+frames the order is the wrong way round for any absolute gate on arriving
+saturation.
+
+**What it shows.** The refined form passes the clear-sky half of the check
+that decides it (NIR_1661 and NIR_3461's clear band unchanged, NIR_3406
+nearly so) and fails the cloud half: NIR_1651's and NIR_1644's cloud do not
+stay white. As written, the refinement undoes the first form everywhere
+except NIR_3406's low sky.
+
 ## Rank
 
 **After 015 (2026-09-26)**, which it now needs (Depends): turning the lens correction on at open changes what reaches these stages. 075 and 076 sit between (2026-09-27): they are the open path's two silent waits, share no ground with these stages, and were built beside 015. Below that, the order argued here stands.
@@ -478,3 +643,15 @@ is the argument that puts it above 052.
 - NIR_1644, 2026-09-26: the sky-map sheet, B's gate in a band down the right side.
 - NIR_0627, 2026-09-26: the sky-map sheet, B's gate on every outline of the blurred background.
 - NIR_3698, 2026-09-26: the reader's own export with the Sky mask's highlights pushed toward blue (above); and the app's own export at lens correction 0 and 1, whose sky centre is near-grey at 0 and blue at 1.
+- NIR_1651, 2026-09-27: option 9 beside today's build, the whole frame on screen, and at 1:1 the cloud's lower edge at 1350,950 and the tree's edge against clear sky at 150,1400. The cloud white rather than cyan, the clear sky the same, no seam.
+- NIR_1644, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the crowns in the cloud at 400,800 and the band's upper edge at 1250,550. The band white rather than cyan, no seam at the crowns.
+- NIR_1827, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the treetops at 1650,1100 and the red haze at 1100,600. The red haze and the treetop halo fainter, the sun haze the same.
+- NIR_3461, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the horizon at 1400,2450, the near pylon at 4400,1500 and the far pylon at 4100,1100. The red glows gone; the low clear sky grey-blue rather than blue.
+- NIR_3406, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the low sky at 2300,1300 and the roofline at 2900,1700. The low sky near-white grey with a faint warm mottle where today's is an even pale blue.
+- NIR_1661, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the low sky among the treetops at 800,1000 and the wisps at 700,550. The lower half of the clear sky slate grey rather than blue.
+- NIR_1651, 2026-09-28: the refined option 9 beside today's build and the first form, whole frame and at 1:1 at the same two places. The cloud cyan as today.
+- NIR_1644, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. The band behind the crowns cyan as today.
+- NIR_1827, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. As today, red haze included.
+- NIR_1661, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. The low clear sky blue as today.
+- NIR_3461, 2026-09-28: the same three, whole frame and at 1:1 at the same three places. The clear band blue and the red glows back, as today.
+- NIR_3406, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. The low sky a little paler than today, without the first form's mottle.

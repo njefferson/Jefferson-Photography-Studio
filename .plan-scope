@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=a4b94ab6879b282e
-diffhash=6c6dcd84d4da3abc
-verdict=IN-SCOPE: 070's records, its rank, the v2.63.28 staging entry and the status page
-# Plan items 3 and 7: records 070 and 069, NOTES with 070 ranked after 076 and above 069, the v2.63.28 staging entry, the status page, and the unopened-tile defect under found and not fixed. Judged by a watcher subagent reading the plan by path and the diff.
+planhash=aa3ea22eb3c20dda
+diffhash=20b6a3b52f90dbd5
+verdict=IN-SCOPE: record 069 gains option 9, built in two forms, rendered, and rejected with its measurements
+# Plan item 1: record 069 gains option 9 with its sources, both forms' renders and why each failed; the candidate code is taken out because neither form passed (item 3). Judged by a watcher subagent reading the plan by path and the diff.
