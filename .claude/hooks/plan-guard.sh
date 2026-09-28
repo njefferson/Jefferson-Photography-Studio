@@ -28,7 +28,10 @@ GATE=""
 [ -z "$GATE" ] && [ -f ../noahjefferson/plan-guard.mjs ] && GATE=../noahjefferson/plan-guard.mjs
 
 if [ -n "$GATE" ]; then
-  printf '%s' "$PAYLOAD" | exec node "$GATE"
+  # Not "| exec": inside a pipe, exec replaces only a subshell, so the script
+  # ran on into the no-gate branch below and refused every plan-mode call,
+  # reads included. Hidden until the hooks first ran (LESSONS §370).
+  printf '%s' "$PAYLOAD" | node "$GATE"; exit $?
 fi
 
 # NO GATE. Decide here rather than waving it through: a crude match is enough,

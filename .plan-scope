@@ -1,6 +1,7 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=3d9769a64c0e9ca1
-diffhash=48764c91a56e0ec3
-verdict=IN-SCOPE: the diff adds only items 1–4 (index, door tool, three gate updates with backlog file, and two lesson sections) with no src/ code touched.
-# IN-SCOPE: the diff adds only items 1–4 (index, door tool, three gate updates with backlog file, and two lesson sections) with no src/ code touched.
+planhash=a4e6f9aca9c0c9d2
+diffhash=23afe448881bfdb9
+verdict=IN-SCOPE: plan-guard.sh bug fix enables gates 3 and 4; owner-images.mjs header documents gate 9.
+# IN-SCOPE: plan-guard.sh bug fix enables gates 3 and 4; owner-images.mjs header documents gate 9.
+# The plan-guard.sh fix is strictly necessary infrastructure: gates 3 (talk-first) and 4 (plan-names) live inside plan-guard.mjs and require the dispatcher to call and respect its verdict. The owner-images.mjs comment is explicitly gate 9 in the plan.
