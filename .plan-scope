@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=87f12ebec33d6c7f
-diffhash=a22925463214286f
-verdict=IN-SCOPE: the v2.63.31 staging entry and status page, with the PC's build-time reading as the device pass
-# The plan's Verification: the build staged as v2.63.31, its SHA read on the live worker and its Deploy and Gates runs green, recorded in NOTES' staging entry and the status page with the PC's measurement as the device pass. Judged by a watcher subagent reading the plan by path and the diff.
+planhash=02ab37f074fb977b
+diffhash=9a0282d3d95f125b
+verdict=IN-SCOPE: 077's final save and its walk checks
+# 077 final: the open session photo's edit saved on the reader's own input and change events, new undo steps, Undo, Redo, Reset and the page going hidden; a switch writes and cancels a pending save; walk checks 5 and 6 wait for the drawn frame. Judged by a watcher subagent reading the plan by path and the diff.
