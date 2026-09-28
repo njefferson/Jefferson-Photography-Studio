@@ -6384,8 +6384,10 @@ async function saveWithoutLocation(copy: boolean) {
   const type = currentFile.kind === "jpeg" ? "image/jpeg" : currentFile.kind === "png" ? "image/png" : "application/octet-stream";
   const r = await saveBlob(new Blob([arrayBufferOf(clean) as ArrayBuffer], { type }), name);
   if (r === "cancelled") return; // sheet closed on purpose — keep the dialog
-  toast(copy ? "Copy saved without location." : "Saved without location.", 2600);
+  // Closed first, then said, for the same reason as the LUT manager's Apply:
+  // toast() mounts inside the open dialog, and it was about to close.
   locDlg.close();
+  toast(copy ? "Copy saved without location." : "Saved without location.", 2600);
 }
 $("locSave").addEventListener("click", () => void saveWithoutLocation(false));
 $("locSaveCopy").addEventListener("click", () => void saveWithoutLocation(true));
@@ -18572,8 +18574,10 @@ async function renderLutList() {
         const rec = await getLut(m.id).catch(() => null);
         if (!rec) { toast("That LUT is no longer stored — re-import its .cube file", 3200); void renderLutList(); return; }
         applyLutToEdit({ id: rec.id, name: rec.name, size: rec.size, data: rec.data, strength: 1 });
-        toast(`LUT applied — ${rec.name}`);
+        // CLOSED FIRST, then said: toast() mounts inside the open dialog, so
+        // said first the words went into the manager and closed with it.
         if (lutManageDlg.open) lutManageDlg.close(); // so the result is what's on screen next
+        toast(`LUT applied — ${rec.name}`);
       });
       const share = document.createElement("button");
       share.type = "button";
