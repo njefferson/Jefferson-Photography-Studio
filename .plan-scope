@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=02ab37f074fb977b
-diffhash=4ef923283caea62d
-verdict=IN-SCOPE: the v2.63.33 staging entry and status page for 077
-# The plan's Verification: v2.63.33 staged with its SHA read live and Deploy and Gates green, recorded in NOTES' staging entry and the status page with the iPad pass for 077. Judged by a watcher subagent reading the plan by path and the diff.
+planhash=b0381777fa291d30
+diffhash=9d4707e1110d442d
+verdict=IN-SCOPE: All hunks restore main's docs content (NOTES v2.63.21 entry, 069 option 8 with Rejected entry, 071 settled questions and BUILT sections, 072 word change) beside the branch's additions, plus approved cross-reference and stale-bullet corrections, touching only docs files per step 1.
+# IN-SCOPE: All hunks restore main's docs content (NOTES v2.63.21 entry, 069 option 8 with Rejected entry, 071 settled questions and BUILT sections, 072 word change) beside the branch's additions, plus approved cross-reference and stale-bullet corrections, touching only docs files per step 1.

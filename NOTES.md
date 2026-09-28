@@ -124,6 +124,61 @@ way to resist fingerprinting; the Firefox and Edge readings are one PC.
   the page waited": `heldDuring` in `src/startup.ts` ignores a pause that began
   just before the build did.
 
+**v2.63.21 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-26 (23cc31e).** Decision 071's fix, both halves, on top of v2.63.12's
+three commits and the stickers export fix, replacing it. VERSION stays 2.63:
+one is faster, the rest are fixes. The Gates run and the deploy for 23cc31e
+both passed, and staging's worker was read naming 23cc31e exactly, with
+offline copy `ips-2.63.21`.
+
+What a reader gets, beyond v2.63.12's three:
+
+- Fixed: stickers on a photo you return to after resuming a session are in
+  its export;
+- Fixed: the test page shows what building the editor's graphics costs a
+  launch, not an average;
+- Faster: an update downloads only the files that changed, and never the
+  sticker library again;
+- Fixed: after an update the start screen answers and says it is preparing
+  the editor, and a photo you choose opens when it is ready.
+
+**What the device pass is.** The PC first, then the iPad.
+
+1. Open https://staging.jefferson-photo-studio.pages.dev/ir.html. The notice
+   at the top should say "Downloading the update… N of M" and then that a new
+   version is ready. This one download is still the whole app, because
+   2.63.12's copy carries no labels to reuse. Press Update now.
+2. The first start after it builds the editor's picture code from scratch.
+   On the PC, "Preparing the editor…" should show with a count of seconds, and
+   Help on the start screen should open while it counts. Note whether it does.
+3. When it says the editor is ready, tap the version number, press "Copy the
+   report", and send the lines that start "Start-up" and "Offline worker".
+4. The next staging update after this one should count only a handful of
+   files.
+
+**The first reading, 2026-09-26, a PC in Firefox 156 (GTX 980 through
+Direct3D, 12 cores), a session of 222.** The update worked as built: "its
+install kept 211 files already on this device and downloaded 7, every sticker
+on the device". The install took 45.4 s, and the cause is not known. The
+start did not: "graphics built 0.15 s–44.25 s (44.11 s; the page waited —
+longest pause 44.10 s; no way to build off the page offered)", with no
+"said it was preparing". So the page froze for 44 seconds in silence.
+Firefox offers no way to build off the page (Mozilla bug 1736076). The
+missing words mean an earlier launch of the same picture code in this browser
+had finished and been recorded, so this launch expected a quick build and
+got 44 s. This Firefox keeps no built copy that it reuses, and pays the build
+on every start. The one-second fallback cannot fire while the page is held.
+**Defect, fixed next:** the launch remembers how long the last build took,
+and a browser whose last build was slow says so before it starts. Making the
+build itself faster is the other half, which the next plan carries.
+
+What was verified here: the offline walk (25 checks, including an update that
+changed one file making 2 requests, and 0 of 162 stickers fetched on a second
+release), the new build-wait walk (seen failing 17 checks against the old
+build), the journey walk and the full accessibility walk, all in headless
+Chromium. Whether Edge on the PC builds off the page once asked is not known
+until step 3's Start-up line.
+
 **v2.63.12 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-26 (f763bee).** Decision 071's first step: measure the frozen first
 launch, and fix the two live defects in the update path beside it. Three
@@ -1091,7 +1146,7 @@ user-scalable=no.
   that the look's selection itself scores as sky. What is left is that
   selection holding what is not sky (073, 052), not the map.
 - [ ] **The first launch after an update froze with nothing said, and every update fetches the whole app again** <!-- decision: 071 -->
-  **Shown as:** The first time the app opens after an update it can sit still for most of a minute while it prepares its graphics; it will stay responsive and say so, and an update will download only what changed.
+  **Shown as:** After an update the start screen answers and says it is preparing the editor, an update downloads only what changed, and the editor's picture code no longer unrolls its loops on Direct3D; waiting to be confirmed on the PC where the minute was measured.
   Reported from the PC after v2.63.7: the start screen showed and nothing
   answered for about a minute. Every release requests and re-stores the whole
   app offline, 218 files and 28 MB, 25 MB of it the sticker library, with

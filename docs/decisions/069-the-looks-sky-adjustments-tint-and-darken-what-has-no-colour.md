@@ -331,9 +331,23 @@ What exists that this item will use, so a second one does not get written
    with no render, and its texels disagree along every edge of the selection
    ("Measured before a render" below). Nothing is chosen, and the record holds
    no option that stands.
+8. **MEASURED OFF THE MAP, 2026-09-26, and not rendered: build each texel from
+   sky samples only.** A tap counts as sky where the refined selection scores it
+   above one half (the level the refinement already cuts at); a texel with less
+   than one sample of sky is filled from its neighbours ring by ring (pull-push
+   fill, Gortler et al. 1996); the photograph's depth key and the grey guard's
+   reference keep today's samples, so Sky depth is unchanged. Against bars fixed
+   and hashed before the run: edge disagreement fell from 31–83% to 0–14% and
+   passes on six of seven frames with sky; it created at most 3 red-ward texels
+   on any frame; the key is bit-identical to today on every frame. It fails on
+   NIR_1703, whose edge band stays at 14.4%, and every disagreeing cell there
+   traces to red crown tips the refined selection itself scores as sky, which the
+   fill then spreads. What is left of this record is the look's selection
+   holding what is not sky (073, 052), not the map.
+
 9. **REJECTED after renders, 2026-09-28: a cloud guard, bright AND
    colourless, with its ends taken from the photograph.** Numbered after
-   main's 8 (the map from sky samples only), which is recorded there. Both of
+   8 (the map from sky samples only), above. Both of
    its forms were built, rendered beside today's build, opened, and taken out;
    neither passed its checks ("Built and rendered" below, and Rejected, 9).
    - **What the field does.** Lightroom's standard answer to "darken a blue
@@ -401,6 +415,8 @@ What exists that this item will use, so a second one does not get written
 - **4, the infrared axis.** It is the one reading known to have kept NIR_1651's cloud white, and it stays the comparison the first render is checked against. As the rule it tests whether a pixel is sky, which is the selection's question put in the stages' place; it needs the linear axis carried past the grade to stages that run after it; a camera-rendered file has no such axis; and its +0.04 was fitted on seven frames.
 - **5, the smoothing alone.** Sky depth darkens a cloud grey with no tint at all, and the film leaves it near-white. Half the rule is a second place for the other half to be forgotten.
 - **7, read the surroundings at the sky map's scale — designed, measured off the map, and rejected before a render.** The texels along the selection's edge average the sky with whatever the bitmap's feather took in, so they disagree with their neighbours on every frame: 31% to 83% of the cells along the edge, against 0% to 8% inside the sky. A rule that acts where the neighbours disagree therefore acts in a band about two texels wide along every treeline, roofline and horizon, and there it hands the stages to the pixel's own reading, which is Option 1's grain in the place Option 1 grained. None of the three rules reaches the inside of a cloud wider than two texels either. What would make the surroundings readable is a map whose edge texels carry the sky's colour; that is a change to how the map is built, not to the stages, and it is not an option here until it is researched.
+- **8, the map from sky samples only — measured off the map, and failed before a render.** It is 7's missing half, researched and built in the scratch harness: each texel averages only the taps the refined selection scores as sky, and a texel with less than one such tap is filled from its neighbours. Against bars fixed before the run, the edge disagreement fell from 31–83% to 0–14%, and it passed on six of seven frames with sky. On NIR_1703 the edge band stays at 14.4%, and every disagreeing cell there traces to red crown tips the selection itself scores as sky, which the fill then spreads. What it cannot fix is what the selection holds (073, 052), so it was not rendered and it is not built.
+
 - **9, the cloud guard, built in two forms 2026-09-27 and 2026-09-28, and taken out.** Brightness alone turned NIR_1651's and NIR_1644's cloud white and greyed the pale low clear sky on NIR_1661, NIR_3406 and NIR_3461. Brightness with colour read at the sky map's scale kept those skies blue and lost the cloud: on these frames a cloud arrives at the sky stages with MORE saturation (0.10 to 0.15 on NIR_1651) than a pale clear sky (0.07 to 0.09 on NIR_3406), and a wispy band's texel mixes cloud with the blue between the wisps. So neither brightness nor arriving saturation separates cloud from pale clear sky on these frames; whatever does is not in the colour a pixel arrives with.
 - **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
 
