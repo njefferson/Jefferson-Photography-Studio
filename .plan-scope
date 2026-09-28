@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=ee87a45c2d4d5933
-diffhash=4e460cbef29ed0d4
-verdict=IN-SCOPE: All hunks—the new button in debug.html, the refactored build-timing helpers (buildFrame, uniqueFrag, timedBuild) in src/debug.ts, the loop-rewrite functions (hideLoopCounts, dropMaskLoops), the whatMakesTheBuildSlow function with its four variants and row handling, and the button event listener—stay within debug.html and src/debug.ts and implement the plan's approved feature without touching the editor.
-# IN-SCOPE: All hunks—the new button in debug.html, the refactored build-timing helpers (buildFrame, uniqueFrag, timedBuild) in src/debug.ts, the loop-rewrite functions (hideLoopCounts, dropMaskLoops), the whatMakesTheBuildSlow function with its four variants and row handling, and the button event listener—stay within debug.html and src/debug.ts and implement the plan's approved feature without touching the editor.
+planhash=a71f8b952603d745
+diffhash=6c702f1f5127ff1d
+verdict=IN-SCOPE: The diff contains two confirmations fixes in src/main.ts (reordering toast and dialog close calls) and one heldDuring overlap test fix in src/startup.ts, matching plan items 1 and 2 exactly; the ARCHITECTURE.md changes are generated line-count updates.
+# IN-SCOPE: The diff contains two confirmations fixes in src/main.ts (reordering toast and dialog close calls) and one heldDuring overlap test fix in src/startup.ts, matching plan items 1 and 2 exactly; the ARCHITECTURE.md changes are generated line-count updates.
