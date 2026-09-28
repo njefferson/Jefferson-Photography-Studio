@@ -54,13 +54,16 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**v2.63.31 at https://staging.jefferson-photo-studio.pages.dev, pushed
-2026-09-28 (107ba14).** Production is v2.63.7. The Gates run and the deploy for
-107ba14 both passed, and staging's offline worker was read naming it, as
-`ips-2.63.31`. VERSION stays 2.63: every change since 2.63.7 is a fix.
+**v2.63.33 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-28 (ae43050).** Production is v2.63.7. The Gates run and the deploy for
+ae43050 both passed, and staging's offline worker was read naming it, as
+`ips-2.63.33`. VERSION stays 2.63: every change since 2.63.7 is a fix.
 
 What a reader gets beyond production, newest first:
 
+- Fixed: your edits to the open photo are kept if the page reloads, the tab is
+  closed or the iPad discards it; saved when the page is hidden and within a
+  second of each change (077);
 - Faster: the editor's picture code no longer unrolls its sampling loops on
   Direct3D, which cost a Windows PC 42 to 47 seconds per build (071); the
   picture is byte-identical on the frames compared;
@@ -84,6 +87,8 @@ What a reader gets beyond production, newest first:
 
 **What the device pass is.**
 
+000. On the iPad, in a session, edit a photo, switch to another app, close the
+     tab from the switcher, then reopen and resume: the edit should be there.
 00. On the PC, in Edge and then in Firefox, open
     https://staging.jefferson-photo-studio.pages.dev/debug.html, press "Run the
     speed tests", and send the row "Building the picture code (first time)".
