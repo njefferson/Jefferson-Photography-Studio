@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
 planhash=87f12ebec33d6c7f
-diffhash=dd2ea1af6db9c1e7
-verdict=IN-SCOPE: the shader's loop reads at explicit level 0, and the walk check that holds it
-# The fragment shader's in-loop texture reads (fetchLin, warpUv, maskWeightOf and the main mask loop) sample at an explicit level 0, with the reason at fetchLin, and the agreement walk gains the text check that refuses texture() anywhere a loop reaches; docs/ARCHITECTURE.md carries the line count. Judged by a watcher subagent reading the plan by path and the diff.
+diffhash=a22925463214286f
+verdict=IN-SCOPE: the v2.63.31 staging entry and status page, with the PC's build-time reading as the device pass
+# The plan's Verification: the build staged as v2.63.31, its SHA read on the live worker and its Deploy and Gates runs green, recorded in NOTES' staging entry and the status page with the PC's measurement as the device pass. Judged by a watcher subagent reading the plan by path and the diff.

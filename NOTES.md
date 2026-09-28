@@ -54,13 +54,16 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**v2.63.28 at https://staging.jefferson-photo-studio.pages.dev, pushed
-2026-09-27 (52eaac4).** Production is v2.63.7. The Gates run and the deploy for
-52eaac4 both passed, and staging's offline worker was read naming it, as
-`ips-2.63.28`. VERSION stays 2.63: every change since 2.63.7 is a fix.
+**v2.63.31 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-28 (107ba14).** Production is v2.63.7. The Gates run and the deploy for
+107ba14 both passed, and staging's offline worker was read naming it, as
+`ips-2.63.31`. VERSION stays 2.63: every change since 2.63.7 is a fix.
 
 What a reader gets beyond production, newest first:
 
+- Faster: the editor's picture code no longer unrolls its sampling loops on
+  Direct3D, which cost a Windows PC 42 to 47 seconds per build (071); the
+  picture is byte-identical on the frames compared;
 - Fixed: a photo turned on its side or flipped gets the look's sky at the top
   of the picture as shown, in the open photo, its tiles and a batch; a Sky mask
   stays on the sky after Undo following a turn; a new Gradient starts at the
@@ -81,6 +84,10 @@ What a reader gets beyond production, newest first:
 
 **What the device pass is.**
 
+00. On the PC, in Edge and then in Firefox, open
+    https://staging.jefferson-photo-studio.pages.dev/debug.html, press "Run the
+    speed tests", and send the row "Building the picture code (first time)".
+    Before this build it read 42,000 to 47,000 ms.
 0. On the iPad, open NIR_1651 or any photo shot on its side and choose
    Aerochrome. The look's sky should be even across the whole sky, with no
    grey half beside the tree. Clouds inside it now take the cyan tint upright
