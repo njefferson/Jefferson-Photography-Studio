@@ -93,6 +93,26 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
   cache is exclusive, and a lookup across every cache waits on all of them.
 - **The host** (Cloudflare Pages `serving-pages`): with no `404.html` the site
   is served as a single-page app and every unknown path answers with the index.
+- **How ANGLE builds the picture code on Direct3D 11** (ANGLE source on GitHub,
+  read 2026-09-28: `hlsl/OutputHLSL.cpp`, `d3d11/Renderer11.cpp`,
+  `ShaderD3D.cpp`). ANGLE translates the GLSL to HLSL and hands it to Microsoft's
+  compiler, FXC, at optimisation level 2. A loop gets `[loop]`, "do not unroll",
+  only when something it calls takes a gradient (`hasGradientInCallGraph`);
+  every other loop reaches FXC with no attribute, and FXC unrolls a loop whose
+  count it can see. Sampling inside a loop whose flow can diverge is already
+  written out at level 0 by ANGLE itself (`mInsideDiscontinuousLoop`, the
+  `Lod0` functions). issues.angleproject.org and bugs.chromium.org are refused
+  by this environment's network.
+- **What is known to make FXC slow** (ANGLE mailing list, "Solving slow
+  compilation of long loops with texture sampling" and "Long shader compile
+  times with D3D11 backend"; Mozilla bugs 658826, 725467, 1247135; ANGLE issue
+  3682, "Slow fxc compile performance with dynamic uniform indexing", read by
+  title only): FXC tries to unroll every loop it can, which on long loops is
+  most of the time, and indexing a uniform array with a loop variable is slow
+  to compile. The proposed ANGLE patch marks every loop `[fastopt] [loop]`; it
+  is not in ANGLE's source today. OneJS issue 130 (2026) measured 7.6 s for one
+  large interpreter shader on Chrome and moved it off the page with
+  `KHR_parallel_shader_compile`, the same answer as this record's compile half.
 
 ## Built already
 
@@ -230,11 +250,25 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
      - **Not yet known:** whether Edge on the PC really builds off the page
        once asked. The Start-up line answers it from the first launch.
    - **BUILT 2026-09-28, the code itself (Rejected 6's other half), in
-     v2.63.31.** Every loop that samples the picture reads it at one level
-     (`textureLod`), so Direct3D no longer unrolls those loops; the picture is
-     byte-identical on the frames compared, and `tools/agreement-walk.mjs`
-     refuses a plain sample anywhere a loop reaches. **Not yet known:** the
-     PC's build time on it, which decides whether 071 is done.
+     v2.63.31, and it did nothing.** Every loop that samples the picture reads
+     it at one level (`textureLod`); the picture is byte-identical on the
+     frames compared, and `tools/agreement-walk.mjs` refuses a plain sample
+     anywhere a loop reaches. **Measured on the PC 2026-09-28, Firefox 156 on
+     v2.63.34: 44,527 ms** to build the picture code the first time (44,521,
+     44,095 and 43,823 ms, each plus the first picture), and 44,233 ms again
+     on a normal launch, against 42,000 to 47,000 ms before. **The premise was
+     wrong** (Looked up): ANGLE already writes sampling in such loops at level
+     0, and a loop with a gradient was the one loop ANGLE marked "do not
+     unroll", so the change handed FXC nearly the same code with fewer loops
+     marked. The same report confirms the download half on the PC: the update
+     kept 214 files, downloaded 4, and took 1.0 s.
+   - **What is left, two candidates, both named by the sources.** The shader's
+     tap loops have counts FXC can see (a 13 by 13, three 7 by 7, a 3 by 3 and
+     a run of eight) and are unrolled; and every mask loop runs to
+     `u_maskCount`, a count FXC cannot see, and indexes thirteen uniform
+     arrays and the local weights `gW` with its loop variable, the mixer's
+     `u_maskHsl[i * 8 + bi]` with a computed index. Which one is the 44 seconds
+     is measured on the PC before anything is changed.
    - **Still open:** the busy card has no seconds count and cannot be put
      aside during a long wait.
 2. Build the redesign now.
