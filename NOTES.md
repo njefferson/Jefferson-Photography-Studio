@@ -1176,8 +1176,10 @@ user-scalable=no.
   screen and a photo chosen meanwhile opening when it is ready. **Still
   open:** whether the PC's browser really builds off the page, which the
   report's Start-up line answers on the first launch; the busy card has no
-  count while it waits; and whether v2.63.31's change to the picture code makes
-  the build fast on Direct3D, which the PC's test page answers.
+  count while it waits; and the build itself. **Measured on the PC
+  2026-09-28, Firefox on v2.63.34: 44,527 ms**, the same as before, so
+  v2.63.31's change did nothing, and the record says why. Two causes remain,
+  both named by the sources, and the PC measures which before anything changes.
   See `docs/decisions/071-the-first-launch-after-an-update-froze-with-nothing-said-and-every-update-downloads-the-whole-app.md`.
 - [ ] **The open photo's edits are lost on a reload or a closed tab** <!-- decision: 077 -->
   **Shown as:** Your edits to the open photo are kept if the page reloads or the tab is closed.
