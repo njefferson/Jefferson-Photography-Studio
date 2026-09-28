@@ -83,7 +83,7 @@
       <h2>Where the builds are</h2>
       <ul class="facts">
         <li><b>Production</b> <span>v2.63.36, promoted on your go on 2026-09-28: your edits to the open photo survive a reload or a closed tab; the editor's picture code no longer unrolls its loops on Direct3D; a photo turned on its side or flipped gets the look's sky at the top as shown; the lens correction opens on again; Keep straight after Done says what it is doing; a batch no longer waits on the browser's storage question; an update downloads only what changed. By pull request, rebase-merged as 62ffe5f with the code the walks passed on staging. Checked on the live site: its offline copy is named ips-2.63.36 and names 62ffe5f, and the Gates run and the deploy for that commit both passed.</span></li>
-        <li><b>On staging</b> <span>The same commit as production, 62ffe5f. Nothing is waiting to be promoted.</span></li>
+        <li><b>On staging</b> <span>v2.63.40, pushed 2026-09-28: the editor as on production, and a test-page button that measures which part of the picture code takes the 44 seconds to build. The Gates run and the deploy for 4b5c5f9 both passed, and staging's offline worker was read naming it. Nothing here goes to production.</span></li>
         <li><b>Next</b> <span>Your PC's reading came back: the picture code still takes 44.5 s to build in Firefox, so 071 is not done. The test page will measure which of two causes it is. Clouds under the look's sky stages (069) are back to research: both forms of a cloud guard were built, rendered and taken out.</span></li>
         <li><b>Last verified green</b> <span><code>62ffe5f</code>, on production and staging: the Gates run and the deploy for that exact commit both passed, on both. A page cannot carry the identifier of the commit that writes it, so this always names the one before.</span></li>
         <li><b>Next version</b> <span>2.63 is production's number. The next release that adds something takes 2.64.</span></li>
@@ -98,10 +98,11 @@
             The edit should be there.
           </li>
           <li>
-            <strong>On the PC, first, in Edge and then Firefox:</strong> open
-            the test page, press "Run the speed tests", and send the row
-            "Building the picture code (first time)". Before this build it read
-            42,000 to 47,000 ms.
+            <strong>On the PC, first, in Firefox and then Edge if you can:</strong>
+            open staging's test page, press "What makes the picture code slow to
+            build" (about three minutes), then "Copy the results", and send the
+            rows. It builds the picture code four ways and names the one that saves
+            the most, which says which fix the 44 seconds needs.
           </li>
           <li>
             <strong>On the PC in Firefox:</strong> end a large session with Done,

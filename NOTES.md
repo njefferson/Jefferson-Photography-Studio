@@ -54,6 +54,21 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**v2.63.40 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-28 (4b5c5f9).** Production is v2.63.36 and the editor is the same; the
+difference is the test page. Its new button, "What makes the picture code slow
+to build", builds the editor's picture code four ways, as shipped, with its 12
+counted loops hidden from Direct3D's compiler, with its 10 mask loops taken
+out, and with both, and names the one that saves the most (071). Staging's
+offline worker was read naming 4b5c5f9 as `ips-2.63.40`, and the Gates run and
+the deploy for it both passed. Checked headless: all four build, and against a
+planted copy whose mask loops match nothing the two variants that need them say
+"not run" instead of timing the program as shipped. The accessibility walk
+passed. **The device pass:** on the PC in Firefox, and in Edge if possible,
+open https://staging.jefferson-photo-studio.pages.dev/debug.html, press the new
+button (about three minutes), then "Copy the results", and send the rows. Nothing
+here goes to production; the fix it points at is the next plan.
+
 **Nothing is waiting to be promoted, 2026-09-28.** v2.63.33 went to production
 on the go the same day, by pull request, rebase-merged as 62ffe5f, with the code
 the walks passed on staging. Production serves the offline copy `ips-2.63.36`,
