@@ -140,12 +140,31 @@ export function appendToLedger(file, text, cap = LEDGER_CAP) {
   writeFileSync(file, keep);
 }
 
+/** What a result says that the session READ, as opposed to what it wrote.
+ *  Takes the parsed payload; returns the text to record, empty when the result
+ *  is the session's own words.
+ *  What the caller relies on: nothing the session AUTHORED comes back. An
+ *  Agent or Workflow result is another model's words, SendMessage and the task
+ *  tools echo the session's own text, and a Write or Edit result echoes the
+ *  content the session supplied. Measured 2026-09-28: a subagent's report and a
+ *  Write's echo each vouched for a SHA nothing had read, and the guard let it
+ *  through. A file tool records NOTHING: its result echoes what the session
+ *  wrote, and the whole pre-edit file it also carries was 43% of one session's
+ *  ledger, flushing honestly read SHAs out of the cap every thirty-odd edits. A
+ *  file's text reaches the ledger when it is Read. */
+export function readText(payload) {
+  const tool = String(payload?.tool_name ?? '');
+  if (['Agent', 'Task', 'Workflow', 'SendMessage', 'TodoWrite', 'TaskCreate', 'TaskUpdate',
+    'Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(tool)) return '';
+  return resultText(payload);
+}
+
 function main() {
   let raw = '';
   try { raw = readFileSync(0, 'utf8'); } catch { return; }
   let p = null;
   try { p = JSON.parse(raw); } catch { return; } // nothing to record, nothing to say
-  appendToLedger(ledgerPath(p), resultText(p));
+  appendToLedger(ledgerPath(p), readText(p));
 }
 
 // ONLY WHEN RUN, NEVER WHEN IMPORTED. See the header.
