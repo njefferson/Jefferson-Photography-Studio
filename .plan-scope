@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/linear-baking-island.md
-planhash=aa3ea22eb3c20dda
-diffhash=20b6a3b52f90dbd5
-verdict=IN-SCOPE: record 069 gains option 9, built in two forms, rendered, and rejected with its measurements
-# Plan item 1: record 069 gains option 9 with its sources, both forms' renders and why each failed; the candidate code is taken out because neither form passed (item 3). Judged by a watcher subagent reading the plan by path and the diff.
+planhash=87f12ebec33d6c7f
+diffhash=dd2ea1af6db9c1e7
+verdict=IN-SCOPE: the shader's loop reads at explicit level 0, and the walk check that holds it
+# The fragment shader's in-loop texture reads (fetchLin, warpUv, maskWeightOf and the main mask loop) sample at an explicit level 0, with the reason at fetchLin, and the agreement walk gains the text check that refuses texture() anywhere a loop reaches; docs/ARCHITECTURE.md carries the line count. Judged by a watcher subagent reading the plan by path and the diff.
