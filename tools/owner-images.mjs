@@ -22,6 +22,16 @@
 // practice DNG and any file the index does not name. Adding a folder is the
 // owner's act: they share it, and its listing is added here. Never search
 // Drive for more.
+//
+// TWO WAYS TO FETCH, AND A FAILED ONE IS NOT A LIMIT (hub LESSONS 370). This
+// door uses the direct link, drive.usercontent.google.com/download?id=ID&
+// export=download&confirm=t, which works only because these folders are shared
+// by link; on a private folder it returns a sign-in page, not the file. The
+// Drive connector's download_file_content works either way: its result is too
+// large to show, so the harness saves it to a file, and
+//   jq -r .content SAVED_FILE | base64 -d > OUT
+// is the file. A session once told the owner a private folder could not be
+// read, having tried only the link; the connector worked first time.
 import { readFileSync, existsSync, statSync, mkdirSync, createWriteStream } from "node:fs";
 import { join, basename, resolve as resolvePath, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
