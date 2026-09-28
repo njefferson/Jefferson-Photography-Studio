@@ -244,10 +244,19 @@ vec3 toGamma(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
 vec2 warpUv(vec2 uv){
   if (!u_warpOn) return uv;
   // Decode centred on byte 128 (= exactly zero), scale 127 — matches warp.ts.
-  vec2 d = (texture(u_warpTex, uv).xy * 255.0 - 128.0) / 127.0;
+  vec2 d = (textureLod(u_warpTex, uv, 0.0).xy * 255.0 - 128.0) / 127.0;
   return uv + d * u_warpScale;
 }
-vec3 fetchLin(vec2 uv){ vec3 s = texture(u_tex, warpUv(uv)).rgb; return u_linear ? s : toLinear(s); }
+// EXPLICIT LEVEL 0, NEVER texture(), inside anything a loop reaches (071).
+// Direct3D's shader compiler cannot take texture gradients inside a real loop
+// or a branch, so every loop that samples with texture() is unrolled in full:
+// the 13x13, the three 7x7s and the median below, inside their if-branches,
+// cost this program 42 to 47 seconds to compile on a PC through Direct3D
+// (Edge and Firefox both go through ANGLE there) against 0.56 s on the iPad.
+// No texture here has mipmaps, so texture() already read level 0 and
+// textureLod(..., 0.0) returns the same texel; only the compile changes.
+// tools/agreement-walk.mjs's shader check refuses texture( back in a loop.
+vec3 fetchLin(vec2 uv){ vec3 s = textureLod(u_tex, warpUv(uv), 0.0).rgb; return u_linear ? s : toLinear(s); }
 
 // MEDIAN OF NINE, the same nineteen-pair network as raw/denoise.ts. There is no
 // sorting in GLSL and there does not need to be: a fixed network is branchless,
@@ -424,8 +433,8 @@ float maskWeightOf(int i, vec3 cKey){
     // loop below and in the JS packers; all three must move together.
     vec3 st = vec3(v_uv, float(s >> 2));
     float w = (u_maskType[i] == 4 && u_maskFineOn)
-      ? texture(u_maskFineTex, st)[s & 3]
-      : texture(u_maskTex, st)[s & 3];
+      ? textureLod(u_maskFineTex, st, 0.0)[s & 3]
+      : textureLod(u_maskTex, st, 0.0)[s & 3];
     if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;  // invert
     return w;
   }
@@ -862,8 +871,8 @@ void main() {
       // any bitmap whose dimensions differ from the first — see MaskLayer.fine.
       vec3 st = vec3(v_uv, float(s >> 2));   // layer = slot / 4, channel = slot % 4
       w = (u_maskType[i] == 4 && u_maskFineOn)
-        ? texture(u_maskFineTex, st)[s & 3]
-        : texture(u_maskTex, st)[s & 3];
+        ? textureLod(u_maskFineTex, st, 0.0)[s & 3]
+        : textureLod(u_maskTex, st, 0.0)[s & 3];
       if (u_maskGeoB[i].y > 0.5) w = 1.0 - w; // invert
     } else if (u_maskType[i] == 3) {
       w = colorMaskWeight(i, cKey); // chroma-key on the fixed mask-stage colour

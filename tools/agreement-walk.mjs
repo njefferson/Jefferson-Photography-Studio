@@ -79,6 +79,40 @@ let bad = 0;
 const fail = (s) => { bad++; console.log(`FAIL  ${s}`); };
 const ok = (s) => console.log(`ok    ${s}`);
 
+// BEFORE THE BROWSER, TOO: NO texture() WHERE A LOOP CAN REACH IT (071).
+// Direct3D's compiler cannot take gradients inside a real loop, so a loop that
+// samples with texture() is unrolled in full; that cost the editor's program 42
+// to 47 seconds to compile on a PC through Direct3D. This container compiles
+// through SwiftShader and would never notice, so it is a TEXT check: every
+// function a loop body calls, and every loop body itself, must sample with an
+// explicit level. The picture is the same either way — no texture here has
+// mipmaps — which is why nothing else in this walk could see it come back.
+{
+  const gl = readFileSync(new URL("../src/gl.ts", import.meta.url), "utf8");
+  const a = gl.indexOf("export const FRAG = `");
+  const frag = gl.slice(a, gl.indexOf("`;", a)).replace(/\/\/[^\n]*/g, "");
+  // Each function's body, by name.
+  const bodies = new Map();
+  for (const m of frag.matchAll(/\b(?:float|vec[234]|void|int|bool)\s+(\w+)\s*\([^)]*\)\s*\{/g)) {
+    let d = 0, i = m.index + m[0].length - 1;
+    for (let j = i; j < frag.length; j++) { if (frag[j] === "{") d++; else if (frag[j] === "}" && --d === 0) { bodies.set(m[1], frag.slice(i, j + 1)); break; } }
+  }
+  // Every loop body.
+  const loops = [];
+  for (const m of frag.matchAll(/\bfor\s*\([^)]*\)\s*\{/g)) {
+    let d = 0;
+    for (let j = m.index + m[0].length - 1; j < frag.length; j++) { if (frag[j] === "{") d++; else if (frag[j] === "}" && --d === 0) { loops.push(frag.slice(m.index, j + 1)); break; } }
+  }
+  // What a loop reaches: its own text, and the functions it calls, transitively.
+  const reached = new Set();
+  const visit = (text) => { for (const [name, body] of bodies) if (!reached.has(name) && new RegExp(`\\b${name}\\s*\\(`).test(text)) { reached.add(name); visit(body); } };
+  loops.forEach(visit);
+  const offenders = [...loops.filter((l) => /\btexture\s*\(/.test(l)).map((l) => l.slice(0, 40).replace(/\s+/g, " ") + "…"),
+    ...[...reached].filter((n) => /\btexture\s*\(/.test(bodies.get(n))).map((n) => `${n}()`)];
+  if (offenders.length) fail(`the fragment shader samples with texture() where a loop reaches it, which Direct3D unrolls in full: ${offenders.join(", ")}`);
+  else ok(`no texture() where any of the ${loops.length} loops reaches (${reached.size} functions they call checked)`);
+}
+
 // THE READING, computed the same way wherever the pixels came from — and it
 // returns the WHOLE hue histogram, not a winner.
 //
