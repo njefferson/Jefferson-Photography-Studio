@@ -78,11 +78,11 @@ rests on.
   the system colour controls**, a colour well that opens the system picker when
   tapped (Human Interface Guidelines, read).
 - **Infrared results are described as a foliage colour and a sky colour.**
-  Kennard names his results as pairs: red foliage with a blue sky, pink with
+  Kennard names the results as pairs: red foliage with a blue sky, pink with
   teal, yellow with blue, orange with blue. Kolari's LUT pack has soft and deep
   pairs of gold and of pink vegetation. Rob Shea's Lightroom profile update adds
   a Sky series so the sky's hue can be chosen for the filter, and a White
-  profile that keeps the sky blue and turns the foliage white. His PRO LUTs
+  profile that keeps the sky blue and turns the foliage white. Rob Shea's PRO LUTs
   carry 23 names: colour names (Amber, Candy, Flamingo, Gold, Mint, Pink,
   Purple, Rose, Sage, Teal, Violet, Wheat, White), six Sky names, Neon, and the
   remaps Invert, Split and Swap; what each one denotes was not read. All read.

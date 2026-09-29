@@ -1,35 +1,30 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=be0e5cb272b31aae
-diffhash=cb56383190385f84
-verdict=IN-SCOPE: The current diff still has the five hunks round four judged (IR-SCIENCE 4b-xi, the Goldie line, record 084, the 084 roadmap bullet and the dated NOTES back-pointer), and the only change since is one wording fix in 4b-xi and one added clause in record 084's Option 1, both inside hunks already judged and neither adding a file, section or subject.
-# IN-SCOPE: The current diff still has the five hunks round four judged (IR-SCIENCE 4b-xi, the Goldie line, record 084, the 084 roadmap bullet and the dated NOTES back-pointer), and the only change since is one wording fix in 4b-xi and one added clause in record 084's Option 1, both inside hunks already judged and neither adding a file, section or subject.
+diffhash=3bc7429a16baf129
+verdict=IN-SCOPE: The uncommitted diff is exactly six pronoun-to-name or pronoun-removal substitutions in IR-SCIENCE.md section 4b-xi and docs/decisions/084-a-foliage-colour-and-a-sky-colour-chosen-by-name.md, each keeping its sentence's meaning and its named source, with nothing else in the repository modified.
+# IN-SCOPE: The uncommitted diff is exactly six pronoun-to-name or pronoun-removal substitutions in IR-SCIENCE.md section 4b-xi and docs/decisions/084-a-foliage-colour-and-a-sky-colour-chosen-by-name.md, each keeping its sentence's meaning and its named source, with nothing else in the repository modified.
 # 
-# WHAT WAS CHECKED (git status, git diff, the untracked record, the plan by path, finding-084d.txt)
-# - git status shows IR-SCIENCE.md and NOTES.md modified and the one untracked record; nothing else is modified or untracked. git diff has four hunks (two in IR-SCIENCE.md, two in NOTES.md), plus the record, which makes five.
-# - Mtimes: IR-SCIENCE.md and the record were both last written at 16:01:41, twenty seconds after finding-084d.txt was written (16:01:21). NOTES.md is unchanged since 15:48:50, as round four recorded, and msg-084.txt is unchanged since 15:41.
-# - Every sentence round four quoted or described was searched for again, whitespace-normalised, in the file where round four placed it, and all of them are present exactly as quoted:
-#   - the "second reader" sentences in the record's Looked up, in msg-084.txt and in 4b-xi;
-#   - the 178 / 139 / 23 / 16 counts;
-#   - the bandGain and 069 wording in Option 1 and in Depends;
-#   - the Hyper Color and Rob Shea extras bullet;
-#   - the Kolari blue-channel clause;
-#   - the "per band" editors sentence;
-#   - the helpx sentence and the shotkit sentence.
-# - The old phrasing "One tutorial, LifePixel's" is gone from the tree. The record's line numbering before Option 1 is unchanged (the "second reader" sentence still starts on line 57), and the edit at 4b-xi keeps its line count, so nothing shifted.
-# - The plan's Step 3 still names exactly these files: IR-SCIENCE 4b-xi, the 084 record, and the NOTES.md roadmap bullet. The Goldie line and the dated back-pointer were judged inside in earlier rounds and are unchanged.
+# WHAT WAS CHECKED (the plan by path, git rev-parse, git status with untracked files listed, git diff --word-diff, git diff --stat and --numstat, git diff -U0, git diff --check, the section headings around every hunk, the surrounding text of the sixth change, finding-084f.txt, and the hub's third-person gate run read-only)
+# - HEAD is 52f959a. git status --untracked-files=all shows exactly two modified files, IR-SCIENCE.md and the 084 record, and no untracked files. NOTES.md is not modified.
+# - git diff --stat reports 6 insertions and 6 deletions: 4 and 4 in IR-SCIENCE.md, 2 and 2 in the 084 record. The minus and plus lines, read one against the other, differ only at the six substitutions. git diff --check reports no whitespace error.
+# - Every IR-SCIENCE.md hunk (lines 1610, 1621, 1654 to 1655) sits inside section 4b-xi, which runs from line 1590 to 1687. The plan's Step 3 names exactly IR-SCIENCE 4b-xi and docs/decisions/084-*.md for the writing, so a pronoun cleanup inside those two files adds no file, section, subject, gate or roadmap line.
+# - The third-person gate (node third-person-check.mjs --repo the repo) exits 0 and reports no third-person references in tracked files.
 # 
-# EDIT 1, IR-SCIENCE 4b-xi, "One tutorial, LifePixel's, also turns the cyan highlights white." became "LifePixel's basics tutorial also turns the cyan highlights white." (line 1631)
-# - Accurate. It names the page the section already cites for this, in the opening paragraph at line 1601: "LifePixel's basics tutorial (read) balances on grass, swaps in the Channel Mixer, then takes Cyan's saturation fully down and its lightness fully up to turn the cyan highlights white."
-# - Source check: verify-infrared-practice.json claim 19 (the LifePixel page infrared-photoshop-basics) is "supported", and its note reads "In Cyans, saturation all the way left and lightness all the way right, turning muddy highlights into normal bright highlights." So the claim was read and supported, and the sentence is at the strength the skeptic allowed.
-# - One imprecision in the caller's brief, not in the text: that first citation is in the opening paragraph ("Two stages, in most recipes read"), not in a bulleted list. The sentence at 1631 is a plain sentence after the bold line and is correct either way.
-# - It only names the tutorial; it adds no claim, so the "second reader checked this section's sentences against those verdicts" statement still holds.
+# The sixth substitution, IR-SCIENCE.md line 1610: "names the results he aims for as pairs" became "names the results aimed for as pairs".
+# - Meaning kept. The sentence still says the results aimed for are described as pairs, and the list that follows (red foliage with a blue sky, pink with teal, yellow with blue, orange with blue) is untouched. Only the relative clause changed, from a finite verb with a bare pronoun to a participle.
+# - Source kept. The subject is still "David Kennard (read)" on the same line, so the attribution and the read status are unchanged. The matching claim in the record (line 81, "Kennard names the results as pairs") now reads the same way as this one.
+# - This closes the gap finding-084f named as an observation: a bare "he" for Kennard on this line that the gate could not see because of the file's allow entry.
 # 
-# EDIT 2, record 084 Option 1, added "4b-xi also records a purple sky and a green-teal sky; whether those join the list is the build's to decide." (lines 198-200)
-# - Accurate. 4b-xi's results list (lines 1625-1628) says "Rob Shea's Photoshop extras (read) give green foliage under a purple sky, and pink under a green-teal sky." That is the Rob Shea Photoshop extras line, and it is where both skies are recorded.
-# - Source check: verify-infrared-practice.json claim 38 is "supported" ("Infrared Extras include Channel Mixer R>G>B>R (purple skies, green foliage) and R>B>G>R (green/teal skies, pink foliage)").
-# - It answers round four's wording note as round four offered: a clause that the purple sky is left to the build, so the build's plan cannot read the omission as an oversight. It claims no source of its own, decides nothing new (the sky names list itself is unchanged, "teal to deep blue, with grey"), and the next sentence, "The exact set is fixed when it is built, from 4b-xi.", now agrees with it.
-# - Minor and not counted: "green-teal" sits next to the list's existing "teal", so the build will have to decide whether it is a new name or the same one. The clause already leaves that to the build.
+# The other five, unchanged from finding-084f and re-read against the current diff:
+# - IR-SCIENCE.md line 1621: "His PRO LUTs (read)" became "Rob Shea's PRO LUTs (read)". The previous bullet is Rob Shea's profile update, so the name is what the pronoun meant. Source and read status kept.
+# - IR-SCIENCE.md line 1654: "His tests used external filters" became "Kennard's tests used external filters". The sentence before opens "Kennard (read)", so the name is what the pronoun meant. Source kept.
+# - IR-SCIENCE.md line 1655: "and he says the colours depend on the camera" became "and the page says the colours depend on the camera". Same claim, with the speaker now Kennard's page, which "Kennard (read)" and "Kennard's tests" in the same sentence pair already name. This is the one wording choice that is not a plain name swap, and it is in the same sentence as the pronoun it fixes.
+# - docs/decisions/084 line 81: "Kennard names his results as pairs" became "Kennard names the results as pairs". Kennard stays the subject and the bullet still ends "All read."
+# - docs/decisions/084 line 85: "His PRO LUTs" became "Rob Shea's PRO LUTs". The sentence before it on the same bullet is Rob Shea's profile update. Source kept.
 # 
 # ANYTHING ELSE CHANGED
-# No. No new hunk, file, section, roadmap line, gate or NOTES.md text since round four. The round-three items stay closed, and the two wording notes round four made are both now discharged. One standing caution from round four still applies: the "second reader checked" sentences in 4b-xi, the record and msg-084.txt stay true only if the text is not edited again before the commit, and any further edit needs checking again.
+# No.
+# 
+# ONE OBSERVATION, not a scope problem and not touched
+# - IR-SCIENCE.md line 1621 and 084 line 85 are 82 characters wide against a wrap of about 80 elsewhere, because the longer name pushed them past it. Line 1610 is now 77, inside the wrap. No gate run here measures width.

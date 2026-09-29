@@ -1607,7 +1607,7 @@ Color looks are made with Hue/Saturation alone and no swap, and the Super Blue
 and Candy Pink filters give their colours straight from the camera (all read).
 
 **The results are described as a foliage colour and a sky colour.**
-- David Kennard (read) names the results he aims for as pairs: red foliage with
+- David Kennard (read) names the results aimed for as pairs: red foliage with
   a blue sky, pink with teal, yellow with blue, orange with blue.
 - LifePixel (read) says a 590 nm frame after the swap has four tones, red and
   yellow in the foliage and blue and cyan in the sky. Its simple adjustment is
@@ -1618,7 +1618,7 @@ and Candy Pink filters give their colours straight from the camera (all read).
 - Rob Shea's 2024 Lightroom profile update (read) adds a Sky series so a reader
   can choose the sky's hue for their filter and camera, and a White profile that
   keeps the sky blue and turns the foliage white.
-- His PRO LUTs (read) carry 23 names: colour names (Amber, Candy, Flamingo,
+- Rob Shea's PRO LUTs (read) carry 23 names: colour names (Amber, Candy, Flamingo,
   Gold, Mint, Pink, Purple, Rose, Sage, Teal, Violet, Wheat, White), Sky 15 to
   Sky 20, Neon, and the remaps Invert, Split and Swap. What each one denotes was
   not read.
@@ -1651,8 +1651,8 @@ balancing on sunlit concrete gives gold foliage after the swap.
 **A hue rotation can stand in for the swap, but not in general.** Kennard
 (read) found a +109 degree Camera Raw hue shift close to the standard swap on two
 filter stacks on a full-spectrum body, and pink foliage with a teal sky from a
-650 nm filter at +146 degrees. His tests used external filters on a
-full-spectrum Canon, and he says the colours depend on the camera.
+650 nm filter at +146 degrees. Kennard's tests used external filters on a
+full-spectrum Canon, and the page says the colours depend on the camera.
 
 **Goldie is also a field term.** Section 4b's list of names calls `Goldie` this
 app's own. Kennard (read) calls the 580/590 nm filter the Goldie filter, because
