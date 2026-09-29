@@ -1201,7 +1201,7 @@ user-scalable=no.
   one neutral in the set, NIR_3466's road, renders maroon. The record has every
   stage, frame by frame.
 - [ ] **The first launch after an update froze with nothing said, and every update fetches the whole app again** <!-- decision: 071 -->
-  **Shown as:** After an update the start screen answers and says it is preparing the editor, an update downloads only what changed, and the editor's picture code no longer unrolls its loops on Direct3D; waiting to be confirmed on the PC where the minute was measured.
+  **Shown as:** After an update the start screen answers and says it is preparing the editor, and an update downloads only what changed. On some Windows PCs the editor still takes about 45 seconds to prepare after an update; the part of it that takes the time is found, and is changed next.
   Reported from the PC after v2.63.7: the start screen showed and nothing
   answered for about a minute. Every release requests and re-stores the whole
   app offline, 218 files and 28 MB, 25 MB of it the sticker library, with
@@ -1226,6 +1226,15 @@ user-scalable=no.
   2026-09-28, Firefox on v2.63.34: 44,527 ms**, the same as before, so
   v2.63.31's change did nothing, and the record says why. Two causes remain,
   both named by the sources, and the PC measures which before anything changes.
+  **Measured 2026-09-29: it is the mask loops.** On the PC (Firefox, Direct3D
+  11) the build takes 45.4 s as shipped, 45.3 s with every loop count hidden,
+  0.79 s with the mask loops taken out and 0.67 s with both. On a second PC
+  drawing in software it takes 18 ms whichever way. So the cost is how
+  Direct3D's compiler handles loops that index uniform arrays, a known shape
+  (ANGLE issue 3682), and ANGLE's own route out of it is a uniform block it
+  turns into a StructuredBuffer. The record's option 8 moves the mask
+  parameters out of those arrays, measured on the PC as a test-page variant
+  before the editor changes.
   See `docs/decisions/071-the-first-launch-after-an-update-froze-with-nothing-said-and-every-update-downloads-the-whole-app.md`.
 - [ ] **The open photo's edits are lost on a reload or a closed tab** <!-- decision: 077 -->
   **Shown as:** Your edits to the open photo are kept if the page reloads or the tab is closed.
