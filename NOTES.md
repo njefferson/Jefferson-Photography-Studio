@@ -1095,14 +1095,16 @@ user-scalable=no.
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **The lens correction whitens bright centre foliage: hold what it corrects under white** <!-- decision: 085 -->
+- [ ] **The lens correction whitens bright centre foliage** <!-- decision: 085 -->
   **Shown as:** Sunlit leaves in the middle of a photo keep their colour when the lens correction is on.
   015's next half. At lens strength 1 the sunlit leaves in the middle of the reported
-  frame go white and pale pink where strength 0 keeps them red. The outside research
-  (IR-SCIENCE and record 085) names the reference guard: clip control, one shared
-  factor that keeps the corrected values under white, as RawTherapee's flat field
-  does. Its first check, before any code, is whether that foliage passes white at the
-  tone stage at strength 1.
+  frame go white and pale pink where strength 0 keeps them red. Clip control, the
+  reference guard the outside research named, was chosen and then not confirmed by
+  its own first check (2026-09-29): on three of the owner's raws the whitening
+  foliage passes white less often at 1, not more. Its colour is flattened from white
+  balance onward by the correction's colour half, which cuts blue against red by
+  about 5 to 6.5% at the centre. Re-opened for research: whether that cut is the
+  lens's own cast coming off or more than the lens put there. Nothing is built.
 
 - [ ] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
   **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.

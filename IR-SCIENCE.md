@@ -4732,6 +4732,12 @@ carried past white is clipped later, per channel, at the tone stage, which is
 where a per-channel clip loses colour toward white (CLAUDE.md). No source says this is why the centre leaves whiten; decision 085
 takes it as the hypothesis to measure first.
 
+**Measured the same day, and it is not this (decision 085, "First check").** On three of the owner's raws under Aerochrome, the
+centre foliage that whitens at strength 1 passes white less often than at 0. Its colour falls first at white balance: the
+correction cuts blue against red by about 5 to 6.5% at the centre, and on foliage that after white balance leans blue at only 10
+to 13% saturation, that cut moves it toward neutral. What the general finding above does describe is the other half: at strength
+1 more already-pale bright values pass white in green and blue, which is where a cloud is.
+
 **Refused on this topic:** rawpedia.rawtherapee.com (challenge page),
 helpx.adobe.com, support.captureone.com and userguides.dxo.com (403), blog.kasson.com
 (403), www.edwardnoble.com (503), and siril.readthedocs.io, docs.rawtherapee.com,

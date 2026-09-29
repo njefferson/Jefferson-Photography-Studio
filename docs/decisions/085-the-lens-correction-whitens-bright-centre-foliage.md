@@ -1,4 +1,4 @@
-# 085 · The lens correction whitens bright centre foliage: hold what it corrects under white, as clip control does
+# 085 · The lens correction whitens bright centre foliage
 
 ## Context
 
@@ -78,21 +78,22 @@ each claim against its source.
   centre values moves the cloud and the foliage they measure (Depends).
 - **The per-channel tone curve**: CLAUDE.md records that a curve applied
   independently per channel desaturates highlights toward white. That is where
-  a value past white loses its colour here.
+  a value past white loses its colour here; the first check found the whitening
+  foliage does not reach it (First check, below).
 
 ## Depends
 
 - touches 015 — 015's correction is what this guards; 015 is archived with this
   record as its next half.
 - touches 021 — 021 put the correction on the linear copy at decode, before the
-  grade, which is where a value carried past white is made and where a guard
-  would act.
-- touches 069 — clouds are among the brightest values at the centre, so holding
-  the correction under white moves what reaches 069's sky stages. The defects
-  differ: 069's cyan cloud is the white point's cast, and this is the lens gain
-  carrying bright values past white.
-- touches 013 — bright foliage is 013's population, and this changes its
-  brightest part.
+  grade, which is where its colour cut is made and where any remedy would act.
+- touches 069 — the correction's cut changes the centre colours 069's sky
+  stages receive, and at strength 1 it carries more already-pale bright values
+  past white in green and blue, which is what a cloud is made of (First check).
+  The defects differ: 069's cyan cloud is the white point's cast, and this is
+  the correction flattening the centre foliage.
+- touches 013 — centre foliage is 013's population, and the correction's cut
+  changes its colour there.
 
 ## Built already
 
@@ -107,8 +108,15 @@ each claim against its source.
 
 ## Options
 
+**Re-opened 2026-09-29: none is chosen.** Option 1's first check ran the same
+day ("First check, 2026-09-29", below). The foliage that whitens does not pass
+white; its colour is flattened from white balance onward, by the correction's
+own colour half. So clip control does not answer this defect, and option 6
+names what the check found, open for research.
+
 1. **Clip control: hold the corrected values under white with one shared
-   factor, computed from the photograph.** Chosen.
+   factor, computed from the photograph.** Chosen 2026-09-29, and not
+   confirmed by its own first check the same day.
    - As RawTherapee's automatic mode does: find the largest value the
      correction would produce in each channel, and if it passes white, scale the
      whole correction down by the one factor that brings it to white. One shared
@@ -123,9 +131,9 @@ each claim against its source.
      to its options.
    - **What it would not change.** On NIR_3716.NEF the bushes lose red all
      over at strength 1, not only at their brightest (Looked at). That is not
-     the pattern a clip makes, so clip control would leave it; whether it is the
-     lens's red cast coming off foliage that was never that red, or the
-     correction taking too much, is measured in the same first check.
+     the pattern a clip makes, so clip control would leave it. The first check
+     found the same flattening on every whitening pixel, and left open whether it
+     is the lens's own cast coming off or more than the lens put there (option 6).
    - **Known limit, from the source:** where the raw already holds a clipped
      pixel, the automatic mode gives no protection.
    - **Open for the build: which white.** RawTherapee applies its factor to the
@@ -140,6 +148,18 @@ each claim against its source.
 3. Tell the reader a hot spot is there.
 4. Clamp each corrected channel at white on its own.
 5. Leave it: the strength slider already lowers the correction.
+6. **The correction's colour half, measured (2026-09-29).** At the centre the
+   correction cuts blue against red by about 5 to 6.5% (blue over red 0.936 to
+   0.947). After white balance blue is the highest channel and red the lowest
+   on 95 to 100% of the whitening pixels, so cutting blue against red moves
+   them toward white, and because they are only 10 to 13% saturated there, the
+   move is large. Before white balance the same cut RAISES their saturation
+   slightly (by 3 to 4%): white balance is only the first place where white is
+   defined. Aerochrome's mixer, whose green output carries minus 1.44 times the
+   matrix's blue, supplies about half to three quarters of the rise in green.
+   Open: whether that cut is the lens's own cast coming off, which is what the
+   correction is for, or more than the lens put there. That needs research
+   before any option here can be chosen.
 
 ## Rejected
 
@@ -158,17 +178,111 @@ each claim against its source.
   it is one practitioner's reading of two frames, and Kolari gives no
   threshold.
 - **4, a per-channel clamp.** It clips each channel on its own, which is the
-  per-channel loss of colour this record is about. Clip control uses one shared
-  factor for exactly that reason.
+  per-channel loss of colour this record took to be its defect before its first
+  check. Clip control uses one shared factor for exactly that reason.
 - **5, leave it.** The whitening is on the reported frame at the strength every
   matched frame opens at.
+- **Re-opened with the Options (2026-09-29).** 2 to 5 were rejected against
+  clip control. With none chosen, 5 is live again under option 6: if the cut is
+  the lens's own cast coming off, the correction is right and leaving it is the
+  answer.
+
+## First check, 2026-09-29: the whitening is not a clip
+
+**What was run.** The app's own state was captured under the Aerochrome chip
+at lens strength 0 and 1 on NIR_1376.NEF, NIR_3716.NEF and NIR_3700.NEF, from a
+copy of today's build with one added function that renders offscreen and reads
+the state back. All six captures' canvases hashed byte-identical to the shipped
+build's, and the slider and the applied strength read back 0 and 1. A copy of
+`compileEdit` with a read-only tap after every stage then ran over the 1:1
+centre crop that was opened, one pixel in four (62,500 of 250,000), and the
+value before the tone stage's per-channel clamp was taken as
+`(n - 0.5) * contrast + 0.5` per channel, as the code computes it. The tapped
+copy returned exactly what the shipped `compileEdit` returns; per pixel, 99.9 to
+100% sit within 3 levels of the app's own GPU render.
+
+**The pixels that whiten** (saturation 0.5 or more on screen at 0; 0.35 or
+less and value 0.8 or more at 1). The figures below are from an independent
+rerun at every pixel of the crop; the check's own one-in-four sample gave
+288, 5,966 and 1,278 pixels and the same direction on the last two.
+
+- NIR_1376.NEF: 1,186 pixels. Past white before the clamp: 0.8% at 0, 0.3% at
+  1 (9 and 3 pixels; the one-in-four sample showed 0.3% at both). Green before
+  the clamp 0.112 to 0.331; saturation after white balance 0.133 to 0.079.
+- NIR_3716.NEF: 24,091 pixels. Past white: 1.9% at 0, 0.3% at 1. Green 0.217
+  to 0.420; saturation after white balance 0.103 to 0.054.
+- NIR_3700.NEF: 5,233 pixels. Past white: 5.4% at 0, 3.2% at 1. Green 0.167
+  to 0.394; saturation after white balance 0.122 to 0.068.
+
+So they pass white less often at 1, not more; on NIR_1376 that rests on single
+figures. Red passes 1 on all but 4 of them; blue on 4 pixels of NIR_3700.NEF at
+1; green never.
+
+**Where the colour goes** (on the one-in-four sample). For these pixels the
+first stage at which strength 1 is clearly less saturated than 0 is exposure
+and white balance: lower on every pixel, by a median factor of 0.52 to 0.58,
+and before every clamp that acts on them, since nothing upstream sits at the
+floor or near white. The correction's own gain table applied to the strength-0
+copy reproduces the whole drop, and its blue gain alone reproduces 95 to 137%
+of it. The centre gains it applies:
+
+- NIR_1376.NEF: red 0.996, green 0.980, blue 0.933.
+- NIR_3716.NEF: red 1.020, green 1.000, blue 0.966.
+- NIR_3700.NEF: red 1.013, green 0.996, blue 0.948.
+
+**The other half of it.** Across the whole crop, strength 1 carries MORE green
+and blue values past white before the clamp on all three raws (on the sample:
+green 70 to 142, 24 to 137 and 1,169 to 2,642; blue 38 to 74, 46 to 304 and
+1,385 to 2,452). At every pixel, 241, 47 and 2,366 pixels are newly past white
+at 1, nearly all of them near neutral at 0. So clip control does not answer the
+whitening foliage, but the correction does push already-pale bright values
+past white, which is what clip control guards and what a cloud is made of (069).
+
+**What was tried against it.** Three independent lenses each tried to refute
+the verdict. None did.
+
+- The check's figures reproduced exactly on its own sample, and the class
+  figures were recomputed at every pixel from a pipeline built separately from
+  the repository's source, each comparison made to fail once. The full-density
+  shares moved (above) and kept their direction.
+- Eleven other definitions of "whitens" were tested beside the check's own. On
+  every definition that selects a change toward white, the share past white
+  falls or stays. The three with no condition at strength 0 (value 0.9 or more
+  at 1, the brightest 5% at 1, pale at 1) rise a little on NIR_1376 (value 0.9
+  or more: 16.0 to 20.3% at every pixel), are flat on NIR_3700 and fall on
+  NIR_3716; the pixels that make those rises are near neutral already at 0, and
+  no rise met the bar fixed before the runs.
+- Gray-world and auto exposure recomputed on the strength-0 copy, stepped as the
+  slider steps them, land on the same positions or one step away and reproduce
+  -0.3 to +0.4% of the drop; unstepped, -5.5 to +7.1%. The balance chosen at
+  open does not explain it.
+
+**Caveats that stand.** On a wider paling set (saturation falling by 0.15 or
+more, value 0.7 or more at 1), part of strength 0's red comes from clamps at the
+low end, which do not act at 1, and on NIR_3700.NEF the band stage's saturation
+guard drops from 1.6 to about 1.0 and amplifies the fall; neither acts on the
+strict set above. On NIR_3700.NEF the lens strength also moves the sky
+selection: its sky maps differ between the two captures, and the sky stages
+move 43% of the whitening pixels at 0 and 58% at 1. The check's own test of its
+planted change could not fail; the independent lens's real plant confirmed the
+exactness it reported.
+
+**Not tested.** The clamps after the tone stage (the HSL mixer, sky
+saturation); anything outside the centre crop, the Aerochrome look and these
+three raws; any device; and any remedy.
+
+**What it supports, and no more.** At the centre, strength 1 cuts blue against
+red by about 5 to 6.5%, and on this weakly coloured foliage, which after white
+balance leans blue, that cut is what turns red to pale. Nothing here shows that
+the correction is wrong, or that any change would bring the red back.
 
 ## Rank
 
-First, where 015 stood, now that 078 is archived. 069 and 013 each touch it:
-069's cloud and 013's foliage are among the brightest values at the centre, and
-this changes them, so either one tuned first would be tuned again. It goes
-above both.
+First, where 015 stood, now that 078 is archived. Re-opened for research
+(2026-09-29), it stays first: 069 and 013 each touch it. The correction's cut
+changes the centre colours 013's foliage is tuned against, and pushes pale
+bright values past white where 069's clouds are, so either one tuned first
+would be tuned again. It goes above both.
 
 ## Looked at
 
