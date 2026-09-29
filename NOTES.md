@@ -1095,45 +1095,14 @@ user-scalable=no.
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **The centre of the picture washes out — the lens correction, against the reference** <!-- decision: 015 --> — reported
-  **Shown as:** Photos open with the lens correction measured from your own flat frames, so the middle of the sky and foliage matches the edges.
-  from the iPad 2026-09-17 on the lone oak under Aerochrome, and the report named
-  the cause correctly. Rendered on and off from the app itself, the measured lens
-  correction removes 37% of the foliage's red-against-blue in the middle of the
-  frame and 18% further out; separating the halves, the brightness bump does
-  almost nothing and the colour curve does all of it. The reading behind it is in
-  `IR-SCIENCE.md` §9: the hot spot is added light whose strength tracks the
-  scene's own, and both published corrections normalise the flat to a reference
-  level — Kolari to its average, RawTherapee to its centre — while this app
-  normalises to nothing, which moves the whole frame's red-against-blue by up to
-  3.79% before any look runs. The first change chosen was the smallest one:
-  restore the average anchor and interpolate the 80 hard bins, both reference
-  behaviour, with the shipped profile arrays untouched. Clip control, a per-image strength and
-  moving the stage out of the creative chain follow, each with its own record.
-  **Two changes shipped 2026-09-17.** The normalising term, which gives the oak
-  back 23.0% of what the stage was taking, measured as two real builds, with a
-  frame carrying no curve and a frame carrying an area-neutral one bit-identical
-  to before. And the correction **no longer applies at open at all** — the
-  profile is still matched and named, the slider and the picker stay, a strength
-  the reader chose is still remembered, but nothing is corrected until it is
-  asked for. Interpolation was measured and not shipped; it changed nothing on
-  this frame. What is left is telling the reader a hot spot is there rather than
-  silently correcting it: the centre-against-edge white balance test, roughly
-  1000K apart on a visible one.
-  See `docs/decisions/015-lens-correction-against-the-reference.md`.
-  **Reversed 2026-09-26: it opens on, at full strength, remembered per lens.**
-  On 22 cell-tower frames at f/5 to f/8, a curve from the owner's own flat
-  frames matched every one. Rendered off, most have a near-grey or red-grey
-  patch at the sky's centre and a redder centre in the foliage. On, the centre
-  loses that cast and the edges warm slightly, so centre and edge move toward
-  each other. The
-  memory was per aperture, so 19 of 22 opened uncorrected. **Ranked first by the
-  dependency test:** 069's grey patch is this drift, and 013 was tuned with it
-  off.
-  **2026-09-29: the record caught up.** It still named the normalisation as the
-  next step; it now says the anchor shipped on 2026-09-17 and the blend was
-  measured and set aside. What is left is decided from the reported frame on
-  today's build, shown in pictures first.
+- [ ] **The lens correction whitens bright centre foliage: hold what it corrects under white** <!-- decision: 085 -->
+  **Shown as:** Sunlit leaves in the middle of a photo keep their colour when the lens correction is on.
+  015's next half. At lens strength 1 the sunlit leaves in the middle of the reported
+  frame go white and pale pink where strength 0 keeps them red. The outside research
+  (IR-SCIENCE and record 085) names the reference guard: clip control, one shared
+  factor that keeps the corrected values under white, as RawTherapee's flat field
+  does. Its first check, before any code, is whether that foliage passes white at the
+  tone stage at strength 1.
 
 - [ ] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
   **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.
@@ -4821,6 +4790,47 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **The centre of the picture washes out — the lens correction, against the reference** <!-- decision: 015 --> — reported
+  **Shown as:** Photos open with the lens correction measured from your own flat frames, so the middle of the sky and foliage matches the edges.
+  from the iPad 2026-09-17 on the lone oak under Aerochrome, and the report named
+  the cause correctly. Rendered on and off from the app itself, the measured lens
+  correction removes 37% of the foliage's red-against-blue in the middle of the
+  frame and 18% further out; separating the halves, the brightness bump does
+  almost nothing and the colour curve does all of it. The reading behind it is in
+  `IR-SCIENCE.md` §9: the hot spot is added light whose strength tracks the
+  scene's own, and both published corrections normalise the flat to a reference
+  level — Kolari to its average, RawTherapee to its centre — while this app
+  normalises to nothing, which moves the whole frame's red-against-blue by up to
+  3.79% before any look runs. The first change chosen was the smallest one:
+  restore the average anchor and interpolate the 80 hard bins, both reference
+  behaviour, with the shipped profile arrays untouched. Clip control, a per-image strength and
+  moving the stage out of the creative chain follow, each with its own record.
+  **Two changes shipped 2026-09-17.** The normalising term, which gives the oak
+  back 23.0% of what the stage was taking, measured as two real builds, with a
+  frame carrying no curve and a frame carrying an area-neutral one bit-identical
+  to before. And the correction **no longer applies at open at all** — the
+  profile is still matched and named, the slider and the picker stay, a strength
+  the reader chose is still remembered, but nothing is corrected until it is
+  asked for. Interpolation was measured and not shipped; it changed nothing on
+  this frame. What is left is telling the reader a hot spot is there rather than
+  silently correcting it: the centre-against-edge white balance test, roughly
+  1000K apart on a visible one.
+  See `docs/decisions/015-lens-correction-against-the-reference.md`.
+  **Reversed 2026-09-26: it opens on, at full strength, remembered per lens.**
+  On 22 cell-tower frames at f/5 to f/8, a curve from the owner's own flat
+  frames matched every one. Rendered off, most have a near-grey or red-grey
+  patch at the sky's centre and a redder centre in the foliage. On, the centre
+  loses that cast and the edges warm slightly, so centre and edge move toward
+  each other. The
+  memory was per aperture, so 19 of 22 opened uncorrected. **Ranked first by the
+  dependency test:** 069's grey patch is this drift, and 013 was tuned with it
+  off.
+  **2026-09-29: the record caught up.** It still named the normalisation as the
+  next step; it now says the anchor shipped on 2026-09-17 and the blend was
+  measured and set aside. What is left is decided from the reported frame on
+  today's build, shown in pictures first.
+  Archived 2026-09-29 with its Outcome; its next half is decision 085.
 
 - [x] **Bold Pink, Aerochrome left pink before it turns the foliage red and the sky blue** <!-- decision: 078 -->
   **Shown as:** A new look, Bold Pink, beside Aerochrome: magenta-pink foliage over a green-teal sky. Help now says what Aerochrome itself looks like: red foliage under a blue sky.

@@ -339,3 +339,32 @@ the argument this reverses.
 - NIR_1376.NEF, 2026-09-29: the reported frame, the lone oak, on today's build (the anchor shipped), opened in the app with its EXIF and lens match, under Aerochrome, exported at full size (5600 x 3728) at lens strength 0 and 1. Whole frame, side by side at 1000 px each: at 1 the canopy is paler, coral-pink against a deeper red at 0, and the brownish haze round the crown's top at 0 evens to blue-teal at 1. The centre at 1:1, 1000 x 1000 each: at 1 a large share of the sunlit leaves go white and pale pink, most of all in the upper canopy and the lit mass lower left, where 0 keeps them red; the red survives in shade and on the trunk; the grey-blue sky gaps barely move. The wash-out the report named is still there; no render of the build before the anchor was opened, so whether it is smaller is §9g's number, not a picture.
 - NIR_3700.NEF, 2026-09-29: the same export on today's build (5600 x 3728), strength 0 and 1 under Aerochrome, whole frame at 1000 px a side and the centre at 1:1. Whole frame: the red-grey blotch in the sky above centre at 0 is an even blue-grey at 1, and the central bushes go paler and whiter. Centre at 1:1: at 0 the sky is grey with red speckle and the pampas plumes and bushes are red-pink; at 1 the sky is blue-grey and the plumes and bushes go largely white. The 2026-09-26 sheet saw the same.
 - NIR_3716.NEF, 2026-09-29: the same export and views. Whole frame: the red disc over the centre of the field at 0 is gone at 1, the field is even, and the central bush cluster goes from deep red to pale pink; a red smudge at the left edge, mid-height, is there at both. Centre at 1:1: at 0 everything in the middle is red, the bushes, the grass, and the dirt track and hillside behind them; at 1 the track and hillside are neutral grey and the bushes pale salmon with white highlights.
+
+## Outcome
+
+Four changes shipped, and three of them stand.
+- **The anchor**, 2026-09-17, in both renderers (`lensAreaMean`; IR-SCIENCE
+  §9g): each colour curve is scaled by the area mean of the gain it applies, so
+  the correction redistributes colour without tinting the frame. It gave the
+  lone-oak frame back 23.0% of what the stage was taking.
+- **On at open again**, commit e6ee756 on main, on production from 2026-09-28
+  (v2.63.36): a lens the app knows opens with its correction on, at full
+  strength or at the strength last chosen for it, remembered per lens at every
+  aperture for a shipped profile and per stored profile for a reader's own
+  measurement.
+- **The report's lens line**, commit 8881ea1 on main, on production from
+  2026-09-29 (v2.64.4): it prints the correction the photograph actually gets,
+  held by `tools/lens-diagnostic-check.mjs`.
+
+What turned out wrong:
+- The fourth, turning the correction off at open (2026-09-17), was reversed on
+  2026-09-26, on this record's own Rejected grounds.
+- The anchor, which this record also calls the normalisation, shipped on
+  2026-09-17. Until 2026-09-29 the record did not say so, and from 2026-09-27
+  it named it as its next step.
+- A 43% figure read off half-size views was superseded by 23.0%.
+- The report's lens line described a correction nothing applied, from
+  2026-09-17 until 2026-09-29.
+
+What it left open, the bright centre foliage going white at strength 1, is
+record 085.

@@ -4691,3 +4691,48 @@ Hidden Realms (hiddenrealms.ch/how-to-build-your-own-ir-chrome-filter/), read in
 full. The transmission figures came only as search summaries of
 truecolorinfrared.com, which this environment blocks, as it does
 www.ultravioletphotography.com and zv.io.
+
+### 9r. A FLAT-FIELD GAIN CAN CARRY BRIGHT VALUES PAST WHITE, AND CLIP CONTROL IS THE REFERENCE GUARD (decision 085, 2026-09-29)
+
+Researched for 015's next half: why the lens correction at full strength turns
+sunlit centre leaves white and pale pink, and what the field does about it. One
+researcher and one skeptic, web only; the skeptic re-checked each claim against
+its source.
+
+- **RawTherapee's flat field, read in its source** (`rtengine/rawflatfield.cc`,
+  confirmed). The flat is normalised per colour channel to its blurred value at
+  the image centre. Each raw value is multiplied by reference over flat, with a
+  guard that leaves a pixel alone where the flat is near zero. **Nothing clamps
+  the corrected output.** Manual clip control multiplies the reference by one
+  shared factor, `max((100 − clipControl)/100, 0.01)`. Automatic clip control
+  finds the largest corrected value per channel and lowers the factor until it
+  reaches that channel's white level. One shared factor lowers the whole
+  correction and keeps the channels' ratios. Where the raw already holds a
+  clipped pixel, the automatic mode gives no protection (partly confirmed: on
+  the Bayer path it depends on where the scan stops).
+- **RawPedia** (snippet only; the page answered with a challenge): a flat field
+  can push nearly overexposed areas into overexposure, and clip control stops
+  that.
+- **darktable issue 12128** (read, confirmed): a per-channel gain map raises
+  bright but unclipped pixels above the raw white point, highlight
+  reconstruction then clips them, and the colour comes out wrong, on clouds.
+- **Kolari** (read, confirmed): corrected = image × (average flat ÷ flat), with
+  a library per lens, filter and aperture; the hot spot is not always centred;
+  its strength follows aperture, focal length, focus distance and the light in
+  the scene. Kolari's lens list gives no numerical threshold for a hot spot.
+- **By hand, per image** (Photo Art From Science, read, confirmed): lower the
+  exposure in a radial filter until the hot spot matches its surroundings,
+  which works best when no channel has clipped.
+- **Amount sliders** for lens shading in Lightroom, Capture One and DxO:
+  search-level only; all three vendors' pages refused.
+
+**What it means here.** This app applies the correction to the linear float
+copy at decode, and nothing there clips (`src/lensflat.ts`, header); a value
+carried past white is clipped later, per channel, at the tone stage, which is
+where a per-channel clip loses colour toward white (CLAUDE.md). No source says this is why the centre leaves whiten; decision 085
+takes it as the hypothesis to measure first.
+
+**Refused on this topic:** rawpedia.rawtherapee.com (challenge page),
+helpx.adobe.com, support.captureone.com and userguides.dxo.com (403), blog.kasson.com
+(403), www.edwardnoble.com (503), and siril.readthedocs.io, docs.rawtherapee.com,
+www.captureintegration.com and www.on1.com (egress proxy).
