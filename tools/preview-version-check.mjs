@@ -46,6 +46,12 @@ const WHOLE = [
   // the new one, which is exactly what the list exists to prevent. Same shape as
   // the defect it was written to fix, one file along.
   "src/hotspot.ts",        // and which half of it is applied
+  // AND WHERE IT IS LAID ON A RAW. Since decision 021 (2026-09-18) a raw's
+  // correction is a flat on the linear copy at decode, in this file, and every
+  // raw preview is made of it — while the list above named only the gains. A
+  // change to how the flat is laid would have kept serving tiles rendered under
+  // the old one. Found reading 015's call chain on 2026-09-29.
+  "src/lensflat.ts",       // the flat laid on a raw at decode
   "src/stamp.ts",          // the hash two parts of the key are built with
 ];
 const DIRS = ["src/raw"];  // the raw decoders, every file

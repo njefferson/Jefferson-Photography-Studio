@@ -112,10 +112,12 @@ does not get written (LESSONS 330):
   `tools/agreement-walk.mjs` does NOT exercise the decode-time flat, which this
   entry used to claim: its raws are practice DNGs with no EXIF, so no curve
   matches, and its camera-JPEG pair sits in a folder that no longer exists
-  (record 083). `tools/lens-order-walk.mjs` is the walk meant to hold it; its
-  three files sat in an earlier session's folder, so it could not run in a fresh
-  container, and moving them to the owner's shared set is part of this record's
-  work of 2026-09-29.
+  (record 083). `tools/lens-order-walk.mjs` is the walk that holds it. Its
+  three files sat in an earlier session's folder, so it could not run in a
+  fresh container. On 2026-09-29 it was changed to take them by name through
+  `tools/owner-images.mjs`, run to a pass on that day's build, and made to fail
+  against a decode flat that ignored what it had already laid: Bypass stopped
+  changing the picture, and 89% of pixels moved on the round trip.
 - **The pass at decode.** The flat laid on the linear raw before the balance
   and the selection (021) is in `src/lensflat.ts`, `src/decode.worker.ts` and
   `src/decodeClient.ts`. It is planned by `lensPlanFor` in `src/main.ts`.
@@ -131,7 +133,12 @@ does not get written (LESSONS 330):
     remembered 0, the card's wording.
   - `tools/lens-store-check.mjs`: the curve rules held both ways.
   - `tools/preview-version-check.mjs`: it hashes `lensPlanFor` and
-    `lensStrengthAtOpen`.
+    `lensStrengthAtOpen`, and from 2026-09-29 `src/lensflat.ts`, which every raw
+    preview is made of and which it had left out.
+  - `tools/lens-diagnostic-check.mjs` (2026-09-29): the diagnostic report's
+    centre gains are the gains `lensGains` lands. The report had worked them out
+    from the stored bins, so from 2026-09-17 it described a correction without
+    the anchor, which nothing applies.
 
 ## Weighed against
 
@@ -243,8 +250,21 @@ LENS.**
   profiles with no brightness curve; it says "colour only" there now.
 - **What stays open.** Not the normalisation: it had shipped nine days before
   this line first named it (above). Whether the wash-out the report named is still
-  there on today's build is shown on the reported frame, and the next half waits
-  on that: a per-image strength, clip control, or telling the reader a hot spot is
+  there on today's build was looked at on 2026-09-29, on the reported frame,
+  NIR_1376.NEF, from full-size exports at strength 0 and 1. On this session's
+  reading of those pictures it is; the pictures went to the owner, and the
+  owner's answer is what decides. How much
+  smaller than before the anchor was not looked at (no render of that build was
+  opened; §9g's 23.0% is a number, not a picture). At 1:1 in the centre, strength 1 turns a large share of the sunlit
+  leaves white and pale pink where 0 keeps them red (Looked at). Two cell-tower
+  frames from the same day's exports show both sides of it. On NIR_3716.NEF the
+  dirt track and hillside in the middle are red at 0 and neutral grey at 1, which
+  is the artefact's red coming off things that have none; the bushes beside them
+  go from deep red to pale salmon in the same step. On NIR_3700.NEF strength 1
+  takes the red speckle out of the sky and turns the pampas plumes largely white.
+  On the oak nothing neutral in the middle shows the cast: its sky gaps barely
+  move. The owner's answer decides whether 015 is archived or its next half gets a
+  record of its own, chosen from: a per-image strength, clip control, or telling the reader a hot spot is
   there by the centre-against-edge white-balance test (about 1000K apart on a
   visible one, §9h). Each is its own record.
 
@@ -316,3 +336,6 @@ the argument this reverses.
 - NIR_3700, 2026-09-26: strength 0 against 1 under Aerochrome, the app's own export: whole frame, 2x centre and corner, and the difference. A red-grey blotch in the sky above centre at 0, an even blue-grey at 1; the seed heads pink-red at 0, white at 1; the corner barely moves.
 - NIR_3703, 2026-09-26: the same sheet. The sky's centre at 2x is flat grey at 0 and blue at 1; the foliage corner is unchanged.
 - NIR_3716, 2026-09-26: the same sheet. A red disc over the centre foliage at 0 that is gone at 1; the bottom-left grass is a little redder at 1 than at 0.
+- NIR_1376.NEF, 2026-09-29: the reported frame, the lone oak, on today's build (the anchor shipped), opened in the app with its EXIF and lens match, under Aerochrome, exported at full size (5600 x 3728) at lens strength 0 and 1. Whole frame, side by side at 1000 px each: at 1 the canopy is paler, coral-pink against a deeper red at 0, and the brownish haze round the crown's top at 0 evens to blue-teal at 1. The centre at 1:1, 1000 x 1000 each: at 1 a large share of the sunlit leaves go white and pale pink, most of all in the upper canopy and the lit mass lower left, where 0 keeps them red; the red survives in shade and on the trunk; the grey-blue sky gaps barely move. The wash-out the report named is still there; no render of the build before the anchor was opened, so whether it is smaller is §9g's number, not a picture.
+- NIR_3700.NEF, 2026-09-29: the same export on today's build (5600 x 3728), strength 0 and 1 under Aerochrome, whole frame at 1000 px a side and the centre at 1:1. Whole frame: the red-grey blotch in the sky above centre at 0 is an even blue-grey at 1, and the central bushes go paler and whiter. Centre at 1:1: at 0 the sky is grey with red speckle and the pampas plumes and bushes are red-pink; at 1 the sky is blue-grey and the plumes and bushes go largely white. The 2026-09-26 sheet saw the same.
+- NIR_3716.NEF, 2026-09-29: the same export and views. Whole frame: the red disc over the centre of the field at 0 is gone at 1, the field is even, and the central bush cluster goes from deep red to pale pink; a red smudge at the left edge, mid-height, is there at both. Centre at 1:1: at 0 everything in the middle is red, the bushes, the grass, and the dirt track and hillside behind them; at 1 the track and hillside are neutral grey and the bushes pale salmon with white highlights.
