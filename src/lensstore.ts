@@ -15,13 +15,15 @@
 //   falloff   the whole radial brightness profile, hot-spot and vignette
 //             together. Correcting it would flatten the corners too, which is
 //             what the Vignette slider is for. NOT applied (owner call).
-//   bump      the hot-spot's share of that brightness. Reported as a RANGE
+//   bump      the hot-spot's share of that brightness. Measured as a RANGE,
 //             because one flat frame cannot separate it from the lens's own
-//             falloff. A range is not a correction. NOT applied.
+//             falloff, and turned into a curve on save by `bumpFrom`. APPLIED
+//             when present: `lensHalves` (hotspot.ts) takes the reader's own
+//             brightness curve over the shipped one. This entry said "NOT
+//             applied" after that stopped being true (corrected 2026-09-29).
 //
-// So a measured profile contributes the COLOUR half. The brightness half stays
-// with the shipped scalar profile and the Hot-spot slider, which is honest
-// about what each of them knows.
+// So a measured profile contributes its colour half, and its brightness half
+// when it carries one; otherwise the brightness comes from the shipped profile.
 //
 // THIS FILE ONLY KEEPS AND MATCHES. Applying is the pipeline's job — the curve
 // goes to `compileEdit` and to the shader as a texture, so it composes with

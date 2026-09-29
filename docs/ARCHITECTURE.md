@@ -636,7 +636,7 @@ cannot describe something the code does not say about itself.
 - **`src/lensflat.ts`** (168 lines) — The measured lens correction as a flat-field pass on the LINEAR working copy, applied at decode before anything is measured or graded (decision 021; IR-SCIENCE.md §9c — RawPedia, the DNG GainMap, Ligh
 - **`src/lensprofile.ts`** (922 lines) — Measuring an IR lens's hot-spot ON THE DEVICE, from flat frames, per channel.
 - **`src/lensrig.ts`** (929 lines) — Measuring a lens, as a destination in the app.
-- **`src/lensstore.ts`** (796 lines) — Keeping a lens profile the reader measured, and putting it back to work.
+- **`src/lensstore.ts`** (798 lines) — Keeping a lens profile the reader measured, and putting it back to work.
 - **`src/localmap.ts`** (100 lines) — Per-image reference maps for Clarity and Dehaze (glow-map pattern: built once per image from LINEAR source data, sampled as a texture by the GPU and bilinearly by the CPU export).
 - **`src/look.ts`** (294 lines) — Shareable looks. A look is the CREATIVE grade only (see SavedLook) — small enough (~0.5 KB of JSON) to travel as a link fragment, a paste-able code, or a tiny .ipslook file, with no server and no acco
 - **`src/lookmark.ts`** (75 lines) — The traveling recipe: every exported JPEG can carry the look that made it, as an APP11 segment ("IPSLOOK\0" + the look.ts wire-format JSON, ~600 bytes).
@@ -650,7 +650,7 @@ cannot describe something the code does not say about itself.
 - **`src/main.ts`** (19479 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (2515 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (2520 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).

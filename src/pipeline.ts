@@ -1802,8 +1802,11 @@ export interface LensCurve {
   kb?: ArrayLike<number>;
   /** The shipped profile's brightness bump, per radial bin, in LINEAR space
    *  (see hotspot.ts — the shipped numbers are gamma-space and are converted
-   *  before they get here). Its own strength, `p.hsFix`, because it comes from
-   *  a different source than kr/kb and the reader turns them down separately. */
+   *  before they get here). It rides the SAME strength as kr/kb — `lensGainsFor`
+   *  takes one — which is `p.lensFix`; `syncLensStrength` in main.ts sets that
+   *  from the shipped card's `hsFix` while the shipped profile is the one
+   *  applied. This line used to give the bump its own strength, `p.hsFix`,
+   *  after the two had become one (corrected 2026-09-29). */
   bump?: ArrayLike<number>;
 }
 
@@ -1872,8 +1875,10 @@ export function lensBin(u: number, v: number, aspect: number, n: number): number
  *  redistributing it: +1.49% red against blue on the lone-oak frame's matched
  *  blend, +3.79% on the worst shipped profile, past 2% on 14 of the 72 that
  *  carry colour. Gray-world white balance is measured BEFORE this stage runs,
- *  so nothing downstream put it back. Restoring it gives the oak back 43% of
- *  the colour the stage was taking. See IR-SCIENCE.md section 9b.
+ *  so nothing downstream put it back. Restoring it gives the oak back 23.0% of
+ *  what the stage was taking, measured as two real builds (IR-SCIENCE.md
+ *  section 9g, which also says why an earlier 43% was wrong); section 9b is
+ *  the research.
  *
  *  The centre anchor is the wrong one here and that is worth knowing rather
  *  than rediscovering: RawTherapee's lifts the periphery and leaves the centre

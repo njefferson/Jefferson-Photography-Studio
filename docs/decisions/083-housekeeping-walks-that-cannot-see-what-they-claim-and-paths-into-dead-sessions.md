@@ -96,8 +96,9 @@ items after it are verified with. The owner set the order on 2026-09-29: the
 lens correction first, and this with the release-readiness work. The lens
 correction's own verification does not lean on the agreement walk, which
 does not exercise the decode-time flat; it uses the lens-order walk, whose
-files move to the owner's shared set under 015, because they sat in an earlier
-session's folder.
+files sat in an earlier session's folder and were moved to the owner's shared
+set under 015 on 2026-09-29, where the walk was run to a pass and made to fail
+once.
 
 ## Looked at
 

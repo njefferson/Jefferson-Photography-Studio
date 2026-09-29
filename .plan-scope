@@ -1,7 +1,7 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=29fd75a82ac4b3a6
-diffhash=1225f0281b362dec
+diffhash=3360c52f399b7e1e
 verdict=IN-SCOPE: the whole current diff (the same 12 modified files and one new file as the earlier verdict) is covered by the plan's Step 2 and Step 3, and the reworded "What stays open" bullet in record 015 now gives the wash-out reading as the session's own and leaves the archive-or-next-half decision to the owner, as the plan requires.
 # IN-SCOPE: the whole current diff (the same 12 modified files and one new file as the earlier verdict) is covered by the plan's Step 2 and Step 3, and the reworded "What stays open" bullet in record 015 now gives the wash-out reading as the session's own and leaves the archive-or-next-half decision to the owner, as the plan requires.
 # 

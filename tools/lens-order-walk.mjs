@@ -6,10 +6,14 @@
 //   node tools/lens-order-walk.mjs [--port=8131] [--file=A.NEF] [--second=B.NEF] [--third=C.NEF] [--chosen=0.3]
 //
 // Three raws from ONE lens that matches a shipped profile, the first two at
-// DIFFERENT apertures. They are real photographs and are NOT in the
-// repository; the defaults are a scratchpad set from a NIKKOR Z DX 50-250mm
-// (NIR_3703 f/5, NIR_3697 f/5.3, NIR_3700 f/8), and without them the walk
-// exits 2 — "did not run", never a pass.
+// DIFFERENT apertures. They are the owner's photographs and are NOT in the
+// repository: they are taken BY NAME through tools/owner-images.mjs, which
+// fetches them from the folders shared for testing and caches them (hub
+// LESSONS 369). The defaults are from a NIKKOR Z DX 50-250mm (NIR_3703.NEF
+// f/5, NIR_3697.NEF f/5.3, NIR_3700.NEF f/8). If they cannot be fetched the
+// walk exits 2 — "did not run", never a pass. Until 2026-09-29 the defaults
+// were paths into one earlier session's scratchpad, so in every container
+// after that one this walk exited 2 and held nothing.
 //
 // WHAT IT HOLDS. The measured lens curve is laid on the linear working copy at
 // decode, before the gray-world balance, the exposure, the denoise measurement
@@ -47,6 +51,7 @@
 // second copy, no drift.
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
+import { resolve as ownerImage } from "./owner-images.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
@@ -64,10 +69,16 @@ const STRENGTH = 1;
 // What the reader chooses on the first frame, for (b). Not 1 and not 0, so it
 // cannot be mistaken for either default.
 const CHOSEN = Number(arg("chosen", "0.3"));
-const SET = "/tmp/claude-0/-home-user/e7a820ad-44f5-555c-96b8-a4dcabafb549/scratchpad/towers";
-const RAW = arg("file", `${SET}/NIR_3703.NEF`);
-const RAW2 = arg("second", `${SET}/NIR_3697.NEF`);
-const RAW3 = arg("third", `${SET}/NIR_3700.NEF`);
+// Names, not paths: anything not in tools/owner-images.json is refused there.
+let RAW, RAW2, RAW3;
+try {
+  RAW = await ownerImage(arg("file", "NIR_3703.NEF"));
+  RAW2 = await ownerImage(arg("second", "NIR_3697.NEF"));
+  RAW3 = await ownerImage(arg("third", "NIR_3700.NEF"));
+} catch (e) {
+  console.log(`\ncould not fetch the owner's raws (${e.message}) — this walk needs three real raws from one lens that matches a shipped profile\n`);
+  process.exit(2);
+}
 const TOL = 0.005; // 0.5% per channel
 // SET FROM BOTH BUILDS' READINGS on NIR_1376 at strength 1, corner over centre,
 // red/blue: the build before 021 (flat after the denoise) read 1.033 / 1.051;
