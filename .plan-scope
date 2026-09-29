@@ -1,7 +1,14 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=58f105af8b13e53b
-diffhash=544c6175dfda6174
-verdict=IN-SCOPE: the uncommitted diff touches only record 071 and NOTES.md, and every hunk maps to plan Step 1.
-# Watcher (read-only subagent), 2026-09-29, plan read by path. Above main: nine commits, relaxed-bardeen's eight rebased and 1146b21 (the previous plan's 069 commit).
-# Uncommitted: docs/decisions/071 (Step 1: MEASURED block with both PC readings; 'What was left' bullet now one; ANGLE's design note in Looked up; option 8 with its measurement design; the cached-launch question as still open) and NOTES.md (Step 1: the readings in 071's roadmap entry and its Shown as line matched to them). Rank unchanged; no other entry touched. Outside the plan: nothing.
+diffhash=fb3b9e53e567a58d
+verdict=IN-SCOPE: record 078 and its roadmap line are Step 3 exactly, no source touched; the Pink IR comparison arm serves the plan's own reads-as-its-own-look test.
+# Watcher verdict, 2026-09-29, on the uncommitted changes (record 078 new, NOTES.md +10 lines), judged against /root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md read in full by path.
+# 
+# IN-SCOPE: the uncommitted changes are exactly Step 3 (record 078 plus its NOTES roadmap bullet), with no source code touched, and the one addition the plan does not list, the Pink IR comparison arm, serves the plan's own "reads as its own look" test.
+# 
+# - docs/decisions/078-...md: the six sections, Depends (touches 069 as required; touches 066 and 022 follow from its Weighed against), Looked at naming all seven frames with .NEF; decides no finishing panel and no sub-label, as the plan says the record must. "## Built already" is required of the top-ranked record by tools/decisions-check.mjs.
+# - NOTES.md: one open bullet with the decision key and a Shown as line, first in the queue, argued in the record's Rank.
+# - No change under src/, ir.html or tools/.
+# - Pink IR as a third arm: beyond Step 2's literal list, within the plan's stated purpose (Whole app: the render step shows whether it reads as its own look); scratch work only.
+# - Commits on the branch (main..HEAD): nothing plainly outside this plan or the previous one.
