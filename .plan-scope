@@ -1,32 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=be0e5cb272b31aae
-diffhash=68fdad630d83ba12
-verdict=IN-SCOPE: The two committed commits, 52f959a and fba2099, contain only what the plan's Step 3 names (IR-SCIENCE 4b-xi, record 084 and its NOTES.md roadmap line) plus two small same-subject notes already judged inside, and six one-word substitutions that replace bare pronouns with author names or plain wording inside that same section and that same record.
-# IN-SCOPE: The two committed commits, 52f959a and fba2099, contain only what the plan's Step 3 names (IR-SCIENCE 4b-xi, record 084 and its NOTES.md roadmap line) plus two small same-subject notes already judged inside, and six one-word substitutions that replace bare pronouns with author names or plain wording inside that same section and that same record.
-# 
-# WHAT WAS CHECKED (the plan by path, git log, git status, git show --stat, git show of both commits, word-diff of fba2099, line numbers at HEAD, finding-084e.txt, finding-084g.txt)
-# - git log --oneline -3 shows HEAD is fba2099, then 52f959a, then 5fc16cf. git status --short prints nothing, so no repository file is modified; the tracked scope record .plan-scope is the only file the coming rewrite will touch.
-# - 52f959a touches four files: .plan-scope, IR-SCIENCE.md, NOTES.md and the new record docs/decisions/084-a-foliage-colour-and-a-sky-colour-chosen-by-name.md. fba2099 touches three: .plan-scope, IR-SCIENCE.md and the same record. No code, no public/ file, no tool or gate file, no other record, and no staging push, which matches the plan's docs-only Step 3.
-# - The plan's Step 3 lists IR-SCIENCE 4b-xi, docs/decisions/084-*.md and the NOTES.md roadmap bullet with the decision key on its first line and a Shown-as line, then a Docs: commit. Both commits carry a Docs: subject.
-# 
-# THE FIVE HUNKS OF 52f959a
-# - IR-SCIENCE.md, new section 4b-xi at line 1590, running to about line 1687: what infrared practitioners do with the one colour axis, with sources, read status and refused hosts. Named by the plan.
-# - IR-SCIENCE.md lines 290 to 292: the entry in section 4b's list of names now says Goldie is also a field term, for the 580/590 nm filter, pointing to 4b-xi. A correction the new section's own text at line 1657 depends on; finding-084e.txt judged it inside.
-# - docs/decisions/084-a-foliage-colour-and-a-sky-colour-chosen-by-name.md, a new file of 317 lines: the record the plan exists to produce. Named by the plan.
-# - NOTES.md line 2088: the roadmap bullet, with the decision key 084 on its first line and the Shown-as line. Named by the plan.
-# - NOTES.md line 19400: a dated back-pointer under the existing heading about the per-colour boxes, saying the premise does not hold on the bare swap either and pointing to 084. It is a note in a document, adds no section or subject beyond the record's own finding, and finding-084e.txt judged it inside.
-# 
-# THE SIX SUBSTITUTIONS OF fba2099 (each keeps its sentence's meaning and its cited source; nothing else changed in the commit apart from .plan-scope)
-# - IR-SCIENCE.md line 1610: the clause after David Kennard's name now reads "names the results aimed for as pairs", a participle in place of a finite verb with a bare pronoun.
-# - IR-SCIENCE.md line 1621: the bullet now opens with Rob Shea's name before "PRO LUTs (read)".
-# - IR-SCIENCE.md line 1654: the sentence about external filters on a full-spectrum Canon now opens with Kennard's name.
-# - IR-SCIENCE.md line 1655: the clause about colours depending on the camera now has "the page" as its speaker, in the same sentence as Kennard's name.
-# - Record 084 line 81: the sentence now reads "Kennard names the results as pairs".
-# - Record 084 line 85: the sentence about PRO LUTs now opens with Rob Shea's name, following the sentence about Rob Shea's profile update.
-# 
-# ANYTHING ELSE CHANGED
-# No. No new file, section, subject, gate, roadmap line or code path beyond what the five hunks and six substitutions describe. The earlier findings (084e for 52f959a, 084g for the substitutions) match what the commits contain, and the six substitutions are the whole of fba2099 outside .plan-scope.
-# 
-# ONE OBSERVATION, not a scope problem
-# - IR-SCIENCE.md line 1621 and record 084 line 85 are 82 characters wide against a wrap of about 80 elsewhere, because the longer name pushed both past it.
+planhash=c63f26c4c28d79e5
+diffhash=0fc787847b99ea62
+verdict=IN-SCOPE: the NOTES diff is the production paragraph, the two staging entries and the Bold Pink line that Step 2 approves, and nothing beyond them
+# IN-SCOPE: every added line sits inside the plan's Step 2 NOTES work (the production paragraph, the two staging entries, the Bold Pink bullet), and no line adds an action, a claim about a person, or a fact that contradicts the plan.
+# - Production paragraph at the top of the staging section: covers the plan's first four bullets (PR 179 opened from staging and rebase-merged as 438ce77, Gates 972 and deploy 942, the live offline copy read naming it, staging matching file for file, and what it carried beyond v2.63.36).
+# - Detail the plan does not spell out: the cache name ips-2.64.4 and the list of what was carried, consistent with the Step 1 read and with entries already in NOTES.
+# - v2.64.4 entry, 5fc16cf, deploy 941, Gates 967: matches Step 2.
+# - v2.64 entry, 214cf9e, deploy 940, Gates 963: matches Step 2.
+# - Bold Pink roadmap bullet: the added sentence "On production from 2026-09-29." is the line Step 2 approves.
+# - Whole diff: only NOTES.md changes, with no pronoun for a person and no quotation of anyone. Cosmetic only: one long line in the production paragraph is not wrapped like its neighbours.

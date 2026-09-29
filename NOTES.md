@@ -54,6 +54,27 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**Nothing is waiting to be promoted, 2026-09-29.** v2.64.4 went to production
+on the go the same day, by pull request 179 opened from `staging` itself and
+rebase-merged as 438ce77. Production serves the offline copy `ips-2.64.4`, read off the live site naming
+438ce77, and the Gates run (972) and the deploy (942) for 438ce77 both passed.
+Staging holds the same files as production, compared file by file. What it
+carried beyond v2.63.36: Bold Pink (078); the diagnostic report's lens line
+reading the correction the photograph actually gets (015); the two
+confirmations that were never seen (v2.63.42, below); and the test page's
+build-time button (v2.63.40, below). The two staging entries that follow were
+not written at the time and are recorded here with it.
+
+**v2.64.4 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-29 (5fc16cf).** v2.64 plus the lens report fix (015): the report's
+centre line now reads the correction applied, held by
+`tools/lens-diagnostic-check.mjs`. The deploy (941) and the Gates run (967)
+passed.
+
+**v2.64 at https://staging.jefferson-photo-studio.pages.dev, pushed 2026-09-29
+(214cf9e).** Bold Pink (078), VERSION 2.64. The deploy (940) and the Gates run
+(963) passed.
+
 **v2.63.42 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-28 (d71f8e8).** v2.63.40 below, plus two fixes. "LUT applied — …" after
 Apply in the colour-file manager, and "Saved without location.", were both put
@@ -1082,7 +1103,7 @@ user-scalable=no.
   mixer neutral, both sky stages at 0, and Restore depth's sky top-up off for it
   on the screen, the tiles and the batch; tone and foliage are still lifted.
   Rendered through the app on the owner's seven raws beside Aerochrome and Pink
-  IR before any code, and the pictures sent.
+  IR before any code, and the pictures sent. On production from 2026-09-29.
 
 - [ ] **The centre of the picture washes out — the lens correction, against the reference** <!-- decision: 015 --> — reported
   **Shown as:** Photos open with the lens correction measured from your own flat frames, so the middle of the sky and foliage matches the edges.
