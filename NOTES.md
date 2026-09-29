@@ -1084,6 +1084,15 @@ user-scalable=no.
   Rendered through the app on the owner's seven raws beside Aerochrome and Pink
   IR before any code, and the pictures sent.
 
+- [ ] **Housekeeping: walks that cannot see what they claim, and paths into dead sessions** <!-- decision: 083 -->
+  **Shown as:** internal
+  The agreement walk's camera-JPEG pair lives in a dead session's folder and is
+  skipped without a word, and its colour bar passed a batch planted to get Bold
+  Pink's sky wrong (10.2 degrees against 15). A tool's default output points into
+  a dead session too; the architecture diagram is short four stages; three prose
+  counts are held by nothing; the diagnostic report read empty headless; and the
+  repository's Dependabot alerts are unread. Asked 2026-09-29.
+
 - [ ] **The centre of the picture washes out — the lens correction, against the reference** <!-- decision: 015 --> — reported
   **Shown as:** Photos open with the lens correction measured from your own flat frames, so the middle of the sky and foliage matches the edges.
   from the iPad 2026-09-17 on the lone oak under Aerochrome, and the report named
@@ -2080,6 +2089,30 @@ user-scalable=no.
   The decision that comes with it is the owner's: a drawn export cannot be
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
+
+- [ ] **The practice photographs carry what a reader's own file carries** <!-- decision: 082 -->
+  **Shown as:** The practice photographs open like your own camera files: the camera and lens known, the lens correction applied, and a picture at once.
+  The 44 practice raws are hand-written DNGs with no EXIF and no preview.
+  The 27 with originals among the owner's files are remade as full DNGs; the
+  other 17 stay as decode fixtures. Forty-four tools read these files, so every
+  number that moves is re-measured, and `EXAMPLES` in sw.js is bumped. Asked
+  2026-09-29.
+- [ ] **The app's screens are assessed as a whole, by a published method, on the tablet** <!-- decision: 079 -->
+  **Shown as:** The whole app is checked screen by screen, on a tablet by touch, and what gets in the way is fixed.
+  A cognitive walkthrough of the primary journey and a heuristic evaluation
+  against Nielsen's ten, severity 0 to 4, by touch. The screen records already
+  open (060, 053, 054) stay their own. After the items that still change the
+  screens. Asked 2026-09-29.
+- [ ] **Help and the ⓘ say what ships, in the reader's words** <!-- decision: 080 -->
+  **Shown as:** Help describes the app as it is now, in plain words, and every control it names is really there.
+  Every section checked against the build and sorted by Diátaxis's four forms;
+  a check that every control Help names exists. Needs the assessment first.
+  Asked 2026-09-29.
+- [ ] **The eleven lessons match the screens they teach** <!-- decision: 081 -->
+  **Shown as:** The lessons are redone so every step works as written on today's screens.
+  Each lesson walked by touch on the current build; a check that every control,
+  tab and look a step names exists. Needs the assessment first. Asked
+  2026-09-29.
 
 ## Aerochrome at full size, the research, and why the halo happens, 2026-09-25
 
