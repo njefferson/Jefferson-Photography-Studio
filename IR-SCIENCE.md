@@ -3254,7 +3254,11 @@ buys no picture today and it costs a texture-filtering change in the shader.
 Rob Shea and David Kennard are both read in full now — 9h below, and the
 Kennard material throughout this section. **Jim Kasson's "Infrared hotspotting:
 the last word" is still not.** `blog.kasson.com` answers 403 to this container,
-and that source is the only one found likely to have MEASURED whether the hot spot
+and on 2026-09-29, with the host allowed for the session, the 403 was shown to be
+the site's own: a Cloudflare JavaScript challenge (`cf-mitigated: challenge`)
+through a proxy reporting no failure, which a headless browser here cannot run
+because it does not trust the proxy's certificate. Refused by the site, not
+blocked by the network. That source is the only one found likely to have MEASURED whether the hot spot
 scales with scene brightness, with aperture and per channel, with numbers rather
 than descriptions. Every statement here about scene dependence rests on Kolari's
 qualitative test and Rob Shea's observation that the right correction moves with

@@ -13,6 +13,11 @@ the table. `compileEdit` assembles it at `src/pipeline.ts:1049-1061` and applies
 it at `1151-1155`, before the camera matrix, the R-B swap, the hue rotation, the
 look's saturation of 3.0 and its mixer carrying -1.44.
 
+That was the code on 2026-09-17. Since 2026-09-18 (record 021) a raw's
+correction runs at decode, in `src/lensflat.ts`, before anything is measured; the
+in-grade stage (`src/pipeline.ts`, `compileEdit`, line 2158 on 2026-09-29) serves
+only 8-bit sources, and the shader in `src/gl.ts` the 8-bit screen.
+
 Rendered on and off from the app itself, that correction removes **37%** of the
 foliage's red-against-blue inside the middle of the frame and **18%** further
 out. Separating the two halves in node: the brightness bump contributes almost
@@ -83,19 +88,34 @@ correction method), rawpedia.rawtherapee.com (Flat-Field), docs.darktable.org
 (the pixelpipe and module order), lifepixel.com (the primer's hot-spot chapter),
 robsheaphotography.com and its two hot-spot videos, transcribed with yt-dlp,
 libraw.org and the DNG specification. Jim Kasson's "Infrared hotspotting: the
-last word" is the one source still unreachable, recorded as unread in §9f; it is
-the only one likely to carry a measurement of how the spot scales with scene
-brightness, which is what the per-image strength turns on.
+last word" (blog.kasson.com, 2020-11-17) is the one source still unread, and on
+2026-09-29 the reason was established: with the host allowed for the session, the
+site answers every request with a Cloudflare JavaScript challenge (a 403 carrying
+`cf-mitigated: challenge`, through a proxy reporting no failure), and a headless
+browser here does not trust the proxy's certificate, so the challenge cannot be
+run. Refused by the site, not blocked by the network. It is the only source likely
+to carry a measurement of how the spot scales with scene brightness, which is what
+the per-image strength turns on.
 
 ## Built already
 
-What exists that the next step on this record, the normalisation, will use, so a
-second one does not get written (LESSONS 330):
+What exists that the remaining work on this record will use, so a second one
+does not get written (LESSONS 330):
 
-- **The stage, twice.** The lens stage is in `src/pipeline.ts`: `lensFix`, the
-  `LensCurve` and the arithmetic near `const lensFix = p.lensBypass ? 0 …`.
-  The same arithmetic is in `src/gl.ts`. `tools/agreement-walk.mjs` checks that
-  the two compute the same picture.
+- **The gains, once.** `lensGainsFor` in `src/pipeline.ts` builds the per-bin
+  gain tables every CPU applier uses; `lensAreaMean` beside it normalises the
+  colour halves (shipped 2026-09-17, Options); `lensBin` picks a pixel's bin, a
+  floor over 80 bins. `src/gl.ts` repeats the normalisation in `setLensCurve`.
+- **The appliers.** The decode-time flat for raws (`src/lensflat.ts`), the raw
+  export's sampler (`src/export.ts`), the in-grade stage for 8-bit sources
+  (`compileEdit`), and the shader for an 8-bit screen (one `texelFetch`).
+  `tools/agreement-walk.mjs` does NOT exercise the decode-time flat, which this
+  entry used to claim: its raws are practice DNGs with no EXIF, so no curve
+  matches, and its camera-JPEG pair sits in a folder that no longer exists
+  (record 083). `tools/lens-order-walk.mjs` is the walk meant to hold it; its
+  three files sat in an earlier session's folder, so it could not run in a fresh
+  container, and moving them to the owner's shared set is part of this record's
+  work of 2026-09-29.
 - **The pass at decode.** The flat laid on the linear raw before the balance
   and the selection (021) is in `src/lensflat.ts`, `src/decode.worker.ts` and
   `src/decodeClient.ts`. It is planned by `lensPlanFor` in `src/main.ts`.
@@ -120,7 +140,7 @@ chroma-noise half of what the same look does to a frame, with its own sources
 already read. This item must not re-open it. They touch the same photographs from
 opposite ends: 013 is about what the grade does to noise, this is about what it
 does to a correction. 013's work changes what this stage gets measured against,
-which is the argument for ranking this behind it.
+which was the argument for ranking this behind it, reversed on 2026-09-26 (Rank).
 
 Previous work on this exact stage, by `NOTES.md` heading: "## Measure every ring
 of a flat again, centre to corner" produced the shipped table, and "## Guard the
@@ -142,7 +162,9 @@ correction, and this record is the second time the same thing has been reported.
 
 ## Options
 
-**Restore the normalisation anchor, and interpolate the bins. Chosen.** Divide
+**Restore the normalisation anchor, and interpolate the bins. Chosen; the anchor
+shipped on 2026-09-17 and the blend was measured and set aside (both below).** The
+plan's wording of 2026-09-17 follows; what shipped is stated exactly below. Divide
 each matched curve by its own area-weighted mean before applying it — Kolari's
 formula complete rather than a new idea — and blend linearly between bins instead
 of indexing `floor(r * n)`. Both are the reference behaviour; neither invents
@@ -150,7 +172,24 @@ anything. The shipped profile arrays are not touched, because normalisation
 happens at apply time, so `hotspotProfiles.ts` keeps exactly what was measured
 and a future re-measurement is unaffected.
 
-It is bounded: `src/pipeline.ts:1049-1061` and `1151-1155`, the matching
+**THE ANCHOR SHIPPED ON 2026-09-17, AND THE BLEND WAS MEASURED AND NOT SHIPPED**
+(IR-SCIENCE §9g; NOTES, this item's bullet). Written into this record on
+2026-09-29: until then its "What stays open" below still named the normalisation.
+- **What the anchor is, exactly.** `lensAreaMean` multiplies each colour curve by
+  the area mean, over the sensor's 3:2 shape, of the gain it applies at full
+  strength, so at full strength the applied gain averages exactly 1 over the frame: the curve redistributes colour
+  and no longer tints it. Kolari's formula scales by the flat's own mean instead;
+  the two differ only in the second order for a curve a few percent from flat.
+- **What it measured.** Two real builds, the lone-oak frame under Aerochrome: the
+  foliage's red-against-blue with the correction on went from 77.4% to 82.6% of
+  its value with the correction off, giving back 23.0% of what the stage was
+  taking. A frame with no curve and a frame with an area-neutral curve were
+  bit-identical. (An earlier 43%, read off half-size views, is superseded.)
+- **The blend** changed nothing on that frame to four significant figures and
+  was not shipped (Rejected).
+
+As planned on 2026-09-17 it was bounded: `src/pipeline.ts:1049-1061` and
+`1151-1155` (that day's lines), the matching
 `src/gl.ts` arithmetic under the standing change-both rule, and a
 `PREVIEW_PIPELINE` bump because the render moves. It has a bit-identity test
 (any frame whose curve is already area-neutral must render byte for byte as it
@@ -160,7 +199,8 @@ does now) and a made-to-fail test (force the mean to 1 and the wash-out returns)
 frame differing only in this stage — as shipped, normalised, normalised and
 interpolated, and off — full frame plus 1:1 crops of the canopy and of open sky.
 A look choice is shown, never described, and no photograph changes without the
-owner's approval.
+owner's approval. (For the anchor this sheet was not made: it shipped on the
+two-build measurement in §9g. The rule stands for what remains.)
 
 **AND STOP APPLYING IT AT OPEN. Chosen, 2026-09-17.** `lensFix` and `hsFix`
 start at zero on every path that opens a photograph. The table, the matcher, the
@@ -201,8 +241,12 @@ LENS.**
   chosen value is stored, 0 included, because absence now means full.
 - **The card says what the profile does.** It said "brightness and colour" on
   profiles with no brightness curve; it says "colour only" there now.
-- **What stays open.** The normalisation above, which answers the wash-out this
-  record was opened for. It still moves only with pictures, as it always said.
+- **What stays open.** Not the normalisation: it had shipped nine days before
+  this line first named it (above). Whether the wash-out the report named is still
+  there on today's build is shown on the reported frame, and the next half waits
+  on that: a per-image strength, clip control, or telling the reader a hot spot is
+  there by the centre-against-edge white-balance test (about 1000K apart on a
+  visible one, §9h). Each is its own record.
 
 ## Rejected
 
@@ -233,6 +277,14 @@ smoothed, clip-controlled and scaled per image, none of which this one is.
 Chosen anyway on 2026-09-17 as a stopgap, and reversed on 2026-09-26 on this
 paragraph's own grounds (Options).
 
+**Blending the 80 bins** (linear interpolation between bin centres). The
+reference behaviour, and measured on 2026-09-17: it changed nothing on the
+lone-oak frame to four significant figures (§9g). It costs every applier a
+change, the shader's included, where a 32-bit float texture is not linearly
+filterable in WebGL 2 without an extension the iPad may lack, so it would be two
+reads and a mix. What would reopen it: a frame where ring edges are seen at full
+size.
+
 **Doing the whole re-architecture in one go** — clip control, a per-image
 strength, and moving the stage out of the creative chain. All three are supported
 by the sources and all three change how every photograph renders. Each is its own
@@ -255,7 +307,7 @@ not worth having to prop up an automatic nobody in the field runs.
 measured with this correction off at open. 069's grey patch in the sky is this
 lens drift, uncorrected, and 013's splotchy Aerochrome was tuned on frames that
 opened without it. Turning it on moves what those items measure, so it goes
-before them. The normalisation that remains is the next step on this record,
+before them. What remains is decided from the reported frame on today's build,
 shown in pictures first. Earlier it ranked fourth (2026-09-17), behind 013 on
 the argument this reverses.
 

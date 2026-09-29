@@ -89,10 +89,15 @@ that case.
 
 ## Rank
 
-Second, after Bold Pink (record 078). Two of its items weaken the agreement
-walk, and the items after it that change what the screen, the tiles, an
-export or a batch render are verified with that walk, so this goes before
-them.
+At the end, with the other release-readiness items, before the practice
+photographs (record 082). It was written second, after Bold Pink (record
+078), on the argument that two of its items weaken the agreement walk the
+items after it are verified with. The owner set the order on 2026-09-29: the
+lens correction first, and this with the release-readiness work. The lens
+correction's own verification does not lean on the agreement walk, which
+does not exercise the decode-time flat; it uses the lens-order walk, whose
+files move to the owner's shared set under 015, because they sat in an earlier
+session's folder.
 
 ## Looked at
 
