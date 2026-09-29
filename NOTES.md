@@ -1074,6 +1074,16 @@ user-scalable=no.
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
+- [ ] **Bold Pink, Aerochrome left pink before it turns the foliage red and the sky blue** <!-- decision: 078 -->
+  **Shown as:** A new look, Bold Pink, beside Aerochrome: magenta-pink foliage over a green-teal sky. Help now says what Aerochrome itself looks like: red foliage under a blue sky.
+  Asked 2026-09-29 from the stage sheets of 069's trace: the picture at the tone
+  curve, before the colour mixer turns the foliage red and the sky stages turn
+  the sky blue. It is Aerochrome's numbers of that day as its own look, with the
+  mixer neutral, both sky stages at 0, and Restore depth's sky top-up off for it
+  on the screen, the tiles and the batch; tone and foliage are still lifted.
+  Rendered through the app on the owner's seven raws beside Aerochrome and Pink
+  IR before any code, and the pictures sent.
+
 - [ ] **The centre of the picture washes out — the lens correction, against the reference** <!-- decision: 015 --> — reported
   **Shown as:** Photos open with the lens correction measured from your own flat frames, so the middle of the sky and foliage matches the edges.
   from the iPad 2026-09-17 on the lone oak under Aerochrome, and the report named
