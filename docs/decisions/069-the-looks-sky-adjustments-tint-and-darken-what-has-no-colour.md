@@ -243,7 +243,7 @@ What exists that this item will use, so a second one does not get written
 - touches 013 — Sky colour smoothing is 013's stage and its sky half works by giving pale grain the sky's colour back; a guard that reads grain as colourless undoes it.
 - touches 052 — 052 rejected a whiteness weight as a selection fix, and its Option 1 puts every cloud the Sky mask holds under these stages; this is what those clouds meet there.
 - touches 023 — the Sky mask's colour grow takes cloud into the sky on purpose, and under 052 that cloud reaches these stages.
-- touches 066 — a film model renders cloud white from the film's own behaviour; this rule is what its clouds must meet if it replaces these stages. Option 10 (2026-09-28) found the cloud's cyan is gray-world's white point amplified by a look derived at it, and a look derived at a neutral white point is 066's ground.
+- touches 066 — a film model renders cloud white from the film's own behaviour; this rule is what its clouds must meet if it replaces these stages. Option 10 (2026-09-28) found the cloud's cyan is gray-world's white point amplified by a look derived at it, and a look derived at a neutral white point is 066's ground; on practice copies, and on the owner's raws (2026-09-29) the cast enters there on every frame and turns a cloud cyan only where it is left off neutral and arrives above 019's gate.
 - needs 015 — the grey patch these stages were being tuned against is, on the
   cell-tower set, the lens's uncorrected centre drift (015, Looked at). With
   015 on at open, what arrives at these stages changes.
@@ -423,6 +423,28 @@ What exists that this item will use, so a second one does not get written
     the white point's, and the look multiplies it.** Traced stage by stage on
     NIR_1651, NIR_1644, NIR_3406 and NIR_3461 ("Measured and rendered,
     2026-09-28", below).
+    - **LABELLED 2026-09-29: what those four files were.** NIR_1651 and
+      NIR_1644 were the practice DNGs in `public/examples/`: no EXIF, so no
+      camera and no lens fix. NIR_1644 has no original in the owner's set at
+      all. NIR_3406 was a real NEF, the carport, and it is not in the owner's
+      set. NIR_3461 was the owner's NEF, opened with its lens fix. So every
+      figure below from NIR_1651, NIR_1644 or NIR_3406 describes a file the
+      app does not open the way it opens a reader's raw.
+    - **CORRECTED 2026-09-29, on the owner's seven raws** ("Traced on the
+      owner's raws, 2026-09-29", below). Where the cast enters holds: on every
+      frame, gray-world leaves the cloud and the clear sky on one side of the
+      white point, with one hue, and the foliage on the other. What does not
+      hold is that the cast makes the cloud cyan. On four of the six frames
+      with cloud, gray-world leaves the cloud within 0.05 of neutral, it
+      arrives at the sky stages under 019's gate, and it leaves white
+      (NIR_1703, NIR_1827, NIR_3461, NIR_3466). The cloud goes cyan on two:
+      NIR_1651's bright band, left at 0.12, and NIR_1661's wisps, left at
+      0.17. Both arrive above the gate's top (0.13) and Sky saturation more
+      than doubles them. So a cyan cloud needs two things: a cloud the white
+      point leaves off neutral, and a gate that reads it as coloured. The one
+      neutral away from the sky in the set (NIR_3466's road) is also off
+      neutral, on the foliage's side, and the look turns it maroon. That is
+      the white point's other half, and it is not in the sky stages at all.
     - **Where it enters.** At open, before any look, NIR_1651's cloud and its
       clear sky carry one cast: hue 173–175, saturation 0.09, in three places
       across the frame. A cast that is the same everywhere is a white point,
@@ -460,7 +482,15 @@ What exists that this item will use, so a second one does not get written
 - **8, the map from sky samples only — measured off the map, and failed before a render.** It is 7's missing half, researched and built in the scratch harness: each texel averages only the taps the refined selection scores as sky, and a texel with less than one such tap is filled from its neighbours. Against bars fixed before the run, the edge disagreement fell from 31–83% to 0–14%, and it passed on six of seven frames with sky. On NIR_1703 the edge band stays at 14.4%, and every disagreeing cell there traces to red crown tips the selection itself scores as sky, which the fill then spreads. What it cannot fix is what the selection holds (073, 052), so it was not rendered and it is not built.
 
 - **9, the cloud guard, built in two forms 2026-09-27 and 2026-09-28, and taken out.** Brightness alone turned NIR_1651's and NIR_1644's cloud white and greyed the pale low clear sky on NIR_1661, NIR_3406 and NIR_3461. Brightness with colour read at the sky map's scale kept those skies blue and lost the cloud: on these frames a cloud arrives at the sky stages with MORE saturation (0.10 to 0.15 on NIR_1651) than a pale clear sky (0.07 to 0.09 on NIR_3406), and a wispy band's texel mixes cloud with the blue between the wisps. So neither brightness nor arriving saturation separates cloud from pale clear sky on these frames; whatever does is not in the colour a pixel arrives with.
+  - **LABELLED 2026-09-29.** NIR_1651, NIR_1644, NIR_1661 and NIR_1827 in both forms' renders were the practice DNGs (no EXIF, no lens fix). NIR_3406 was a real NEF outside the owner's set. NIR_3461 was the owner's NEF. The comparison that rejected the refined form, 0.10 to 0.15 against 0.07 to 0.09, set a practice copy against a file outside the set.
+  - **CORRECTED 2026-09-29, on the owner's seven raws.** Medians of each region as it arrives at the sky stages:
+    - Dense cloud arrives LESS saturated than every clear sky measured: 0.030 to 0.069 (NIR_1703, NIR_1827, NIR_3461, NIR_3466), against clear sky from 0.116 (NIR_3698) to 0.443 (NIR_1827).
+    - Thin cloud arrives as saturated as pale clear sky: NIR_1661's wisps at 0.269 and its own low clear sky at 0.268.
+    - NIR_1651's bright band arrives at 0.177, between NIR_3461's clear band at 0.170 and NIR_1661's low sky at 0.268.
+
+    So the order the rejection gave, cloud above pale clear sky, is wrong for dense cloud. Its conclusion still stands on the owner's files: the ranges overlap, so no absolute gate on arriving saturation separates cloud from pale clear sky. What the owner's files add is that the clouds that go cyan are the thin and off-neutral ones. Both forms were rendered only on the frames above. Rendering them on the owner's seven is open and not built.
 - **10 as rendered, the cloud's white point under today's look (2026-09-28).** It turns the cloud white on NIR_1651 and NIR_1644. It also takes the blue out of their clear skies, the white highlights out of their foliage, and on NIR_1651 spreads red haze from the crown into the cloud. The white point is right and the look is not derived at it; 10 stays open for the two together.
+  - **LABELLED 2026-09-29.** Those renders were NIR_1651 and NIR_1644 as practice DNGs, and NIR_3461 as the owner's NEF. They moved the white balance, which the 2026-09-29 trace does not, so they were not redone. On the owner's files they are open.
 - **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
 
 ## Built and measured, 2026-09-26
@@ -550,6 +580,11 @@ whether the hot spot is corrected, not on these stages.
 
 ## Built and rendered, 2026-09-27 (option 9, first form: brightness alone)
 
+**Labelled 2026-09-29.** The four practice files below were NIR_1651, NIR_1644,
+NIR_1827 and NIR_1661, all DNGs with no EXIF and no lens fix. NIR_3406 was a
+real NEF outside the owner's set. NIR_3461 was the owner's NEF. The pictures
+are as they were seen, and on the owner's raws they are not yet rendered.
+
 **What was built.** Option 9 as written, in `buildSkyMap`, the shader and
 `compileEdit`, on the work branch and not committed. Nothing reached staging,
 and the code was taken out on 2026-09-28 after the refined form's renders.
@@ -603,6 +638,12 @@ six frames would pass is Rejected 2.
 
 ## Built and rendered, 2026-09-28 (option 9, refined: bright × colourless)
 
+**Labelled 2026-09-29.** The same six files as the first form, and the same
+label: four practice DNGs, NIR_3406 outside the owner's set, NIR_3461 the
+owner's NEF. The measurement under "Why, measured" set NIR_1651's practice copy
+against NIR_3406. Rejected 9 carries the same comparison made on the owner's
+seven.
+
 **What was built.** The design now written as option 9: `SkyMap.sat`, each
 texel's mean arriving saturation over its selected samples, clamped to the
 display range, uploaded as an R8 texture; the weight 1 − bright ×
@@ -644,6 +685,12 @@ except NIR_3406's low sky.
 
 ## Measured and rendered, 2026-09-28 (option 10: where the cloud's colour enters)
 
+**Labelled 2026-09-29.** NIR_1651 and NIR_1644 here were the practice DNGs, with
+no lens fix, and NIR_1644 has no original in the owner's set. NIR_3406 was a
+real NEF outside the owner's set. NIR_3461 was the owner's NEF with its lens
+fix. The next section traces the owner's seven raws without moving anything.
+The D renders move the white balance, so they were not redone.
+
 **The instrument.** A scratch harness through today's build (d71f8e8's code),
 the view at three stages per frame: A as opened, with no look; B the Aerochrome
 chip with smoothing, Sky depth and Sky saturation at 0; C the chip as it ships
@@ -681,6 +728,108 @@ same offset applied to the chip's sliders, as a reader would.
   slate-blue where C's is blue, and the forest is solid orange-red.
 - **NIR_3461.** Nearly the same, the clear sky a little less blue.
 
+## Traced on the owner's raws, 2026-09-29
+
+**What was traced.** The seven owner raws this record names: NIR_1651.NEF,
+NIR_1661.NEF, NIR_1703.NEF, NIR_1827.NEF, NIR_3461.NEF, NIR_3466.NEF and
+NIR_3698.NEF, fetched through `tools/owner-images.mjs`. Four regions were traced
+through every stage, in order, where the frame has them: a cloud, a clear sky,
+foliage, and a neutral away from the sky. **No setting was moved.** Each file
+was opened in the built app on a fresh page, so the lens fix matched from EXIF
+opened at strength 1 on all seven. Then the Aerochrome chip was pressed. Each
+box was chosen on the app's own render, as opened and under the chip, before a
+number was read.
+
+**The instrument, and what it had to reproduce.** The app's own state was
+captured, not rebuilt: the params, the linear image, the fine selection and the
+sky map.
+
+- A scratch copy of the app, differing by one line that reads that state,
+  rendered a canvas byte-identical to the shipped build's on all seven files,
+  as opened and under the chip.
+- A copy of `compileEdit` with a tap after every stage (27) ran over the
+  captured state in node. It returned exactly what the shipped `compileEdit`
+  returns on every traced pixel, and its first tap equalled the pre-pass
+  exactly. The pre-pass was composed as `syncSkyMap` composes it.
+- Every region's mean matched the app's own GPU render of the same region
+  within 0.5 of a level of 255, as opened and under the chip.
+- The decode stages were read from the same NEF by `readNefCfa` and
+  `demosaicBinned`.
+
+**The settings the app chose.** Restore depth raised Sky saturation to 2 on six
+frames and left 1.8 on NIR_1661. Sky depth was 0 and recovery 0 on all seven.
+**Black level:** the four per-site values in MakerNote 0x3D read 1008 on all
+seven files. The app averages them to one number, and on these files the
+average loses nothing.
+
+**How the figures read.** Saturation is the region's median per pixel. Hue is
+the hue of the region's mean. "After white balance" is camera-native linear,
+before the matrix and the swap. "Arrives" is the display value entering the
+three sky stages, and "leaves" is the value after them.
+
+- **NIR_1651.NEF**, no neutral in the frame. The bright cloud band: 0.117 after
+  white balance at hue 42, cyan from the swap (hue 173), arrives at 0.177,
+  leaves at 0.423. Clear sky: hue 40 after white balance, arrives at 0.314,
+  leaves at 0.735. Foliage sits at hue 220 after white balance.
+- **NIR_1661.NEF**, no certain neutral: the pale patch between the trunks may be
+  water. The wisps: 0.168 after white balance at hue 40, arrive at 0.269, leave
+  at 0.619. The low pale clear sky: 0.164 at hue 40, arrives at 0.268, leaves
+  at 0.606. Foliage at hue 222.
+- **NIR_1703.NEF**, no neutral. Dense cloud: 0.050 at hue 38, arrives at 0.069,
+  leaves at 0.086. The darkest sky, at the upper right, which may be thin
+  cloud: hue 44, arrives at 0.259, leaves at 0.615.
+- **NIR_1827.NEF**, no neutral. A puff: 0.036 at hue 44, arrives at 0.055,
+  leaves at 0.052. The red rims, which are 061's ground, raise its upper
+  quartile to 0.224. Clear sky: hue 47, arrives at 0.443, leaves at 0.947. Its
+  depth key is 0.
+- **NIR_3461.NEF**, no neutral that a box can hold: the pylon steel is thinner
+  than one. Dense cloud: 0.020 at hue 67, arrives at 0.034, leaves at 0.035.
+  The clear band: hue 51, arrives at 0.170, leaves at 0.445.
+- **NIR_3466.NEF**, the neutral is the road's asphalt.
+  - The cloud streak: 0.018 at hue 65, arrives at 0.030, leaves at 0.031.
+  - Clear sky: hue 53, arrives at 0.171, leaves at 0.444.
+  - The asphalt: 0.052 after white balance at hue 232, the foliage's side of
+    the white point. It is 0.098 after the matrix and the swap. The 3x3 mixer
+    takes it to 0.255, where the same mixer leaves the cloud at 0.043. The
+    foliage band takes it to 0.406. It arrives red, at hue 7 and 0.549.
+  - Opened at 1:1, the road is dark grey as opened and maroon under the chip.
+- **NIR_3698.NEF**, no cloud in the frame and no certain neutral. Clear sky:
+  0.062 at hue 44, arrives at 0.116, leaves at 0.296.
+
+**What it shows.**
+
+- **The cast enters at the white balance, on every frame.** After gray-world,
+  cloud and clear sky sit at camera-native hue 38 to 67, and foliage and the
+  asphalt at 220 to 232. Gray-world puts the frame's mean at neutral, which
+  leaves the sky on one side of it and the ground on the other.
+- **How far a cloud is left off neutral depends on the frame.** Dense cloud is
+  left at 0.018 to 0.050. NIR_1651's bright band, in a frame the tree
+  dominates, is left at 0.117, and NIR_1661's thin wisps at 0.168.
+- **The look's mapping amplifies the ground side and not the sky side.** The
+  swap turns the sky side cyan and the ground side magenta. The 3x3 mixer then
+  multiplies NIR_3466's asphalt by 2.6 and leaves its cloud where it was.
+- **The sky stages decide the cloud.**
+  - Arriving under 019's gate top (0.13), a cloud is spared: 0.030 to 0.031,
+    0.034 to 0.035, 0.055 to 0.052 and 0.069 to 0.086.
+  - Arriving above it, a cloud is more than doubled: 0.177 to 0.423 and 0.269
+    to 0.619.
+  - Sky colour smoothing moved no cloud measurably on any frame.
+  - Every clear sky arrives above the gate except NIR_3698's (0.116, inside
+    it), and every clear sky is more than doubled.
+- **The sheets show the same.**
+  - NIR_1651's band is faintly cyan from the swap and vivid only after Sky
+    saturation.
+  - NIR_1661's wisps turn pale blue only at Sky saturation.
+  - The dense clouds of NIR_1703, NIR_1827, NIR_3461 and NIR_3466 stay white
+    at every stage.
+  - On NIR_3461 the wires first read as red dotted lines at Sky colour
+    smoothing, which is 013's and 061's ground and not this record's.
+
+**What it does not do.** It moves nothing, so the white-point renders (option
+10's D) and option 9's two forms are still unrendered on the owner's files. The
+asphalt's maroon comes from the look's mapping and the foliage band, outside
+the sky stages, and it is IR-SCIENCE 4d's ground, not this record's.
+
 ## Rank
 
 **After 015 (2026-09-26)**, which it now needs (Depends): turning the lens correction on at open changes what reaches these stages. 075 and 076 sit between (2026-09-27): they are the open path's two silent waits, share no ground with these stages, and were built beside 015. Below that, the order argued here stands.
@@ -689,6 +838,15 @@ same offset applied to the chip's sliders, as a reader would.
 cloud's cyan is the white point's, and fixing it needs the look derived again at
 a neutral white point, which is 066's ground. So what waits here waits on that
 derivation, and this record's cloud checks become 066's.
+
+**Corrected 2026-09-29: upstream AND at the gate, and the rank stands.** Option
+10 was measured on practice copies. On the owner's seven raws the cast does
+enter at the white point, on every frame. But a cloud goes cyan only where the
+white point leaves it off neutral and it arrives above 019's gate, which is two
+of the six frames with cloud. So the question sits in two places: the white
+point, with a look derived at it (066's ground), and a gate in these stages
+that reads a cloud left off neutral as coloured. Neither changes which items
+above or below this one would be redone, so the rank does not move.
 
 **It holds no standing option as of 2026-09-26**, so what waits on it waits on
 research, not on a build.
@@ -749,16 +907,23 @@ is the argument that puts it above 052.
 - NIR_1651, 2026-09-27: option 9 beside today's build, the whole frame on screen, and at 1:1 the cloud's lower edge at 1350,950 and the tree's edge against clear sky at 150,1400. The cloud white rather than cyan, the clear sky the same, no seam.
 - NIR_1644, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the crowns in the cloud at 400,800 and the band's upper edge at 1250,550. The band white rather than cyan, no seam at the crowns.
 - NIR_1827, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the treetops at 1650,1100 and the red haze at 1100,600. The red haze and the treetop halo fainter, the sun haze the same.
-- NIR_3461, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the horizon at 1400,2450, the near pylon at 4400,1500 and the far pylon at 4100,1100. The red glows gone; the low clear sky grey-blue rather than blue.
+- NIR_3461.NEF, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the horizon at 1400,2450, the near pylon at 4400,1500 and the far pylon at 4100,1100. The red glows gone; the low clear sky grey-blue rather than blue.
 - NIR_3406, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the low sky at 2300,1300 and the roofline at 2900,1700. The low sky near-white grey with a faint warm mottle where today's is an even pale blue.
 - NIR_1661, 2026-09-27: option 9 beside today's build, whole frame, and at 1:1 the low sky among the treetops at 800,1000 and the wisps at 700,550. The lower half of the clear sky slate grey rather than blue.
 - NIR_1651, 2026-09-28: the refined option 9 beside today's build and the first form, whole frame and at 1:1 at the same two places. The cloud cyan as today.
 - NIR_1644, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. The band behind the crowns cyan as today.
 - NIR_1827, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. As today, red haze included.
 - NIR_1661, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. The low clear sky blue as today.
-- NIR_3461, 2026-09-28: the same three, whole frame and at 1:1 at the same three places. The clear band blue and the red glows back, as today.
+- NIR_3461.NEF, 2026-09-28: the same three, whole frame and at 1:1 at the same three places. The clear band blue and the red glows back, as today.
 - NIR_3406, 2026-09-28: the same three, whole frame and at 1:1 at the same two places. The low sky a little paler than today, without the first form's mottle.
 - NIR_1651, 2026-09-28: the three stages side by side, as opened, the look with its sky stages off, and the look as it ships; then the look as it ships beside the same with the white point from the cloud. The cloud cyan only at C; white at D, with red haze round the crown and a slate clear sky.
 - NIR_1644, 2026-09-28: the same four renders. The band behind the crowns cyan at C and white at D; the upper sky slate at D.
 - NIR_3406, 2026-09-28: the three stages. The sky a faint cool grey at A, pale blue at C.
-- NIR_3461, 2026-09-28: the same four renders. The dense cloud near-white at every stage and in D; the clear sky a little less blue in D.
+- NIR_3461.NEF, 2026-09-28: the same four renders. The dense cloud near-white at every stage and in D; the clear sky a little less blue in D.
+- NIR_1651.NEF, 2026-09-29: the app's own render as opened and under the chip, turned for display with a grid, to place the boxes; then the stage sheet, fourteen stages in order with the boxes drawn. The bright band faintly cyan from the swap on and vivid cyan-blue at Sky saturation; the clear sky deep teal-blue there; the tree lilac-white after white balance, magenta through the bands and red at the HSL mixer.
+- NIR_1661.NEF, 2026-09-29: the same two sheets, thirteen stages (no tone curve written). The wisps and the low pale sky grey through the mapping and pale blue only at Sky saturation; the pale patch between the trunks seen and left unboxed.
+- NIR_1703.NEF, 2026-09-29: the same two sheets, fourteen stages. The dense cloud grey-white at every stage; blue only in the upper corners and the dark streaks at Sky saturation.
+- NIR_1827.NEF, 2026-09-29: the same two sheets, fourteen stages. The puff white at every stage with red rims under the chip; the broad haze grey-white; blue only where the sky is clear, at Sky saturation.
+- NIR_3461.NEF, 2026-09-29: the same two sheets, fourteen stages. The dense cloud white at every stage; the clear band teal at the mixer, slate at the HSL mixer and blue at Sky saturation; the wires red and dotted from Sky colour smoothing on.
+- NIR_3466.NEF, 2026-09-29: the same two sheets, fourteen stages, and the road at 1:1 from the app's own render in both states: dark grey as opened, maroon with a fine red mottle under the chip. The cloud streak white at every stage.
+- NIR_3698.NEF, 2026-09-29: the same two sheets, fourteen stages. The clear sky grey after white balance, grey-green through the mapping and light blue at Sky saturation, paler toward the centre.
