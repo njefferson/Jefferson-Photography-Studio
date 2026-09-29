@@ -10,8 +10,11 @@ magenta-pink and the sky teal.
 
 Under Aerochrome, three stages after the tone curve move a pixel:
 
-- the colour mixer (the look's `hsl`), which turns the magenta red;
-- Sky colour smoothing and Sky saturation, which turn the teal blue.
+- the colour mixer (the look's `hsl`), whose band shifts turn the magenta
+  red (+43° at 320°) and move green and aqua toward blue (+54° at 120°, +35°
+  at 180°);
+- Sky colour smoothing and Sky saturation, which smooth and deepen the sky's
+  colour where the sky is.
 
 Sky depth ships at 0 and moves nothing. So Bold Pink, as settings, is
 Aerochrome with the colour mixer neutral and both sky stages at 0.
@@ -21,10 +24,17 @@ Aerochrome with the colour mixer neutral and both sky stages at 0.
 median is bright, the foliage band from the measured warm saturation, and Sky
 saturation when the sky it MEASURES on the rendered frame is below the
 reference (`needsSky`). The sky half starts from the look's own value and
-rises to the slider's ceiling of 2 (`solveSky`). A look carrying Sky
-saturation 0 would get its sky raised on most photographs and come out blue.
-The tone and foliage halves run before the sky stages and are in the picture
-that was asked for.
+rises to the slider's ceiling of 2 (`solveSky`). Sky saturation deepens the
+sky's own colour; it does not move its hue. Measured 2026-09-29 on a build
+planted to skip Bold Pink's opt-out, its Sky saturation of 0 was topped up to
+0.33 on NIR_1661.NEF and 1.87 on NIR_3466.NEF, where the real build holds it at
+0 on both: a deeper green-teal than the picture that was asked for. The tone
+and foliage halves run before the sky stages and are in that picture.
+The batch builds its own base and carries the flag the same way. A batch
+planted to ignore it moved its output's mean colour on NIR_1661.NEF by about
+two levels, which the agreement walk cannot tell from the real build; so the
+batch half is shown by the batch agreeing with the screen under Bold Pink, not
+by a plant that failed.
 
 **Help describes Aerochrome as Bold Pink.** Its paragraph on the looks calls
 Aerochrome "deep magenta foliage over a teal sky". The trace shows that is the
@@ -42,14 +52,22 @@ NIR_1703 and NIR_1827, it stays grey-white under Bold Pink, and Pink IR tints it
 throughout. Its foliage figures sit within 0.02 of Aerochrome's on every frame,
 so resetting the mixer moves the foliage's hue and not how much colour it has.
 
+**The built button, rendered on the same seven after the build** (2026-09-29,
+each opened beside the picture above): the same picture on six, byte for byte
+on NIR_1661.NEF. On NIR_3461.NEF the grass is a little more vivid, foliage
+0.42 against 0.38, because the built look solves Restore depth's foliage lift
+with the mixer already neutral, where the hand-set arm solved it under
+Aerochrome's mixer and then reset the mixer.
+
 ## Looked up
 
 - **Kolari Vision, "How to Emulate Kodak Aerochrome with the 550nm IR
   Filter"** (kolarivision.com, read 2026-09-29). The published route is two
   swaps. After the first, red with blue, the picture has "red foliage and green
   sky"; a second swap, blue with green, turns the sky blue. The app's route is
-  different in its parts (one swap, a nine-number mixer, then the sky stages),
-  and the same in its order: the sky goes blue last. Bold Pink stops before
+  different in its parts (one swap, a nine-number mixer, a colour mix, then
+  the sky stages), and the same in its order: the sky goes blue last, after
+  the foliage's colour is set. Bold Pink stops before
   that step, so its green-teal sky is what the route looks like at that point,
   not a defect of the look.
 - Nothing outside the repo decides whether the app should carry it. It is the
@@ -137,9 +155,9 @@ What exists that building this will use, so a second one does not get written
 - **3, by reference.** Record 066 replaces Aerochrome's rendering, and Bold
   Pink would change with it, silently.
 - **4, the sky top-up left on.** It raises Sky saturation from 0 toward 2
-  wherever the measured sky is under the reference, which is most frames. The
-  result is Aerochrome's sky without Aerochrome's mixer, not the picture that
-  was asked for.
+  wherever the measured sky is under the reference: to 0.33 on NIR_1661 and
+  1.87 on NIR_3466, measured. The sky comes out a deeper green-teal than the
+  picture that was asked for.
 - **5, Aerochrome's finishing panel.** Its steps give the film's references
   (a sky of 0.66 to 0.92, foliage scarlet) and a Sky saturation step for a look
   whose sky stage is off. Every reason on it would be false here.

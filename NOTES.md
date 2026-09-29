@@ -1077,8 +1077,8 @@ user-scalable=no.
 - [ ] **Bold Pink, Aerochrome left pink before it turns the foliage red and the sky blue** <!-- decision: 078 -->
   **Shown as:** A new look, Bold Pink, beside Aerochrome: magenta-pink foliage over a green-teal sky. Help now says what Aerochrome itself looks like: red foliage under a blue sky.
   Asked 2026-09-29 from the stage sheets of 069's trace: the picture at the tone
-  curve, before the colour mixer turns the foliage red and the sky stages turn
-  the sky blue. It is Aerochrome's numbers of that day as its own look, with the
+  curve, before the colour mixer turns the foliage red and, with the sky
+  stages after it, the sky blue. It is Aerochrome's numbers of that day as its own look, with the
   mixer neutral, both sky stages at 0, and Restore depth's sky top-up off for it
   on the screen, the tiles and the batch; tone and foliage are still lifted.
   Rendered through the app on the owner's seven raws beside Aerochrome and Pink

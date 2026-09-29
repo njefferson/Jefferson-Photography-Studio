@@ -470,6 +470,7 @@ const ui = {
   dcpBtn: $("dcpBtn") as HTMLButtonElement,
   lookAero: $("lookAero") as HTMLButtonElement,
   lookEir: $("lookEir") as HTMLButtonElement,
+  lookBoldPink: $("lookBoldPink") as HTMLButtonElement,
   lookRed: $("lookRed") as HTMLButtonElement,
   lookGoldie: $("lookGoldie") as HTMLButtonElement,
   lookNatural: $("lookNatural") as HTMLButtonElement,
@@ -1719,6 +1720,16 @@ interface Look {
    *  own colour. The sky is a portion of the photograph, so its amount lives
    *  here and not on the hue band (decision 019). Creative; rides a saved look. */
   skySat?: number;
+  /** Whether Restore depth may top up this look's Sky saturation. Absent is
+   *  true. False on Bold Pink (decision 078), whose sky stages are off on
+   *  purpose: `solveLift` raises Sky saturation from the look's own value
+   *  toward 2 wherever the sky it measures is under the reference. Measured
+   *  2026-09-29 with this flag planted off, Bold Pink's 0 became 0.33 on
+   *  NIR_1661.NEF and 1.87 on NIR_3466.NEF: its green-teal sky deepened past
+   *  the picture the look was taken from. The tone and foliage halves of the
+   *  lift still run. Read through `liftBaseFor` and the batch's
+   *  own base, so the screen, the tiles and a .zip agree. */
+  liftSky?: boolean;
   glow?: number;
   /** Per-kind, because raw and camera-rendered files arrive in DIFFERENT
    *  STATES and one cast correction cannot serve both. A raw opens on the
@@ -1891,6 +1902,18 @@ const LOOKS: Record<string, Look> = {
          raw: { sat: 1.0, contrast: 1.15, foliage: [0, 1.6, 1],
                 hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
          jpeg: { sat: 1.35, contrast: 1.12 } },
+  // BOLD PINK (decision 078): Aerochrome stopped before its colour mix turns
+  // the foliage red and, with the two sky stages, the sky blue -- the picture at
+  // the tone-curve step of 069's trace. Aerochrome's numbers of 2026-09-29
+  // COPIED, not referenced: 066 replaces how Aerochrome renders, and a look
+  // chosen for how it looks must not move under the reader when that lands.
+  // No `hsl` (applyLook resets the mixer to neutral), both sky stages at 0,
+  // Restore depth's sky top-up off, no finishing panel (its steps give the
+  // film's references, which this look does not claim).
+  boldPink: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 0, skyDepth: 0, skySat: 0, liftSky: false,
+              mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
+              raw: { sat: 1.0, contrast: 1.15, foliage: [0, 1.6, 1] },
+              jpeg: { sat: 1.35, contrast: 1.12 } },
   red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
   goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
   natural: { swapRB: false, toggleSwap: true, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
@@ -2357,6 +2380,7 @@ let activeLook: string | null = null;
 const lookButtons: Record<string, HTMLButtonElement> = {
   aero: ui.lookAero,
   eir: ui.lookEir,
+  boldPink: ui.lookBoldPink,
   red: ui.lookRed,
   goldie: ui.lookGoldie,
   natural: ui.lookNatural,
@@ -2719,7 +2743,10 @@ function applySnapshot(s: Snapshot) {
   // strips it, and a revived JSON warp has no real Float32Array to sample.
   const sw = s.params.warp;
   params.warp = sw && sw.du instanceof Float32Array ? sw : null;
-  activeLook = s.activeLook ?? null;
+  // A look this build does not know is no look, as defaultLook treats one: a
+  // snapshot saved by a newer build can name a look added since, and every
+  // reader of activeLook indexes LOOKS with it.
+  activeLook = s.activeLook && LOOKS[s.activeLook] ? s.activeLook : null;
   lookBias = (s.lookBias ? [...s.lookBias] : [1, 1, 1]) as [number, number, number];
   lookWb = s.lookWb ? [...s.lookWb] as [number, number, number] : null;
   // ABSENT IS NOT THE SAME AS NULL for the measurement. A stored edit written by
@@ -3382,7 +3409,7 @@ function openFinish(key: keyof typeof LOOKS): void {
  *  steps is on. */
 function closeFinish(): void {
   finishPanel.hidden = true;
-  finishOpen.hidden = !(activeLook && (LOOKS[activeLook].finish ?? []).length);
+  finishOpen.hidden = !(activeLook && (LOOKS[activeLook]?.finish ?? []).length);
 }
 
 finishClose.addEventListener("click", () => { closeFinish(); if (!finishOpen.hidden) finishOpen.focus(); });
@@ -3799,12 +3826,13 @@ const SKY_SAT_MAX = 2;   // the Sky saturation slider's own ceiling (EditParams.
 const BAND_NEUTRAL: [number, number, number] = [0, 1, 1];
 /** Where the lift starts from: the look's own per-population amounts, so the
  *  lift tops up rather than overwrites. Neutral with no look. */
-interface LiftBase { foliage: [number, number, number]; sky: [number, number, number]; skySat: number }
-const liftBaseNeutral = (): LiftBase => ({ foliage: [...BAND_NEUTRAL], sky: [...BAND_NEUTRAL], skySat: 0 });
+interface LiftBase { foliage: [number, number, number]; sky: [number, number, number]; skySat: number; liftSky: boolean }
+const liftBaseNeutral = (): LiftBase => ({ foliage: [...BAND_NEUTRAL], sky: [...BAND_NEUTRAL], skySat: 0, liftSky: true });
 /** The lift's starting point for `img` under the built-in look `name` (null:
  *  no look). Takes the photograph (for its kind: raw or camera-rendered, the
  *  look's per-kind block) and the look's key. Returns the look's Foliage and
- *  Sky bands and its Sky saturation, or neutral. What the result must
+ *  Sky bands, its Sky saturation and whether the lift may top that up
+ *  (`Look.liftSky`), or neutral. What the result must
  *  satisfy: it equals what applyLook writes onto params for that look, or
  *  the lift would top up from the wrong place and the tile, the batch and the
  *  screen would disagree. */
@@ -3816,6 +3844,7 @@ function liftBaseFor(img: DecodedImage, name: string | null): LiftBase {
     foliage: strength.foliage ? [...strength.foliage] : [...BAND_NEUTRAL],
     sky: strength.sky ? [...strength.sky] : [...BAND_NEUTRAL],
     skySat: l.skySat ?? 0,
+    liftSky: l.liftSky !== false,
   };
 }
 
@@ -3931,7 +3960,9 @@ function solveLift(withColour: boolean, img: DecodedImage, params: EditParams, s
   // The sky by PLACE: only with a bitmap, only where one found a sky, and
   // only when that sky has some colour to scale (an overcast reads near 0 and
   // is left alone — the gate in the stage would leave it anyway).
-  const needsSky = withColour && !!skyMask && before.skySat > 1e-4 && before.skySat < FLAT_COOL_REF - 0.01;
+  // And only when the look allows it: Bold Pink's sky stages are off on
+  // purpose, and a top-up from 0 deepens its sky past the look (078).
+  const needsSky = withColour && base0.liftSky && !!skyMask && before.skySat > 1e-4 && before.skySat < FLAT_COOL_REF - 0.01;
   if (!needsTone && !needsWarm && !needsSky) {
     // Nothing to do for THIS frame — but the tone it inherited may be a lift
     // solved for a different one, so hand back the neutral curve rather than
@@ -16392,7 +16423,7 @@ const LESSONS: { title: string; tab: PanelTab | "masks"; steps: string[] }[] = [
     tab: "ir",
     steps: [
       "The R⇄B channel swap flips the whole color world in one tap — the classic infrared move.",
-      "Try the film Looks — Aerochrome, Aero Red, Goldie. Press a look twice to flip its built-in swap.",
+      "Try the colour Looks — Aerochrome, Bold Pink, Pink IR, Red, Goldie. Press Pink IR, Red or Goldie twice to flip its swap.",
       "B&W IR and HIE B&W give the classic black-and-white infrared feel — and the B&W tab goes further, with a full channel mix (that's Lesson 7).",
       "Restore depth (further down this tab) is already on. Infrared frames usually open flat, and it puts the contrast and colour back — working out how far THIS photo is from where it should sit, then moving it there. It runs again every time you press a look.",
       "If a look comes out too strong, pull Restore depth's Strength down instead of fighting it with contrast. 100% is the full correction worked out for the frame; lower leaves more of the picture as it arrived.",
@@ -17607,7 +17638,10 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   // materials into the sky and foliage bands — the auto-balance-only choice
   // gets the tonal half alone, matching a bare open.
   if (autoLift) {
-    const base: LiftBase = hasLook ? { foliage: [...look.foliage] as [number, number, number], sky: [...look.sky] as [number, number, number], skySat: look.skySat ?? 0 } : liftBaseNeutral();
+    // `liftSky` from the built-in look, as liftBaseFor reads it for the screen
+    // and the tiles; a saved look carries no such flag and is lifted as before.
+    const liftSky = grade.kind !== "builtin" || LOOKS[grade.key].liftSky !== false;
+    const base: LiftBase = hasLook ? { foliage: [...look.foliage] as [number, number, number], sky: [...look.sky] as [number, number, number], skySat: look.skySat ?? 0, liftSky } : liftBaseNeutral();
     // At the file's own turn, which is the turn `runBatch` exports at (070).
     const solved = solveLift(hasLook, img, p, hasLook ? skyMaskFor(img, img.rotate ?? 0) : null, base);
     const lift = solved && scaleLift(solved, liftAmount, base);
@@ -17870,7 +17904,7 @@ const bcLooks = $("bcLooks") as HTMLDivElement;
 let chosenGrade: BatchGrade | null = null;
 
 const BUILTIN_NAMES: Record<string, string> = {
-  aero: "Pink IR", eir: "Aerochrome", red: "Red", goldie: "Goldie", natural: "Natural IR",
+  aero: "Pink IR", eir: "Aerochrome", boldPink: "Bold Pink", red: "Red", goldie: "Goldie", natural: "Natural IR",
   mono: "B&W IR", sepia: "Sepia IR", hie: "HIE B&W",
 };
 

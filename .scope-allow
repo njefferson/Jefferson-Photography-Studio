@@ -75,6 +75,7 @@ Look.denoise = selection : the look sets the amount; AIM_NOISE decides where it 
 Look.skySmooth = selection
 Look.skyDepth = selection
 Look.skySat = selection
+Look.liftSky = selection : whether Restore depth may raise skySat, which acts only through the sky selection (078)
 Look.texture = selection : see EditParams.texture — AIM_TEXTURE is where the look's one amount stops having to serve both
 Look.glow = whole-frame : see EditParams.glow
 Look.raw = not-pixels
