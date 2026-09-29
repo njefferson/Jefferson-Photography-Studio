@@ -312,8 +312,9 @@ What exists that this item will use, so a second one does not get written
      the look's selection at rotation 0, whose map on these two frames leaves
      NIR_1651's cloud and most of NIR_1644's band outside it, and
      `tools/look-sheet.mjs` renders the app's path, so no instrument puts them
-     under these stages at this rank. They are run as 070's acceptance, and 070
-     does not ship until they pass.
+     under these stages at this rank. They are run as 070's acceptance. 070
+     shipped without them, as 8c7915f on 2026-09-28 (v2.63.36), and they are
+     still owed, as 070's roadmap line says.
    - **Waiting for a selection that covers steel**: NIR_3461's near pylon, the
      steel that arrives pale keeping its colour and value. Today's selection is
      0 inside that pylon (052), and no ranked item is built to cover that
@@ -488,9 +489,11 @@ What exists that this item will use, so a second one does not get written
     - Thin cloud arrives as saturated as pale clear sky: NIR_1661's wisps at 0.269 and its own low clear sky at 0.268.
     - NIR_1651's bright band arrives at 0.177, between NIR_3461's clear band at 0.170 and NIR_1661's low sky at 0.268.
 
-    So the order the rejection gave, cloud above pale clear sky, is wrong for dense cloud. Its conclusion still stands on the owner's files: the ranges overlap, so no absolute gate on arriving saturation separates cloud from pale clear sky. What the owner's files add is that the clouds that go cyan are the thin and off-neutral ones. Both forms were rendered only on the frames above. Rendering them on the owner's seven is open and not built.
+    So the order the rejection gave, cloud above pale clear sky, is wrong for dense cloud. Its conclusion still stands on the owner's files: the ranges overlap, so no absolute gate on arriving saturation separates cloud from pale clear sky. What the owner's files add is that the clouds that go cyan are the thin and off-neutral ones. Both forms were rendered only on the frames above.
+  - **Rendering them on the owner's raws is not owed (2026-09-29).** The refined form's rejection rests on the arriving saturations measured on the owner's seven, which a render cannot move. The brightness-alone form was rejected on renders, and its failure, the pale low clear sky greyed, was seen on NIR_3461, the owner's NEF. And neither form was committed, so a render would need the guard built again from this record's design, which is not the code rendered on 2026-09-27 and 2026-09-28.
 - **10 as rendered, the cloud's white point under today's look (2026-09-28).** It turns the cloud white on NIR_1651 and NIR_1644. It also takes the blue out of their clear skies, the white highlights out of their foliage, and on NIR_1651 spreads red haze from the crown into the cloud. The white point is right and the look is not derived at it; 10 stays open for the two together.
-  - **LABELLED 2026-09-29.** Those renders were NIR_1651 and NIR_1644 as practice DNGs, and NIR_3461 as the owner's NEF. They moved the white balance, which the 2026-09-29 trace does not, so they were not redone. On the owner's files they are open.
+  - **LABELLED 2026-09-29.** Those renders were NIR_1651 and NIR_1644 as practice DNGs, and NIR_3461 as the owner's NEF. They moved the white balance, which the 2026-09-29 trace does not, so they were not redone.
+  - **RENDERED 2026-09-29 on the owner's NIR_1651.NEF, NIR_1661.NEF and NIR_1703.NEF** ("Rendered on the owner's raws, 2026-09-29", below). The cloud box goes white on all three; every clear sky goes flat grey but one patch on NIR_1703, the foliage goes solid red, and on NIR_1651 the rest of the same cloud goes salmon-red. Moving the white point alone breaks the look as it ships, as it did on the practice copies; 10 stays open for the white point and the look together.
 - **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
 
 ## Built and measured, 2026-09-26
@@ -583,7 +586,8 @@ whether the hot spot is corrected, not on these stages.
 **Labelled 2026-09-29.** The four practice files below were NIR_1651, NIR_1644,
 NIR_1827 and NIR_1661, all DNGs with no EXIF and no lens fix. NIR_3406 was a
 real NEF outside the owner's set. NIR_3461 was the owner's NEF. The pictures
-are as they were seen, and on the owner's raws they are not yet rendered.
+are as they were seen. On the owner's other raws they were not rendered, and
+Rejected 9 says why that is not owed.
 
 **What was built.** Option 9 as written, in `buildSkyMap`, the shader and
 `compileEdit`, on the work branch and not committed. Nothing reached staging,

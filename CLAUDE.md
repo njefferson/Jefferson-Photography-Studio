@@ -140,6 +140,14 @@ it: a gate that only counts says a filing cabinet is full.
   → the owner's on-device pass → the owner's explicit go → PR + merge to `main`.
   Never merge a product change to main without that go. Docs-only changes
   (NOTES.md, this file) may merge without the gate.
+- **Docs-only commits go STRAIGHT TO MAIN, by a fast-forward push, with no pull
+  request (owner, 2026-09-29).** The pull request tool appends a link to the
+  chat, and an edit removes it only from the current text: the first revision
+  stays in the edit history, which only the owner can delete (hub LESSONS 373).
+  So: check that main is an ancestor of the working branch and that nothing
+  outside docs differs, `git push origin HEAD:main`, then read the remote's
+  main head, the Gates and deploy runs for that SHA, and the live offline copy.
+  A branch carrying any product change still goes through staging and the go.
 - Push to `staging` UNPROMPTED whenever work reaches a point the owner needs
   to test AND no other branch is already waiting for a go to `main` — being
   asked for it is the signal this rule was broken (owner rule, 2026-07-13). Staging

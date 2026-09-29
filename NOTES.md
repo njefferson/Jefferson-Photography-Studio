@@ -1163,8 +1163,8 @@ user-scalable=no.
   with colour and stay 061's and 013's. It must pass the whiteness weight's
   three measured failures (052) and keep 013's speckle gone, and if the
   speckle comes back the option fails rather than gaining a width tuned on the
-  practice frames. Its cloud checks wait for the rotation fix (070), ranked
-  above it from 2026-09-27. Above 052, whose Option 1 brings every cloud the
+  practice frames. Its cloud checks waited for the rotation fix (070), which
+  shipped on 2026-09-28 without them; they are still owed. Above 052, whose Option 1 brings every cloud the
   Sky mask holds under these stages.
   See `docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md`.
   **Built 2026-09-26 and failed.** The one rule brought 013's speckle back at
