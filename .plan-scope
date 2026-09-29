@@ -1,13 +1,7 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=cf59f0881d973e71
-diffhash=58ccb5415e6f4168
-verdict=IN-SCOPE: the eight commits above main are relaxed-bardeen's rebased, and the uncommitted diff touches only the four files Step 5 names, in the places it names.
-# Watcher (read-only subagent), 2026-09-29, plan read by path.
-# 3a, the base: main..HEAD is 8 commits, relaxed-bardeen's rebased onto the new main (subjects match in order, patch-equivalent); the committed tree differs from origin/claude/relaxed-bardeen-vlwm3g only in .claude/hooks/ident-guard.mjs and .claude/hooks/ledger.mjs, which PR 178 put on main. Nothing else added.
-# 3b, uncommitted: four modified files, none untracked.
-# - 069: new "Traced on the owner's raws, 2026-09-29" section; LABELLED/CORRECTED notes on option 10, Rejected 9 and Rejected 10; labels on the three dated sections they cite; the Rank paragraph correction on option 10; the Depends "touches 066" line; seven new .NEF "Looked at" entries; three NIR_3461 heads renamed to NIR_3461.NEF (Step 5).
-# - .owner-images-allow: only the two NIR_3461 rows for 2026-09-27 and 2026-09-28 removed, matching those renames (Step 5).
-# - IR-SCIENCE 4c-xxiv: one labelled-and-corrected block at the end of the section (Step 5).
-# - NOTES.md: the same label and correction on the option-10 paragraph (Step 5).
-# Outside the plan: nothing. No code, tools, hooks, other records, or other sections touched.
+planhash=58f105af8b13e53b
+diffhash=544c6175dfda6174
+verdict=IN-SCOPE: the uncommitted diff touches only record 071 and NOTES.md, and every hunk maps to plan Step 1.
+# Watcher (read-only subagent), 2026-09-29, plan read by path. Above main: nine commits, relaxed-bardeen's eight rebased and 1146b21 (the previous plan's 069 commit).
+# Uncommitted: docs/decisions/071 (Step 1: MEASURED block with both PC readings; 'What was left' bullet now one; ANGLE's design note in Looked up; option 8 with its measurement design; the cached-launch question as still open) and NOTES.md (Step 1: the readings in 071's roadmap entry and its Shown as line matched to them). Rank unchanged; no other entry touched. Outside the plan: nothing.

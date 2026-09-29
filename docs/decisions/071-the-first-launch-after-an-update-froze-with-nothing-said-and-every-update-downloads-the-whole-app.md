@@ -113,6 +113,23 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
   is not in ANGLE's source today. OneJS issue 130 (2026) measured 7.6 s for one
   large interpreter shader on Chrome and moved it off the page with
   `KHR_parallel_shader_compile`, the same answer as this record's compile half.
+- **ANGLE's own route out of it** (ANGLE design note "Uniform Block to
+  StructuredBuffer Translation", `src/libANGLE/renderer/d3d/d3d11/` in the ANGLE
+  source; read in full 2026-09-29 from GitHub's mirror,
+  raw.githubusercontent.com/google/angle/main/..., because this environment's
+  network refuses chromium.googlesource.com):
+  - Its background: "We run into a compile performance issue with fxc and
+    dynamic constant buffer indexing."
+  - Its rule: ANGLE translates a uniform block into a StructuredBuffer when the
+    block has only one array member, of size 50 or more, and every access to it
+    is through the indexing operator. The element may be a scalar, a vector,
+    some matrices, or a struct of those with no array or struct inside it.
+  - Its limits: the array is never used whole (no comparison, assignment or
+    function argument), and only layouts that need no std140 padding, or can be
+    emulated, are supported. It gives no measured numbers.
+  - So the field has two known ways to give FXC the mask parameters without
+    loop-variable indexing into plain uniform arrays: one uniform block of that
+    shape, or a data texture read with `texelFetch`.
 
 ## Built already
 
@@ -262,15 +279,44 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
      unroll", so the change handed FXC nearly the same code with fewer loops
      marked. The same report confirms the download half on the PC: the update
      kept 214 files, downloaded 4, and took 1.0 s.
-   - **What is left, two candidates, both named by the sources.** The shader's
+   - **What was left, two candidates, both named by the sources, and now one**
+     (the measurement of 2026-09-29, directly below, names the mask loops). The shader's
      tap loops have counts FXC can see (a 13 by 13, three 7 by 7, a 3 by 3 and
      a run of eight) and are unrolled; and every mask loop runs to
      `u_maskCount`, a count FXC cannot see, and indexes thirteen uniform
      arrays and the local weights `gW` with its loop variable, the mixer's
      `u_maskHsl[i * 8 + bi]` with a computed index. Which one is the 44 seconds
      is measured on the PC before anything is changed.
+   - **MEASURED 2026-09-29: IT IS THE MASK LOOPS.** The test page's "What
+     makes the picture code slow to build", v2.63.42 on staging.
+     - **On the PC** (Firefox 156, ANGLE over Direct3D 11 on a GTX 980, taken
+       2026-09-29 01:03 UTC), each built once from nothing, plus its first
+       picture:
+       - as shipped, 45,361 ms;
+       - with every loop's count hidden from the compiler, 45,329 ms;
+       - with the mask loops taken out, 789 ms;
+       - with both, 672 ms.
+
+       The counted loops' unrolling costs nothing measurable. The mask loops
+       are 44.6 of the 45.4 seconds.
+     - **The control** (a second PC, Chrome 152 drawing through SwiftShader, a
+       software renderer, taken 2026-09-28 20:53 UTC): 18, 19, 22 and 18 ms
+       for the same four. The same program builds in milliseconds on a
+       compiler that is not FXC. So the cost is how FXC handles the mask
+       loops, not the size of the program.
+     - The option that follows is 8. Nothing else in either report bears on
+       this record.
    - **Still open:** the busy card has no seconds count and cannot be put
      aside during a long wait.
+   - **Still open, asked 2026-09-29: is a stored copy slower to start than a
+     first visit while an update downloads?** The two reports above cannot
+     settle it. Neither is a first visit, and the one taken while an update
+     was installing (the second PC: started 0.45 s, a 220 ms pause, 1.45 Mb/s)
+     is also a different machine, browser and renderer from the one taken with
+     none (0.17 s, 3 ms). What settles it is one machine and one browser, read
+     three ways off the report's Start-up line: a first visit with nothing
+     stored, a stored copy with no update, and a stored copy while an update
+     downloads.
 2. Build the redesign now.
 3. Words only: say a download is running, change nothing about it.
 4. Take the stickers out of the precache and change nothing else.
@@ -278,6 +324,23 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
 6. Compile the picture code without blocking (parallel compile, polled), with a
    sentence on screen while it compiles.
 7. Leave it.
+8. **NEXT, written 2026-09-29, open and not built: the mask parameters leave
+   the indexed uniform arrays.** The measurement under 1 names the mask loops.
+   The field names the shape FXC is slow on, loop-variable indexing into
+   uniform arrays (issue 3682), and ANGLE's own route out of it (Looked up).
+   - **Two ways to hand FXC the same numbers.** One uniform block whose only
+     member is an array of structs, one struct per mask, padded to 50 entries
+     so ANGLE turns it into a StructuredBuffer. Or a data texture, one row per
+     mask, read with `texelFetch`. Either way the shader reads the same values
+     and the picture must not change: screen and export stay identical
+     (`tools/agreement-walk.mjs`), and every mask walk passes.
+   - **Measured before the editor changes, as 1 did.** A fifth variant on the
+     test page rewrites the mask arrays into the block and is timed beside the
+     four there today, on the PC. If the block does not take the build near
+     the 789 ms of the loops taken out, the texture is measured next. The
+     editor's own program changes only after one of them does.
+   - **Its own plan.** It is a change across thirteen arrays, their upload in
+     `src/gl.ts` and the CPU path that has to match it.
 
 ## Rejected
 
