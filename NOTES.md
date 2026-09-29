@@ -2085,6 +2085,15 @@ user-scalable=no.
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
 
+- [ ] **A foliage colour and a sky colour, chosen by name** <!-- decision: 084 -->
+  **Shown as:** Choose a colour for the foliage and one for the sky from named swatches, each showing its name and angle, and the photo takes them.
+  Asked 2026-09-29, for later. The sources describe an infrared result as a
+  foliage colour and a sky colour; here every hue control but one is a shift
+  or a fixed mapping, and the two boxes named Sky and Foliage act on each other's subject as a
+  photo opens. Two rows of named swatches write destinations onto those
+  boxes, which learn to find their subjects from the photograph. After Big
+  image, before the screens are assessed.
+
 - [ ] **Housekeeping: walks that cannot see what they claim, and paths into dead sessions** <!-- decision: 083 -->
   **Shown as:** internal
   The agreement walk's camera-JPEG pair lives in a dead session's folder and is
@@ -19387,6 +19396,11 @@ being asked.
 Three ways to settle it, all copy decisions and all the owner's: leave the names
 and rely on the sub-label; rename the boxes for what they key on; or have the
 labels swap their names along with their contents.
+
+**2026-09-29: the premise does not hold on the bare swap either.** On two
+frames as they open, with the swap on and no look, the box named Sky takes the
+foliage and the one named Foliage takes the sky (decision 084's Looked at). 084
+chooses a fourth way: the boxes find their subjects from the photograph.
 
 ## A look choice is shown, not described — the rule and the half-built tool, 2026-09-16
 

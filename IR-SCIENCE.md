@@ -287,8 +287,9 @@ recipes the app actually implements, audited:
   app cannot reach them, but their RENDERING is a nameable target.
 - **HIE** — Kodak High Speed Infrared, the black-and-white film with the
   characteristic halation. The app has `HIE B&W`.
-- **`Red`, `Goldie`, `Natural IR`** — this app's own names, not field terms.
-  Worth knowing when reading a tutorial that uses none of them.
+- **`Red`, `Goldie`, `Natural IR`** — this app's own names. `Red` and
+  `Natural IR` are not field terms. `Goldie` is also a field term, for the
+  580/590 nm filter (4b-xi, corrected 2026-09-29). Worth knowing when reading a tutorial.
 
 **The bare swap has no film name.** It is called a channel swap, or false colour,
 and the pink-foliage/cyan-sky result is simply what a 590/665-class conversion
@@ -1585,6 +1586,104 @@ never needed.
 **Hosts refused on this topic:** huggingface.co, bj.bcebos.com, tfhub.dev,
 www.kaggle.com, sceneparsing.csail.mit.edu and download.pytorch.org.
 GitHub's release downloads and raw.githubusercontent.com both worked.
+
+### 4b-xi. A RESULT IS DESCRIBED AS TWO COLOURS, THE FOLIAGE'S AND THE SKY'S
+
+Researched 2026-09-29 for decision 084 (a simple colour tool for infrared).
+Four researchers; a skeptic then re-checked each report claim by claim against
+every cited source it could reach, and a second reader checked this section's
+sentences against those verdicts. What is below is what survived, at the
+strength the skeptic allowed. Refused hosts are named at the end.
+
+**Two stages, in most recipes read.** A global remap first, then hue,
+saturation and lightness moves by colour band. The remap is the red-blue swap
+in a channel mixer, a hue rotation, an Invert layer in Color blend mode, or a
+swap profile or LUT. LifePixel's basics tutorial (read) balances on grass, swaps
+in the Channel Mixer, then takes Cyan's saturation fully down and its lightness
+fully up to turn the cyan highlights white. Rob Shea's free LUTs (read) are six
+remaps: the swap, three swaps with green reassigned, an Invert in Color mode and
+a 180-degree hue shift. Not every route has the first stage: LifePixel's Hyper
+Color looks are made with Hue/Saturation alone and no swap, and the Super Blue
+and Candy Pink filters give their colours straight from the camera (all read).
+
+**The results are described as a foliage colour and a sky colour.**
+- David Kennard (read) names the results he aims for as pairs: red foliage with
+  a blue sky, pink with teal, yellow with blue, orange with blue.
+- LifePixel (read) says a 590 nm frame after the swap has four tones, red and
+  yellow in the foliage and blue and cyan in the sky. Its simple adjustment is
+  two hue moves that leave two, blue and yellow.
+- Kolari's LUT pack by Pierre-Louis Ferrer (read) has soft and deep pairs of
+  gold and of pink vegetation, soft and deep pairs for the IR Chrome and NDVI
+  filters, a Classic White, a black-and-white and two portrait LUTs.
+- Rob Shea's 2024 Lightroom profile update (read) adds a Sky series so a reader
+  can choose the sky's hue for their filter and camera, and a White profile that
+  keeps the sky blue and turns the foliage white.
+- His PRO LUTs (read) carry 23 names: colour names (Amber, Candy, Flamingo,
+  Gold, Mint, Pink, Purple, Rose, Sage, Teal, Violet, Wheat, White), Sky 15 to
+  Sky 20, Neon, and the remaps Invert, Split and Swap. What each one denotes was
+  not read.
+- LifePixel's Hyper Color tutorial (read) reaches magenta or purple, red,
+  yellow and green foliage with Hue/Saturation alone. Rob Shea's Photoshop
+  extras (read) give green foliage under a purple sky, and pink under a
+  green-teal sky.
+
+**So the results read fit the axis this camera records (4b-ix): one colour for
+the foliage end and one for the sky end.** LifePixel's basics tutorial also
+turns the cyan highlights white.
+
+**What each conversion gives after the swap, before any palette moves.**
+LifePixel's filter guide (read): 830 nm the darkest sky and whitest foliage;
+720 nm less colour than 665 and only the blue-sky effect; 665 nm more colour;
+590 nm golden-orange foliage under a royal-blue sky. Kolari (read): 590 nm
+golden-yellow leaves and bright blue skies; 665 nm pale yellow leaves and a
+brighter blue, best processed to white leaves under a blue sky by desaturating
+the yellow; 720 nm dark blue skies and some mild colour. This camera's
+conversion is bracketed to 665-720 nm (4c-iii) and opens with pink foliage under
+a teal sky (decision 084's Looked at). Of the three palettes rendered there, one
+per conversion class, pink with teal is where it opens; white with blue and gold
+with blue are each a few moves away. Orange with blue is named by at least as
+many sources and was not rendered.
+
+**The white-balance reference decides the foliage colour too.** Markus Hagner
+(read): balancing on grass gives white vegetation and suits 720 nm and deeper;
+balancing on sunlit concrete gives gold foliage after the swap.
+
+**A hue rotation can stand in for the swap, but not in general.** Kennard
+(read) found a +109 degree Camera Raw hue shift close to the standard swap on two
+filter stacks on a full-spectrum body, and pink foliage with a teal sky from a
+650 nm filter at +146 degrees. His tests used external filters on a
+full-spectrum Canon, and he says the colours depend on the camera.
+
+**Goldie is also a field term.** Section 4b's list of names calls `Goldie` this
+app's own. Kennard (read) calls the 580/590 nm filter the Goldie filter, because
+a swap gives it yellow foliage. That the app's Goldie look is the same thing is
+an inference; no source says so.
+
+**Two cautions from the practitioners.**
+- Kolari (read) calls adjusting yellow-foliage saturation globally a common
+  mistake, because it reaches the shadows too. It selects the foliage through
+  the red channel as a luminosity mask instead. That is section 4d's finding
+  from another direction: a colour is not a place. In a separate step, for the
+  blue cast of a 720 nm frame, it selects the clouds and ground through the blue
+  channel and adjusts Cyan and Blue.
+- Rob Shea (read) warns that with Lightroom's swap profiles some tools show the
+  colours reversed: the tone curve's channels, HSL, Calibration and the local
+  Temp slider. This app's two named colour boxes do something alike on a frame
+  as it opens (decision 084).
+
+**Hosts refused on this topic.** Confirmed by a skeptic as refused by this
+environment's egress proxy: murrayfoote.com, www.capturelandscapes.com,
+www.keptlight.com, elements.envato.com, infraredatelier.wordpress.com and
+shotkit.com.
+Listed as refused by the researcher, cause not confirmed: www.decopix.com,
+www.johncaplisphotography.com, www.slrlounge.com, www.capturemonkey.com,
+www.alex-kunz.com, luminescentphoto.com, digitalir.wordpress.com,
+blog.martinbelan.com, www.sparklestock.com, phlearn.com, www.artstation.com,
+chriswright.photography, fotoscope.co.uk, www.adorama.com, www.usgs.gov,
+earthobservatory.nasa.gov and gridfiti.com. Refused by the site
+itself: photographylife.com (402) and robertreiser.photography (410).
+helpx.adobe.com answered 403 to the web fetcher, and to plain requests from the
+editors' skeptic; the tablet researcher read its pages with plain requests.
 
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
