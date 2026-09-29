@@ -705,6 +705,7 @@
                    the film did, and the walks press this button by id. -->
               <button id="lookAero" type="button">Pink IR<small class="look-sub"></small></button>
               <button id="lookEir" type="button">Aerochrome<small class="look-sub"></small></button>
+              <button id="lookBoldPink" type="button">Bold Pink<small class="look-sub"></small></button>
               <button id="lookRed" type="button">Red<small class="look-sub"></small></button>
               <button id="lookGoldie" type="button">Goldie<small class="look-sub"></small></button>
               <button id="lookNatural" type="button">Natural IR<small class="look-sub"></small></button>
@@ -712,7 +713,7 @@
               <button id="lookSepia" type="button">Sepia IR<small class="look-sub"></small></button>
               <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
             </div>
-            <p class="note">Looks showing <strong>norm / R&#8646;B</strong> under the name flip that swap when you press them again. <strong>Aerochrome</strong> shows <strong>film</strong> instead: the swap is part of its recipe rather than an option on top of it, so there is nothing to flip &mdash; the swap button above and the Grade tab's channel mixer are there if you want to take it apart yourself. <strong>None</strong> takes the look off this photograph, back to its own balance, and the photographs you open next start without one; an imported LUT stays.</p>
+            <p class="note">Looks showing <strong>norm / R&#8646;B</strong> under the name flip that swap when you press them again. <strong>Aerochrome</strong> shows <strong>film</strong> instead: the swap is part of its recipe rather than an option on top of it, so there is nothing to flip &mdash; the swap button above and the Grade tab's channel mixer are there if you want to take it apart yourself. <strong>Bold Pink</strong> is Aerochrome left pink, before it turns the foliage red and the sky blue; it has no swap to flip either. <strong>None</strong> takes the look off this photograph, back to its own balance, and the photographs you open next start without one; an imported LUT stays.</p>
             <button id="finishOpen" type="button" class="accent-outline full-btn" hidden>Finish this look</button>
             <!-- The one-band notice, and the choice it used to make for you.
                  Before 2026-09-11 a camera JPEG like this was always balanced
@@ -1749,12 +1750,14 @@
         <p><strong>Aerochrome and Pink IR are two different mappings, not two strengths.</strong>
         The film's three layers were sensitive to green, red and infrared, with a yellow filter throwing blue
         away, so no two-channel swap can express what it did. The <strong>Aerochrome</strong> look is the swap
-        plus a nine-number channel mix measured against six real frames &mdash; deep magenta foliage over a teal
-        sky. It also asks for a little more noise reduction than your photo measured for itself, because the
+        plus a nine-number channel mix measured against six real frames, then a colour mix and two sky steps
+        &mdash; red foliage under a blue sky. It also asks for a little more noise reduction than your photo measured for itself, because the
         colour and the grain in an infrared frame come out of the same place and rise together; the Denoise
         slider shows it and you can pull it back. <strong>Pink IR</strong> is the red&#8646;blue swap with
-        saturation &mdash; the pink-and-teal rendering this app has always had. Neither is more correct than the
-        other; they are different pictures, and both are one press away. The film's own bare three-way rotation
+        saturation &mdash; the pink-and-teal rendering this app has always had. <strong>Bold Pink</strong> is Aerochrome
+        stopped before its colour mix and its sky steps: the same swap and channel mix, left magenta-pink over a
+        green-teal sky. Restore depth still lifts its tone and foliage and leaves its sky as it is. None of the
+        three is more correct than the others; they are different pictures, and each is one press away. The film's own bare three-way rotation
         is still on the Grade tab as the Film rotation mixer preset, if you want it without the rest.</p>
         <p><strong>Black &amp; white</strong> (its own B&amp;W tab) — made for 720nm shots — turns the photo mono, with
         weight sliders (or a named mix) choosing how much of each channel becomes brightness. While it's on, the Color
@@ -2011,7 +2014,7 @@
         Tap it (in the top bar next to <em>Open image(s)</em>, or on the start screen) and it first asks
         <em>what goes on every photo</em>: <strong>your current edit</strong> (the grade on screen — offered only when
         a photo is open), <strong>a saved look</strong> from My looks, <strong>a built-in look</strong> (Aerochrome,
-        Pink IR, B&amp;W IR…), or <strong>Auto-balance only</strong> — no look at all, just each photo properly
+        Bold Pink, Pink IR, B&amp;W IR…), or <strong>Auto-balance only</strong> — no look at all, just each photo properly
         white-balanced and exposed, which is the quickest way to preview a whole folder and see what you've got.
         Then pick the files. Each photo is auto-balanced on its own (its own white balance, exposure, denoise and
         lens hot-spot fix) with the chosen grade layered on top. The set comes back as one <strong>.zip</strong>

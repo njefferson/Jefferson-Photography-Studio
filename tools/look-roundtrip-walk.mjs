@@ -59,7 +59,7 @@ const RAW = `/home/user/Jefferson-Photography-Studio/public/examples/${FRAME}.dn
 // B&W IR is the one to pass through: it is the furthest from every other look
 // and the look the original observation used.
 const VIA = "lookMono";
-const LOOKS = ["lookAero", "lookEir", "lookHie", "lookGoldie", "lookRed", "lookSepia", "lookNatural"];
+const LOOKS = ["lookAero", "lookEir", "lookBoldPink", "lookHie", "lookGoldie", "lookRed", "lookSepia", "lookNatural"];
 const CYCLES = 10;
 
 let failed = 0;
