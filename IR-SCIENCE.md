@@ -2730,6 +2730,32 @@ Traced stage by stage on 2026-09-28 (decision 069, option 10).
   it; either one moved alone is wrong.** The same 3–7% sensitivity is why two
   frames with the same cloud can render it white on one and cyan on the other.
 
+**LABELLED AND CORRECTED 2026-09-29.** The trace above ran on NIR_1651 and
+NIR_1644 as the practice DNGs, with no EXIF and so no lens fix, and NIR_1644 has
+no original in the owner's set. NIR_3461 was the owner's NEF. Traced again on
+the owner's seven raws, opened with their lens fix and nothing moved (decision
+069, "Traced on the owner's raws, 2026-09-29"):
+
+- **Where it enters holds.** On every frame, gray-world leaves cloud and clear
+  sky on one side of the white point, at camera-native hue 38 to 67, and
+  foliage and the one neutral on the ground (a road's asphalt) on the other, at
+  220 to 232.
+- **That it makes the cloud cyan does not hold as stated.** Dense cloud is left
+  within 0.05 of neutral on four of six frames with cloud. It arrives at the
+  sky stages under the saturation gate's top (0.13) and leaves white.
+  NIR_1651's bright band (left at 0.12) and NIR_1661's thin wisps (0.17) arrive
+  above the gate, and Sky saturation more than doubles them. A cyan cloud needs
+  both: a white point that leaves it off neutral, and a gate that reads it as
+  coloured.
+- **The look amplifies the ground side, not the sky side.** On NIR_3466 the
+  3x3 mixer multiplies the asphalt's saturation by 2.6 and leaves the cloud's
+  where it was. The asphalt arrives red at 0.55 and renders maroon, which is
+  section 4d's ground.
+- **The four per-site black values read 1008 on all seven files.** The app
+  averages them to one number, and here that loses nothing.
+- **Still unmeasured on the owner's files:** the white point taken from the
+  cloud, because it moves a setting.
+
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 
 4c-vi originally read that raising denoise did nothing to the ratio (NIR_1480

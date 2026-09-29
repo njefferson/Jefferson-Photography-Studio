@@ -1,7 +1,13 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
-plan=/root/.claude/plans/linear-baking-island.md
-planhash=a4e6f9aca9c0c9d2
-diffhash=23afe448881bfdb9
-verdict=IN-SCOPE: plan-guard.sh bug fix enables gates 3 and 4; owner-images.mjs header documents gate 9.
-# IN-SCOPE: plan-guard.sh bug fix enables gates 3 and 4; owner-images.mjs header documents gate 9.
-# The plan-guard.sh fix is strictly necessary infrastructure: gates 3 (talk-first) and 4 (plan-names) live inside plan-guard.mjs and require the dispatcher to call and respect its verdict. The owner-images.mjs comment is explicitly gate 9 in the plan.
+plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
+planhash=cf59f0881d973e71
+diffhash=58ccb5415e6f4168
+verdict=IN-SCOPE: the eight commits above main are relaxed-bardeen's rebased, and the uncommitted diff touches only the four files Step 5 names, in the places it names.
+# Watcher (read-only subagent), 2026-09-29, plan read by path.
+# 3a, the base: main..HEAD is 8 commits, relaxed-bardeen's rebased onto the new main (subjects match in order, patch-equivalent); the committed tree differs from origin/claude/relaxed-bardeen-vlwm3g only in .claude/hooks/ident-guard.mjs and .claude/hooks/ledger.mjs, which PR 178 put on main. Nothing else added.
+# 3b, uncommitted: four modified files, none untracked.
+# - 069: new "Traced on the owner's raws, 2026-09-29" section; LABELLED/CORRECTED notes on option 10, Rejected 9 and Rejected 10; labels on the three dated sections they cite; the Rank paragraph correction on option 10; the Depends "touches 066" line; seven new .NEF "Looked at" entries; three NIR_3461 heads renamed to NIR_3461.NEF (Step 5).
+# - .owner-images-allow: only the two NIR_3461 rows for 2026-09-27 and 2026-09-28 removed, matching those renames (Step 5).
+# - IR-SCIENCE 4c-xxiv: one labelled-and-corrected block at the end of the section (Step 5).
+# - NOTES.md: the same label and correction on the option-10 paragraph (Step 5).
+# Outside the plan: nothing. No code, tools, hooks, other records, or other sections touched.

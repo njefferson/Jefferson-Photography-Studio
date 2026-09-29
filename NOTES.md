@@ -1191,6 +1191,15 @@ user-scalable=no.
   also takes the blue out of the clear sky and spreads red haze from the crown,
   because the look's numbers were derived at gray-world's white point. So it
   needs the look derived again at a neutral white point, which is 066's ground.
+  **Labelled and corrected 2026-09-29.** That trace ran on practice copies
+  (NIR_1651 and NIR_1644, no lens fix) beside one owner's NEF, NIR_3461. On the
+  owner's seven raws, traced through every stage with nothing moved, the cast
+  enters at the white point on every frame. But dense cloud is left within 0.05
+  of neutral and stays white on four of the six frames with cloud. The cloud
+  goes cyan only where the white point leaves it off neutral AND it arrives
+  above the saturation gate: NIR_1651's bright band and NIR_1661's wisps. The
+  one neutral in the set, NIR_3466's road, renders maroon. The record has every
+  stage, frame by frame.
 - [ ] **The first launch after an update froze with nothing said, and every update fetches the whole app again** <!-- decision: 071 -->
   **Shown as:** After an update the start screen answers and says it is preparing the editor, an update downloads only what changed, and the editor's picture code no longer unrolls its loops on Direct3D; waiting to be confirmed on the PC where the minute was measured.
   Reported from the PC after v2.63.7: the start screen showed and nothing
