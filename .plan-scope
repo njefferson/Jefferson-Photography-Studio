@@ -1,17 +1,17 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=58f105af8b13e53b
-diffhash=7e66245de5bcdd91
-verdict=IN-SCOPE: step 6's five records and their roadmap lines are the plan's release-readiness items, docs only, researched, ranked by what would be redone.
-# Watcher verdict, 2026-09-29, on the uncommitted Step 6 changes (records 079 to 083 new, NOTES.md +33 lines), judged against /root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md read in full by path.
+planhash=29fd75a82ac4b3a6
+diffhash=bc5b9eb95f56425c
+verdict=IN-SCOPE: steps 0 and 1 are docs only plus the CI hub pin moved with the doctrine marker, as the commit chain requires.
+# Watcher verdict, 2026-09-29, on the uncommitted Step 0 and Step 1 changes (.doctrine-sync, IR-SCIENCE.md, NOTES.md, records 015 and 083), judged against /root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md read in full by path.
 # 
-# IN-SCOPE: The uncommitted changes are exactly Step 6 (five records, 079 to 083, and five NOTES.md roadmap bullets), docs only, and all three earlier thin spots are fixed.
+# IN-SCOPE: the uncommitted diff is docs only (five files, nothing in src/ or tools/), and every hunk maps to plan Step 0 or Step 1, and the three corrections to record 015 are in place.
 # 
-# - Every record has the six sections, Depends and a keyed NOTES bullet with a Shown as line; every record cited in prose is declared in Depends.
-# - 079: researched (NN/g, MeasuringU, PMC7651936); 060, 053, 054 touched and kept as their own records; 046 distinct-from with a reason; ranked last after the screen items.
-# - 080: researched (Diataxis); audits Help and each panel of the info dialog; needs 079; Help's Aerochrome sentence as the first instance, fixed in 078's build.
-# - 081: researched (Diataxis); needs 079; Lesson 2 as the first instance; eleven lessons confirmed.
-# - 082: researched (DNG 1.6); weighs the 44 files, the tools that read them and the EXAMPLES bump; ranked by its own dependencies.
-# - 083: the plan's named items covered; the hub branch declined with a reason; the three extras are what turned up, recorded not fixed; rank second argued by dependency, within the plan's latitude.
-# - Docs only: nothing in src/, tools/, ir.html, VERSION or sw.js changed.
-# - Not covered: 083's hold on later items is argued in prose, not declared as edges, so the graph does not show it.
+# - .doctrine-sync: 5c57d1f to 05008dd, Step 0's --adopt.
+# - IR-SCIENCE §9f: Kasson recorded as refused by the site (Cloudflare JavaScript challenge), Step 0.
+# - NOTES: 015's bullet no longer says the first change is to come; 083's bullet moved before 082, its wording matching record 083's corrected finding.
+# - 015: anchor stated exactly (at full strength), 23.0% measured, 43% superseded; the blend in Rejected with its measurement and what would reopen it; that day's line numbers marked; Built already corrected (agreement walk does not exercise the decode flat; lens-order walk cannot run until its files move); What stays open rewritten; Weighed against's reversed ranking argument marked; the plan's wording labelled.
+# - 083: Rank at the end before 082, the owner's order, verification by the lens-order walk.
+# - Every frame 015 names (NIR_3700, NIR_3703, NIR_3716) is in its Looked at; NIR_1376 is not named.
+# 
+# Re-judged with .github/workflows/gates.yml: IN-SCOPE. One line, the hub-gates.yml pin 5c57d1f to 05008dd, the companion the commit chain requires once Step 0 adopts the marker; hub-gates.yml is identical between the two commits; the gate scripts CI runs differ only slightly (branch-guard, a shebang in privacy-check, one label in pwa-check).

@@ -1084,15 +1084,6 @@ user-scalable=no.
   Rendered through the app on the owner's seven raws beside Aerochrome and Pink
   IR before any code, and the pictures sent.
 
-- [ ] **Housekeeping: walks that cannot see what they claim, and paths into dead sessions** <!-- decision: 083 -->
-  **Shown as:** internal
-  The agreement walk's camera-JPEG pair lives in a dead session's folder and is
-  skipped without a word, and its colour bar passed a batch planted to get Bold
-  Pink's sky wrong (10.2 degrees against 15). A tool's default output points into
-  a dead session too; the architecture diagram is short four stages; three prose
-  counts are held by nothing; the diagnostic report read empty headless; and the
-  repository's Dependabot alerts are unread. Asked 2026-09-29.
-
 - [ ] **The centre of the picture washes out — the lens correction, against the reference** <!-- decision: 015 --> — reported
   **Shown as:** Photos open with the lens correction measured from your own flat frames, so the middle of the sky and foliage matches the edges.
   from the iPad 2026-09-17 on the lone oak under Aerochrome, and the report named
@@ -1104,9 +1095,9 @@ user-scalable=no.
   scene's own, and both published corrections normalise the flat to a reference
   level — Kolari to its average, RawTherapee to its centre — while this app
   normalises to nothing, which moves the whole frame's red-against-blue by up to
-  3.79% before any look runs. First change is the smallest one: restore the
-  average anchor and interpolate the 80 hard bins, both reference behaviour, with
-  the shipped profile arrays untouched. Clip control, a per-image strength and
+  3.79% before any look runs. The first change chosen was the smallest one:
+  restore the average anchor and interpolate the 80 hard bins, both reference
+  behaviour, with the shipped profile arrays untouched. Clip control, a per-image strength and
   moving the stage out of the creative chain follow, each with its own record.
   **Two changes shipped 2026-09-17.** The normalising term, which gives the oak
   back 23.0% of what the stage was taking, measured as two real builds, with a
@@ -1128,6 +1119,10 @@ user-scalable=no.
   memory was per aperture, so 19 of 22 opened uncorrected. **Ranked first by the
   dependency test:** 069's grey patch is this drift, and 013 was tuned with it
   off.
+  **2026-09-29: the record caught up.** It still named the normalisation as the
+  next step; it now says the anchor shipped on 2026-09-17 and the blend was
+  measured and set aside. What is left is decided from the reported frame on
+  today's build, shown in pictures first.
 
 - [ ] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
   **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.
@@ -2089,6 +2084,15 @@ user-scalable=no.
   The decision that comes with it is the owner's: a drawn export cannot be
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
+
+- [ ] **Housekeeping: walks that cannot see what they claim, and paths into dead sessions** <!-- decision: 083 -->
+  **Shown as:** internal
+  The agreement walk's camera-JPEG pair lives in a dead session's folder and is
+  skipped without a word, and it could not tell a batch that ignores Bold Pink's
+  sky opt-out from one that honours it (both read 10.2 degrees against 15). A tool's default output points into
+  a dead session too; the architecture diagram is short four stages; three prose
+  counts are held by nothing; the diagnostic report read empty headless; and the
+  repository's Dependabot alerts are unread. Asked 2026-09-29.
 
 - [ ] **The practice photographs carry what a reader's own file carries** <!-- decision: 082 -->
   **Shown as:** The practice photographs open like your own camera files: the camera and lens known, the lens correction applied, and a picture at once.
