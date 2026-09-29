@@ -215,3 +215,19 @@ at 0), and Pink IR as it ships.
   Aerochrome's foliage terracotta-red under a pale blue sky. Bold Pink's
   foliage vivid magenta under a pale grey-green sky. Pink IR's foliage light
   pink under a mint-turquoise sky.
+
+## Outcome
+
+Shipped as commit 9eeea5d, and on production on 2026-09-29 in v2.64.4 (pull
+request 179, rebase-merged as 438ce77). Bold Pink is a built-in look beside
+Aerochrome on the IR tab, carrying Aerochrome's numbers of that day with the
+colour mixer neutral and Sky colour smoothing, Sky saturation and Sky depth at
+0. Restore depth keeps its tone and foliage halves and skips its sky top-up for
+this look, on the screen, the tiles and the batch. Help now describes
+Aerochrome as red foliage under a blue sky.
+
+Nothing recorded as wrong after it shipped. One instrument limit was found
+while building: the agreement walk cannot tell a batch that ignores the sky
+opt-out from one that honours it, which record 083 carries. A change record 069
+makes at the white point would move this look too, and its renders are redone
+then (Depends).

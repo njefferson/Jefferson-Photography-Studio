@@ -304,6 +304,10 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
        for the same four. The same program builds in milliseconds on a
        compiler that is not FXC. So the cost is how FXC handles the mask
        loops, not the size of the program.
+     - **A second control reading** (a work PC, Chrome 152 drawing through
+       SwiftShader, v2.64.4 on staging, taken 2026-09-29 19:11 UTC): 42, 26,
+       31 and 34 ms for the same four. It says the same as the first control
+       and nothing about FXC.
      - The option that follows is 8. Nothing else in either report bears on
        this record.
    - **Still open:** the busy card has no seconds count and cannot be put
@@ -316,7 +320,9 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
      none (0.17 s, 3 ms). What settles it is one machine and one browser, read
      three ways off the report's Start-up line: a first visit with nothing
      stored, a stored copy with no update, and a stored copy while an update
-     downloads.
+     downloads. One of the three is in, from the second control reading's
+     machine: a stored copy with no update started at 0.74 s, with a longest
+     pause of 0 ms.
 2. Build the redesign now.
 3. Words only: say a download is running, change nothing about it.
 4. Take the stickers out of the precache and change nothing else.

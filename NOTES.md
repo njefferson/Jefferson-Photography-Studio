@@ -1095,16 +1095,6 @@ user-scalable=no.
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **Bold Pink, Aerochrome left pink before it turns the foliage red and the sky blue** <!-- decision: 078 -->
-  **Shown as:** A new look, Bold Pink, beside Aerochrome: magenta-pink foliage over a green-teal sky. Help now says what Aerochrome itself looks like: red foliage under a blue sky.
-  Asked 2026-09-29 from the stage sheets of 069's trace: the picture at the tone
-  curve, before the colour mixer turns the foliage red and, with the sky
-  stages after it, the sky blue. It is Aerochrome's numbers of that day as its own look, with the
-  mixer neutral, both sky stages at 0, and Restore depth's sky top-up off for it
-  on the screen, the tiles and the batch; tone and foliage are still lifted.
-  Rendered through the app on the owner's seven raws beside Aerochrome and Pink
-  IR before any code, and the pictures sent. On production from 2026-09-29.
-
 - [ ] **The centre of the picture washes out — the lens correction, against the reference** <!-- decision: 015 --> — reported
   **Shown as:** Photos open with the lens correction measured from your own flat frames, so the middle of the sky and foliage matches the edges.
   from the iPad 2026-09-17 on the lone oak under Aerochrome, and the report named
@@ -1157,6 +1147,7 @@ user-scalable=no.
   is refused in words. Found and fixed with it: a saved photo dropped together
   with photos deleted an open session without asking.
   See `docs/decisions/075-keeping-photos-after-ending-a-large-session-waits-on-the-old-sessions-delete.md`.
+  Shipped 2026-09-28 in v2.63.36 (1b1ea0a on main). Left open: the device pass the v2.63.33 staging entry asks for, in Firefox on the PC, with no result recorded; and why the old session's delete runs for minutes on that PC, not established.
 
 - [ ] **Batch export and adding photos wait for the browser's storage permission** <!-- decision: 076 -->
   **Shown as:** A batch starts, and a set finishes, without waiting for you to answer the browser's question about keeping data.
@@ -1164,6 +1155,7 @@ user-scalable=no.
   "Processing 0" until it was answered. On production from 2026-09-28:
   the request is made and never waited on.
   See `docs/decisions/076-batch-export-and-adding-photos-wait-for-the-browsers-storage-permission.md`.
+  Shipped 2026-09-28 in v2.63.36 (e5ef790 on main). Left open: the device pass the v2.63.33 staging entry asks for, a batch started in Firefox before answering the storage question, with no result recorded.
 
 - [ ] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
   **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
@@ -1185,6 +1177,8 @@ user-scalable=no.
   only for the three sky stages on the open photograph, so it touches 052
   rather than being superseded by it. See
   `docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md`.
+  Shipped 2026-09-28 in v2.63.36 (8c7915f on main). Left open: the device pass the v2.63.33 staging entry asks for on the iPad, with no result recorded; and 069's cloud checks on the turned frames.
+
 - [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
   **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.
   Sky colour smoothing pulls a white or grey pixel inside the sky toward the
@@ -1277,6 +1271,7 @@ user-scalable=no.
   applied a LUT. On production from 2026-09-28: it is also written when the page
   is hidden and a second after each edit settles.
   See `docs/decisions/077-the-open-photos-edits-are-lost-on-a-reload-or-a-closed-tab.md`.
+  Shipped 2026-09-28 in v2.63.36 (b83e813 on main). Left open: the device pass the v2.63.33 staging entry asks for on the iPad (edit, switch app, close the tab, resume), with no result recorded.
 
 - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
   **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
@@ -4826,6 +4821,17 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **Bold Pink, Aerochrome left pink before it turns the foliage red and the sky blue** <!-- decision: 078 -->
+  **Shown as:** A new look, Bold Pink, beside Aerochrome: magenta-pink foliage over a green-teal sky. Help now says what Aerochrome itself looks like: red foliage under a blue sky.
+  Asked 2026-09-29 from the stage sheets of 069's trace: the picture at the tone
+  curve, before the colour mixer turns the foliage red and, with the sky
+  stages after it, the sky blue. It is Aerochrome's numbers of that day as its own look, with the
+  mixer neutral, both sky stages at 0, and Restore depth's sky top-up off for it
+  on the screen, the tiles and the batch; tone and foliage are still lifted.
+  Rendered through the app on the owner's seven raws beside Aerochrome and Pink
+  IR before any code, and the pictures sent. On production from 2026-09-29.
+  Archived 2026-09-29 with its Outcome (decision 078).
 
 - [x] **A colour file is not a photograph either** <!-- decision: 059 -->
   **Shown as:** Manage your LUTs no longer needs a photo open — it's on the start screen and in the (i) dialog too.
