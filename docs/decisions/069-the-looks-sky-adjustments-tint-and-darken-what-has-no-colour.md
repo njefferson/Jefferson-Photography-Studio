@@ -830,6 +830,83 @@ three sky stages, and "leaves" is the value after them.
 asphalt's maroon comes from the look's mapping and the foliage band, outside
 the sky stages, and it is IR-SCIENCE 4d's ground, not this record's.
 
+## Rendered on the owner's raws, 2026-09-29 (option 10's D)
+
+**What was rendered.** NIR_1651.NEF, NIR_1661.NEF and NIR_1703.NEF, fetched
+through `tools/owner-images.mjs` and opened in the app built from 438ce77's
+source (built 14:10 UTC), each with its lens fix at strength 1. Two renders per frame, on a fresh page each:
+
+- **As it ships:** the Aerochrome chip pressed at the white point the app
+  chose at open (gray-world).
+- **The white point from the cloud:** with the swap off, the red and blue
+  white-balance sliders moved until the cloud box the trace chose reads
+  R = G = B on screen, within 1.5 levels; the swap back on; then the chip. The chip is the one
+  printed Aerochrome (`#lookEir`), as in the trace; a first run pressed the chip
+  printed Pink IR and was discarded unrecorded. Only a reader's
+  controls were used: the swap button, the white-balance sliders and the chip.
+
+Each render was opened whole frame before any box was read, and the boxes were
+read off the saved renders as pointers. As each frame opened, the cloud box read
+on the full canvas matched the trace's own read of it to 0.1 of a level, so
+these renders start from the state the trace measured. Read off the smaller
+saved renders, the traced boxes as shipped sit within 1.2 levels of the
+trace's. Boxes are fractions of the frame, left, top, right, bottom.
+
+**Option 9's two forms were not rendered.** Neither was committed: both were
+built on the work branch and taken out on 2026-09-28, so there is no build of
+either to render the owner's raws through.
+
+- **NIR_1651.NEF.** The sliders moved red 500 to 496 and blue 665 to 678.
+  - As it ships: the cloud blue-white with a vivid cyan-blue band at its lower
+    right, the clear sky steel blue, the tree red with pink-white tips.
+  - From the cloud: the traced band goes white-grey (saturation 0.42 to 0.02).
+    The rest of the cloud turns salmon-red: the upper cloud (0.35, 0.05, 0.65,
+    0.15) goes from hue 202 at 0.18 to hue 10 at 0.42. The clear sky goes flat mid grey (0.74 to 0.05).
+    The tree goes solid saturated red, the pink-white tips gone (0.77 to 1.00),
+    and red speckle spreads from the crown into the grey sky on both sides.
+- **NIR_1661.NEF.** The sliders moved red 504 to 497 and blue 659 to 678.
+  - As it ships: a deep blue sky, the wisps pale blue (hue 200 at 0.62), the
+    near pines white to pale pink, the trees behind them red, and the branch at
+    the upper right vivid red.
+  - From the cloud: the wisps go white-grey (0.62 to 0.03), and the whole sky
+    goes flat grey, the deep blue at the top included (0.3, 0.02, 0.7, 0.12:
+    0.92 to 0.04). The near pines go from white and pale pink to saturated red
+    (0.05, 0.3, 0.3, 0.5: 0.08 to 0.96), so every tree in the frame is red.
+- **NIR_1703.NEF.**
+  - As it ships: the dense cloud grey-white (hue 205 at 0.09), blue only in the
+    upper corners and along the dark streaks, and the trees red.
+  - From the cloud, with the sliders moved red 498 to 496 and blue 670 to 675:
+    the cloud box already near neutral goes grey-white (0.09 to 0.03). The blue
+    in the corners and streaks mostly goes grey (the traced clear sky 0.62 to
+    0.07); a dark blue patch stays at the right edge below the top corner
+    (0.91, 0.10, 0.99, 0.20: hue 216 at 0.29),
+    the trees go solid red, and a red fringe runs along the treetops against
+    the sky.
+
+**What it shows.**
+
+- **The cloud box goes white on every frame** (0.42 to 0.02, 0.62 to 0.03,
+  0.09 to 0.03), on slider moves of 2 to 7 down on red and 5 to 19 up on blue,
+  out of 1000.
+- **Only the box, on NIR_1651.** The rest of the same cloud goes salmon-red,
+  further from neutral than it was, on the other side. As it ships, the two
+  parts differ in display saturation (0.42 and 0.18), and a white point set on
+  one does not whiten the other.
+- **Every clear sky loses its blue.** Steel blue, deep blue and the corner blue
+  go flat grey (0.74 to 0.05, 0.92 to 0.04, 0.62 to 0.07), all but one patch on
+  NIR_1703. The trace found
+  cloud and clear sky on the same side of gray-world's white point, with one
+  hue; moving the white point to the cloud takes the sky with it.
+- **The foliage goes solid red.** The white and pale pink tips go (NIR_1651's
+  tree 0.77 to 1.00, NIR_1661's near pines 0.08 to 0.96). Red speckle spreads
+  from NIR_1651's crown into the sky, and a red fringe runs along NIR_1703's
+  treetops.
+- **So on the owner's raws, as on the practice copies (2026-09-28), moving the
+  white point alone breaks the look as it ships, and on NIR_1651 one white
+  point does not neutralise the whole cloud.** That agrees with option 10's
+  reading. No render here tests a look derived again at a moved white point,
+  which is 066's ground, so these renders do not establish that it would hold.
+
 ## Rank
 
 **After 015 (2026-09-26)**, which it now needs (Depends): turning the lens correction on at open changes what reaches these stages. 075 and 076 sit between (2026-09-27): they are the open path's two silent waits, share no ground with these stages, and were built beside 015. Below that, the order argued here stands.
@@ -927,3 +1004,6 @@ is the argument that puts it above 052.
 - NIR_3461.NEF, 2026-09-29: the same two sheets, fourteen stages. The dense cloud white at every stage; the clear band teal at the mixer, slate at the HSL mixer and blue at Sky saturation; the wires red and dotted from Sky colour smoothing on.
 - NIR_3466.NEF, 2026-09-29: the same two sheets, fourteen stages, and the road at 1:1 from the app's own render in both states: dark grey as opened, maroon with a fine red mottle under the chip. The cloud streak white at every stage.
 - NIR_3698.NEF, 2026-09-29: the same two sheets, fourteen stages. The clear sky grey after white balance, grey-green through the mapping and light blue at Sky saturation, paler toward the centre.
+- NIR_1651.NEF, 2026-09-29: option 10's D on the owner's raw, the Aerochrome chip at the white point chosen at open beside the same chip at the white point taken from the cloud, whole frame on screen. The traced band white-grey from the cloud; the rest of the cloud salmon-red, the clear sky flat grey, the tree solid red with red speckle spreading into the sky.
+- NIR_1661.NEF, 2026-09-29: the same two renders, whole frame. From the cloud the wisps white-grey and the whole sky flat grey; every tree red, the near pines included.
+- NIR_1703.NEF, 2026-09-29: the same two renders, whole frame. From the cloud the dense cloud grey-white as before, the blue corners and streaks mostly grey with a dark blue patch at the right edge, the trees solid red with a red fringe along the treetops.
