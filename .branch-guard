@@ -108,6 +108,15 @@ also=tools/palette-spec-check.mjs
 # functions are pure, so this needs no browser and costs milliseconds.
 also=tools/lens-store-check.mjs
 
+# Run on every commit: the diagnostic report's centre gains are the gains that
+# land. The line worked them out from the stored bins, so from 2026-09-17, when
+# every renderer began multiplying each colour curve by its area mean (decision
+# 015), it described a correction nothing applies — on every matched photograph,
+# beside a card that read the one source and gave different numbers. It reads
+# `lensGains` now; this holds each printed gain to `lensGains` at the centre bin
+# over every shipped profile. Pure functions, no browser.
+also=tools/lens-diagnostic-check.mjs
+
 # Run on every commit: a mask joins the one above it three ways (048) and all
 # three must survive. The union was added beside subtract and intersect, and the
 # old fold made intersect its default branch, so one careless edit could drop
