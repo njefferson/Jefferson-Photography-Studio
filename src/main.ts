@@ -34,9 +34,9 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
-import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, lensGain, LENS_GAIN_HI, LENS_GAIN_LO, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
+import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
-import { lensGains, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
+import { lensGains, lensCentreLine, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
@@ -1026,33 +1026,15 @@ function lensDiagnostic(): string {
   );
 }
 
-/** WHAT THE CORRECTION DOES TO THE MIDDLE OF THE FRAME, which is the only place
- *  a hot-spot lives and the only number that answers "why is it a blue circle".
- *  Read through the same `lensGain` the pipeline uses rather than from the
- *  stored bins, so it reports what LANDS and not what was measured — strength,
- *  bypass and the 0.5..2 clamp all included. */
+/** WHAT THE CORRECTION DOES TO THE MIDDLE OF THE FRAME, for the report. The
+ *  arithmetic is `lensCentreLine` in lensflat.ts, which reads the same
+ *  `lensGains` tables every renderer applies, so it reports what LANDS —
+ *  strength, bypass, the area anchor and the 0.5..2 clamp all included. It
+ *  worked this out from the stored bins until 2026-09-29 and so reported a
+ *  correction without the anchor, which nothing applies. */
 function lensCentreDiagnostic(): string {
   if (!current) return "nothing open";
-  const c = currentLensCurve();
-  if (!c) return "no correction on this photograph";
-  const s = params.lensBypass ? 0 : params.lensFix;
-  const kr = c.kr, kb = c.kb, bump = c.bump;
-  if (!kr || !kb || kr.length < 1) return `brightness only · centre ${bump ? lensGain(1 + bump[0], s).toFixed(3) : "1.000"}x`;
-  const gr = lensGain(kr[0], s), gb = lensGain(kb[0], s);
-  const gc = bump ? lensGain(1 + bump[0], s) : 1;
-  const ratio = gr > 1e-6 ? gb / gr : Infinity;
-  // Named rather than left as a bare number: the ratio is the finding, and a
-  // report that makes the reader judge whether 1.9 is a lot has not reported.
-  const verdict =
-    ratio >= 1.6 ? " — THE MIDDLE IS BEING PUSHED STRONGLY BLUE" :
-    ratio >= 1.25 ? " — the middle is being pushed noticeably blue" :
-    ratio <= 0.8 ? " — the middle is being pushed red" : " — close to neutral";
-  const clamped = [gr, gb, gc].filter((g) => g >= LENS_GAIN_HI - 1e-9 || g <= LENS_GAIN_LO + 1e-9).length;
-  return (
-    `red ${gr.toFixed(3)}x · blue ${gb.toFixed(3)}x · brightness ${gc.toFixed(3)}x` +
-    ` · blue over red ${ratio.toFixed(2)}x${verdict}` +
-    (clamped ? ` · ${clamped} of 3 hit the safety clamp — the measurement is out of range` : "")
-  );
+  return lensCentreLine(currentLensCurve(), params.lensBypass ? 0 : params.lensFix);
 }
 
 /** The curve for the frame the reader has open — both halves, from the two

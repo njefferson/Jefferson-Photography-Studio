@@ -8,7 +8,7 @@
 // float because nothing here clips. The gain arithmetic is the one source
 // compileEdit's in-grade stage (kept for 8-bit sources, which have no linear
 // copy) also uses, so the two cannot disagree about a ring.
-import { lensBin, lensGainsFor, type LensCurve } from "./pipeline";
+import { lensBin, lensGainsFor, LENS_GAIN_HI, LENS_GAIN_LO, type LensCurve } from "./pipeline";
 import type { DecodedImage } from "./decode";
 
 /** The per-bin gains one strength applies: red, blue and the brightness half on
@@ -40,6 +40,53 @@ export interface LensPlan {
 /** The gain tables — pipeline.ts's `lensGainsFor`, re-exported so every caller
  *  of this module reaches the one source rather than a second copy. */
 export const lensGains = lensGainsFor;
+
+/**
+ * WHAT THE CORRECTION DOES TO THE MIDDLE OF THE FRAME, as the diagnostic
+ * report's "Centre gains" line — the only place a hot-spot lives, and the only
+ * number that answers "why is it a blue circle".
+ *
+ * It used to work this out itself, from the stored bins through `lensGain`,
+ * and so it reported a correction nothing applies: no area anchor (the
+ * normalisation every renderer has carried since 2026-09-17), and a brightness
+ * half kept even where the renderers drop it for a length mismatch. Now it
+ * reads the one source, as the card's `centreEffect` does.
+ * @param curve  the matched curve (`currentLensCurve` in main.ts), or null.
+ * @param strength  the strength that lands: 0 under Bypass.
+ * @returns the line's text: the gain landing on red, blue and brightness at the
+ *   centre bin (red and blue each include the brightness half, as they do when
+ *   applied), blue over red with a named verdict, and how many of the three
+ *   factors sit at the 0.5..2 clamp.
+ * What the result must satisfy: every gain it prints equals `lensGains(curve,
+ *   strength)` at bin 0 to the three decimals printed — `gr[0]`, `gb[0]`,
+ *   `gg[0]`, or 1 where that is null — so it reports what lands.
+ *   `tools/lens-diagnostic-check.mjs` holds it there over every shipped profile.
+ *   Consumer: `lensCentreDiagnostic` in main.ts.
+ */
+export function lensCentreLine(curve: LensCurve | null | undefined, strength: number): string {
+  if (!curve) return "no correction on this photograph";
+  const g = lensGains(curve, strength);
+  const gr = g ? g.gr[0] : 1, gb = g ? g.gb[0] : 1, gc = g ? g.gg[0] : 1;
+  const colourOn = !!(curve.kr && curve.kb && Math.min(curve.kr.length, curve.kb.length) > 1);
+  if (!colourOn) return `brightness only · centre ${gc.toFixed(3)}x`;
+  const ratio = gr > 1e-6 ? gb / gr : Infinity;
+  // Named rather than left as a bare number: the ratio is the finding, and a
+  // report that makes the reader judge whether 1.9 is a lot has not reported.
+  const verdict =
+    ratio >= 1.6 ? " — THE MIDDLE IS BEING PUSHED STRONGLY BLUE" :
+    ratio >= 1.25 ? " — the middle is being pushed noticeably blue" :
+    ratio <= 0.8 ? " — the middle is being pushed red" : " — close to neutral";
+  // The clamp bounds each FACTOR (lensGain), not the product, so the colour
+  // halves are read back out of red and blue by dividing the brightness away.
+  // Float32 tables, so the edge is a tolerance rather than equality.
+  const hit = (v: number) => v >= LENS_GAIN_HI - 1e-5 || v <= LENS_GAIN_LO + 1e-5;
+  const clamped = [gc > 0 ? gr / gc : gr, gc > 0 ? gb / gc : gb, gc].filter(hit).length;
+  return (
+    `red ${gr.toFixed(3)}x · blue ${gb.toFixed(3)}x · brightness ${gc.toFixed(3)}x` +
+    ` · blue over red ${ratio.toFixed(2)}x${verdict}` +
+    (clamped ? ` · ${clamped} of 3 hit the safety clamp — the measurement is out of range` : "")
+  );
+}
 
 /**
  * Apply (or re-apply) the flat to a linear RGBA buffer in place.
