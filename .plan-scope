@@ -1,12 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=c63f26c4c28d79e5
-diffhash=0fc787847b99ea62
-verdict=IN-SCOPE: the NOTES diff is the production paragraph, the two staging entries and the Bold Pink line that Step 2 approves, and nothing beyond them
-# IN-SCOPE: every added line sits inside the plan's Step 2 NOTES work (the production paragraph, the two staging entries, the Bold Pink bullet), and no line adds an action, a claim about a person, or a fact that contradicts the plan.
-# - Production paragraph at the top of the staging section: covers the plan's first four bullets (PR 179 opened from staging and rebase-merged as 438ce77, Gates 972 and deploy 942, the live offline copy read naming it, staging matching file for file, and what it carried beyond v2.63.36).
-# - Detail the plan does not spell out: the cache name ips-2.64.4 and the list of what was carried, consistent with the Step 1 read and with entries already in NOTES.
-# - v2.64.4 entry, 5fc16cf, deploy 941, Gates 967: matches Step 2.
-# - v2.64 entry, 214cf9e, deploy 940, Gates 963: matches Step 2.
-# - Bold Pink roadmap bullet: the added sentence "On production from 2026-09-29." is the line Step 2 approves.
-# - Whole diff: only NOTES.md changes, with no pronoun for a person and no quotation of anyone. Cosmetic only: one long line in the production paragraph is not wrapped like its neighbours.
+planhash=943188a1fccf26a3
+diffhash=c1132a2836034d76
+verdict=IN-SCOPE: the diff is record 084 redone around the owner's tool, with its renders, the 4b-xi findings and the roadmap bullet, and nothing beyond Step 1
+# IN-SCOPE: the diff is Step 1 only (record renamed, the owner's tool stated as chosen, named swatches in Rejected, renders on both raws, 4b-xi findings, NOTES bullet).
+# - Scope: the renamed record, IR-SCIENCE.md and NOTES.md change; no src, roadmap rank or other record; nothing from Steps 2 to 5.
+# - Option 1 designs only how: swap chips, bands, one Strength, Save as a look. Options 2 to 4 sit in Rejected; none re-decides the tool.
+# - The NOTES bullet matches Option 1 and the record's Rank.
+# - The 4b-xi additions match the record's Looked up for Rob Shea, irlab.uk, Kennard, ON1, Kolari, the band moves, the strength controls and the tablet points.
+# - Three wording points from this reading were applied before the commit: the 30-degree band is named as the Sky box's centre under the swap; Kolari's move is for white or yellow foliage, as 4b-xi says; and the green-reassigned readings are said to differ from the stated results rather than to contradict them.
+# - Earlier watchers on this step found support gaps (the one-box renders, the first round's points, three off-question options); each was fixed before this reading.

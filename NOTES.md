@@ -2106,13 +2106,14 @@ user-scalable=no.
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
 
-- [ ] **A foliage colour and a sky colour, chosen by name** <!-- decision: 084 -->
-  **Shown as:** Choose a colour for the foliage and one for the sky from named swatches, each showing its name and angle, and the photo takes them.
-  Asked 2026-09-29, for later. The sources describe an infrared result as a
-  foliage colour and a sky colour; here every hue control but one is a shift
-  or a fixed mapping, and the two boxes named Sky and Foliage act on each other's subject as a
-  photo opens. Two rows of named swatches write destinations onto those
-  boxes, which learn to find their subjects from the photograph. After Big
+- [ ] **HSL adjustments and channel swaps, for making infrared looks** <!-- decision: 084 -->
+  **Shown as:** One panel for making a look: pick a channel swap from a row of named ones, adjust the colours on top of it, set its strength, and save it as a look.
+  Asked 2026-09-29, for later. Making a look is a remap and then colour-band
+  moves (IR-SCIENCE 4b-xi); here the swap is on the IR tab, any other remap is
+  nine typed numbers on the Grade tab, and the bands are on the Colour tab. One
+  panel gathers them: swap chips written onto the existing swap and mixer, the
+  eight bands entered from the photo, the Sky and Foliage boxes keyed on where
+  the subjects sit after the swap, one Strength, and Save as a look. After Big
   image, before the screens are assessed.
 
 - [ ] **Housekeeping: walks that cannot see what they claim, and paths into dead sessions** <!-- decision: 083 -->

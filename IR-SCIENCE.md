@@ -1671,6 +1671,52 @@ an inference; no source says so.
   Temp slider. This app's two named colour boxes do something alike on a frame
   as it opens (decision 084).
 
+**The remaps' own results, researched again 2026-09-29 for the redone 084.**
+Three web-only researchers; each claim below carries the read status it was
+returned with.
+- **Rob Shea's Photoshop actions (v3, read) state their mixer settings.** The
+  RB Swap sets the red output to 0 red and 100 blue and the blue output to 0
+  blue and 100 red, with green unchanged. "G to R" also sends green fully to the
+  red output, "G Split" sends it half to red and half to blue, and "G to B"
+  sends it fully to blue. Invert is an Invert layer in Color blend mode, and
+  Hue 180 is a Hue/Saturation layer shifting every hue by 180 degrees.
+- **Rob Shea's Lightroom swap profiles (read) state the result of each.** Hue:
+  orange foliage, blue sky. Invert: complementary colours, brightness
+  untouched. RB: orange foliage, teal sky. RB G-B: yellow and purple. RB G-R:
+  red and green. RB G-Split: orange foliage, a natural blue sky. The profiles
+  need the base profile pack, and white balance is set after applying one.
+- **irlab.uk (read)** is a browser app that installs to a home screen and works
+  offline. Its swaps are R and B, G and B, R and G, and a rotation each way. It
+  sets white balance before or after the swap, and exports a .cube file.
+- **Kennard's rotation (read):** red output from blue, green from red, blue
+  from green, giving candy-pink foliage and a greenish sky. It is the mapping
+  this app's Film rotation chip carries.
+- **Rob Shea's ON1 presets (read)** name ten or eleven swap methods (Amber,
+  Gold, Flamingo, Invert, Pink, Mint, Rose, Split, Swap, White), each giving
+  different sky and foliage colours. No mapping is stated.
+- **The band moves practitioners make after the swap (read).** Kolari's
+  Photoshop tutorial desaturates the reds, greens and yellows and raises their
+  lightness, and turns yellow's hue to taste for white or yellow foliage;
+  Kolari's advanced page takes yellow's saturation to 0 and raises its
+  lightness for white leaves. A Digital Camera World tutorial for Affinity,
+  made on an ordinary photograph, raises cyan's saturation and lowers its
+  luminosity to deepen the blues. A search summary (snippet) says Lightroom
+  still reads a swapped blue sky as orange, so its targeted picker finds the
+  band better than its name.
+- **A strength control on a look is common.** Luminar's Mood slider (default 30
+  of 100, read), ON1's effect opacity (read), Kolari's Soft and Deep LUT pairs
+  (read), and Photomator's LUT intensity (read).
+- **On a tablet (read unless marked).**
+  - Lightroom on the iPad swaps only through a profile installed from a
+    desktop, because iOS cannot install profiles (Rob Shea).
+  - Affinity Photo 2 and Pixelmator Pro on the iPad have a channel mixer.
+  - Darkroom has eight HSL bands with a picker, and no mixer.
+  - Swap RGB offers RG, RB and GB swaps with an amount slider.
+  - Photoshop on the iPad appears to have no channel mixer (snippet; Adobe's
+    page refused).
+  - A Lightroom mobile forum thread reports its hue slider reaches only
+    neighbouring hues.
+
 **Hosts refused on this topic.** Confirmed by a skeptic as refused by this
 environment's egress proxy: murrayfoote.com, www.capturelandscapes.com,
 www.keptlight.com, elements.envato.com, infraredatelier.wordpress.com and
@@ -1684,6 +1730,13 @@ earthobservatory.nasa.gov and gridfiti.com. Refused by the site
 itself: photographylife.com (402) and robertreiser.photography (410).
 helpx.adobe.com answered 403 to the web fetcher, and to plain requests from the
 editors' skeptic; the tablet researcher read its pages with plain requests.
+In the second round, as the researchers reported them: 403 from
+helpx.adobe.com, userguides.dxo.com, support.captureone.com and www.alex-kunz.com;
+a challenge page from www.keptlight.com and rawpedia.rawtherapee.com; a redirect
+from youtube.com; and refused by this environment's egress proxy,
+order.robsheaphotography.com, www.on1.com, exposure.software,
+marketplace.skylum.com, lifeafterphotoshop.com, fullspectrumuk.com,
+discussions.apple.com, gentlemencoders.com and 9to5mac.com.
 
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 
