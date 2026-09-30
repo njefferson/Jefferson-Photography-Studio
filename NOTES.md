@@ -54,7 +54,43 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**Nothing is waiting to be promoted, 2026-09-29.** v2.64.4 went to production
+**v2.64.18 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-30 (f9dd4b8).** Production's code plus two changes (071).
+- The report's Offline worker line says what a waiting worker of the same
+  version answered when the page asked it to take over. Either it took over,
+  or it declined because it is another build, because files are missing from
+  its offline copy (it names the first), or because more than one window is
+  open. If its check fails, the report says that too. The offline walk checks
+  the cache-gap refusal, and that the takeover and all three refusals reach
+  the report in words (25 to 29). Each goes red under a planted defect.
+- The test page's "What makes the picture code slow to build" builds six ways.
+  The new two move the mask settings into uniform blocks, and into a texture:
+  071 option 8's two routes. Every first picture is now really drawn. By
+  WebGL2's own rule every earlier reading's first-picture time was a refused
+  draw; that was measured headless here, not on the PC (071).
+
+Staging's offline worker was read naming f9dd4b8 as `ips-2.64.18`, and the Gates
+run (988) and the deploy (948) for it both passed. Checked headless:
+- all six rows build and draw, and two planted copies (a changed declaration,
+  a fourteenth mask array) make the new two print "not run";
+- a planted refused draw prints "did not draw" with no time on every row;
+- the offline walk passed (31 checks), and each plant turned exactly its own
+  checks red;
+- the agreement walk, the build-wait walk and the accessibility walk (205
+  checks) passed.
+
+**The device pass:** one run on the PC in Firefox. Open
+https://staging.jefferson-photo-studio.pages.dev/debug.html and press "What
+makes the picture code slow to build". It runs six builds, and each
+as-shipped build has taken about 42 seconds on that PC, so allow several
+minutes. Then press "Copy the results" and send everything it copies. The
+report above the rows carries the Offline worker line, which is this pass's
+other half. It says what happened to a waiting update: taken over, or
+declined and why. If nothing was waiting when the page loaded, the line says
+so, and that half waits for the next update. Nothing here goes to production
+until the go.
+
+**Nothing was waiting to be promoted, 2026-09-29.** v2.64.4 went to production
 on the go the same day, by pull request 179 opened from `staging` itself and
 rebase-merged as 438ce77. Production serves the offline copy `ips-2.64.4`, read off the live site naming
 438ce77, and the Gates run (972) and the deploy (942) for 438ce77 both passed.

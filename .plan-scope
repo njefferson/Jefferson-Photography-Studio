@@ -1,10 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=0fd05b51e61ffa2c
-diffhash=54b0e910b523bbac
-verdict=IN-SCOPE: step 4 — the test page's two option-8 variants (uniform blocks, a texture) with not-run guards, every sampler bound so the first picture really draws, a failed draw printed without a time; the editor's own program unchanged; record 071 says what the refused draws meant; the module map's line count regenerated
-# Scope watcher, 2026-09-30, on steps 3 and 4 of the plan, reading the plan by path and the diff:
-# IN-SCOPE (step 4): two rewrites of copies of FRAG on the test page (masksToBlocks, masksToTexture), each with a prep binding a zero buffer or texture, and a "not run" guard on the declared set and the sites; timedBuild prints the driver's log on a failed build; bindSamplers and the err field are the support the variants need to really draw; src/gl.ts, src/pipeline.ts and src/main.ts have no diff, so the editor's own program is unchanged.
-# Problems named and fixed before this record: record 071's "every device" now names WebGL2's validation rule as its basis; the PC's build/draw split is taken from the PC's own report (42,418 + 2.0 ms); option 8's threshold is a same-run comparison, since the earlier 715 and 789 ms included a refused draw.
-# Also fixed before this record, from the review workflow: a variant whose first draw fails prints no time and is not compared (made to fail with a planted refused draw); buildingThePictureCode honours the error; the draw is timed without setup; comments stripped before counting (53 reads, not 54); a guard on new or resized mask arrays (made to fail with a fourteenth array); the doc comment names six ways.
-# The generated module map (docs/ARCHITECTURE.md) changes only the test page's line count.
+diffhash=59ffb54811669696
+verdict=IN-SCOPE: plan step 5 — the NOTES staging entry for f9dd4b8 (ips-2.64.18, Gates 988, deploy 948) naming the one PC run
+# Scope watcher (a subagent reading the plan by path), 2026-09-30: IN-SCOPE for plan step 5, one staging entry naming the single PC run; closes nothing the plan leaves open and picks nothing for the owner. Its three minor points were fixed before this record: when the worker line can answer is now stated, the refused-draw claim names its basis (WebGL2 rule, measured headless, not on the PC), and the time estimate rests on the PC readings.
