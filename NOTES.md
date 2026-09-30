@@ -1106,9 +1106,14 @@ user-scalable=no.
   about 5 to 6.5% at the centre. The second check (2026-09-30) says that cut is the
   lens's own cast coming off. On the same three raws, neutral things at the centre
   move toward the same material at the frame's edge and never cross it, and the
-  field's standard correction removes a hot spot's colour the same way. So leaving
-  the correction as it is is the likely answer, and it is a look choice. Nothing is
-  built.
+  field's standard correction removes a hot spot's colour the same way. The third
+  check (2026-09-30) measured brightness on whole frames of six raws at strengths 0
+  to 1.5, which the second did not. In the rendered picture under Aerochrome the
+  middle brightens and the outer frame darkens on all six. On the four tree frames,
+  at strength 1, 43 to 56% of the darkest third within radius 0.2 is more than 5%
+  darker than at 0. On one frame a cloud at the middle turns from neutral toward
+  blue from 1, plainly at 1.25 and 1.5. The recommendation to leave it rested on colour alone and is withdrawn.
+  Nothing is built.
 
 - [ ] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
   **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.

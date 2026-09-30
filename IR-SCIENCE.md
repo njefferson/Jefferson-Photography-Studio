@@ -4750,6 +4750,14 @@ gains that differ the same way, and gray-world absorbs that. At other strengths 
 hold exactly. This is arithmetic from `lensGain` and `grayWorldWB`, not a measurement.
 A flat measured under one light can miscorrect scenes under another (markshelley.co.uk in visible light; Hagen 2014's simulations of quantitative work, decision 085), and what light this correction's profile was measured under is not recorded.
 
+**In the rendered picture it changes brightness as well as colour (decision 085, "Third check", 2026-09-30).** Measured on
+six of the owner's raws under Aerochrome, whole frames, strengths 0 to 1.5. At strength 1 the correction changes the linear
+copy's middle by 0 to 4%, while the rendered picture brightens in the middle, by 6 to 57%, and darkens in the outer band, by
+8 to 15%. Where after decode that difference arises was not measured. On the four tree frames, at strength 1, 43 to 56% of
+the darkest third within radius 0.2 is more than 5% darker than at 0 while the bright parts there brighten, and on one frame
+a cloud at the middle turns from neutral toward blue from 1, plainly at 1.25 and 1.5. The second check above measured colour on neutral things at
+strength 1 only.
+
 **Refused on this topic:** rawpedia.rawtherapee.com (challenge page),
 helpx.adobe.com, support.captureone.com and userguides.dxo.com (403), blog.kasson.com
 (403), www.edwardnoble.com (503), and siril.readthedocs.io, docs.rawtherapee.com,

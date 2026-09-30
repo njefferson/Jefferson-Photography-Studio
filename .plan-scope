@@ -1,29 +1,18 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=6c15a77508194d98
-diffhash=8330fc26db7c4681
-verdict=IN-SCOPE: third scope check on record 071 (plan Part 1 step 3): only record 071 is edited, no code, no other record; every addition serves step 3; no route is chosen or rejected; its accuracy notes were fixed in the text, from the sources it named, before this record
-# Scope check, third pass, on record 071 (plan Part 1 step 3), by a subagent reading the plan by path and the diff against the work branch's copy of the record.
+diffhash=ce25d848eaf35cc3
+verdict=IN-SCOPE: second scope check on record 085's third check, NOTES and IR-SCIENCE (plan Part 2 step 4): docs only, no remedy or look chosen, no other record or code; its six accuracy problems were fixed in the text, with the pampas sky box re-measured, before this record
+# Scope check, second pass, on record 085's third check, NOTES.md's 085 bullet and IR-SCIENCE §9r (plan Part 2 step 4), by a subagent reading the plan by path, the diff, the whole record, the measurement files and the pictures.
 # 
-# Verdict line as returned: IN-SCOPE: the diff edits only record 071 (no other record, no code), every addition serves plan Part 1 step 3 (the v2.64.18 reading, option 8 measured, options 9 to 12 with what was found for and against, the software route rejected with its reason, Rank and Depends updated), and no route is chosen or rejected. The problems below are over-claims and one-sided omissions to fix, not scope drift.
+# Verdict line as returned: IN-SCOPE: the diff is docs only (record 085, NOTES.md's 085 bullet, IR-SCIENCE §9r), it is Part 2 step 4, it chooses no remedy or look, and it changes no other record or code.
 # 
-# It confirmed all 13 fixes from the second pass present, and the reading, skeptic counts, staging version, StructuredBuffer conditions, X-codes, neotolis and OneJS figures correct, and the Rank change one sentence that moves nothing.
+# It confirmed every frame named has a Looked at entry, and these figures match the files: sky at one height, the band-mean alternatives, the cloud chroma and sRGB, the linear middle and outer band, the per-strength ranges, the plants, and the darkest-third shares and medians.
 # 
-# Its accuracy notes, each fixed in the text before this record was made:
-# - DXC issue 8958 listed under "Firefox slower than Chrome in each": it was measured on an M4 Mac under macOS with DXC 1.9 and no browser (read through WebFetch this session). Now its own bullet with its platform, in option 10 and in Looked up.
-# - Option 12 gave only the tile rate; the export rate (46.8 s on one thread for 20.9 MP, NOTES 2.40) added, with the preview-size arithmetic marked as arithmetic.
-# - Option 11 did not say what the interim picture is: now "the photograph with no mask's effect".
-# - DXC's [unroll] refusal: "by default", the threshold and the 2016 language-version escape restored; its relevance to a WGSL port marked not shown.
-# - ANGLE's new pixel shader for a new target layout: now says what a rebuild would cost option 9's loop-free program is not measured.
-# - EXT_float_blend: marked as mattering only for blending into float32 targets, not shown to be needed.
-# - GEGL and RawTherapee: their thin sources named (one operation's description; an issue author's statement in a feature request).
-# - Affinity: "large amounts of compositing work" in place of "layer count".
-# - "28 loops": now 10 loops over masks in the source, about 28 once the helpers are inlined.
-# - The 2023 test and the second project named (mvaligursky/webgl-parallel_shader_compile; neotolis-engine issue 575).
-# - "an estimate no source bears on": now the port's size is not estimated here.
-# - Quotes restored in full ("seem to get processed nicely ... (some DTs are slightly longer)"; "the functionality to effectively implement ubershaders").
-# - darktable's CPU preview: marked as the default of a preference.
-# - The 60-slot budget: now 60 registers, a non-instanced block counting one, read in Firefox's copy of ANGLE's source (kMaxAllowToUseRegisterCount; lines 210 to 211 set 1 for a non-instanced block).
-# - "a first launch after a release" and "paid once per release": now "a release that changes the picture code".
-# - The Rank's sky-records sentence: now says option 9, if chosen, would change how the mask-gated stages get their weights, and that the edge is declared when a route is chosen.
-# - The bold "9 to 12 are not rejected and not chosen" bullet: tools/decisions-check.mjs passes with it (exit 0).
+# Its six accuracy problems, each fixed before this record:
+# 1. "drops up to 7% of a ring" held only for the middle; recomputed from rings.json's counts (up to 23% of an outer ring on NIR_1661, 44% on NIR_1703) and stated.
+# 2. "the centre never falls below the edges" was false on the pampas; now "never falls below where it stood against the edges at 0", on two frames, with the oak's boxes placed near the top of the frame (about radius 0.39). The pampas centre box was re-measured with every pixel counted (0.62, 0.74, 0.82), since the pixels the red filter had dropped there were the red spot in the sky.
+# 3. The outer frame's darkening: now "mostly its sky", with NIR_1661's and NIR_1703's non-sky edge pixels holding within 3% or brightening; the pictures sentence names the four frames where the corners visibly darken.
+# 4. Which instrument and frame each plant covered is now listed, including that the capture's ring figures had only the strength-0 self-check.
+# 5. The half-size copies and the thirds' exclusions are stated, and "the middle" is defined for rings and thirds.
+# 6. "9 to 89%" is now "9 to 88%"; the cloud now turns "toward blue from 1, plainly at 1.25 and 1.5" in the record, NOTES and IR-SCIENCE.

@@ -199,9 +199,11 @@ day ("First check, 2026-09-29", below). The foliage that whitens does not pass
 white; its colour is flattened from white balance onward, by the correction's
 own colour half. So clip control does not answer this defect, and option 6
 names what the check found. The second check (2026-09-30, below) answers
-option 6's question: the cut is the lens's own cast coming off. That makes 5,
-leave it, the likely answer. It is not chosen here, because what the centre
-foliage should look like is a look choice, shown and not described.
+option 6's question for colour: the cut is the lens's own cast coming off. It
+made 5, leave it, look like the likely answer. The third check (2026-09-30,
+below) withdraws that: the second check measured colour only, and in the
+rendered picture the correction also changes brightness across the whole
+frame. Option 7 names what it found. None is chosen.
 
 1. **Clip control: hold the corrected values under white with one shared
    factor, computed from the photograph.** Chosen 2026-09-29, and not
@@ -252,6 +254,15 @@ foliage should look like is a look choice, shown and not described.
    hot spot's colour (Looked up), and a red-foliage rendering shows the hot
    spot as red at the centre. So part of the centre foliage's red at strength 0
    is the lens's.
+7. **What the correction does to brightness in the rendered picture,
+   measured (2026-09-30).** Under Aerochrome, raising the strength brightens
+   the middle and darkens the outer band on all six raws measured, while the
+   linear copy moves by 0 to 5%. On the four tree frames, at strength 1, 43 to
+   56% of the darkest third within radius 0.2 is more than 5% darker than at 0.
+   On NIR_1703 a cloud at the middle turns from neutral toward blue from 1,
+   plainly at 1.25 and 1.5
+   ("Third check", below). A remedy is its own record once the cause is known;
+   this option is the finding, as 6 is.
 
 ## Rejected
 
@@ -276,9 +287,12 @@ foliage should look like is a look choice, shown and not described.
   matched frame opens at.
 - **Re-opened with the Options (2026-09-29).** 2 to 5 were rejected against
   clip control. With none chosen, 5 is live again under option 6: if the cut is
-  the lens's own cast coming off, the correction is right and leaving it is the
-  answer. The second check (2026-09-30) found exactly that, so 5 is the likely
-  answer. Its objection above still describes the pictures: the leaves at
+  the lens's own cast coming off, the correction is right in colour. The second
+  check (2026-09-30) found that, and 5 looked like the likely answer. The third
+  check (2026-09-30) withdraws that: the second check's basis was colour alone,
+  and the correction also changes brightness in the rendered picture, which it
+  did not measure. Whether that change is wanted is a look choice. Its
+  objection above still describes the pictures: the leaves at
   strength 1 are paler than at 0. What changed is what that paleness is: less
   of the hot spot's red on them. The check measured the neutral things beside
   the leaves, not the leaves, and the gaps it left at 1 may be hot spot still
@@ -442,6 +456,187 @@ gain is not a plain scale of `k`, and this arithmetic does not hold exactly.
 
 **Not tested.** Any remedy; any other look; anything on a device.
 
+## Third check, 2026-09-30: brightness across the whole frame
+
+**Why it was run.** The first check read colour in a 1:1 crop of the centre. The
+second read colour on nine regions, in six pairs of centre against edge. Neither
+measured brightness, and neither looked above strength 1, while the slider runs
+to 1.5. A centre that gets dimmer beyond some point was then reported on the
+whole picture. This check measures brightness on whole frames across the
+slider's whole range.
+
+**What was run.**
+- Six of the shared raws, all under the Aerochrome chip:
+  - the record's three, NIR_1376.NEF, NIR_3716.NEF and NIR_3700.NEF;
+  - three more with sky or foliage across the frame: NIR_1651.NEF, NIR_1661.NEF
+    and NIR_1703.NEF. NIR_1651 and NIR_1661 are upright frames.
+- The capture build was a copy of today's build with one added read-back
+  function. Each raw was opened in it once and captured as it opened, at
+  strength 1. The slider was then moved to 0, 0.25, 0.5, 0.75, 1, 1.25 and 1.5,
+  as a reader moves it, and the slider's and the applied strength's values were
+  read back and matched at each step.
+- What was measured is the picture the app's renderer draws, read back
+  offscreen at 2800 by 1864 in the photograph's stored orientation, and the
+  linear working copy. The canvas on screen was hashed at each step but not
+  measured, and the read-back was not compared with it.
+- On NIR_1376.NEF alone, the shipped build and the capture build were driven
+  through the Aerochrome chip, then 1, 0 and back to 1, and hashed alike at
+  every step. The other five were not compared with the shipped build.
+- Brightness is Rec. 709 luminance of the rendered picture, decoded from sRGB to
+  linear light. The linear copy's figure is the mean of its three channels.
+- Each pixel is compared with the same pixel at strength 0, so the scene's own
+  content cancels. Distance runs from 0 at the centre to 1 at the corner.
+- The ring figures are means of those per-pixel ratios. They leave out pixels
+  whose luminance at strength 0 is under 0.01 or over 0.95, or whose luminance
+  at the step is under 0.005 or over 0.99. That drops 0 to 7% of the middle on
+  every frame, and 0 to 4% of the outer rings on four of them, but up to 23% of
+  an outer ring on NIR_1661 and up to 44% on NIR_1703, whose corners are dark;
+  their outer-band figures rest on what is left.
+- Pixels are also split into thirds by their brightness at strength 0, across
+  the whole frame, because a ring's figure mixes the parts that rise with the
+  parts that fall. The middle is radius under 0.1 for the ring figures and
+  under 0.2 for the thirds.
+- The thirds, the sky boxes and the cloud box are read from half-size copies of
+  the rendered picture (1400 by 932, 8-bit, each pixel the mean of four). The
+  thirds leave out pixels at or under 0.003, or at or over 0.97 at strength 0
+  and 0.99 at the step.
+- What each instrument was made to fail on:
+  - the ring figures in the capture (the middle, the outer band, the linear
+    copy): strength 0 against itself reads 1.000 in every ring. No plant was
+    run through them;
+  - the sky-and-other rings, on NIR_1376: a planted brightening of the centre
+    by 1.2 reads 1.200, a darkening by 0.8 reads 0.800, and a plant of nothing
+    is refused;
+  - the thirds, on NIR_1651: a planted darkening of the darkest third inside
+    radius 0.2 reads 0.800 with the brightest third unmoved, and a plant of
+    nothing is refused;
+  - the boxes, on the NIR_1703 cloud: a planted darkening by 0.8 reads 0.800,
+    and a plant of nothing is refused;
+  - the picture sheets: a short capture is refused (not kept).
+  The outputs of the rest are kept beside the captures.
+
+**What the pictures show.** On the oak, the towers, NIR_1651 and NIR_1703 the
+corners visibly darken as the strength rises; on the pampas and NIR_1661 that
+shows in the maps and the figures. In the middle, lit foliage and pale ground go
+brighter and paler. On NIR_1703.NEF, conifers under cloud, a pale blue patch
+opens in the cloud at the middle at 1.25 and 1.5.
+
+The maps of each pixel's change against strength 0 show one more thing, on the
+oak and the two pine frames NIR_1651.NEF and NIR_1661.NEF: the trunk and the
+shadowed branches in the middle get darker, while the lit leaves around them get
+brighter. On NIR_1703 grey patches of the middle's cloud get darker at 1.5. By
+eye on the whole frames, the dark parts of the middle look about the same at
+every strength on the oak, NIR_1651 and NIR_1661. So on those three the dimming
+shows in the maps and the figures, not plainly in the pictures at the size they
+were opened.
+
+**Figures.** Most are given at strength 1, where every matched frame opens, and
+at 1.5.
+- **The middle** (radius under 0.1), all counted pixels: brighter on all six,
+  by 6 to 57% at 1 and 9 to 88% at 1.5. Taken instead as the ratio of the
+  ring's mean luminance, it is 6 to 54% at 1 and 9 to 76% at 1.5; the top of
+  the range depends on the method.
+- **The outer band** (radius 0.7 to 1): darker on all six, by 8 to 15% at 1 and
+  10 to 22% at 1.5 (as a ratio of means, 7 to 11% and 10 to 16%). That is
+  mostly its sky: on NIR_1661 and NIR_1703 the pixels at the edge that are not
+  sky hold within 3% or brighten (0.976 to 1.062 in the outermost
+  rings).
+- **The darkest third inside radius 0.2, on the four tree frames** (the oak,
+  NIR_1651, NIR_1661, NIR_1703).
+  - The share of it more than 5% darker than at 0:
+    - at 0.5, 34%, 8%, 59% and 10%;
+    - at 1, 54%, 43%, 55% and 56%;
+    - at 1.5, 46%, 34%, 44% and 67%.
+  - Of the strengths read by tone (0.5, 1, 1.25, 1.5), the share is largest at
+    1 on the oak and NIR_1651, at 0.5 on NIR_1661, and still growing at 1.5 on
+    NIR_1703.
+  - Its median, as a ratio to 0: 0.928, 0.990, 0.909 and 0.946 at 1, and
+    0.989, 1.107, 1.023 and 0.924 at 1.5. So as a whole it is darker at 1 on
+    three of the four and unchanged on NIR_1651, and at 1.5 darker only on
+    NIR_1703.
+  - The brightest third inside the same radius rises by 5 to 35% at 1.
+- **The same darkest third on the towers and the pampas**: brighter, a median
+  of 1.593 and 1.151 at 1, with 1% of it more than 5% darker.
+- **Sky at one height**, on two frames, the second check's regions: a box at
+  the middle of the width against the two edges at the same height. On the oak
+  the centre sky is 1.03 times the edges' mean at 0, 1.13 at 1 and 1.19 at 1.5;
+  those boxes sit near the top of the frame, so its centre box is at about
+  radius 0.39, not the middle. On the pampas, at about radius 0.13, it is 0.62
+  at 0, 0.74 at 1 and 0.82 at 1.5. On both, the centre never falls below where
+  it stood against the edges at 0.
+- **The cloud at the middle of NIR_1703** (a box above the tree line, x 0.40
+  to 0.55 and y 0.36 to 0.50 of the frame, with the 4% of it that is a red tree
+  tip left out). Its luminance rises by 5% at 1 and 8% at 1.5. Its colour moves
+  from neutral to blue: chroma, the mean over its pixels of the largest channel
+  minus the smallest, of 255, is 4 at 0, 18 at 1, 32 at 1.25 and 48 at 1.5. Its
+  mean sRGB is 216, 213, 215 at 0 and 194, 226, 242 at 1.5.
+- **The linear working copy**, before exposure and the look, which is the
+  profile's own effect as applied. At 1, its middle is 0.981, 0.986 and 0.964
+  of its value at 0 on the oak, NIR_1651 and NIR_1661, and 1.004, 0.999 and
+  1.004 on the towers, the pampas and NIR_1703. At 1.5 the lowest is 0.948, on
+  NIR_1661. Its outer band moves by under 1% on all six at either strength.
+
+So at strength 1 the linear copy's middle changes by 0 to 4% and the rendered
+middle by 6 to 57%; at 1.5, by 0 to 5% and by 9 to 89%. Exposure was not read at
+each step, so which stage after decode makes the difference is not measured. The
+first check found that at the centre the correction cuts blue against red, and
+that Aerochrome's green output carries minus 1.44 times the matrix's blue. A blue
+cut would raise brightness where it lands, which fits the brightening; it was not
+measured here. Also not measured: why the darkest third falls on the four tree
+frames and rises on the other two. The linear middle does not explain it: it
+falls on three of the four tree frames and not on NIR_1703.
+
+**What it supports.**
+- The middle does get dimmer, in part, on the four tree frames. At strength 1,
+  43 to 56% of the middle's darkest third is more than 5% darker than at 0, and
+  as a whole that third is darker on three of them. On NIR_1703 the share keeps
+  growing to 67% at 1.5; on the other three it is largest at or below 1.
+- Meanwhile the middle's bright parts brighten, and the outer band darkens on
+  all six, mostly through its sky.
+- In sky at one height, on the two frames measured, the centre never falls
+  below where it stood against the edges at 0: on the pampas it closes on them
+  from below, and on the oak, near the top of the frame, it rises above them,
+  1.19 times at 1.5.
+- On NIR_1703 the correction also turns the middle's cloud from neutral to
+  blue, a little at 1 and plainly at 1.25 and 1.5. The second check found that
+  neutral things at the centre stop short of the edge at strength 1; it did not
+  look above 1, and it had no cloud. Whether this cloud is neutral in the scene,
+  and so whether this is the correction taking more than the lens put there, is
+  not known. 069's defect is also a cloud going cyan, which this record's
+  Depends attributes to the white point.
+- None of the earlier checks could see the brightness change. The first read
+  colour in a crop, the second colour on neutral regions.
+- The second check's finding stands for colour: the centre's cut is the lens's
+  own cast coming off. Its recommendation to leave the correction as it opens
+  rested on colour alone, and it is withdrawn. Whether the change in brightness
+  is wanted is a look choice, not decided here.
+
+**Caveats.**
+- One look, Aerochrome. A look that maps colour to brightness differently may
+  not show this.
+- Six raws, one camera. Which lens, focal length and aperture each was taken
+  at, and so which profile applied, was not read here.
+- "More than 5% darker" is a threshold chosen for this check, not a figure for
+  what an eye can see.
+- The pictures were measured as the renderer draws them offscreen, not as the
+  canvas shows them.
+- For the oak, the towers and the pampas, the four-panel sheet and a change map
+  were opened before any figure was read; their eight-state sheets were opened
+  afterwards.
+- The app does not come back to its opening picture. As opened at 1, and at 1
+  after the slider has moved, the capture build's pictures hash differently on
+  all six raws, and on NIR_1376 the shipped build does the same. The ring
+  figures for the two agree to within 0.00001. Where the difference comes from
+  is not established.
+- The sky on NIR_1651, NIR_1661 and NIR_1703 carries stepped banding at strength
+  0 as well. It was not examined.
+- Whether this is what was seen on the device is not known. Which look and
+  which photograph showed it was not recorded.
+- The cloud box was placed by eye on the whole frame at 1.5, where the blue
+  patch shows; it is one box on one frame.
+
+**Not tested.** Any remedy; any other look; anything on a device.
+
 ## Rank
 
 First, where 015 stood, now that 078 is archived. Re-opened for research
@@ -450,7 +645,9 @@ changes the centre colours 013's foliage is tuned against, and pushes pale
 bright values past white where 069's clouds are, so either one tuned first
 would be tuned again. It goes above both. The second check (2026-09-30) leaves
 it first: until 5 is settled, 069 and 013 do not know which centre they are
-tuned against.
+tuned against. The third check (2026-09-30) keeps it first: in the rendered
+picture the correction changes brightness across the whole frame, and 069's
+clouds and 013's foliage are both judged in it.
 
 ## Looked at
 
@@ -512,3 +709,57 @@ touches `applyLensFlat` or `lensGainsFor` (read in their diffs).
   and 1: three boxes on the sky near the top, one above the crown and one at
   each edge. At 0 the sky above the crown is a grey teal and the edges a deeper
   blue; at 1 the gradient is gentler and the crown's sky is bluer.
+- NIR_1376.NEF, 2026-09-30, the third check's eight whole frames side by side
+  (as opened, then 0, 0.25, 0.5, 0.75, 1, 1.25 and 1.5 after the slider), the
+  four-panel sheet (0, as opened, 1, 1.5) and the change map at 1. At 0 a warm
+  grey halo sits in the sky around the crown; by 0.5 it is fainter, and at 1 to
+  1.5 the sky is an even blue while the upper corners go a deeper navy. The
+  crown pales a little from 0 to 1.5. In the map the trunk and main branches
+  are darker than at 0, the leaves around them brighter, and the outer frame
+  darker.
+- NIR_3716.NEF, 2026-09-30, the same eight frames, the four-panel sheet and the
+  change map at 1. At 0 the grass in the middle is a deep red; from 0.5 it
+  goes paler, and at 1.5 it is a pale pink-white, visibly brighter than at 0.
+  The bottom corners go darker. The red flare at the left and the pale streak
+  in the sky are the same at every strength. The map shows a bright disc in
+  the middle with the fence posts in it darker, and the outer frame darker;
+  the disc's edge looks sharper in the map than the ring means show, and it was
+  not examined.
+- NIR_3700.NEF, 2026-09-30, the same eight frames, the four-panel sheet and the
+  change map at 1.5. At 0 the sky between the two tower trees is a
+  brownish-grey patch with a red spot; by 0.5 it is grey, and at 1 and 1.5 a
+  slate blue like the sky around it. The plumes go whiter from 0.5 up. By eye
+  the slate at 1.5 reads darker than the brown-grey patch at 0, while the
+  second check's centre box there measures 0.0875 in luminance at 0 and
+  0.1081 at 1.5. In the map the plumes in the middle are brighter,
+  the dark tower tree on the left darker, and the outer frame darker, with
+  faint rings in the sky.
+- NIR_1651.NEF, 2026-09-30, an upright frame shown as stored, turned a
+  quarter: the same eight frames, the four-panel sheet and the change map at
+  1.5. From 0 to 1.5 the sky in the corners on the sky side goes from a lighter
+  teal to a darker navy, and the cloud at the far edge from bright cyan-white
+  to a greyer, duller tone. The foliage across the middle looks about the same
+  by eye at every strength. In the map the lit foliage in the middle is much
+  brighter, the dark branches inside it darker, and the foliage at the frame's
+  edge darker.
+- NIR_1661.NEF, 2026-09-30, an upright frame shown as stored, turned a
+  quarter: the same eight frames, the four-panel sheet and the change map at
+  1. At 0 the foliage in the middle carries a pink-red patch; at 1 and 1.5 it
+  has gone white like the rest of the crown. The sky beside it is a lighter
+  teal at 0 and a little more even above it. By eye the dark shadowed boughs
+  low in the middle look about the same at every strength; in the map they are
+  darker, and the lit foliage above and below them brighter.
+- NIR_1703.NEF, 2026-09-30, the same eight frames, the four-panel sheet, the
+  change map at 1.5, and a crop of the cloud at the middle (x 0.40 to 0.55, y
+  0.36 to 0.50 of the frame) at 0, 1, 1.25 and 1.5 opened beside them; a red
+  tree tip sits in the crop's lower left corner. The
+  upper corners go a deeper blue as the strength rises. The cloud in the
+  middle is an even white-grey at 0 and whiter at 1; at 1.25, and more at 1.5,
+  a pale blue patch opens in it just above the trees. In the crop the patch at
+  1.5 is lighter than at 0 and plainly blue; on the whole frame it read duller,
+  which was the white turning blue. In the map the lit edges of the trees in
+  the middle are brighter, grey patches of the cloud in the middle darker, and
+  the upper corners darker.
+- All six, 2026-09-30: as opened and at 1 after the slider look the same by
+  eye. The skies of NIR_1651, NIR_1661 and NIR_1703 carry stepped banding at
+  every strength, 0 included.
