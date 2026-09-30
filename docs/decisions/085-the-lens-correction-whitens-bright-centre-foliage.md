@@ -72,7 +72,14 @@ each claim against its source.
 **Second research, 2026-09-30**, on option 6's question: whether a hot spot
 carries colour, how a flat field treats that colour, and how the field checks
 it. One researcher and one skeptic, web only. The skeptic opened 37 claims'
-sources: 22 confirmed, 6 partly, none contradicted, 9 unreachable.
+sources: 22 confirmed, 6 partly, none contradicted, 9 unreachable. On
+2026-09-30 eleven hosts were opened to the session: the six the proxy had
+refused, then api.crossref.org, api.openalex.org, api.semanticscholar.org,
+ui.adsabs.harvard.edu and hagenlab.org (which did not connect). A second
+reading covered five of the unread claims. Hagen's abstract was read through
+Crossref and OpenAlex, not on the publisher's page, and claim 26 on
+markshelley.co.uk alone, one of the two pages first cited. With those, the tally is 24 confirmed, 8
+partly, 1 not supported at the page it was credited to, and 4 unreachable.
 
 - **A hot spot carries colour, not only brightness** (David Kennard, read,
   confirmed). Kennard's blog posts 1134, 1126, 976 and 978 report:
@@ -84,7 +91,15 @@ sources: 22 confirmed, 6 partly, none contradicted, 9 unreachable.
     infrared, corrected on its own with a curve;
   - CornerFix, profiled from a white card, taking the slightly red sky out.
 
-  None gives a number.
+  None gives a number. irrecams.de says the same without a measurement (read
+  2026-09-30, confirmed): "Often the blue channel of the image is more affected
+  by this, which is why a hotspot appears as a color blob", and in a monochrome
+  image it is "only very faint or not at all". A claim credited to
+  leeramsden.com, that a hot spot looks worse once processed in colour and takes
+  on the foliage colour inside the sky, is on none of that site's five infrared
+  posts (not supported). Kennard's 1126, above, says the part about colour: under
+  a red-foliage rendering the centre sky turns reddish. Nothing read says it
+  looks worse.
 - **Per-channel division is the field's standard, and removing a colour cast is
   what it is for.** RawTherapee, Siril and PixInsight do it, and so do the DNG
   SDK's GainMap, darktable, Lightroom's Flat-Field Correction and CornerFix (read
@@ -105,18 +120,40 @@ sources: 22 confirmed, 6 partly, none contradicted, 9 unreachable.
   - a published test with coloured light at the centre and in a corner (Bowman
     and others, arXiv 1911.13295).
 - **What goes wrong, as documented.**
-  - A flat whose light differs from the scene's (mostly snippets; the hosts were
-    refused).
+  - A flat whose light differs from the scene's. Read on 2026-09-30:
+    - Hagen, "Flatfield correction errors due to spectral mismatching" (Optical
+      Engineering 53(12), 2014; the abstract, read through Crossref and
+      OpenAlex, confirmed). Users have been told to make the flat's light "as
+      close as possible to that of the measurement object". The paper builds a
+      radiometric model, and "Simulations covering a variety of measurement
+      scenarios indicate that spectral mismatching can create quantitative
+      errors of up to a factor of 5 in situations that are regularly
+      encountered by researchers performing quantitative work". The abstract
+      is four sentences about quantitative measurement and names no
+      wavelengths; the paper itself was not read.
+    - The astro-imaging page at markshelley.co.uk (partly): "flat frames of one colour (e.g.
+      blue or white) do not properly correct light frames of another colour
+      (e.g. orange/brown light pollution)". The cause it gives is non-linearity
+      and pixel crosstalk, and the remedy is "flats with the same colour and
+      intensity as the background of the light frames". It is one author's
+      finding on two cameras, in visible light.
+    - A Qualcomm patent (US20150042844A1, partly): colour shading "depends on
+      the spectra of the scene illuminant as well as the surface reflectances
+      of the objects being imaged and, therefore, cannot be fixed robustly
+      using pre-calibration techniques". Its cause is a phone module's
+      infrared-blocking filter, not a hot spot, and its own method still
+      starts from one calibrated table.
   - A wrong black level (pixls.us, read).
   - Crosstalk: per-channel gains leave the edges less saturated, and a 3×3
     matrix per position is needed (arXiv 1911.13295, read).
   - A diffuser that is not neutral in infrared (Kennard, read).
 - **Not found.** Nothing on what a hot-spot correction does to foliage colour,
   and no source for an internally converted camera with no external filter.
-- **Refused, not read:** irrecams.de, leeramsden.com, patents.google.com,
-  www.spiedigitallibrary.org, www.markshelley.co.uk and www.cloudynights.com
-  (egress proxy); blog.kasson.com, lenscraft.co.uk and
-  rawpedia.rawtherapee.com (challenge pages). Nine claims rest on those.
+- **Not read:** four claims, on blog.kasson.com, lenscraft.co.uk and
+  rawpedia.rawtherapee.com, which answered with their own challenge pages.
+  www.spiedigitallibrary.org and www.cloudynights.com did the same; Hagen's
+  abstract was read through Crossref instead, and claim 26 was read on Shelley's
+  page alone.
 
 ## Weighed against
 
@@ -398,8 +435,10 @@ gain is not a plain scale of `k`, and this arithmetic does not hold exactly.
 - The gaps left at 1 (0.008 to 0.047) may be what is left of the hot spot, or
   real differences between the materials. This check cannot tell which.
 - Three raws, one camera, one look.
-- The skeptic could not read nine claims; none of them is needed for this
-  finding.
+- A flat measured under one light can miscorrect scenes under another
+  (Looked up), and what light the shipped profile was measured under is not
+  recorded, so this check cannot rule that out.
+- Four claims stay unread; none of them is needed for this finding.
 
 **Not tested.** Any remedy; any other look; anything on a device.
 

@@ -1,8 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=0fd05b51e61ffa2c
-diffhash=2d94899ad771330c
-verdict=IN-SCOPE: record 085's second research and second check, with its IR-SCIENCE and roadmap lines, answer plan step 2; no option chosen, nothing built; two over-claims narrowed
-# Scope watcher, 2026-09-30, on the 085 docs diff (IR-SCIENCE.md, NOTES.md, record 085), reading the plan by path:
-# IN-SCOPE: every hunk serves plan step 2 ("085's question") or the standing rules it rests on (IR-SCIENCE for research, the roadmap bullet stating its record's state); docs only, straight to main per the Throughout line. Nothing outside the plan: no code change, no other record, no new record, no option chosen for the owner.
-# Two claims went further than their support; both were narrowed before this record: the normalisation arithmetic now names strength 1 and the gain's clamp (lensGain), and the Rejected bullet now says "less of the hot spot's red", noting the check measured neutral things, not the leaves.
+planhash=4706b1fd85dc25b6
+diffhash=460489376403774d
+verdict=IN-SCOPE: plan step 3 — record 085's five newly read claims (8, 10, 24, 25, 26), the tally, the unread line and one caveat, with one IR-SCIENCE 9r line; no option chosen
+# Scope watchers (subagents reading the plan by path), 2026-09-30, three passes on this diff. Final verdict: IN-SCOPE, every hunk serves plan step 3 (verdicts, tally, refused line, one caveat under the second check, one IR-SCIENCE 9r line), nothing chooses between 085 options, tallies 24 confirmed, 8 partly, 1 not supported, 4 unreachable of 37. Every problem named across the three passes was fixed before this record, the last three being the host count (eleven, named), the route for claim 26 (one of its two cited pages), and the Hagen abstract described as four sentences about quantitative measurement.

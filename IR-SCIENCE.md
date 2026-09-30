@@ -4748,6 +4748,7 @@ Some tools normalise the flat to its centre, which keeps the centre's colour. Th
 balance at open is gray-world. At strength 1, inside the gain's clamp, two flats that differ by one scale per channel give
 gains that differ the same way, and gray-world absorbs that. At other strengths the gain is not a plain scale, so this does not
 hold exactly. This is arithmetic from `lensGain` and `grayWorldWB`, not a measurement.
+A flat measured under one light can miscorrect scenes under another (markshelley.co.uk in visible light; Hagen 2014's simulations of quantitative work, decision 085), and what light this correction's profile was measured under is not recorded.
 
 **Refused on this topic:** rawpedia.rawtherapee.com (challenge page),
 helpx.adobe.com, support.captureone.com and userguides.dxo.com (403), blog.kasson.com
