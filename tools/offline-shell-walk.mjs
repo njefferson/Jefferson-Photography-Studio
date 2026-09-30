@@ -291,7 +291,7 @@ if (PLANT === "noreheard") {
   const only = updateImports(text).filter(({ exp }) => !elsewhere.has(exp));
   if (only.length !== 1) stop(`${debugs[0]} imports ${only.length} name(s) from the update module that no other chunk does — expected onAdoptAnswer alone`);
   const { exp, local } = only[0];
-  const hits = [...text.matchAll(new RegExp(`(?<![\\w$.])${local.replace(/[$]/g, "\\$&")}\\(`, "g"))];
+  const hits = [...text.matchAll(new RegExp(`(?<![\\w$.])${local.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\(`, "g"))];
   console.log(`plant noreheard: ${hits.length} call(s) of "${exp} as ${local}" in assets/${debugs[0]}${hits.map((h) => ` — at byte ${h.index}: …${text.slice(h.index - 24, h.index + 24)}…`).join("")}`);
   if (hits.length !== 1) stop(`landed ${hits.length} times — expected once`);
   const at = hits[0].index;

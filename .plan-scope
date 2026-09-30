@@ -1,6 +1,21 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=aa0284ab8c7617dc
-diffhash=e59f7d0730fb42dd
-verdict=IN-SCOPE: change 1, the v2.64.26 staging entry's false cost replaced by the true costs, each checked against the code
-# IN-SCOPE: The working tree on claude/laughing-edison-x0pdv8 matches the patch byte for byte, and it touches only NOTES.md (12 lines added, 4 removed). The only change is in the v2.64.26 entry under "On staging, waiting on a device pass": the "What this costs" sentence is replaced and everything around it is unchanged. That is change 1 of the plan and nothing else. Every claim in the new text holds against the code. `PREVIEW_PIPELINE` is 66 now and was 65 at ed3870d^, where ed3870d moved it, and `previewKey` puts it first in the key, so every stored preview misses once and is rendered again. In the current code, `lensPlanFor` lays `lensStrengthAtOpen`, which is now 1 with a matched profile and 0 without one. `applySnapshot` restores the photograph's own `lensFix` (for an older edit with no `lensFix` stored, it keeps the open's value through the merge). On the next draw, `ensureLensApplied` calls `bringLensTo`, which makes one ratio pass only when the strength differs from what the decode laid. `makeThumb` calls `bringLensTo` only for an own edit, and each tile comes from a fresh decode in `oneThumbnail`. So one pass per open and one per tile, only for a matched raw whose own strength is not 1, is correct. For a raw with no matched lens, `lensCurveFor` returns null, so `lensPlanFor` returns null and `bringLensTo` resolves to strength 0 against an empty stamp, which matches what is already there, so no pass runs. At ed3870d^, `lensStrengthAtOpen` returned `rememberedStrength(key) ?? 1`, so the decode laid the remembered strength and the old inline `ensureLensApplied` skipped the pass when the photograph's strength equalled it. The old `makeThumb` had no re-apply at all: the tile's pixels carried the decode's strength and `lensForEdit` returned null for a linear source. A pass between two strengths of the same curve uses one gain table size, so it is a single pass, not two. Two small points leave the claims true because the text says "whenever" and not "only when": a bypassed lens also causes a pass, and a photograph at 1 with nothing remembered also skipped it before. The text states no measured time and says outright that the pass's time on a device was not measured. The only numbers it gives are the version numbers, 65 and 66. No one is quoted or named, and there is no table.
+planhash=afa1d04169393365
+diffhash=8a08fd60dfe1d843
+verdict=IN-SCOPE: the one line at tools/offline-shell-walk.mjs:294 that amended step 3b names, and nothing else
+# IN-SCOPE: The change is the one line at tools/offline-shell-walk.mjs:294 that the plan's amended step 3b names word for word, and it touches nothing else.
+# 
+# The plan's "Amended 2026-09-30, after step 3" paragraph records this alert: "Incomplete string escaping", `tools/offline-shell-walk.mjs` line 294, where the line "escapes only `$`". Step 3b then approves the fix. It reads: "Apply the saved patch (`scratchpad/codeql-escape.patch`). At line 294 of `tools/offline-shell-walk.mjs`, `local.replace(/[$]/g, …)` becomes `local.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")`. Nothing else changes."
+# 
+# The working-tree diff is exactly that replacement, on line 294 and nowhere else, and its changed lines are the same as the saved patch's. The branch is `claude/laughing-edison-x0pdv8` at `a7721c7`, which matches the route step 3b sets out: "Commit it on the work branch… with a scope watcher's verdict recorded first", then "Push it to the work branch, then fast-forward staging to it", after which the plan continues at step 4.
+# 
+# The change also clears "What would make it wrong", whose list allows "anything beyond `d9e5110` besides docs and step 3b's one line". The Verification section expects the same result: "After 3b: that, plus the one line in `tools/offline-shell-walk.mjs`".
+# 
+# Two conditions still bind after the commit:
+# - **Commit message:** it must be the one step 3b gives: "Internal: the offline walk escapes every regular-expression character in a name it searches for".
+# - **Merge gate:** step 3b allows the merge only once `hub-gates`, both `Analyze` runs and `CodeQL` are green on the new head.
+# 
+# Files:
+# - /root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
+# - /home/user/Jefferson-Photography-Studio/tools/offline-shell-walk.mjs
+# - /tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/codeql-escape.patch
