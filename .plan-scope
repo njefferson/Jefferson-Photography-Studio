@@ -1,21 +1,26 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=afa1d04169393365
-diffhash=8a08fd60dfe1d843
-verdict=IN-SCOPE: the one line at tools/offline-shell-walk.mjs:294 that amended step 3b names, and nothing else
-# IN-SCOPE: The change is the one line at tools/offline-shell-walk.mjs:294 that the plan's amended step 3b names word for word, and it touches nothing else.
+diffhash=67db7fdbb89eb8fb
+verdict=IN-SCOPE: the step 5 records, NOTES, IR-SCIENCE and 085 saying production from v2.64.31 (3bb7e37), 085 open for the iPad pass
+# IN-SCOPE: the diff is the docs-only records update that the plan's step 5 describes, in the three files it names, and every factual statement in it checks out against the repository, GitHub and the live site.
 # 
-# The plan's "Amended 2026-09-30, after step 3" paragraph records this alert: "Incomplete string escaping", `tools/offline-shell-walk.mjs` line 294, where the line "escapes only `$`". Step 3b then approves the fix. It reads: "Apply the saved patch (`scratchpad/codeql-escape.patch`). At line 294 of `tools/offline-shell-walk.mjs`, `local.replace(/[$]/g, …)` becomes `local.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")`. Nothing else changes."
+# The plan lines I relied on are step 5 and the Leaves open list. Step 5 asks for a "Nothing is waiting to be promoted, 2026-09-30" paragraph under NOTES "On staging", like the 2026-09-29 one, giving what went, the merge SHA, the version, the runs and the live copy. It asks for every "on staging while production remembers" statement to become "on production from 2026-09-30 in v2.64.N (SHA)" in six places: 085's Options chosen paragraph, Built already, Rejected 2 and Rank, NOTES' 085 bullet and the reversal under 2026-09-14, and IR-SCIENCE §9r. It also says 085 stays open for the iPad pass, and that its bullet should say so as 077's does. Leaves open repeats that the iPad pass on the lens slider was not run.
 # 
-# The working-tree diff is exactly that replacement, on line 294 and nowhere else, and its changed lines are the same as the saved patch's. The branch is `claude/laughing-edison-x0pdv8` at `a7721c7`, which matches the route step 3b sets out: "Commit it on the work branch… with a scope watcher's verdict recorded first", then "Push it to the work branch, then fast-forward staging to it", after which the plan continues at step 4.
+# The diff changes exactly those six places and adds the paragraph, and touches nothing else. The paragraph follows the 2026-09-29 one sentence by sentence. It also records the CodeQL commit and the `github-advanced-security` failure. I read both as part of "what went" and "the runs" rather than new scope. The 085 bullet now ends "Shipped 2026-09-30 in v2.64.31 (3bb7e37 on main). Left open: the device pass … with no result recorded", the same form as 077's. The 085 record says it "stays open for it", and its Rank now waits on "the iPad pass on the slider".
 # 
-# The change also clears "What would make it wrong", whose list allows "anything beyond `d9e5110` besides docs and step 3b's one line". The Verification section expects the same result: "After 3b: that, plus the one line in `tools/offline-shell-walk.mjs`".
+# No statement that the lens change is only on staging, or that production still remembers the strength, is left in the three files. Three older passages are still there and are correct as they stand:
+# - NOTES' v2.64.26 staging entry, kept as the record.
+# - NOTES line 200, "until the go", which belongs to v2.64.18's entry.
+# - IR-SCIENCE line 3384, from 2026-09-17, which the plan does not cover because it was not written today.
 # 
-# Two conditions still bind after the commit:
-# - **Commit message:** it must be the one step 3b gives: "Internal: the offline walk escapes every regular-expression character in a name it searches for".
-# - **Merge gate:** step 3b allows the merge only once `hub-gates`, both `Analyze` runs and `CodeQL` are green on the new head.
+# Facts checked:
+# - **Production:** `origin/main` is 3bb7e37. The live sw.js reads `const CACHE = "ips-2.64.31"` and names 3bb7e375d878…. Gates run 1008 and deploy run 958 for 3bb7e37 both concluded success.
+# - **Pull request 180:** its head ref is `staging` at b6776e4 and its base was a3c0047. It was merged at 20:30:33Z, and main's commit SHAs differ from staging's, which fits a rebase merge.
+# - **Staging matches production:** the trees are identical (`fd2c980`), so "compared tree for tree" holds.
+# - **Version .31 rather than .26:** `rev-list` from VERSION's last change (9eeea5d) counts 26 at d9e5110 and 31 at 3bb7e37. The five commits between are 11c0206, a3c0047, 76331bd and f0b33fb, which touch only docs, NOTES, IR-SCIENCE and `.plan-scope`, plus 3bb7e37, which touches only `tools/offline-shell-walk.mjs` and `.plan-scope`. That matches "four docs commits and one tools commit".
+# - **What it carried:** 085 for the lens; 071's test page rows in v2.64.18, v2.64.20 and v2.64.26; the report's Offline worker line in v2.64.18. All match the NOTES staging entries.
+# - **The PR's two heads and the failed job:** the two heads were a7721c7 and b6776e4. Job 110082946394's log shows the repo checked out at b6776e4 and "Built prompt with 10756 tokens". It then shows "CAPIError: 400 The requested model is not supported" from api.individual.githubcopilot.com, before any finding, so "at its first request to its model … GitHub's own error" is accurate. I did not read the log for the a7721c7 run myself; that half is taken from the facts given.
+# - **CodeQL on the new head:** the new head is b6776e4, and the passing CodeQL check there is taken from the facts given, not re-read.
 # 
-# Files:
-# - /root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-# - /home/user/Jefferson-Photography-Studio/tools/offline-shell-walk.mjs
-# - /tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/codeql-escape.patch
+# Factual errors found: none.

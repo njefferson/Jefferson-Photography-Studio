@@ -54,6 +54,27 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**Nothing is waiting to be promoted, 2026-09-30.** v2.64.26 went to production
+on the go the same day, by pull request 180 opened from `staging` itself and
+rebase-merged as 3bb7e37. Production serves the offline copy `ips-2.64.31`,
+read off the live site naming 3bb7e37, and the Gates run (1008) and the deploy
+(958) for 3bb7e37 both passed. Staging holds the same files as production,
+compared tree for tree. The number reads .31 rather than .26 because the count
+includes the four docs commits and one tools commit since. What it carried
+beyond v2.64.4's code: every photograph opening with the lens correction at
+full strength (085); the test page's rows for 071 (v2.64.18, v2.64.20 and
+v2.64.26, below); and the report saying what a waiting update answered
+(v2.64.18, below). One commit joined it before the merge: CodeQL flagged the
+offline walk (`tools/offline-shell-walk.mjs`) for escaping only `$` in a name
+it builds a regular expression from, and the walk now escapes every
+regular-expression character. The name is an identifier, so the walk matches
+exactly what it matched before; CodeQL passed on the new head.
+`github-advanced-security` failed on both heads at its first request to its
+model, before reporting anything, with GitHub's own error that the model it
+asked for is not supported. The device
+passes below now run on production. What each release carried stays below as
+the record.
+
 **v2.64.26 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-30 (d9e5110).** v2.64.20 below, plus two changes, the lens change as
 ed3870d and the test page's rows as d9e5110. Staging's offline worker was read
@@ -1241,10 +1262,10 @@ user-scalable=no.
   At 1 the hot spot's colour comes off the middle; above 1 the middle washes out.
   What was wrong was the slider's memory: a strength set for a lens became every
   later photograph's opening strength, and a double tap went back to it. On
-  staging, every photograph opens at 1 (0 with no profile), nothing is remembered per lens,
+  production from 2026-09-30 in v2.64.31 (3bb7e37), every photograph opens at 1 (0 with no profile), nothing is remembered per lens,
   a double tap goes back to 1 with a matched or hand-picked lens and to 0 without
-  one, and the range stays 0 to 1.5. On staging in
-  v2.64.26 (d9e5110), waiting on the device pass.
+  one, and the range stays 0 to 1.5.
+  Shipped 2026-09-30 in v2.64.31 (3bb7e37 on main). Left open: the device pass the v2.64.26 staging entry asks for on the iPad (move the strength, open the next photograph, double-tap, Undo), with no result recorded.
 
 - [ ] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
   **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.
@@ -2966,9 +2987,9 @@ the first id matching /stren/i. Every one of them produced a confident number.
 **Reversed 2026-09-30 (decision 085).** The six raws of 085's third check,
 looked at whole, put the right opening strength at the profile's full
 correction, and the memory was carrying a high setting from one photograph to
-the next, where it washed out the middle. On staging (v2.64.26, waiting on the
-device pass) every photograph opens at 1 with a matched profile and at 0 without
-one, a
+the next, where it washed out the middle. On production from 2026-09-30 in
+v2.64.31 (3bb7e37), every photograph opens at 1 with a matched profile and at 0
+without one, a
 strength set stays with that photograph's own edit, the stored entry is removed
 at start-up, and a double tap goes back to 1 with a matched or hand-picked lens
 and to 0 without one.

@@ -187,8 +187,8 @@ partly, 1 not supported at the page it was credited to, and 4 unreachable.
   (`src/lensflat.ts`, `src/pipeline.ts`), with the strength slider
   (`#hsStrength`) remembered per lens at every aperture for a shipped
   profile, and per stored profile (lens, focal length and aperture) for a
-  reader's own measurement. That is still production. On staging since
-  2026-09-30 (v2.64.26, waiting on the device pass), every photograph opens at
+  reader's own measurement. That was production until 2026-09-30. On
+  production from 2026-09-30 in v2.64.31 (3bb7e37), every photograph opens at
   1 with a matched profile and at 0 without one, nothing is carried to the
   next, and a double tap on the slider goes back to 1 with a matched or
   hand-picked lens and to 0 without one (Options).
@@ -208,16 +208,17 @@ out. So the correction is right at 1, and the slider keeps its range of 0 to
 became the strength every later photograph with that lens opened at, and a
 double tap went back to that remembered value rather than to 1, so a high
 setting washed out the middle of every later photograph and a double tap kept
-returning to it. On staging, nothing remembered decides a photograph's
-opening strength (production still remembers until the device pass and the
-go): a photograph opens at 1 with a matched profile and at 0 with none, what was
+returning to it. On production from 2026-09-30 in v2.64.31 (3bb7e37), nothing
+remembered decides a photograph's opening strength: a photograph opens at 1 with a matched profile and at 0 with none, what was
 stored is removed at start-up, a strength set on one photograph stays with
 that photograph's own edit, and a double tap on the slider goes back to 1 with
 a matched or hand-picked lens and to 0 without one. The objection that
 rejected 5 before, that the whitening is on the reported frame at the strength
 every matched frame opens at, is answered by the looking: at 1 that paleness
-is the hot spot's colour coming off, and it is where the correction belongs. On
-staging 2026-09-30 in v2.64.26 (d9e5110), waiting on the device pass.
+is the hot spot's colour coming off, and it is where the correction belongs. It
+went to staging in v2.64.26 (d9e5110) and to production on the go the same day,
+2026-09-30, in v2.64.31 (3bb7e37). The iPad pass on the slider was not run
+before the go, and this record stays open for it.
 
 **Re-opened 2026-09-29, before the choice above: none was chosen then.** Option 1's first check ran the same
 day ("First check, 2026-09-29", below). The foliage that whitens does not pass
@@ -292,9 +293,9 @@ frame. Option 7 names what it found. None was chosen then.
 ## Rejected
 
 - **2, a per-image strength.** Practitioners do correct by hand, per image, and
-  the app already has the slider (remembered from photo to photo on
-  production; on staging since 2026-09-30 it opens at 1 on every matched
-  photograph instead). But it asks
+  the app already has the slider (remembered from photo to photo until
+  2026-09-30; on production from that day in v2.64.31 (3bb7e37) it opens at 1
+  on every matched photograph instead). But it asks
   the reader to find, on every bright frame, the strength at which the leaves
   stop whitening. That is the cost the automatic mode exists to remove. And
   on NIR_1376.NEF strength 0.5 carries about half of each defect, and on
@@ -675,8 +676,8 @@ it first: until 5 is settled, 069 and 013 do not know which centre they are
 tuned against. The third check (2026-09-30) keeps it first: in the rendered
 picture the correction changes brightness across the whole frame, and 069's
 clouds and 013's foliage are both judged in it. Chosen 2026-09-30 and on
-staging, it stays first until the device pass: 069 and 013 are tuned against
-the centre it settles.
+production the same day in v2.64.31 (3bb7e37), it stays first until the iPad
+pass on the slider: 069 and 013 are tuned against the centre it settles.
 
 ## Looked at
 
