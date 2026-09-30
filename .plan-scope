@@ -1,6 +1,29 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=4706b1fd85dc25b6
-diffhash=460489376403774d
-verdict=IN-SCOPE: plan step 3 — record 085's five newly read claims (8, 10, 24, 25, 26), the tally, the unread line and one caveat, with one IR-SCIENCE 9r line; no option chosen
-# Scope watchers (subagents reading the plan by path), 2026-09-30, three passes on this diff. Final verdict: IN-SCOPE, every hunk serves plan step 3 (verdicts, tally, refused line, one caveat under the second check, one IR-SCIENCE 9r line), nothing chooses between 085 options, tallies 24 confirmed, 8 partly, 1 not supported, 4 unreachable of 37. Every problem named across the three passes was fixed before this record, the last three being the host count (eleven, named), the route for claim 26 (one of its two cited pages), and the Hagen abstract described as four sentences about quantitative measurement.
+planhash=6c15a77508194d98
+diffhash=8330fc26db7c4681
+verdict=IN-SCOPE: third scope check on record 071 (plan Part 1 step 3): only record 071 is edited, no code, no other record; every addition serves step 3; no route is chosen or rejected; its accuracy notes were fixed in the text, from the sources it named, before this record
+# Scope check, third pass, on record 071 (plan Part 1 step 3), by a subagent reading the plan by path and the diff against the work branch's copy of the record.
+# 
+# Verdict line as returned: IN-SCOPE: the diff edits only record 071 (no other record, no code), every addition serves plan Part 1 step 3 (the v2.64.18 reading, option 8 measured, options 9 to 12 with what was found for and against, the software route rejected with its reason, Rank and Depends updated), and no route is chosen or rejected. The problems below are over-claims and one-sided omissions to fix, not scope drift.
+# 
+# It confirmed all 13 fixes from the second pass present, and the reading, skeptic counts, staging version, StructuredBuffer conditions, X-codes, neotolis and OneJS figures correct, and the Rank change one sentence that moves nothing.
+# 
+# Its accuracy notes, each fixed in the text before this record was made:
+# - DXC issue 8958 listed under "Firefox slower than Chrome in each": it was measured on an M4 Mac under macOS with DXC 1.9 and no browser (read through WebFetch this session). Now its own bullet with its platform, in option 10 and in Looked up.
+# - Option 12 gave only the tile rate; the export rate (46.8 s on one thread for 20.9 MP, NOTES 2.40) added, with the preview-size arithmetic marked as arithmetic.
+# - Option 11 did not say what the interim picture is: now "the photograph with no mask's effect".
+# - DXC's [unroll] refusal: "by default", the threshold and the 2016 language-version escape restored; its relevance to a WGSL port marked not shown.
+# - ANGLE's new pixel shader for a new target layout: now says what a rebuild would cost option 9's loop-free program is not measured.
+# - EXT_float_blend: marked as mattering only for blending into float32 targets, not shown to be needed.
+# - GEGL and RawTherapee: their thin sources named (one operation's description; an issue author's statement in a feature request).
+# - Affinity: "large amounts of compositing work" in place of "layer count".
+# - "28 loops": now 10 loops over masks in the source, about 28 once the helpers are inlined.
+# - The 2023 test and the second project named (mvaligursky/webgl-parallel_shader_compile; neotolis-engine issue 575).
+# - "an estimate no source bears on": now the port's size is not estimated here.
+# - Quotes restored in full ("seem to get processed nicely ... (some DTs are slightly longer)"; "the functionality to effectively implement ubershaders").
+# - darktable's CPU preview: marked as the default of a preference.
+# - The 60-slot budget: now 60 registers, a non-instanced block counting one, read in Firefox's copy of ANGLE's source (kMaxAllowToUseRegisterCount; lines 210 to 211 set 1 for a non-instanced block).
+# - "a first launch after a release" and "paid once per release": now "a release that changes the picture code".
+# - The Rank's sky-records sentence: now says option 9, if chosen, would change how the mask-gated stages get their weights, and that the edge is declared when a route is chosen.
+# - The bold "9 to 12 are not rejected and not chosen" bullet: tools/decisions-check.mjs passes with it (exit 0).
