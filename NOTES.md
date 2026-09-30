@@ -2847,8 +2847,7 @@ device pass) every photograph opens at 1 with a matched profile and at 0 without
 one, a
 strength set stays with that photograph's own edit, the stored entry is removed
 at start-up, and a double tap goes back to 1 with a matched or hand-picked lens
-and to 0 without one. The cost this section was written
-to remove comes back: a reader who turns a lens down does so on each photograph.
+and to 0 without one.
 
 ## Healed spots cloning the wrong colour — RETRACTED, it was the measurement, 2026-09-14
 
