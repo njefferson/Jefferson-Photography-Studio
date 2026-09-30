@@ -20,7 +20,7 @@ import { sniff } from "./import";
 import { workerCount } from "./exportparallel";
 import { linearAt } from "./decode";
 import { makeRowDenoiser } from "./raw/denoise";
-import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, type EditParams, type MaskLayer } from "./pipeline";
+import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, type EditParams, type MaskLayer } from "./pipeline";
 import { exportImage } from "./export";
 import { drawFrame, canDrawFrame, buildLinearSource, type DrawnFrame } from "./gpuexport";
 import { Renderer, VERT, FRAG } from "./gl";
@@ -448,6 +448,24 @@ function dropMaskLoops(src: string): { src: string; loops: number } {
   return { src: s, loops };
 }
 
+/** The editor's fragment program with every mask loop run to a count the
+ *  compiler can see, `k`, in place of `u_maskCount`: the per-mask-count build
+ *  (decision 071), where a photograph's program would be built for the number
+ *  of masks it has.
+ *  @param src  a fragment source, the editor's FRAG.
+ *  @param k  the count, 2 or `MAX_MASKS`; at `MAX_MASKS` every index stays
+ *    inside the arrays (8 per-mask slots, `u_maskHsl[64]` at i*8+7,
+ *    `u_maskGrade[24]` at i*3+2, the local `gW[8]`).
+ *  @returns the rewritten source, how many loops it changed, and `clean`: true
+ *    only when the one `u_maskCount` left is its declaration. Consumer: the
+ *    build-slow rows, which print "not run" unless `loops > 0` and `clean`, so
+ *    a mask loop written some other way can never be timed under this name. */
+function fixMaskLoops(src: string, k: number): { src: string; loops: number; clean: boolean } {
+  let loops = 0;
+  const s = src.replace(MASK_LOOP, (_m, v: string) => { loops++; return `; ${v} < ${k};`; });
+  return { src: s, loops, clean: (s.match(/\bu_maskCount\b/g) ?? []).length === 1 };
+}
+
 /** THE THIRTEEN PER-MASK UNIFORM ARRAYS the mask loops index (decision 071,
  *  option 8), and where each lands in the two rewrites below: `field` is the
  *  vec4 slot per mask, `sw` the components read, `int` whether the value is an
@@ -576,16 +594,17 @@ function bindZeroMaskTexture(gl: WebGL2RenderingContext, prog: WebGLProgram): ()
  *  Firefox took 44,527 ms to build it on v2.63.34, and changing how its loops
  *  sample did nothing, because ANGLE already did that itself. The sources name
  *  two causes: FXC unrolling every loop it can count, and FXC's slowness with
- *  loops that index uniform arrays. This builds the editor's own program six
+ *  loops that index uniform arrays. This builds the editor's own program eight
  *  ways, once each, in one context, after a tiny program has started the
  *  driver: as shipped, with the counts hidden, with the mask loops dropped,
- *  both, and option 8's two forms, the mask settings in uniform blocks and in
- *  a texture, each bound by its `prep` before the first draw. Each is built
+ *  both, option 8's two forms (the mask settings in uniform blocks and in a
+ *  texture, each bound by its `prep` before the first draw), and the mask
+ *  loops counted to 2 and to 8, a count the compiler can see. Each is built
  *  and drawn once here and never used by the editor. A row whose rewrite does
  *  not fit the source prints "not run", and one whose draw fails prints no
  *  time; the rest are compared, and the one that saves the most names the cause. */
 async function whatMakesTheBuildSlow(): Promise<void> {
-  const p = note("Building the editor's picture code six ways… this takes about six builds, which on a Windows PC can be four minutes.");
+  const p = note("Building the editor's picture code eight ways… this takes about eight builds, which on a Windows PC can be five minutes or more; the last row may take longer than all the others.");
   const frame = buildFrame();
   if (!frame) { p.remove(); row("What makes the build slow", "WebGL2 unavailable", "The editor cannot run on this device."); return; }
   const { gl, tri } = frame;
@@ -600,6 +619,8 @@ async function whatMakesTheBuildSlow(): Promise<void> {
     const both = dropMaskLoops(hidden.src);
     const blocks = masksToBlocks(FRAG);
     const texed = masksToTexture(FRAG);
+    const two = fixMaskLoops(FRAG, 2);
+    const most = fixMaskLoops(FRAG, MAX_MASKS);
     const variants: { name: string; src: string; changed: string; ok: boolean; prep?: (gl: WebGL2RenderingContext, prog: WebGLProgram) => () => void }[] = [
       { name: "As shipped", src: FRAG, changed: "nothing changed", ok: true },
       { name: "…with every loop's count hidden from the compiler", src: hidden.src,
@@ -615,11 +636,24 @@ async function whatMakesTheBuildSlow(): Promise<void> {
         changed: `${blocks.sites} reads of the thirteen mask arrays moved into three blocks`, ok: blocks.ok, prep: bindZeroBlocks },
       { name: "…with the mask settings in a texture", src: texed.src,
         changed: `${texed.sites} reads of the thirteen mask arrays moved into one texture`, ok: texed.ok, prep: bindZeroMaskTexture },
+      // THE PER-MASK-COUNT BUILD (decision 071): the mask loops kept, run to a
+      // count the compiler can see. LAST, because a count of 8 may unroll into a
+      // long build, and a lost context would silence every row after it. TWO,
+      // NOT ONE: at 1 the inner `j = i + 1` loops vanish as well, which is part
+      // of what "taken out" measures, so the two could not be told apart.
+      { name: "…with the mask loops counted to 2", src: two.src,
+        changed: `${two.loops} mask loops given a count it can see, 2`, ok: two.loops > 0 && two.clean },
+      { name: `…with the mask loops counted to ${MAX_MASKS}`, src: most.src,
+        changed: `${most.loops} mask loops given a count it can see, ${MAX_MASKS}, the most a photograph holds`, ok: most.loops > 0 && most.clean },
     ];
     const stamp = 1000 + Math.floor(Math.random() * 8e8);
     const timed: { name: string; t: number }[] = [];
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
+      if (gl.isContextLost()) {
+        row(v.name, "not run", "The graphics context was lost during an earlier row, so nothing after it can be built here.");
+        continue;
+      }
       if (!v.ok) {
         row(v.name, "not run",
           "The picture code has changed shape since this test was written, so this rewrite no longer finds what it changes. Timing it would time a program that is not what this row says.");
@@ -629,7 +663,17 @@ async function whatMakesTheBuildSlow(): Promise<void> {
         const r = timedBuild(gl, VERT, uniqueFrag(v.src, stamp + i), v.prep);
         // A FIRST PICTURE THAT RAISED AN ERROR DID NOT DRAW: its time is the
         // build alone, and the row says so rather than passing it for a picture.
-        if (r.err) {
+        // A CONTEXT LOST IN THIS ROW is the device giving up on the program,
+        // not the program failing, and it is the case the last rows are placed
+        // for; said in this row, not only in the rows after it. Asked of the
+        // context itself, not only when the draw raised an error: a loss after
+        // the error was read, or one the clearing read absorbed, would
+        // otherwise be timed as a picture.
+        if (gl.isContextLost()) {
+          row(v.name, "did not draw (context lost)",
+            `Built once, from nothing: ${v.changed}. The graphics context was lost before the first picture, which is the device giving up on this program rather than the program being wrong; nothing after it can be built here.`,
+            `${ms(r.link)} to build; no picture drawn`);
+        } else if (r.err) {
           row(v.name, `did not draw (GL error ${r.err})`,
             `Built once, from nothing: ${v.changed}. The first picture raised GL error ${r.err}, so it was not drawn and this is not compared.`,
             `${ms(r.link)} to build; no picture drawn`);
@@ -638,7 +682,12 @@ async function whatMakesTheBuildSlow(): Promise<void> {
           row(v.name, ms(tot(r)), `Built once, from nothing: ${v.changed}.`, `${ms(r.link)} + ${ms(r.draw)} (built + first picture)`);
         }
       } catch (err) {
-        row(v.name, "did not build", `${(err as Error).message}, with ${v.changed}.`);
+        if (gl.isContextLost()) {
+          row(v.name, "did not build (context lost)",
+            `The graphics context was lost while this was being built, with ${v.changed}. That is the device giving up on this program, not the program failing to build; nothing after it can be built here.`);
+        } else {
+          row(v.name, "did not build", `${(err as Error).message}, with ${v.changed}.`);
+        }
       }
       await tick();
     }
