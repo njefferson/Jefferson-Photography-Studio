@@ -262,10 +262,50 @@ function uniqueFrag(src: string, tag: number): string {
     `void main() {\n  if (gl_FragCoord.x < -${tag}.0) { frag = vec4(${tag}.0 / 1e9); return; }`);
 }
 
+/** EVERY SAMPLER ON A UNIT OF ITS OWN, WITH A TEXTURE OF ITS OWN TYPE, so the
+ *  first picture is really drawn. Takes the context and a linked program that
+ *  is in use; binds a 1 x 1 zero texture per active 2D, 2D-array or 3D sampler, on
+ *  units counted up from 0, and gives back the undo that deletes them.
+ *  Why: every sampler starts on unit 0, and WebGL2 refuses a draw
+ *  (INVALID_OPERATION, 1282) when samplers of different types share a unit. The
+ *  editor's program has 2D-array and 3D samplers beside its 2D ones, so until
+ *  2026-09-30 every first picture this page timed raised that error and drew
+ *  nothing (measured headless). What the draw has to satisfy: `timedBuild`
+ *  reads `getError` after it and reports anything but 0, so a sampler type this
+ *  does not know stays on unit 0 and shows as an error rather than as a time.
+ *  The last unit is left for `bindZeroMaskTexture`. */
+function bindSamplers(gl: WebGL2RenderingContext, prog: WebGLProgram): () => void {
+  const texs: WebGLTexture[] = [];
+  const n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS) as number;
+  let unit = 0;
+  for (let i = 0; i < n; i++) {
+    const u = gl.getActiveUniform(prog, i);
+    const target = !u ? 0 : u.type === gl.SAMPLER_2D ? gl.TEXTURE_2D
+      : u.type === gl.SAMPLER_2D_ARRAY ? gl.TEXTURE_2D_ARRAY : u.type === gl.SAMPLER_3D ? gl.TEXTURE_3D : 0;
+    if (!u || !target) continue;
+    const tex = gl.createTexture()!;
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(target, tex);
+    gl.texParameteri(target, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(target, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    if (target === gl.TEXTURE_2D) gl.texImage2D(target, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    else gl.texImage3D(target, 0, gl.RGBA8, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.uniform1i(gl.getUniformLocation(prog, u.name), unit);
+    texs.push(tex);
+    unit++;
+  }
+  gl.activeTexture(gl.TEXTURE0);
+  return () => { texs.forEach((t) => gl.deleteTexture(t)); };
+}
+
 /** ONE BUILD OF A PROGRAM, TIMED THE WAY A LAUNCH PAYS IT (decision 071). Takes a
- *  context from `buildFrame`, a vertex and a fragment source; builds them,
- *  then draws once so the driver has to finish. Gives back the build and the
- *  first picture in milliseconds, and throws if the program did not build.
+ *  context from `buildFrame`, a vertex and a fragment source, and optionally
+ *  `prep`, which binds what a rewritten variant needs before its first draw
+ *  and returns its own undo; builds them, then draws once so the driver has to
+ *  finish. Gives back the build and the first picture in milliseconds, and
+ *  `err`, the GL error that draw raised (0 for none), so a "first picture" that
+ *  never drew cannot pass for one; throws, with the driver's log, if the
+ *  program did not build.
  *  `buildingThePictureCode` and `whatMakesTheBuildSlow` both read these two
  *  numbers against each other's, so they must stay one measurement.
  *  Everything queued before a run is finished first, so no run is billed for
@@ -274,7 +314,8 @@ function uniqueFrag(src: string, tag: number): string {
  *  BUILT, THEN DRAWN, timed apart: some drivers finish the picture code only
  *  when it first draws, so the build alone can look cheap while the first
  *  picture pays for it. */
-function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string): { link: number; draw: number } {
+function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string,
+  prep?: (gl: WebGL2RenderingContext, prog: WebGLProgram) => () => void): { link: number; draw: number; err: number } {
   const px = new Uint8Array(4);
   const drain = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
   drain();
@@ -290,18 +331,29 @@ function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string): { l
   const ok = gl.getProgramParameter(prog, gl.LINK_STATUS);
   const t1 = performance.now();
   if (!ok) {
+    // THE DRIVER'S OWN WORDS, so a rewritten variant that fails says why.
+    const log = (gl.getShaderInfoLog(fs) || gl.getProgramInfoLog(prog) || "").trim().slice(0, 300);
     gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
-    throw new Error("the editor's picture code did not build on this device");
+    throw new Error(`the editor's picture code did not build on this device${log ? ` (${log})` : ""}`);
   }
   gl.useProgram(prog);
   const loc = gl.getAttribLocation(prog, "a_pos");
   if (loc >= 0) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0); }
+  const undoSamplers = bindSamplers(gl, prog);
+  const undo = prep ? prep(gl, prog) : null;
+  gl.getError(); // clear anything left over, so `err` is this draw's alone
+  // The draw is timed from here, so the textures and buffers bound above are
+  // not billed to the first picture; getError has already waited for them.
+  const td = performance.now();
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  const err = gl.getError();
   drain();
   const t2 = performance.now();
+  undo?.();
+  undoSamplers();
   gl.useProgram(null);
   gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
-  return { link: t1 - t0, draw: t2 - t1 };
+  return { link: t1 - t0, draw: t2 - td, err };
 }
 
 async function buildingThePictureCode(): Promise<void> {
@@ -313,7 +365,7 @@ async function buildingThePictureCode(): Promise<void> {
   const build = (tag: number) => timedBuild(gl, VERT, uniqueFrag(FRAG, tag));
   try {
     const stamp = 1000 + Math.floor(Math.random() * 8e8);
-    const cold: { link: number; draw: number }[] = [];
+    const cold: { link: number; draw: number; err: number }[] = [];
     for (let i = 0; i < 3; i++) { cold.push(build(stamp + i)); await tick(); }
     const warm = build(stamp);
     p.remove();
@@ -324,6 +376,15 @@ async function buildingThePictureCode(): Promise<void> {
     // far cheaper. Measured on an iPad, 2026-09-26: 557 ms, then 22 and 22, and
     // the median it used to lead with (23 ms) hid the number this row exists for.
     const first = cold[0];
+    // A FIRST PICTURE THAT RAISED AN ERROR WAS NOT DRAWN, so a row whose draw
+    // failed prints no time: its number would be a build plus a refused draw.
+    const refused = [...cold, warm].find((r) => r.err);
+    if (refused) {
+      row("Building the picture code (first time)", `did not draw (GL error ${refused.err})`,
+        "The picture code built, but its first picture raised an error, so no time here would be what a launch pays.",
+        `${cold.map((r) => `${ms(r.link)} to build${r.err ? `, GL error ${r.err}` : ""}`).join("; ")}`);
+      return;
+    }
     const runs = cold.map((r) => `${ms(r.link)} + ${ms(r.draw)}`).join(", ");
     row("Building the picture code (first time)", ms(tot(first)),
       tot(first) > 5000
@@ -373,17 +434,144 @@ function dropMaskLoops(src: string): { src: string; loops: number } {
   return { src: s, loops };
 }
 
+/** THE THIRTEEN PER-MASK UNIFORM ARRAYS the mask loops index (decision 071,
+ *  option 8), and where each lands in the two rewrites below: `field` is the
+ *  vec4 slot per mask, `sw` the components read, `int` whether the value is an
+ *  int. `u_maskHsl` (8 per mask) and `u_maskGrade` (3 per mask) are indexed by
+ *  a computed index and are handled on their own. */
+const MASK_FIELDS: [string, number, string, boolean][] = [
+  ["u_maskType", 0, "x", true], ["u_maskSlot", 0, "y", true], ["u_maskOp", 0, "z", true], ["u_maskAims", 0, "w", true],
+  ["u_maskGeoA", 1, "", false], ["u_maskGeoB", 2, "xy", false], ["u_maskAdj", 3, "", false],
+  ["u_maskFol", 4, "xyz", false], ["u_maskSkyBand", 5, "xyz", false], ["u_maskHue", 6, "x", false], ["u_maskGradeBal", 6, "y", false],
+];
+const MASK_ARRAY_NAMES = [...MASK_FIELDS.map((f) => f[0]), "u_maskHsl", "u_maskGrade"];
+/** How many entries each of those arrays declares in `src/gl.ts`: 8 per mask,
+ *  8 mixer bands a mask for `u_maskHsl`, 3 grade rows a mask for `u_maskGrade`.
+ *  The rewrites' blocks and texture are laid out for exactly these. */
+const MASK_ARRAY_SIZE: Record<string, number> = { ...Object.fromEntries(MASK_FIELDS.map((f) => [f[0], 8])), u_maskHsl: 64, u_maskGrade: 24 };
+
+/** Rewrite every per-mask uniform array of a fragment source through `to`.
+ *  Takes the source, the declarations to put in their place (inserted after
+ *  `uniform int u_maskCount;`), and `to(name, index)` giving the new read for
+ *  one index site. Gives back the source, with its comments removed, and
+ *  whether the rewrite is whole: the per-mask arrays declared are exactly the
+ *  thirteen at the sizes in `MASK_ARRAY_SIZE`, all thirteen declarations are
+ *  removed, every array is read at least once, and no read or declaration of a
+ *  per-mask array is left. What the caller relies on: `ok` false means the
+ *  program has changed shape and the variant must print "not run", never a
+ *  time for a program that is not what it claims to be. */
+function rewriteMaskArrays(src: string, decls: string, to: (name: string, index: string) => string): { src: string; ok: boolean; sites: number } {
+  // Comments go first: a use named in a comment is not a read, and was counted
+  // as one (54 where the program reads 53). GLSL has no string literals, so
+  // every `//` and `/*` starts a comment.
+  let s = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""), removed = 0, sites = 0, everyRead = true;
+  // THE SET OF PER-MASK ARRAYS HAS TO BE THE ONE THIS WAS WRITTEN FOR. A new
+  // array, or one resized, would be left out of the rewrite and still pass.
+  const declared = [...s.matchAll(/^uniform (?:\w+ )?\w+ (u_mask\w+)\[(\d+)\];/gm)].map((m) => `${m[1]}[${m[2]}]`).sort();
+  const expected = MASK_ARRAY_NAMES.map((n) => `${n}[${MASK_ARRAY_SIZE[n]}]`).sort();
+  const sameSet = declared.join() === expected.join();
+  for (const name of MASK_ARRAY_NAMES) {
+    const decl = new RegExp(`^uniform (?:int|float|vec2|vec3|vec4) ${name}\\[\\d+\\];.*$`, "m");
+    if (decl.test(s)) { s = s.replace(decl, ""); removed++; }
+    let n = 0;
+    s = s.replace(new RegExp(`\\b${name}\\[([^\\]]+)\\]`, "g"), (_m, idx: string) => { n++; return to(name, idx.trim()); });
+    if (!n) everyRead = false;
+    sites += n;
+  }
+  const anchor = "uniform int u_maskCount;";
+  const anchored = s.split(anchor).length === 2;
+  if (anchored) s = s.replace(anchor, `${anchor}\n${decls}`);
+  const left = new RegExp(`\\b(?:${MASK_ARRAY_NAMES.join("|")})\\[`).test(s) || /^uniform (?:\w+ )?\w+ u_mask\w*\[\d+\];/m.test(s);
+  return { src: s, ok: sameSet && removed === MASK_ARRAY_NAMES.length && everyRead && anchored && !left, sites };
+}
+
+/** OPTION 8, FIRST FORM: the mask parameters in uniform blocks. One block whose
+ *  only member is an array of 50 structs of vec4 and ivec4 (so std140 needs no
+ *  padding, and ANGLE can hand FXC a StructuredBuffer), and the colour-mixer and
+ *  grade offsets in blocks of their own, since a struct in such a block may not
+ *  hold an array. Takes a fragment source; gives back `rewriteMaskArrays`'
+ *  answer. */
+function masksToBlocks(src: string): { src: string; ok: boolean; sites: number } {
+  const decls = [
+    "struct DbgMask { ivec4 f0; vec4 f1; vec4 f2; vec4 f3; vec4 f4; vec4 f5; vec4 f6; };",
+    "struct DbgV { vec4 v; };",
+    "layout(std140) uniform DbgMasks { DbgMask m[50]; } dbgM;",
+    "layout(std140) uniform DbgHsl { DbgV e[64]; } dbgH;",
+    "layout(std140) uniform DbgGrade { DbgV e[50]; } dbgG;",
+  ].join("\n");
+  return rewriteMaskArrays(src, decls, (name, i) => {
+    if (name === "u_maskHsl") return `dbgH.e[${i}].v.xyz`;
+    if (name === "u_maskGrade") return `dbgG.e[${i}].v.xyz`;
+    const [, field, sw] = MASK_FIELDS.find((f) => f[0] === name)!;
+    return `dbgM.m[${i}].f${field}${sw ? `.${sw}` : ""}`;
+  });
+}
+
+/** OPTION 8, SECOND FORM: the same parameters in one float texture read with
+ *  texelFetch, as the measured lens curve already is (`u_lensTex`): 18 texels
+ *  per mask (7 fields, 8 mixer bands, 3 grade rows), one row per mask. Takes a
+ *  fragment source; gives back `rewriteMaskArrays`' answer. */
+function masksToTexture(src: string): { src: string; ok: boolean; sites: number } {
+  const at = (x: string, y: string) => `texelFetch(u_dbgMaskTex, ivec2(${x}, ${y}), 0)`;
+  return rewriteMaskArrays(src, "uniform highp sampler2D u_dbgMaskTex;", (name, i) => {
+    if (name === "u_maskHsl") return `${at(`7 + (${i}) % 8`, `(${i}) / 8`)}.xyz`;
+    if (name === "u_maskGrade") return `${at(`15 + (${i}) % 3`, `(${i}) / 3`)}.xyz`;
+    const [, field, sw, isInt] = MASK_FIELDS.find((f) => f[0] === name)!;
+    const read = `${at(String(field), `(${i})`)}${sw ? `.${sw}` : ""}`;
+    return isInt ? `int(${read})` : read;
+  });
+}
+
+/** Bind a zero-filled buffer to every uniform block the variant's program kept,
+ *  before its first draw: a block with no buffer bound makes the draw fail.
+ *  Takes the context and program; returns the undo. */
+function bindZeroBlocks(gl: WebGL2RenderingContext, prog: WebGLProgram): () => void {
+  const bufs: WebGLBuffer[] = [];
+  ["DbgMasks", "DbgHsl", "DbgGrade"].forEach((name, k) => {
+    const idx = gl.getUniformBlockIndex(prog, name);
+    if (idx === gl.INVALID_INDEX) return;
+    gl.uniformBlockBinding(prog, idx, k);
+    const size = gl.getActiveUniformBlockParameter(prog, idx, gl.UNIFORM_BLOCK_DATA_SIZE) as number;
+    const buf = gl.createBuffer()!;
+    gl.bindBuffer(gl.UNIFORM_BUFFER, buf);
+    gl.bufferData(gl.UNIFORM_BUFFER, size, gl.STATIC_DRAW);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, k, buf);
+    bufs.push(buf);
+  });
+  return () => { bufs.forEach((b) => gl.deleteBuffer(b)); gl.bindBuffer(gl.UNIFORM_BUFFER, null); };
+}
+
+/** Bind a zero 18 x 8 float texture for the texture variant, on the last texture
+ *  unit so it meets none of the program's other samplers. Takes the context and
+ *  program; returns the undo. */
+function bindZeroMaskTexture(gl: WebGL2RenderingContext, prog: WebGLProgram): () => void {
+  const unit = (gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS) as number) - 1;
+  const tex = gl.createTexture()!;
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 18, 8, 0, gl.RGBA, gl.FLOAT, new Float32Array(18 * 8 * 4));
+  const loc = gl.getUniformLocation(prog, "u_dbgMaskTex");
+  if (loc) gl.uniform1i(loc, unit);
+  gl.activeTexture(gl.TEXTURE0);
+  return () => { gl.deleteTexture(tex); };
+}
+
 /** WHICH PART OF THE PICTURE CODE THE 44 SECONDS IS (decision 071). The PC in
  *  Firefox took 44,527 ms to build it on v2.63.34, and changing how its loops
  *  sample did nothing, because ANGLE already did that itself. The sources name
  *  two causes: FXC unrolling every loop it can count, and FXC's slowness with
- *  loops that index uniform arrays. This builds the editor's own program four
+ *  loops that index uniform arrays. This builds the editor's own program six
  *  ways, once each, in one context, after a tiny program has started the
- *  driver: as shipped, with the counts hidden, with the mask loops dropped, and
- *  both. None of the four is ever drawn by the editor; they are only timed.
- *  The variant that drops the most is the cause, and the fix differs by which. */
+ *  driver: as shipped, with the counts hidden, with the mask loops dropped,
+ *  both, and option 8's two forms, the mask settings in uniform blocks and in
+ *  a texture, each bound by its `prep` before the first draw. Each is built
+ *  and drawn once here and never used by the editor. A row whose rewrite does
+ *  not fit the source prints "not run", and one whose draw fails prints no
+ *  time; the rest are compared, and the one that saves the most names the cause. */
 async function whatMakesTheBuildSlow(): Promise<void> {
-  const p = note("Building the editor's picture code four ways… this takes about four builds, which on a Windows PC can be three minutes.");
+  const p = note("Building the editor's picture code six ways… this takes about six builds, which on a Windows PC can be four minutes.");
   const frame = buildFrame();
   if (!frame) { p.remove(); row("What makes the build slow", "WebGL2 unavailable", "The editor cannot run on this device."); return; }
   const { gl, tri } = frame;
@@ -396,7 +584,9 @@ async function whatMakesTheBuildSlow(): Promise<void> {
     const hidden = hideLoopCounts(FRAG);
     const dropped = dropMaskLoops(FRAG);
     const both = dropMaskLoops(hidden.src);
-    const variants: { name: string; src: string; changed: string; ok: boolean }[] = [
+    const blocks = masksToBlocks(FRAG);
+    const texed = masksToTexture(FRAG);
+    const variants: { name: string; src: string; changed: string; ok: boolean; prep?: (gl: WebGL2RenderingContext, prog: WebGLProgram) => () => void }[] = [
       { name: "As shipped", src: FRAG, changed: "nothing changed", ok: true },
       { name: "…with every loop's count hidden from the compiler", src: hidden.src,
         changed: `${hidden.loops} loops given a count it cannot see`, ok: hidden.loops > 0 },
@@ -404,6 +594,13 @@ async function whatMakesTheBuildSlow(): Promise<void> {
         changed: `${dropped.loops} mask loops run zero times`, ok: dropped.loops > 0 },
       { name: "…with both", src: both.src,
         changed: `${hidden.loops} counts hidden and ${both.loops} mask loops taken out`, ok: hidden.loops > 0 && both.loops > 0 },
+      // OPTION 8 (decision 071): the mask loops kept, their parameters moved out
+      // of the indexed uniform arrays FXC is slow on. Measured here before the
+      // editor's own program changes.
+      { name: "…with the mask settings in uniform blocks", src: blocks.src,
+        changed: `${blocks.sites} reads of the thirteen mask arrays moved into three blocks`, ok: blocks.ok, prep: bindZeroBlocks },
+      { name: "…with the mask settings in a texture", src: texed.src,
+        changed: `${texed.sites} reads of the thirteen mask arrays moved into one texture`, ok: texed.ok, prep: bindZeroMaskTexture },
     ];
     const stamp = 1000 + Math.floor(Math.random() * 8e8);
     const timed: { name: string; t: number }[] = [];
@@ -411,13 +608,21 @@ async function whatMakesTheBuildSlow(): Promise<void> {
       const v = variants[i];
       if (!v.ok) {
         row(v.name, "not run",
-          "No loop of that kind was found, so the picture code has changed shape since this test was written. Timing it would time the program as shipped under another name.");
+          "The picture code has changed shape since this test was written, so this rewrite no longer finds what it changes. Timing it would time a program that is not what this row says.");
         continue;
       }
       try {
-        const r = timedBuild(gl, VERT, uniqueFrag(v.src, stamp + i));
-        timed.push({ name: v.name, t: tot(r) });
-        row(v.name, ms(tot(r)), `Built once, from nothing: ${v.changed}.`, `${ms(r.link)} + ${ms(r.draw)} (built + first picture)`);
+        const r = timedBuild(gl, VERT, uniqueFrag(v.src, stamp + i), v.prep);
+        // A FIRST PICTURE THAT RAISED AN ERROR DID NOT DRAW: its time is the
+        // build alone, and the row says so rather than passing it for a picture.
+        if (r.err) {
+          row(v.name, `did not draw (GL error ${r.err})`,
+            `Built once, from nothing: ${v.changed}. The first picture raised GL error ${r.err}, so it was not drawn and this is not compared.`,
+            `${ms(r.link)} to build; no picture drawn`);
+        } else {
+          timed.push({ name: v.name, t: tot(r) });
+          row(v.name, ms(tot(r)), `Built once, from nothing: ${v.changed}.`, `${ms(r.link)} + ${ms(r.draw)} (built + first picture)`);
+        }
       } catch (err) {
         row(v.name, "did not build", `${(err as Error).message}, with ${v.changed}.`);
       }
