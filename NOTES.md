@@ -82,10 +82,18 @@ Gates run (996) passed too.
   by -0.240 where the photographs differ by -0.239, and with the tile's
   strength change taken out the tiles differ by 0.003. The double-tap and
   agreement walks pass on this build, and so does the accessibility walk, 205
-  of 205 in both themes, run on this build's code after the last change. What this costs: a
-  reader who turns a lens down now does so on each photograph, which is what the 2026-09-14
-  entry "The correction strength would not stay where it was put" was written
-  to stop, and a chosen 0 no longer carries to the next photograph.
+  of 205 in both themes, run on this build's code after the last change. Its
+  true costs: every quick-look preview stored on a device is rendered again the
+  first time it is needed after the update, because the preview version moved
+  from 65 to 66 and a stored preview's key carries it (`previewKey`); and a raw
+  with a matched lens whose own strength is not 1 takes one correction pass
+  each time it is opened and one each time its thumbnail is drawn, because the
+  decode lays 1 and the photograph's own strength is then applied over it by
+  ratio (`bringLensTo`). Before, the open's decode used the lens's remembered
+  strength and skipped that pass whenever the photograph's strength was the
+  last one set for its lens; a thumbnail took no pass at all and drew whatever
+  strength the decode laid. A raw with no matched lens opens at 0 and takes no
+  pass. How long the pass takes on a device was not measured.
 - **The test page builds the picture code with the mask loops counted (071).**
   "What makes the picture code slow to build" now builds the editor's program eight ways; the
   two new rows run the mask loops to 2 and to 8, a count the compiler can see,
