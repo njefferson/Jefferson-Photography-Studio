@@ -308,6 +308,12 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
        SwiftShader, v2.64.4 on staging, taken 2026-09-29 19:11 UTC): 42, 26,
        31 and 34 ms for the same four. It says the same as the first control
        and nothing about FXC.
+     - **The same PC again, 2026-09-30** (Firefox 156, ANGLE over Direct3D 11
+       on the GTX 980, v2.64.4 on staging, taken 00:30 UTC): as shipped,
+       42,420 ms; with every loop's count hidden, 42,639 ms; with the mask
+       loops taken out, 715 ms; with both, 660 ms. The mask loops are 41.7 of
+       the 42.4 seconds, as they were 44.6 of 45.4 the day before. Option 8
+       stands, and its test-page variants are the next measurement.
      - The option that follows is 8. Nothing else in either report bears on
        this record.
    - **Still open:** the busy card has no seconds count and cannot be put
@@ -322,7 +328,20 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
      stored, a stored copy with no update, and a stored copy while an update
      downloads. One of the three is in, from the second control reading's
      machine: a stored copy with no update started at 0.74 s, with a longest
-     pause of 0 ms.
+     pause of 0 ms. On the GTX 980 PC in Firefox, the same kind of launch has
+     now been read twice: 0.17 s with a 3 ms pause, and on 2026-09-30 0.18 s
+     with 0 ms. That machine still owes a first visit and a launch while an
+     update downloads.
+   - **Found in the same report, 2026-09-30: the report cannot say why an
+     update did not take over.** A 2.64.4 worker was waiting while v2.63.42
+     served the page, and the worker line called it "nothing to take", which
+     is wrong when an older worker serves. The worker refuses a takeover
+     silently on three grounds (another build under the same version, a gap in
+     its cache, another window open), and the report knows the two workers'
+     versions and nothing of what the waiting one decided, so it cannot tell
+     the three apart, or tell a refusal from a takeover still running. The
+     cache-gap refusal has no check in the offline walk, and that walk has
+     never run in Firefox. The fix is owed and open.
 2. Build the redesign now.
 3. Words only: say a download is running, change nothing about it.
 4. Take the stickers out of the precache and change nothing else.

@@ -84,6 +84,7 @@ full. What bears on this record:
 
 ## Depends
 
+- touches 085 — the lens correction's cut changes the centre colours this model would be tuned against.
 - touches 052 — the model derives the sky per pixel; whether it still needs the look's selection is measured when it is built.
 - touches 013 — the chroma noise the model controls is 013's defect.
 - touches 017 — the sky-depth stage this model would replace.
@@ -135,19 +136,29 @@ full. What bears on this record:
 
 ## Rank
 
-**Eighth**, after 069, 071, 070, 052, 013, 068 and 065, and above 061, in the
-Aerochrome work the queue now leads with (settled 2026-09-25). It sits below
-the white guard (069) and the rotation fix (070) because both change the sky it
-is measured against: 069 is the rule its clouds must meet if it replaces the sky
-stages, and 070 moves the look's own sky on a turned photograph. It sits below
-052 and 013 because both change the ground it is measured on: the sky
-selection, and the chroma noise the model must control. It sits below 068,
-which follows the three records it needs directly and changes nothing this
-model is measured on, since today's finder stays the default on every Sky mask.
-It sits below 065 because a fill changes which sky a reader's mask holds. It
-sits above 061 because 061's channel alignment touches thin edges only, which
-the model's colour re-attachment respects, and nothing in the model is tuned
-against them. Its first measurement decides whether it needs 052 at all.
+**Thirteenth as of 2026-09-30**, where it was written as eighth. Five items were
+placed above it since, the lens correction's centre colours (085) among them,
+and the rotation fix (070) now sits above the white guard (069). It sits below
+069 and 070 because both change the sky it is measured against: 069 is the rule
+its clouds must meet if it replaces the sky stages, and 070 moves the look's own
+sky on a turned photograph. It sits below 052 and 013 because both change the
+ground it is measured on: the sky selection, and the chroma noise the model must
+control. It sits below 068, which follows the three records it needs directly
+and changes nothing this model is measured on, since today's finder stays the
+default on every Sky mask. It sits below 065 because a fill changes which sky a
+reader's mask holds. It sits below 085 because the lens correction's cut
+changes the centre colours it would be tuned against. It sits above 061 because
+061's channel alignment touches thin edges only, which the model's colour
+re-attachment respects, and nothing in the model is tuned against them. Its
+first measurement decides whether it needs 052 at all.
+
+**The white guard's clouds now wait on it (2026-09-29), and it still does not
+move above the white guard (069).** 069's option 10, rendered on the owner's
+raws, found the cloud's white point can move only with the look derived again
+at it, which is this record's ground. But this model is measured against 069's
+rule, 052's selection, 013's chroma and 065's fill, each of which argues in
+writing that it comes first, so moving it above them would tune it against
+ground about to change.
 
 ## Looked at
 
