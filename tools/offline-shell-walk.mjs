@@ -51,6 +51,27 @@
 // silently did not apply prints the same green as a fix. Bare --plant means
 // `redirect`, the half the device reported. The list, and the check each one
 // turns red, is PLANTS below.
+//
+// THE TAKEOVER ANSWERS, AND THE REPORT SAYS WHAT IT ANSWERED (2026-09-30). A
+// waiting worker the page asks to take over (ADOPT, adoptIfAlone) replies with
+// what it did: took over, or refused for the build, a gap in its offline copy,
+// or another window. Checks 25 to 29 hold the behaviour AND the words: 25, a
+// gap of one file refuses and the report names the file (scenario J; `nogap`
+// plants it back); 26, the takeover in D is recorded as taken; 27, a second
+// window in E refuses in words; 28, another build of this version refuses in
+// words (scenario K); 29, the TEST page's report comes to say 25's words too.
+// 25, 27 and 28 read the EDITOR's report, opened by its version tag on the
+// page that asked, because it is built when it is opened. The test page builds
+// its report at load, while its own request is still unanswered — measured
+// 2026-09-30, five loads of debug.html behind a one-file gap, every report
+// "asked to take over, no answer yet", every page's adoptAnswer() holding the
+// answer a moment later — so it now builds it again when the answer lands
+// (debug.ts, onAdoptAnswer), and 29 polls its textarea for the words.
+// `noreheard` cuts that registration out of the built debug chunk and 29 goes
+// red. After a takeover no worker is waiting, so the report says it on a clause
+// of its own; 26 reads that, and adoptAnswer() on the asking page beside it,
+// through the module that page already loaded, under the name the build gave
+// it (ADOPT_ANSWER below).
 import { chromium } from "playwright-core";
 import { createServer } from "node:http";
 import { readFile, readdir } from "node:fs/promises";
@@ -88,6 +109,22 @@ const STICKER_FILES = JSON.parse(`[${grab(/const STICKER_FILES = \[([\s\S]*?)\];
 const V = grab(/const CACHE = "ips-([^"]+)";/, "stamped CACHE")[1];
 const BUILD = JSON.parse(grab(/const BUILD = ("[^"]*");/, "stamped BUILD")[1]);
 const HEADERS_REV = JSON.parse(grab(/const HEADERS_REV = ("[^"]*");/, "stamped HEADERS_REV")[1]);
+
+// adoptAnswer() — THE ASKING PAGE'S OWN RECORD of what the waiting worker said
+// (src/swupdate.ts) — is a module export, not a global, and the build renames
+// it. The diagnostic imports that one name and nothing else from the update
+// module, so the diagnostic chunk's import clause is where the build says what
+// it called it. Read out of dist like the lists above; anything but exactly one
+// name there stops the walk rather than guess which export is which.
+const ADOPT_ANSWER = await (async () => {
+  const chunks = (await readdir(join(DIST, "assets"))).filter((f) => /^diagnostic-[\w-]+\.js$/.test(f));
+  if (chunks.length !== 1) throw new Error(`dist/assets has ${chunks.length} diagnostic chunks — expected one`);
+  const text = await readFile(join(DIST, "assets", chunks[0]), "utf8");
+  const imports = [...text.matchAll(/import\{([^}]*)\}from"\.\/(swupdate-[\w-]+\.js)"/g)];
+  const names = imports.flatMap((m) => m[1].split(","));
+  if (imports.length !== 1 || names.length !== 1) throw new Error(`${chunks[0]} imports ${names.length} name(s) from the update module — expected adoptAnswer alone`);
+  return { url: `/assets/${imports[0][2]}`, name: names[0].split(" as ")[0].trim() };
+})();
 
 /** THE REVISION RULE, restated here ON PURPOSE, from the file bytes: the first
  *  sixteen hex digits of the SHA-256. Takes a Buffer; returns the string. It is
@@ -164,19 +201,29 @@ const PLANTS = {
     ],
   },
   // A waiting worker takes over for ANY build the page names — a newer one too.
+  // Check 10 shows it as scenario B unable to finish, with others beside it (F
+  // and I on one run, C and I on the next; which ones depends on timing):
+  // each newer worker takes over before it can be seen waiting (2026-09-30).
   adoptany: {
-    turns: "10",
-    edits: [["  if (!BUILD || build !== BUILD) return;", "  // PLANTED: any build the page names is taken as this one"]],
+    turns: "10, 28",
+    edits: [['  if (!BUILD || build !== BUILD) return { taken: false, why: "build", worker: BUILD || "(not stamped)", page: build || "(not stamped)" };', "  // PLANTED: any build the page names is taken as this one"]],
   },
-  // The page's "I am your build" is ignored, so the same build waits for ever.
+  // The page's "I am your build" is ignored, so the same build waits for ever
+  // and no page is ever answered — which every word check needs.
   noadopt: {
-    turns: "16",
-    edits: [['  if (d && d.type === "ADOPT" && e.source) e.waitUntil(adoptIfAlone(e.source, String(d.build || "")));', "  // PLANTED: ADOPT is ignored"]],
+    turns: "16, 21, 25, 26, 27, 28, 29",
+    edits: [['    e.waitUntil(adoptIfAlone(e.source, String(d.build || "")).then(\n      (r) => { if (port) port.postMessage(r); },\n      (err) => { if (port) port.postMessage({ taken: false, why: "error", error: String((err && err.message) || err).slice(0, 200) }); }));', "    // PLANTED: ADOPT is ignored"]],
   },
   // A second window does not stop the takeover.
   alone: {
-    turns: "17",
-    edits: [["  if (wins.length !== 1 || wins[0].id !== asker.id) return;", "  // PLANTED: every other window is ignored"]],
+    turns: "17, 27",
+    edits: [['  if (wins.length !== 1 || wins[0].id !== asker.id) return { taken: false, why: "windows", windows: wins.length };', "  // PLANTED: every other window is ignored"]],
+  },
+  // A cache with a file missing from it is taken over anyway — and a takeover
+  // leaves no waiting worker for the test page's report to describe.
+  nogap: {
+    turns: "25, 29",
+    edits: [['  if (gap.n) return { taken: false, why: "cache", missing: gap.files, first: gap.first };', "  // PLANTED: a gap in the offline copy is no reason to wait"]],
   },
   // The end of an install never looks at its cache again.
   noendcheck: {
@@ -208,10 +255,47 @@ const PLANTS = {
     turns: "20",
     edits: [["      const got = await fetchVerified(u, rev, deadline(Math.max(1000, left)));", "      const got = await fetchVerified(u, rev); // PLANTED: no deadline on a sticker"]],
   },
+  // Not a line of sw.js: the test page never hears the takeover answer, so its
+  // report stays as it was built at load. Applied to the BUILT debug chunk, in
+  // scenario J only (DEBUG_PLANT below).
+  noreheard: { turns: "29", chunk: true },
 };
 if (PLANT && !PLANTS[PLANT]) {
   console.error(`unknown plant "${PLANT}" — one of: ${Object.keys(PLANTS).join(", ")}`);
   process.exit(2);
+}
+
+// --plant=noreheard CUTS OUT THE TEST PAGE'S REGISTRATION for the takeover
+// answer — debug.ts's `onAdoptAnswer(() => { if (!out.length && !running) void refreshReport(); })` — from
+// the built debug chunk, by calling a no-op in its place. The build renames
+// both ends, so the export is found as the ONE name of the update module that
+// the debug chunk imports and no other chunk does, and the call as that name's
+// local binding followed by "(". It must land exactly once or the walk stops:
+// a plant that missed prints the same green as a fix, and one that hit twice
+// is some other defect. Scenario J serves these bytes, and its releases list
+// their revision, so the install labels them like any file it was told about;
+// no other scenario sees them.
+let DEBUG_PLANT = null; // { path, bytes } under --plant=noreheard
+if (PLANT === "noreheard") {
+  const stop = (why) => { console.error(`plant noreheard: ${why}`); process.exit(2); };
+  const chunks = (await readdir(join(DIST, "assets"))).filter((f) => f.endsWith(".js"));
+  const updateImports = (t) => {
+    const m = t.match(/import\{([^}]*)\}from"\.\/swupdate-[\w-]+\.js"/);
+    return m ? m[1].split(",").map((s) => { const [exp, local = exp] = s.split(" as ").map((x) => x.trim()); return { exp, local }; }) : [];
+  };
+  const debugs = chunks.filter((f) => /^debug-[\w-]+\.js$/.test(f));
+  if (debugs.length !== 1) stop(`dist/assets has ${debugs.length} debug chunks — expected one`);
+  const text = await readFile(join(DIST, "assets", debugs[0]), "utf8");
+  const elsewhere = new Set();
+  for (const f of chunks) if (f !== debugs[0]) for (const { exp } of updateImports(await readFile(join(DIST, "assets", f), "utf8"))) elsewhere.add(exp);
+  const only = updateImports(text).filter(({ exp }) => !elsewhere.has(exp));
+  if (only.length !== 1) stop(`${debugs[0]} imports ${only.length} name(s) from the update module that no other chunk does — expected onAdoptAnswer alone`);
+  const { exp, local } = only[0];
+  const hits = [...text.matchAll(new RegExp(`(?<![\\w$.])${local.replace(/[$]/g, "\\$&")}\\(`, "g"))];
+  console.log(`plant noreheard: ${hits.length} call(s) of "${exp} as ${local}" in assets/${debugs[0]}${hits.map((h) => ` — at byte ${h.index}: …${text.slice(h.index - 24, h.index + 24)}…`).join("")}`);
+  if (hits.length !== 1) stop(`landed ${hits.length} times — expected once`);
+  const at = hits[0].index;
+  DEBUG_PLANT = { path: `/assets/${debugs[0]}`, bytes: Buffer.from(`${text.slice(0, at)}(()=>{})(${text.slice(at + local.length + 1)}`) };
 }
 const plantHits = new Set();
 let no404Planted = false;
@@ -221,7 +305,7 @@ let no404Planted = false;
  *  landed so the run can refuse to trust itself when one did not. */
 function withPlant(text) {
   const plant = PLANT && PLANTS[PLANT];
-  if (!plant || plant.server) return text;
+  if (!plant || !plant.edits) return text;
   let t = text;
   for (const [find, swap] of plant.edits) {
     if (t.includes(find)) { t = t.replace(find, () => swap); plantHits.add(find); }
@@ -499,6 +583,48 @@ const stored = (p, name, entries) => p.evaluate(async ({ name, entries }) => {
   return out;
 }, { name, entries });
 
+/** WHAT THE PAGE'S OWN adoptAnswer() RETURNS: null when it never asked,
+ *  { answer: null } while no answer has come, or { answer } with the worker's
+ *  reply. Takes the page. Returns that value, or "(not a function)" when the
+ *  name read out of the build does not name one. Read through an import of the
+ *  url the page already loaded, which hands back the SAME module — so this is
+ *  the page's record, not a fresh copy of the module with nothing in it. */
+const adoptAnswerOf = (p) => p.evaluate(async ({ url, name }) => {
+  const m = await import(new URL(url, location.href).href);
+  return typeof m[name] === "function" ? m[name]() : "(not a function)";
+}, ADOPT_ANSWER);
+
+/** Whether the page's takeover request has been answered within `ms`. Takes
+ *  the page and the deadline; returns true or false, never throws. */
+const answered = (p, ms) => within(p, async ({ url, name }) => {
+  const m = await import(new URL(url, location.href).href);
+  const a = typeof m[name] === "function" ? m[name]() : null;
+  return !!(a && a.answer);
+}, ADOPT_ANSWER, ms);
+
+/** THE EDITOR'S OWN REPORT — its "Offline worker" line, opened the way the
+ *  version tag opens it, on the page that asked the waiting worker to take
+ *  over. Takes the page (on /ir.html); returns the line once it is written.
+ *  What the takeover checks rely on: the editor builds its report when it is
+ *  OPENED, so the line can carry an answer that arrived after the page loaded.
+ *  The test page's report depends on being rebuilt when the answer lands, and
+ *  check 29 holds that on its own (header). A programmatic click, because the
+ *  editor's first-visit welcome may be open over the tag. */
+async function editorReport(p) {
+  await p.evaluate(() => document.getElementById("verTag").click());
+  await until(p, "the editor's report", () => /^Offline worker/m.test(document.getElementById("verDlgText")?.value ?? ""), null, 30000);
+  return p.evaluate(() => document.getElementById("verDlgText").value.split("\n").find((l) => l.startsWith("Offline worker")) ?? "");
+}
+
+/** The takeover clause of a report line, for a check's detail: from the words
+ *  about the waiting worker on, whitespace collapsed. Takes the line; returns
+ *  the clause, or the start of the line when it has none. */
+const takeoverClause = (line) => {
+  const t = line.replace(/\s+/g, " ");
+  const i = t.indexOf("a worker of this same version");
+  return i >= 0 ? t.slice(i, i + 260) : t.slice(0, 200);
+};
+
 /** The install's summary as that release stored it, or null. */
 const summaryOf = (p, name) => p.evaluate(async (name) => {
   if (!(await caches.has(name))) return null;
@@ -543,7 +669,7 @@ try {
     // fixed worker, which is the failure mode "made to fail once" exists to
     // prevent rather than to demonstrate.
     const plant = PLANT && PLANTS[PLANT];
-    if (plant && !plant.server) {
+    if (plant && plant.edits) {
       const missed = plant.edits.filter(([find]) => !plantHits.has(find));
       if (missed.length) check("the plant applied", false, `dist/sw.js does not contain: ${missed.map(([f]) => f.trim()).join(" | ")}`);
     }
@@ -823,6 +949,15 @@ try {
     // stops an older worker activating from emptying a newer one's install.
     check("21 an activation deletes older releases' caches and leaves a newer one's alone",
       took && w.keys.includes("ips-9999.9") && !w.keys.includes("ips-0.0.1"), `caches ${w.keys.join(", ")}`);
+    // 26 — AND THE PAGE THAT ASKED WAS TOLD IT TOOK OVER, and its report says
+    // so. Once the worker has taken over nothing is waiting, so the report says
+    // it on its own clause, from the page's adoptAnswer().
+    const told = await answered(p, 5000);
+    const a26 = await adoptAnswerOf(p);
+    const line26 = took ? await editorReport(p) : "(never took over)";
+    const words26 = "the worker serving this page took over when this page asked it to";
+    check(`26 after that takeover the asking page's adoptAnswer() says it took over, and the editor's report says "${words26}"`,
+      told && a26?.answer?.taken === true && line26.includes(words26), `adoptAnswer() ${JSON.stringify(a26)}; report "${line26.replace(/\s+/g, " ").slice(0, 260)}"`);
   });
 
   // ======== E: the same build, with a second window open ====================
@@ -843,6 +978,13 @@ try {
     check("17 with a second window open, the same build still waits: the other window may be an older one",
       w.controller === "0.0.1" && w.waiting === V && cc === 0,
       `controller ${w.controller}, waiting ${w.waiting}, ${cc} takeover(s) five seconds after it installed`);
+    // 27 — AND THE REPORT SAYS WHY, in the words a reader copies: the first
+    // window's own report, since it asked just as the second one did.
+    const told = await answered(p, 5000);
+    const line = w.waiting ? await editorReport(p) : "(no worker waiting, so the report has no takeover clause)";
+    const words = "it declined when this page asked: 2 windows of the app are open";
+    check(`27 and the editor's report, on a window that asked, says it "${words}"`,
+      told && line.includes(words), `answer ${JSON.stringify(await adoptAnswerOf(p))}; report "${takeoverClause(line)}"`);
   });
 
   // ======== F: the app is closed while an update installs ===================
@@ -996,11 +1138,95 @@ try {
     check("24 when the host's header rules change, every file is downloaded again rather than carried forward with the old headers",
       notAsked.length === 0, notAsked.length ? `${notAsked.length} of ${want.size} carried forward, e.g. ${notAsked.slice(0, 3).join(", ")}` : `all ${want.size} downloaded`);
   });
+
+  // ======== J: the same build, with a gap in its offline copy ===============
+  await scenario("J (a gap in the cache)", async (keep) => {
+    // Release 1 is an older build, as in D. This build's worker then installs
+    // under privacy.html, which carries no strip and so asks nobody to take
+    // over — which lets one file be taken out of its cache BEFORE any page has
+    // asked. Then the editor opens as the only window: the same build, one
+    // window, so the gap is the only thing standing between it and a takeover.
+    // Under --plant=noreheard both releases here list the planted debug chunk,
+    // and the server hands it out; otherwise nothing differs from the build.
+    const debugFiles = DEBUG_PLANT ? { [DEBUG_PLANT.path]: DEBUG_PLANT.bytes } : {};
+    if (DEBUG_PLANT) S.files.set(DEBUG_PLANT.path, DEBUG_PLANT.bytes);
+    S.sw = release({ version: "0.0.1", build: "walk-0.0.1", files: debugFiles });
+    const { ctx, p } = await openFresh(STRIP_LOG);
+    keep(ctx);
+    if (DEBUG_PLANT) {
+      // THE PLANT LANDED where the test page will be served from: the release
+      // in control keeps the planted bytes, under their own label.
+      const [[, lab, dig]] = await stored(p, "ips-0.0.1", [["." + DEBUG_PLANT.path, ""]]);
+      const want = revOf(DEBUG_PLANT.bytes);
+      if (dig !== want || lab !== labelOf(want)) check("the noreheard plant applied", false, `ips-0.0.1 holds ${DEBUG_PLANT.path} as ${dig ?? "nothing"} labelled ${lab}; the planted bytes are ${want}`);
+    }
+    await p.goto(`${ORIGIN}/privacy.html`);
+    await until(p, "the privacy page to be controlled", () => !!navigator.serviceWorker.controller, null, 15000);
+    S.sw = DEBUG_PLANT ? release({ files: debugFiles }) : SW_SRC;
+    await update(p);
+    await waiting(p);
+    const GONE = "." + PAL;
+    const removed = await p.evaluate(async ({ name, u }) => (await caches.open(name)).delete(u), { name: `ips-${V}`, u: GONE });
+    if (!removed) throw new Error(`${GONE} was not in ips-${V} to take out`);
+    await p.goto(`${ORIGIN}/ir.html`);
+    await until(p, "the editor to be controlled", () => !!navigator.serviceWorker.controller, null, 15000);
+    const told = await answered(p, 15000);
+    // Five seconds, as 17 waits: a takeover under way would have landed by now.
+    await p.waitForTimeout(5000);
+    const w = await workers(p);
+    const cc = await p.evaluate(() => window.__cc);
+    const a = await adoptAnswerOf(p);
+    const line = w.waiting ? await editorReport(p) : "(no worker waiting, so the report has no takeover clause)";
+    const words = `it declined when this page asked: its offline copy is missing 1 file (the first is ${GONE})`;
+    check("25 a waiting worker of this build whose offline copy lacks one file does not take over, and the editor's report, on the page that asked, names the file",
+      told && w.controller === "0.0.1" && w.waiting === V && cc === 0 && line.includes(words),
+      `controller ${w.controller}, waiting ${w.waiting}, ${cc} takeover(s); answer ${JSON.stringify(a)}; report "${takeoverClause(line)}"`);
+
+    // 29 — AND THE TEST PAGE'S REPORT, the one a reader is sent to copy, comes
+    // to say it too. It is built at load, before the worker has finished
+    // checking its offline copy, so it has to be built again when the answer
+    // lands (debug.ts, onAdoptAnswer). Opened in the same tab, so it is the
+    // only window, behind the same gap, and it asks for itself. The textarea is
+    // polled as it stands, synchronously: the reader copies what is there.
+    const t29 = Date.now();
+    await p.goto(`${ORIGIN}/debug.html`);
+    const said = await within(p, (w) => (document.getElementById("dText")?.value ?? "").includes(w), words, 10000);
+    const secs = ((Date.now() - t29) / 1000).toFixed(1);
+    const dLine = await p.evaluate(() => (document.getElementById("dText")?.value ?? "").split("\n").find((l) => l.startsWith("Offline worker")) ?? "(no Offline worker line)");
+    check("29 the test page's own report, opened as the only window behind the same gap, comes to name the missing file within ten seconds",
+      said, `${said ? "said so" : "still not saying so"} ${secs} s after opening; answer ${JSON.stringify(await adoptAnswerOf(p))}; report "${takeoverClause(dLine)}"`);
+  });
+
+  // ======== K: this version, another build ==================================
+  await scenario("K (another build of this version)", async (keep) => {
+    // The version is what a staging force-push can repeat, so the build is what
+    // adoptIfAlone tests first: this release's own sw.js, stamped with a build
+    // that is not the page's. Its cache is whole and the editor is the only
+    // window, so the build is the only thing that can refuse it.
+    S.sw = release({ version: "0.0.1", build: "walk-0.0.1" });
+    const { ctx, p } = await openFresh(STRIP_LOG);
+    keep(ctx);
+    await p.evaluate(() => { window.__cc = 0; });
+    const OTHER = "walk-another-build";
+    S.sw = release({ build: OTHER });
+    await update(p);
+    await waiting(p);
+    const told = await answered(p, 15000);
+    await p.waitForTimeout(5000);
+    const w = await workers(p);
+    const cc = await p.evaluate(() => window.__cc);
+    const a = await adoptAnswerOf(p);
+    const line = w.waiting ? await editorReport(p) : "(no worker waiting, so the report has no takeover clause)";
+    const words = `it declined when this page asked: it is build ${OTHER} and this page is build ${BUILD}`;
+    check("28 a waiting worker of this same version but another build does not take over, and the editor's report, on the page that asked, names both builds",
+      told && w.controller === "0.0.1" && w.waiting === V && cc === 0 && line.includes(words),
+      `controller ${w.controller}, waiting ${w.waiting}, ${cc} takeover(s); answer ${JSON.stringify(a)}; report "${takeoverClause(line)}"`);
+  });
 } finally {
   await b.close();
   server.closeAllConnections?.();
   await new Promise((r) => server.close(r));
 }
-if (PLANT) console.log(`\nplant "${PLANT}" should turn check ${PLANTS[PLANT].turns} red`);
+if (PLANT) console.log(`\nplant "${PLANT}" should turn check${PLANTS[PLANT].turns.includes(",") ? "s" : ""} ${PLANTS[PLANT].turns} red`);
 console.log(failed ? `\n${failed} check(s) failed` : "\nall checks passed");
 process.exit(failed ? 1 : 0);

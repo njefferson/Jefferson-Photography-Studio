@@ -13,7 +13,7 @@ import { buildDiagnostic } from "./diagnostic";
 // The test page gets the update strip too — it had never had one, so the page a
 // reader is most likely to be sitting on during a release was the one that
 // never told them a release had happened.
-import { wireUpdateStrip } from "./swupdate";
+import { onAdoptAnswer, wireUpdateStrip } from "./swupdate";
 import { decode } from "./decode";
 import { decodeOffThread, decodeLanes } from "./decodeClient";
 import { sniff } from "./import";
@@ -78,10 +78,31 @@ const textArea = $("dText") as HTMLTextAreaElement;
 // missing.
 wireUpdateStrip();
 
-const refreshReport = () => buildDiagnostic(__APP_VERSION__, [
-  { k: "Not in this report", v: "the photograph you have open — open the app itself and use its ⓘ for that" },
-]).then((t) => { textArea.value = t; });
+// Only the latest build writes: the one at load can finish after the one the
+// takeover answer starts, and would put "no answer yet" back. And a report
+// arriving while the text is focused, which is where a refused clipboard
+// leaves it selected for a hand copy, waits until the focus leaves.
+let reportSeq = 0;
+let reportLater: string | null = null;
+textArea.addEventListener("blur", () => { if (reportLater !== null) { textArea.value = reportLater; reportLater = null; } });
+const refreshReport = () => {
+  const n = ++reportSeq;
+  return buildDiagnostic(__APP_VERSION__, [
+    { k: "Not in this report", v: "the photograph you have open — open the app itself and use its ⓘ for that" },
+  ]).then((t) => {
+    if (n !== reportSeq) return;
+    if (document.activeElement === textArea) reportLater = t;
+    else { textArea.value = t; reportLater = null; }
+  });
+};
 void refreshReport();
+// The worker answers a takeover request only after checking its whole offline
+// copy, which is later than the report above is built, so the worker line is
+// built again when the answer lands. Only before any speed row exists: once a
+// run has shown its numbers, the report above them is the one taken with them,
+// and "Copy the results" must not pair it with a later one.
+let running = 0;
+onAdoptAnswer(() => { if (!out.length && !running) void refreshReport(); });
 
 async function copy(text: string, btn: HTMLButtonElement, label: string, fallback: HTMLTextAreaElement = textArea) {
   const old = btn.textContent;
@@ -1692,7 +1713,8 @@ async function fullResolutionPreview(): Promise<void> {
   btn.disabled = true;
   const was = btn.textContent;
   btn.textContent = "Running…";
-  await readingFromABigStore();
+  running++;
+  try { await readingFromABigStore(); } finally { running--; }
   btn.textContent = was;
   btn.disabled = false;
   const copyBtn = $("dCopyAll") as HTMLButtonElement;
@@ -1705,7 +1727,8 @@ async function fullResolutionPreview(): Promise<void> {
   btn.disabled = true;
   const was = btn.textContent;
   btn.textContent = "Running…";
-  await whatMakesTheBuildSlow();
+  running++;
+  try { await whatMakesTheBuildSlow(); } finally { running--; }
   btn.textContent = was;
   btn.disabled = false;
   const copyBtn = $("dCopyAll") as HTMLButtonElement;
@@ -1717,6 +1740,7 @@ async function fullResolutionPreview(): Promise<void> {
   const btn = e.currentTarget as HTMLButtonElement;
   btn.disabled = true;
   btn.textContent = "Running…";
+  running++;
   results.replaceChildren();
   out.length = 0;
   // One moment for the whole block: the report is re-taken with the numbers,
@@ -1736,6 +1760,7 @@ async function fullResolutionPreview(): Promise<void> {
   await theCanvasTheExportUses();
   await fullResolutionPreview();
   await storage();
+  running--;
   btn.textContent = "Run again";
   btn.disabled = false;
   const copyBtn = $("dCopyAll") as HTMLButtonElement;

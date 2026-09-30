@@ -353,18 +353,32 @@ async function olderCopies() {
   return out;
 }
 
-/** How many of this release's entries cache `c` lacks — every PRECACHE url and
- *  every page's second address. Takes the cache; returns the count. Read by
- *  the end of an install and by the takeover, both of which must never act on
- *  a cache with anything missing from it. */
-async function missingFrom(c) {
-  let missing = 0;
+/** WHAT cache `c` lacks of this release — every PRECACHE url and every page's
+ *  second address. Takes the cache; returns `{ n, files, first }`: how many
+ *  entries are missing, how many FILES that is (a page and its second address
+ *  are one file, and "./" is index.html's), and the first file found missing,
+ *  named by its PRECACHE url (null when none). What the callers rely on: `n`
+ *  is 0 exactly when every entry is there (the install's test), and `files`
+ *  and `first` are what the takeover's refusal tells the reader. */
+async function gapIn(c) {
+  const pageOf = new Map();
+  for (const [u] of PRECACHE) { const a = alsoAt(u); if (a) pageOf.set(a, u); }
+  let n = 0, first = null;
+  const files = new Set();
+  const miss = (u) => { n++; const f = pageOf.get(u) || u; files.add(f); if (first === null) first = f; };
   for (const [u] of PRECACHE) {
-    if (!(await c.match(u))) missing++;
+    if (!(await c.match(u))) miss(u);
     const alias = alsoAt(u);
-    if (alias && !(await c.match(alias))) missing++;
+    if (alias && !(await c.match(alias))) miss(alias);
   }
-  return missing;
+  return { n, files: files.size, first };
+}
+
+/** How many of this release's entries cache `c` lacks. Takes the cache; returns
+ *  the count, `gapIn(c).n`. Read by the end of an install, which must never
+ *  finish on a cache with anything missing from it. */
+async function missingFrom(c) {
+  return (await gapIn(c)).n;
 }
 
 /** IS THIS RELEASE'S CACHE STILL THERE, AND WHOLE? Takes nothing; returns
@@ -579,14 +593,23 @@ function keeps(k) {
  *  (3) the asker is the ONLY window — skipWaiting moves every window, and
  *      another may be an older build (workbox-window's tab A and tab B).
  *  Otherwise it does nothing and the worker waits exactly as §7h has it; a
- *  newer build is always refused by (1), whatever the page asks. Returns
- *  nothing. */
+ *  newer build is always refused by (1), whatever the page asks.
+ *  Returns WHAT IT DID AND WHY (2026-09-30): `{ taken: true }`, or
+ *  `{ taken: false, why }` with `why` one of "build" (with `worker` and `page`,
+ *  the two builds), "cache" (with `missing`, a count or "all", and `first`, a
+ *  file), or "windows" (with `windows`, how many are open). The report prints
+ *  it, because a refusal that says nothing looked identical to a takeover still
+ *  running on the PC's report of 2026-09-30. What the caller relies on: the
+ *  reason returned is the test that refused, checked in this order. */
 async function adoptIfAlone(asker, build) {
-  if (!BUILD || build !== BUILD) return;
-  if (!(await caches.has(CACHE)) || (await missingFrom(await caches.open(CACHE)))) return;
+  if (!BUILD || build !== BUILD) return { taken: false, why: "build", worker: BUILD || "(not stamped)", page: build || "(not stamped)" };
+  if (!(await caches.has(CACHE))) return { taken: false, why: "cache", missing: "all", first: null };
+  const gap = await gapIn(await caches.open(CACHE));
+  if (gap.n) return { taken: false, why: "cache", missing: gap.files, first: gap.first };
   const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-  if (wins.length !== 1 || wins[0].id !== asker.id) return;
+  if (wins.length !== 1 || wins[0].id !== asker.id) return { taken: false, why: "windows", windows: wins.length };
   await self.skipWaiting();
+  return { taken: true };
 }
 
 // Let the page force a waiting worker to take over immediately (the "Update to
@@ -610,7 +633,15 @@ self.addEventListener("message", (e) => {
     e.ports[0].postMessage(progress ? { version: RELEASE, done: progress.done, total: progress.total } : null);
   }
   // "I AM YOUR BUILD" — the page asking this worker to take over (adoptIfAlone).
-  if (d && d.type === "ADOPT" && e.source) e.waitUntil(adoptIfAlone(e.source, String(d.build || "")));
+  // The answer goes back on the port the page sent, when it sent one.
+  if (d && d.type === "ADOPT" && e.source) {
+    const port = e.ports && e.ports[0];
+    // A check that throws still answers, so the page never waits on an answer
+    // that is not coming and reports it as one still running.
+    e.waitUntil(adoptIfAlone(e.source, String(d.build || "")).then(
+      (r) => { if (port) port.postMessage(r); },
+      (err) => { if (port) port.postMessage({ taken: false, why: "error", error: String((err && err.message) || err).slice(0, 200) }); }));
+  }
 });
 
 /** WHERE A NON-NAVIGATION IS ANSWERED FROM. Takes the request and its parsed

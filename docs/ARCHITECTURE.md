@@ -608,11 +608,11 @@ cannot describe something the code does not say about itself.
 - **`src/color.ts`** (88 lines) — Camera color science.
 - **`src/cubeimport.ts`** (136 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (247 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
-- **`src/debug.ts`** (1745 lines) — The test page behind the version number.
+- **`src/debug.ts`** (1770 lines) — The test page behind the version number.
 - **`src/decode.ts`** (398 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (59 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
-- **`src/diagnostic.ts`** (293 lines) — The text report (Doctrine §7f).
+- **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (258 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
 - **`src/export.ts`** (1127 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
@@ -675,7 +675,7 @@ cannot describe something the code does not say about itself.
 - **`src/startup.ts`** (154 lines) — WHAT THE FIRST SECONDS OF THIS LAUNCH COST, AND WHERE (decision 071).
 - **`src/sticker.ts`** (576 lines) — Sticker compositing — rhymes with heal.ts (src/heal.ts): stickers are baked INTO the linear source (pre-pipeline), so each one inherits the channel swap / WB / looks / grade / grain and lands in the I
 - **`src/straighten.ts`** (279 lines) — FINDING THE ANGLE A FRAME IS OFF BY.
-- **`src/swupdate.ts`** (404 lines) — THE STANDING "A NEW VERSION IS WAITING" STRIP, for all three PWAs (Doctrine §7h).
+- **`src/swupdate.ts`** (458 lines) — THE STANDING "A NEW VERSION IS WAITING" STRIP, for all three PWAs (Doctrine §7h).
 - **`src/theme.ts`** (115 lines) — Day/night mode, shared across every page.
 - **`src/toggletip.ts`** (134 lines) — A CONTROL'S OWN SENTENCE, REACHED BY A FINGER — the toggletip of decision 024.
 - **`src/verdlg.ts`** (135 lines) — THE "THIS BUILD" PANEL — what changed, and the report to send (Doctrine §7d, §7f).
