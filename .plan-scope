@@ -1,7 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=6c15a77508194d98
-diffhash=0b46de997cccceda
-verdict=IN-SCOPE: Part 1 step 2 — a row with no number carries its reason into Copy the results, folded to one line; measured rows unchanged; the editor untouched; the module map's line count regenerated
-# Scope watcher (a subagent reading the plan by path), 2026-09-30: IN-SCOPE for Part 1 step 2. The diff touches only src/debug.ts; gl.ts and FRAG are untouched, so the editor program is unchanged; no measured row value can match NOT_MEASURED, so measured rows copy byte-identically; contract gate 321/321. Named: the value set is wider than the plan five words (refused, not available), the same class, stated in the commit body; the fold in timedBuild is redundant and harmless; not produced and not comparable stay outside the set.
-# The generated module map changes only the test page's line count.
+diffhash=412f8218e97e0011
+verdict=IN-SCOPE: Part 1 step 4 — the NOTES line for v2.64.20 on staging (32a5285, ips-2.64.20, Gates 992, deploy 950)
+# Scope watcher (a subagent reading the plan by path), 2026-09-30: IN-SCOPE for Part 1 step 4, the NOTES line for v2.64.20 on staging; every claim matches the facts (32a5285, ips-2.64.20, Gates 992, deploy 950, the planted check); nothing chosen for the owner.

@@ -54,6 +54,18 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**v2.64.20 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-30 (32a5285).** v2.64.18 below, plus one fix to the test page: "Copy
+the results" now carries the explanation under any row with no number (did not
+build, did not draw, not run, failed, refused, not available, WebGL2
+unavailable), so the texture row's "did not build" arrives with the driver's
+reason. The PC reading of v2.64.18 had lost it. Checked headless: with the
+texture row planted to fail, its copied reason holds the driver's words on one
+line, and rows with a number copy exactly as before. Staging's offline worker
+was read naming 32a5285 as `ips-2.64.20`, and the Gates run (992) and the
+deploy (950) for it both passed. **The device pass**
+is v2.64.18's, below, now with the texture row's reason in the copy.
+
 **v2.64.18 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-30 (f9dd4b8).** Production's code plus two changes (071).
 - The report's Offline worker line says what a waiting worker of the same
