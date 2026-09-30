@@ -601,10 +601,14 @@ function updateHotspotUI() {
   // correction that does not move it is how a reader stops believing the panel.
   const superseded = !!myLens;
   hsUi.card.hidden = superseded;
+  // WRITTEN EVEN WHILE HIDDEN. `syncFromUI` reads `params.hsFix` back off this
+  // slider, and a hidden slider still holding the previous photograph's value
+  // made that value this photograph's shipped strength, which "Forget this
+  // profile" then handed to the correction.
+  hsUi.strength.value = String(params.hsFix);
   if (superseded) return;
   hsUi.strength.disabled = false;
   hsUi.bypassBtn.disabled = false;
-  hsUi.strength.value = String(params.hsFix);
   hsUi.bypassBtn.setAttribute("aria-pressed", String(params.hsBypass));
   hsUi.prompt.hidden = !!hotspotState;
   if (!hotspotState) {
@@ -632,10 +636,6 @@ function updateHotspotUI() {
     `${short} · ${src} · ${knows}${note ? ` — ${note}` : ""}${params.hsBypass ? " · bypassed" : ""}${centreEffect()}`;
 }
 
-hsUi.strength.addEventListener("change", () => {
-  rememberStrength(lensStrengthKey(), Number(hsUi.strength.value));
-  updateHotspotUI();
-});
 hsUi.strength.addEventListener("input", () => {
   params.hsFix = Number(hsUi.strength.value);
   syncLensStrength();
@@ -653,7 +653,17 @@ hsUi.applyManualBtn.addEventListener("click", () => {
   const p = Hotspot.findShippedManual(short, fl, currentExif);
   if (!p) return; // the picker only offers lenses that have profiles
   hotspotState = { p, short, source: "manual" };
+  // A PICKED LENS IS A MATCHED LENS, so it lands at the full correction every
+  // matched photograph opens at (decision 085). The frame opened unmatched at
+  // 0, and a pick that left it there corrected nothing while the card named
+  // the lens; the double tap goes back to this same 1 (lensStrengthTarget).
+  params.hsFix = 1;
+  syncLensStrength();
   syncHotspot();
+  syncMirrors(); // Aerochrome's finishing copy shows the new strength too
+  // One undo step for the strength. The pick itself is not part of the edit:
+  // Undo leaves the lens picked, and the pick is not saved with the photograph,
+  // so a return to it asks for the lens again (NOTES, found and not fixed).
   flushRecord();
 });
 
@@ -749,8 +759,7 @@ function updateMyLensUI() {
  *  apply it and the sky selection and the automatics read corrected pixels.
  *  @param imported  the file, bytes in hand.
  *  @returns the plan, or null when no profile matches or the strength is 0 —
- *    a decode with nothing to lay on it. A matched lens with nothing
- *    remembered lays strength 1.
+ *    a decode with nothing to lay on it. A matched lens lays strength 1.
  *  What the result must satisfy: `strength` equals what `params.lensFix` will
  *    be set to when this photograph opens, or `ensureLensApplied` re-runs the
  *    pass on the first draw and the balance was measured on the wrong data. */
@@ -1064,8 +1073,8 @@ function initMyLens(_img: DecodedImage, _imported: ImportedFile) {
   // leak onto this one. Both halves go up together — initHotspot has already
   // run and settled the shipped match.
   //
-  // The reader's own card's strength: what they chose for this profile, or
-  // full when they have chosen nothing (`lensStrengthAtOpen`). With no
+  // The reader's own card's strength: full on every photograph
+  // (`lensStrengthAtOpen`, decision 085). With no
   // measurement of theirs it is 0 here and `syncLensStrength` below hands
   // `lensFix` to the shipped card, exactly as before.
   params.lensFix = myLens ? lensStrengthAtOpen(currentExif, "own") : 0;
@@ -1080,14 +1089,6 @@ myLensUi.strength.addEventListener("input", () => {
   if (!myLens) return;
   params.lensFix = Number(myLensUi.strength.value);
   syncMyLens(); // draw() coalesces the drag into one undo step, like every slider
-});
-// REMEMBERED ON `change`, NOT ON `input` — a drag fires input per pixel, and
-// writing storage on each one would store every value the slider passed
-// through on the way to the one that was meant.
-myLensUi.strength.addEventListener("change", () => {
-  if (!myLens) return;
-  rememberStrength("own:" + myLens.p.key, Number(myLensUi.strength.value));
-  updateMyLensUI();
 });
 myLensUi.bypass.addEventListener("click", () => {
   if (!myLens) return;
@@ -1146,8 +1147,8 @@ function showFileKind(img: DecodedImage, imported: ImportedFile): void {
  *
  *  It auto-SELECTS the profile from EXIF — if the lens cannot be identified the
  *  manual picker is surfaced rather than the match being guessed — and APPLIES
- *  it at the strength `lensStrengthAtOpen` gives: the one the reader last chose
- *  for this lens, or full when they have chosen none. No match opens at 0.
+ *  it at the strength `lensStrengthAtOpen` gives: full, 1, on every photograph
+ *  (decision 085). No match opens at 0.
  *
  *  WHY IT OPENS ON (decision 015, reversed). From 2026-09-17 this opened at
  *  zero, a stopgap that 015's own Rejected section argues against: the
@@ -1161,9 +1162,10 @@ function showFileKind(img: DecodedImage, imported: ImportedFile): void {
  *
  *  WHAT IR-SCIENCE.md 9h SAID STILL HOLDS for the per-image question — a stored
  *  per-lens correction cannot be right for every frame, because the stray light
- *  scales with the scene — and that is why the strength is a slider that moves
- *  when the photograph opens, is remembered per lens, and has Bypass and the
- *  hold-to-compare button beside it. An at-open automatic here has to be
+ *  scales with the scene — and that is why the strength is a slider on every
+ *  photograph, with Bypass and the hold-to-compare button beside it. What a
+ *  reader sets stays with that photograph's own edit and is never carried to
+ *  the next (decision 085). An at-open automatic here has to be
  *  visible and undoable with the uncorrected picture one press away, and this
  *  one now is all three. */
 function initHotspot(_img: DecodedImage, _imported: ImportedFile) {
@@ -1176,94 +1178,29 @@ function initHotspot(_img: DecodedImage, _imported: ImportedFile) {
   updateLensCmp();
 }
 
-/** THE CORRECTION STRENGTH THE READER CHOSE FOR THIS LENS, REMEMBERED.
+/** NOTHING BUT THE LENS PROFILE DECIDES A PHOTOGRAPH'S OPENING STRENGTH
+ *  (decision 085, 2026-09-30). Until then the strength last set was remembered
+ *  per lens under `ips-lens-strength` and became the strength every later
+ *  photograph of that lens opened at, a remedy for a session of sixty-two
+ *  frames where a strength had to be set once per photo. Its cost showed on
+ *  the whole frame: a slider left above 1 opened every later photograph with
+ *  its middle washed out, and a double tap went back to that remembered
+ *  position instead of to the correction. So every photograph opens at full,
+ *  and a strength set stays with that photograph's own edit.
  *
- *  It was hard-coded to 1 on every open — `params.lensFix = myLens ? 1 : 0` and
- *  `params.hsFix = 1` — so turning it down never survived moving to the next
- *  photograph. Reported from a session of SIXTY-TWO frames, where the remedy
- *  the reader had already found was a slider they then had to move sixty-two
- *  times, once per photo, to keep it.
- *
- *  WHY THE DEFAULT IS NOT SIMPLY LOWERED INSTEAD. Swept on the reported frame,
- *  the radial red-green spread from centre to edge falls monotonically as
- *  strength rises — 32.3 at 0, 19.7 at 1, 13.7 at 1.5 — so by the measure the
- *  profile is calibrated against, MORE correction is flatter, and a lower
- *  shipped default would be worse on a flat field. What the reader is reacting
- *  to is not that average: the correction is a radial push applied to whatever
- *  is there, and in a bright field that is already near neutral it reads as a
- *  cyan disc while the ring average, dominated by sky and foliage, is still
- *  red. Both are true, and which one matters is the reader's call on their own
- *  photographs — so this remembers their answer rather than guessing a better
- *  number for them.
- *
- *  KEYED PER LENS, because a strength that suits a 50-250 is not a claim about
- *  any other lens, and one global number would silently carry it across. Same
- *  shape as the standing default look. The key is `own:<profile key>` for the
- *  reader's own measurement and `shipped:<short name>` for a shipped profile.
- *
- *  NOT PER APERTURE, WHICH THE SHIPPED KEY WAS until 2026-09-26
- *  (`shipped:50-250@5.3`). A strength chosen on a frame at f/5.3 then reached
- *  only other frames at f/5.3, so on a set of 22 frames from one lens between
- *  f/5 and f/8, 19 opened ignoring a strength the reader had already set. The
- *  aperture still chooses WHICH curve applies (`matchIn`); how much of it the
- *  reader wants is a preference about the lens. Rows written under the old
- *  `@f` keys are never read again — nothing asks for them — and so fall back
- *  to full, which is what an unset lens opens at now anyway. */
-const LENS_STRENGTH_KEY = "ips-lens-strength";
-
-function lensStrengthMap(): Record<string, number> {
+ *  Takes nothing and returns nothing. Afterwards `ips-lens-strength` is absent
+ *  from this origin's storage (or storage is refused, and there is nothing to
+ *  read). Removed rather than left unread, because a stored answer is
+ *  harmless only until something reads it again. Consumer: the lens-order
+ *  walk, which plants a row, reloads, and asserts it is gone. */
+function forgetStoredLensStrengths(): void {
   try {
-    const raw = localStorage.getItem(LENS_STRENGTH_KEY);
-    const m = raw ? JSON.parse(raw) : {};
-    return m && typeof m === "object" ? (m as Record<string, number>) : {};
+    localStorage.removeItem("ips-lens-strength");
   } catch {
-    return {};
+    /* storage refused: nothing was stored to read */
   }
 }
-
-/** The remembered strength for a profile, or null to open at full. */
-function rememberedStrength(key: string | null): number | null {
-  if (!key) return null;
-  const v = lensStrengthMap()[key];
-  return Number.isFinite(v) && v >= 0 && v <= 1.5 ? v : null;
-}
-
-/** Remember the strength the reader chose for a lens.
- *  @param key  `lensStrengthKey()` for the open photograph; null stores nothing.
- *  @param v  the slider's value, 0 included.
- *  @returns nothing; the row is written to localStorage, or silently not where
- *    storage is refused.
- *  What the result must satisfy: `rememberedStrength(key)` gives `v` back for
- *    any `v` the slider can hold, so `lensStrengthAtOpen` opens the next
- *    photograph with this lens at it. */
-function rememberStrength(key: string | null, v: number): void {
-  if (!key || !Number.isFinite(v)) return;
-  try {
-    const m = lensStrengthMap();
-    // EVERY VALUE IS STORED, 0 INCLUDED, because absence means FULL now. This
-    // deleted the row at 0 while absence meant off, and at 1 before that while
-    // absence meant full the first time — each time dropping exactly the value
-    // absence stood for, which is harmless only until the default moves. It has
-    // moved twice. A reader who turns a lens off has to get off on the next
-    // photograph, not the default. The lens-order walk remembers 0 and opens
-    // again to hold this.
-    m[key] = v;
-    localStorage.setItem(LENS_STRENGTH_KEY, JSON.stringify(m));
-  } catch {
-    /* private window: the slider still works, it just will not be remembered */
-  }
-}
-
-/** The key a strength is remembered against: the reader's own measurement when
- *  they have one for this frame, otherwise the shipped profile — by lens, not
- *  by aperture (see LENS_STRENGTH_KEY). `lensStrengthAtOpen` builds the same
- *  two shapes from a file's EXIF; this one reads the open photograph's cards,
- *  so a lens picked by hand is remembered under the lens it names. */
-function lensStrengthKey(): string | null {
-  if (myLens) return "own:" + myLens.p.key;
-  if (hotspotState) return "shipped:" + hotspotState.short;
-  return null;
-}
+forgetStoredLensStrengths();
 
 /** THE STRENGTH A PHOTOGRAPH OPENS WITH — the one place that decides it.
  *
@@ -1275,9 +1212,8 @@ function lensStrengthKey(): string | null {
  *    own card's alone, 0 when they have no profile for this frame (what
  *    `initMyLens` sets). `"shipped"`: the shipped card's alone, `params.hsFix`,
  *    0 when no shipped profile matches (what `initHotspot` sets).
- *  @returns the strength remembered for that LENS (`rememberedStrength`), or 1
- *    when a profile matches and nothing is remembered, or 0 when no profile
- *    matches.
+ *  @returns 1 when a profile matches, 0 when none does. Nothing a reader set
+ *    on another photograph reaches it (decision 085).
  *
  *  THE PRECEDENCE IS syncLensStrength's, not a second rule: the reader's own
  *  card owns `params.lensFix` whenever they have a matching measurement, and
@@ -1294,8 +1230,8 @@ function lensStrengthKey(): string | null {
  *  the plan's strength equals what `params.lensFix` opens at (lensPlanFor's
  *  contract), and the agreement walk's four paths start from one number.
  *
- *  FULL WHEN NOTHING IS REMEMBERED, and why is on `initHotspot` (decision 015,
- *  reversed). */
+ *  FULL, and why is on `initHotspot` (decision 015, reversed) and on
+ *  `forgetStoredLensStrengths` (decision 085). */
 function lensStrengthAtOpen(ex: ExifSubset | null, card?: "own" | "shipped"): number {
   let key: string | null = null;
   if (card !== "shipped") {
@@ -1306,7 +1242,7 @@ function lensStrengthAtOpen(ex: ExifSubset | null, card?: "own" | "shipped"): nu
     const short = Hotspot.shortFor(ex?.lens);
     if (short && Hotspot.findShipped(ex)) key = "shipped:" + short;
   }
-  return key ? rememberedStrength(key) ?? 1 : 0;
+  return key ? 1 : 0;
 }
 
 /** A file's EXIF, or null when it cannot be read.
@@ -3073,8 +3009,8 @@ updateSlotUI(); // reflect any slots saved in a previous session
 let raf = 0;
 let lastToneKey = "";
 /** THE FLAT FOLLOWS THE CONTROLS, ON THE WORKING COPY ITSELF (decision 021).
- *  The decode laid the correction on the linear copy at the remembered
- *  strength; Strength, Bypass, Undo, Reset, a look and the bare-decode hold
+ *  The decode laid the correction on the linear copy at the photograph's
+ *  opening strength; Strength, Bypass, Undo, Reset, a look and the bare-decode hold
  *  all move `params.lensFix`/`lensBypass`, and this is the one place that
  *  brings the pixels to what they say — a re-apply by ratio against what is
  *  already in the buffer, exact, no second copy — followed by a fresh upload.
@@ -3083,15 +3019,30 @@ let lastToneKey = "";
 function ensureLensApplied(): void {
   const img = current;
   if (!img?.linear) return;
-  const curve = currentLensCurve();
-  const strength = curve && !params.lensBypass ? (params.lensFix ?? 0) : 0;
+  if (bringLensTo(img, currentLensCurve(), params)) uploadPreview();
+}
+
+/** Bring a decode's linear copy to the correction an edit asks for, by ratio
+ *  against what is already in it (decision 021).
+ *  @param img  a decode; one with no `linear` copy is left alone.
+ *  @param curve  the curve matched to that file, or null for none.
+ *  @param p  the edit's `lensFix` and `lensBypass`.
+ *  @returns true when the pixels changed, so the caller re-uploads or re-reads.
+ *  What the result must satisfy: afterwards `img.lensApplied` names exactly the
+ *  gains in `img.linear`. Consumers: `ensureLensApplied` for the open
+ *  photograph, and `makeThumb` for a tile drawn from a photograph's own edit,
+ *  whose decode laid the opening strength (decision 085), so the strip and the
+ *  photograph show one correction. */
+function bringLensTo(img: DecodedImage, curve: LensCurve | null, p: Pick<EditParams, "lensFix" | "lensBypass">): boolean {
+  if (!img.linear) return false;
+  const strength = curve && !p.lensBypass ? (p.lensFix ?? 0) : 0;
   const stamp = curve ? lensPlanStamp(curve) : "";
   const have = img.lensApplied ?? { stamp: "", strength: 0, gains: null };
-  if (have.stamp === stamp && have.strength === strength) return;
+  if (have.stamp === stamp && have.strength === strength) return false;
   const next = lensGains(curve, strength);
   applyLensFlat(img.linear, img.width, img.height, next, have.gains);
   img.lensApplied = { stamp, strength, gains: next };
-  uploadPreview();
+  return true;
 }
 
 function draw() {
@@ -3593,7 +3544,7 @@ function wireVersionMenu() {
       // 021): a raw's flat is laid on the linear copy at decode, before the
       // gray-world balance, the exposure, the denoise measurement and the sky
       // selection read it. The walk reads these two lines back.
-      { k: "Correction order", v: current?.linear ? `on the linear raw at decode, before the balance and the selection — ${current.lensApplied?.gains ? `strength ${current.lensApplied.strength} laid on the pixels` : "nothing laid on the pixels (no profile, or strength 0 at decode)"}` : current ? "inside the grade — an 8-bit source has no linear copy to correct first" : "nothing open" },
+      { k: "Correction order", v: current?.linear ? `on the linear raw at decode, before the balance and the selection — ${current.lensApplied?.gains ? `strength ${current.lensApplied.strength} laid on the pixels` : "nothing laid on the pixels (no profile matched, or the strength is set to 0)"}` : current ? "inside the grade — an 8-bit source has no linear copy to correct first" : "nothing open" },
       { k: "Balance", v: current ? `white balance ${params.wb.map((x) => x.toFixed(4)).join(" · ")} — the at-open gray-world unless moved since` : "nothing open" },
       // WHAT THE SHADOWS ARE LIT BY, which one white balance cannot answer: in
       // the infrared a shadow gets almost nothing from the sky and is filled by
@@ -12191,17 +12142,18 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, o
     ...cloneParams(own ? own.params : params),
     // An own edit carries its own correction strength. Without one, the tile
     // claims what opening the photo will do, and that is `lensStrengthAtOpen`
-    // — the strength remembered for this lens, full when none is, 0 with no
-    // match — asked of THIS file's EXIF, the same question the open asks
+    // — full with a matched lens, 0 with no match — asked of THIS file's
+    // EXIF, the same question the open asks
     // (decision 015, reversed; see initHotspot). A tile that corrected
     // differently from the open photograph would be the exact
     // strip-against-photo disagreement `lensHalves` exists to make impossible.
-    // A raw's tile carries the flat in its pixels already (the decode laid it
-    // at the same strength, lensPlanFor); this is what an 8-bit source's grade
+    // A raw's tile carries the flat in its pixels already (the decode laid the
+    // opening strength, lensPlanFor, and an own edit's strength is brought to
+    // it below, after the sky mask); this is what an 8-bit source's grade
     // reads. `hsFix` is the shipped card's own control and set beside it so
     // the tile does not carry the OPEN photograph's, which the clone above
     // would otherwise hand it.
-    lensFix: own ? own.params.lensFix : lensStrengthAtOpen(ex),
+    lensFix: own ? (own.params.lensFix ?? lensStrengthAtOpen(ex)) : lensStrengthAtOpen(ex),
     lensBypass: own ? own.params.lensBypass : false,
     hsFix: own ? own.params.hsFix : lensStrengthAtOpen(ex, "shipped"),
     hsBypass: own ? own.params.hsBypass : false,
@@ -12333,6 +12285,18 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, o
   // half again as bright as the photograph's, and the agreement walk would
   // say so.
   const tileSky = ((p.skySmooth ?? 0) > 0 || (p.skyDepth ?? 0) > 0 || (p.skySat ?? 0) > 0) ? skyMaskFor(img, rot) : null;
+  // A RAW'S DECODE LAID THE OPENING STRENGTH, 1 with a matched lens (lensPlanFor,
+  // decision 085), and an own edit may carry another. Nothing downstream
+  // re-applies it for a raw — `lensForEdit` hands the grade no curve when the
+  // flat is in the pixels — so the pixels are brought to the edit's strength
+  // here, as the open photograph's are, or the tile shows a correction the
+  // photograph does not. AFTER the sky mask, not before: the open photograph's
+  // selection was built at decode, at the opening strength, and a later
+  // strength does not rebuild it, so the tile's is built from the same pixels.
+  // Nothing above reads pixels for an own edit. An edit saved before `lensFix`
+  // existed carries none, and opening it keeps the fresh open's strength
+  // (applySnapshot merges over it), so the tile does the same.
+  if (own) bringLensTo(img, lens, { lensFix: own.params.lensFix ?? lensStrengthAtOpen(ex), lensBypass: own.params.lensBypass });
   const tileSample = (x: number, y: number) => linearAt(img, Math.min(img.width - 1, Math.floor(x / s)), Math.min(img.height - 1, Math.floor(y / s)));
   const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileSky) : null;
   const edit = compileEdit(p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileMap, tileSky);
@@ -14159,6 +14123,30 @@ function captureSliderDefaults(): void {
   for (const t of [params.tone, params.toneR, params.toneG, params.toneB]) toneDefaults.push([...t]);
 }
 
+/** WHERE A DOUBLE TAP SENDS A LENS STRENGTH SLIDER: the opening default,
+ *  worked out at the moment of the tap (decision 085). Not the value in
+ *  `sliderDefaults`: that is captured only at a fresh open (establishFreshEdit),
+ *  so after a return to a photograph from memory it still holds whichever
+ *  photograph was last opened fresh, matched or not; and Aerochrome's
+ *  finishing copy is built when the look is picked, after any capture, so it
+ *  has no captured default at all and its double tap did nothing.
+ *  @param el  the slider tapped: the shipped card's Strength, Aerochrome's
+ *    finishing copy of it (`data-mirror`), or the reader's own card's.
+ *  @returns "1" when that card has a lens to correct (`hotspotState` for the
+ *    shipped card, a hand-picked lens included; `myLens` for the reader's
+ *    own), "0" when it has none, or undefined for any other slider, which
+ *    keeps its own rule. What the result must satisfy: it equals what
+ *    `lensStrengthAtOpen` opens a matched frame at, so a double tap and a
+ *    fresh open agree. The lens-order walk holds it for the shipped card's
+ *    slider on a matched frame (d) and for the finishing copy (d2, the check
+ *    that fails without this function); the reader's own card and the "0"
+ *    branch are held by nothing yet. */
+function lensStrengthTarget(el: HTMLInputElement): string | undefined {
+  if (el === hsUi.strength || el.dataset.mirror === hsUi.strength.id) return hotspotState ? "1" : "0";
+  if (el === myLensUi.strength) return myLens ? "1" : "0";
+  return undefined;
+}
+
 /** Wire every slider in the panel once, AND the tone curve's five points, which
  *  are the same gesture on a control that is not an input. Delegated, so controls
  *  built later are covered without anything having to remember to call this
@@ -14176,7 +14164,9 @@ function wireSliderReset(): void {
   for (const el of document.querySelectorAll<HTMLInputElement>('#panel input[type="range"]')) {
     if (!el.title) el.title = el.id in PREF_SLIDER_DEFAULTS
       ? "Double-tap to put this back to its usual setting"
-      : "Double-tap to put this back to where the photo opened";
+      : lensStrengthTarget(el) !== undefined
+        ? "Double-tap to put this back to the full correction, or to off when no lens profile matched"
+        : "Double-tap to put this back to where the photo opened";
   }
   const back = (el: HTMLInputElement) => {
     // WITH A MASK PICKED, a slider that follows it shows the MASK'S value, so
@@ -14186,7 +14176,8 @@ function wireSliderReset(): void {
     // read through the same `get` the switch shows it with (042, stage 2).
     const tm = overlayReady ? targetMask() : null;
     const mc = tm ? maskCtls().find((k) => k.el === el) : undefined;
-    const to = tm && mc ? String(mc.get(neutralMask(tm.type))) : (PREF_SLIDER_DEFAULTS[el.id] ?? sliderDefaults.get(el.id));
+    const to = tm && mc ? String(mc.get(neutralMask(tm.type)))
+      : (lensStrengthTarget(el) ?? PREF_SLIDER_DEFAULTS[el.id] ?? sliderDefaults.get(el.id));
     if (to === undefined || el.disabled || el.value === to) return;
     el.value = to;
     el.dispatchEvent(new Event("input", { bubbles: true }));
@@ -17579,9 +17570,8 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   hotspotColor: 0,
   // THE STRENGTH OPENING THIS FRAME WOULD APPLY, from its own EXIF — the one
   // rule every path asks (lensStrengthAtOpen; decision 015, reversed). These
-  // were 0 while the correction opened off, and stayed 0 when a reader had a
-  // strength remembered for the lens, so a batch of that lens came out
-  // uncorrected beside an open that was not.
+  // were 0 while the correction opened off, so a batch of a matched lens came
+  // out uncorrected beside an open that was not.
   lensFix: lensStrengthAtOpen(ex),
   lensBypass: false,
   forceBalance: false,

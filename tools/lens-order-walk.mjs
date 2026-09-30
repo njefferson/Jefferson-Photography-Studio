@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // THE BALANCE IS MEASURED ON CORRECTED DATA — asserted, not assumed (decision 021).
-// AND A MATCHED LENS OPENS CORRECTED, AT THE STRENGTH CHOSEN FOR THE LENS (015).
+// AND A MATCHED LENS OPENS CORRECTED, AT FULL STRENGTH, EVERY TIME (015, 085).
 //
 //   python3 -m http.server 8131 --directory dist   (in another shell)
 //   node tools/lens-order-walk.mjs [--port=8131] [--file=A.NEF] [--second=B.NEF] [--third=C.NEF] [--chosen=0.3]
 //
-// Three raws from ONE lens that matches a shipped profile, the first two at
-// DIFFERENT apertures. They are the owner's photographs and are NOT in the
+// Three raws from ONE lens that matches a shipped profile. They are the owner's
+// photographs and are NOT in the
 // repository: they are taken BY NAME through tools/owner-images.mjs, which
 // fetches them from the folders shared for testing and caches them (hub
 // LESSONS 369). The defaults are from a NIKKOR Z DX 50-250mm (NIR_3703.NEF
@@ -32,14 +32,32 @@
 // to set the slider and open the same file twice before it could measure
 // anything. Red on that build.
 //
-// (b) A CHOSEN STRENGTH REACHES THE NEXT FRAME OF THE LENS AT ANOTHER APERTURE.
-// It was remembered per aperture (`shipped:50-250@5.0`), so a strength chosen
-// at f/5 opened nothing at f/5.3. Red on that build.
+// (b) A STRENGTH CHOSEN ON ONE FRAME DOES NOT REACH THE NEXT (decision 085,
+// 2026-09-30). Until then the strength last set was remembered per lens and
+// became the one every later frame of that lens opened at, so a slider left
+// high washed out the middle of every photograph after it. Now the next frame
+// of the lens opens at full, laid at decode. Red on the build that remembered.
 //
-// (c) A CHOSEN 0 IS REMEMBERED, and the next open lays nothing. Absence means
-// full now, so a 0 that is not stored comes back as 1. This one CANNOT go red
-// on the build before, whose default was 0 — it was made to fail by planting
-// the old delete-at-0 back into `rememberStrength`.
+// (c) NOT EVEN 0: a lens turned off on one frame opens at full on the next.
+// Red on the build that remembered, which carried the 0.
+//
+// (c2) AN OLD STORED STRENGTH IS REMOVED AND DECIDES NOTHING. Planted in a
+// fresh browser, the way a build that remembered left it, then the app is
+// loaded: the entry is gone and the first open lays full. A browser of its own,
+// so no edit from the frames above can answer for it. Red on the build that
+// remembered, which opened at the planted 0.4.
+//
+// (d) A DOUBLE TAP PUTS THE STRENGTH BACK TO FULL, the opening default, not to
+// the last position set, and it is one undo step. Red on the build that
+// remembered, whose double tap went to the remembered strength. On a fresh open
+// the default captured at open is 1 as well, so (d) cannot tell the tap-time
+// target from the captured one; (d2) can.
+//
+// (d2) THE SAME TAP ON AEROCHROME'S FINISHING COPY OF THE SLIDER. The copy is
+// built when the look is picked, after the open captured its defaults, so no
+// captured default holds a place for it to go back to: without the tap-time
+// target (`lensStrengthTarget`) the tap does nothing. Red on the build before
+// it, where it left the strength where it was set.
 //
 // AND THE CARD SAYS WHAT THE PROFILE KNOWS: "colour only" for a profile with no
 // brightness curve, "brightness and colour" only when it has both. It said the
@@ -64,10 +82,10 @@ import { build } from "esbuild";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");
 const PORT = arg("port", "8131");
-// The strength a matched lens opens at when nothing is remembered.
+// The strength a matched lens opens at, always.
 const STRENGTH = 1;
-// What the reader chooses on the first frame, for (b). Not 1 and not 0, so it
-// cannot be mistaken for either default.
+// What the reader chooses on the first frame, for (b) and (d). Not 1 and not
+// 0, so it cannot be mistaken for either.
 const CHOSEN = Number(arg("chosen", "0.3"));
 // Names, not paths: anything not in tools/owner-images.json is refused there.
 let RAW, RAW2, RAW3;
@@ -121,15 +139,13 @@ const short = A.Hotspot.shortFor(ex?.lens);
 const { colour, bump } = A.Hotspot.lensHalves(null, shipped);
 const curve = colour || bump ? { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined } : null;
 check("the raw's lens matches a shipped profile (the walk needs one)", !!curve, `${ex?.lens ?? "no lens"} → ${shipped ? "matched" : "no match"}`);
-// THE OTHER TWO FRAMES: same lens, and the second at a different aperture —
-// otherwise (b) says nothing about apertures and must not be allowed to pass.
+// THE OTHER TWO FRAMES: the same lens, or (b) and (c) say nothing about it.
 const exOf = (f) => A.readExifSubset(new Uint8Array(readFileSync(f)));
 const fOf = (e) => (e?.fNumber ? e.fNumber[0] / e.fNumber[1] : NaN);
 const ex2 = exOf(RAW2), ex3 = exOf(RAW3);
 const sameLens = [ex2, ex3].every((e) => A.Hotspot.shortFor(e?.lens) === short && !!A.Hotspot.findShipped(e));
-const apart = Math.abs(fOf(ex) - fOf(ex2)) > 0.05;
 console.log(`  frames — ${RAW.split("/").pop()} f/${fOf(ex).toFixed(1)} · ${RAW2.split("/").pop()} f/${fOf(ex2).toFixed(1)} · ${RAW3.split("/").pop()} f/${fOf(ex3).toFixed(1)} · lens ${short}`);
-if (!sameLens || !apart) { console.log(`\nthe three raws must share one matched lens and the first two differ in aperture (same lens ${sameLens}, apertures apart ${apart}) — the walk cannot see its own case\n`); process.exit(2); }
+if (!sameLens) { console.log(`\nthe three raws must share one matched lens (same lens ${sameLens}) — the walk cannot see its own case\n`); process.exit(2); }
 // What the card should say each profile knows: both halves asked, the same
 // tests the report and the reader's own card use.
 const knows = (e) => { const p = A.Hotspot.findShipped(e); const c = A.Hotspot.hasColour(p); const b = !!p?.bump?.some((v) => v > 0); return c && b ? "brightness and colour" : c ? "colour only" : b ? "brightness only" : "nothing on this frame"; };
@@ -213,23 +229,66 @@ try {
   check("Bypass changes the picture", h1 !== h0, `${h0} → ${h1}`);
   check("and Bypass off returns it to within one 8-bit step on under 1% of pixels (the re-apply is a ratio, not a second copy)", back.maxD <= 1 && back.changedShare < 0.01, `max step ${back.maxD} · pixels moved ${(100 * back.changedShare).toFixed(3)}%`);
 
-  // (b) CHOOSE A STRENGTH ON THIS FRAME, OPEN THE SAME LENS AT ANOTHER APERTURE.
-  // The slider's `change` is what remembers it, exactly as a finger lifting.
+  // (b) CHOOSE A STRENGTH ON THIS FRAME, THEN OPEN THE NEXT FRAME OF THE LENS.
+  // Set as a finger sets it, `input` then `change` on lifting.
   await setSlider(p, "hsStrength", CHOSEN);
   await open(p, RAW2);
   const r2 = await report(p), c2 = await card(p);
   console.log(`  app — ${RAW2.split("/").pop()}: ${r2.order}\n        card: ${c2.status} · Strength ${c2.strength}`);
-  check(`(b) ${CHOSEN} chosen at f/${fOf(ex).toFixed(1)} is laid at decode on the next frame of the lens, at f/${fOf(ex2).toFixed(1)}`, laid(r2.order) === CHOSEN, r2.order || "no Correction order line");
-  check(`(b) and its Strength opens at ${CHOSEN}`, Number(c2.strength) === CHOSEN, `Strength ${c2.strength}`);
+  check(`(b) ${CHOSEN} chosen on one frame does not reach the next: it lays ${STRENGTH} at decode`, laid(r2.order) === STRENGTH, r2.order || "no Correction order line");
+  check(`(b) and its Strength opens at ${STRENGTH}`, Number(c2.strength) === STRENGTH, `Strength ${c2.strength}`);
 
-  // (c) CHOOSE 0 — THE LENS OFF — AND OPEN A THIRD FRAME. Absence means full,
-  // so this holds only if a 0 is stored rather than dropped.
+  // (c) CHOOSE 0 — THE LENS OFF — ON THIS FRAME, THEN OPEN A THIRD.
   await setSlider(p, "hsStrength", 0);
   await open(p, RAW3);
   const r3 = await report(p), c3 = await card(p);
   console.log(`  app — ${RAW3.split("/").pop()}: ${r3.order}\n        card: ${c3.status} · Strength ${c3.strength}`);
-  check("(c) a chosen 0 is remembered: the next frame of the lens lays nothing at decode", laid(r3.order) === 0, r3.order || "no Correction order line");
-  check("(c) and its Strength opens at 0", Number(c3.strength) === 0, `Strength ${c3.strength}`);
+  check(`(c) a chosen 0 does not reach the next frame: it lays ${STRENGTH} at decode`, laid(r3.order) === STRENGTH, r3.order || "no Correction order line");
+  check(`(c) and its Strength opens at ${STRENGTH}`, Number(c3.strength) === STRENGTH, `Strength ${c3.strength}`);
   check(`the card says what this frame's profile knows too: "${knows(ex3)}"`, c3.status.includes(` · ${knows(ex3)}`), c3.status || "no status");
+
+  // (c2) A STORED STRENGTH FROM A BUILD THAT REMEMBERED, IN A FRESH BROWSER.
+  const ctx2 = await b.newContext({ viewport: { width: 1280, height: 950 } });
+  try {
+    const q = await ctx2.newPage(); q.on("dialog", (d) => d.accept());
+    await q.goto(`http://127.0.0.1:${PORT}/ir.html`);
+    await q.evaluate((s) => localStorage.setItem("ips-lens-strength", JSON.stringify({ [`shipped:${s}`]: 0.4 })), short);
+    await q.goto(`http://127.0.0.1:${PORT}/ir.html`);
+    const stale = await q.evaluate(() => localStorage.getItem("ips-lens-strength"));
+    check("(c2) an old stored strength is removed when the app starts", stale === null, `stored ${stale ?? "nothing"}`);
+    await open(q, RAW);
+    const r6 = await report(q), c6 = await card(q);
+    console.log(`  app — ${RAW.split("/").pop()} in a fresh browser with 0.4 planted: ${r6.order}\n        card: ${c6.status} · Strength ${c6.strength}`);
+    check(`(c2) the planted 0.4 decides nothing: the first open lays ${STRENGTH} at decode`, laid(r6.order) === STRENGTH, r6.order || "no Correction order line");
+    check(`(c2) and its Strength opens at ${STRENGTH}`, Number(c6.strength) === STRENGTH, `Strength ${c6.strength}`);
+  } finally { await ctx2.close(); }
+
+  // (d) MOVE THE SLIDER, THEN DOUBLE-TAP IT: back to full, one undo step. The
+  // double tap is the panel's `dblclick` on the slider itself, as a mouse sends it.
+  await setSlider(p, "hsStrength", CHOSEN);
+  await p.evaluate(() => document.getElementById("hsStrength")?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true })));
+  await settle(p);
+  const c4 = await card(p);
+  check(`(d) a double tap after ${CHOSEN} puts the Strength back to ${STRENGTH}`, Number(c4.strength) === STRENGTH, `Strength ${c4.strength}`);
+  await p.evaluate(() => document.getElementById("undoBtn")?.click());
+  await settle(p);
+  const c5 = await card(p);
+  check(`(d) and one Undo returns it to ${CHOSEN}: the double tap was one step`, Number(c5.strength) === CHOSEN, `Strength ${c5.strength}`);
+
+  // (d2) PICK AEROCHROME, MOVE ITS FINISHING COPY, THEN DOUBLE-TAP THE COPY.
+  await p.evaluate(() => document.getElementById("lookEir")?.click());
+  await settle(p);
+  const hasCopy = await p.evaluate(() => !!document.getElementById("finish-hsStrength"));
+  check("(d2) Aerochrome's finishing panel carries a copy of the Strength slider", hasCopy, hasCopy ? "finish-hsStrength present" : "no finish-hsStrength");
+  await setSlider(p, "finish-hsStrength", CHOSEN);
+  const c6 = await card(p);
+  // A PRECONDITION, not a finding: the copy's own listener writes the Strength,
+  // so this holds whenever the copy exists. It is here so that the tap below is
+  // measured from 0.3 rather than from a Strength that was already 1.
+  check(`(d2) precondition: the copy moved the Strength to ${CHOSEN}, so the tap below starts away from ${STRENGTH}`, Number(c6.strength) === CHOSEN, `Strength ${c6.strength}`);
+  await p.evaluate(() => document.getElementById("finish-hsStrength")?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true })));
+  await settle(p);
+  const c7 = await card(p);
+  check(`(d2) a double tap on the copy puts the Strength back to ${STRENGTH}`, Number(c7.strength) === STRENGTH, `Strength ${c7.strength}`);
 } finally { await b.close(); }
 console.log(failed ? `\n${failed} failed` : "\nall checks passed"); process.exit(failed ? 1 : 0);

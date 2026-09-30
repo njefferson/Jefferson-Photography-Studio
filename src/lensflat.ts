@@ -2,7 +2,7 @@
 // applied at decode before anything is measured or graded (decision 021;
 // IR-SCIENCE.md §9c — RawPedia, the DNG GainMap, Lightroom and darktable all
 // finish the correction before the grade). One radial gain table from the
-// matched curve and the remembered strength; one in-place multiply per pixel;
+// matched curve and the photograph's strength; one in-place multiply per pixel;
 // and a RE-APPLY BY RATIO, so a strength change, Bypass, Undo and the bare-decode
 // hold reach the uncorrected picture without a second 80 MB buffer — exact in
 // float because nothing here clips. The gain arithmetic is the one source
@@ -30,7 +30,7 @@ export interface LensApplied {
 }
 
 /** The plan handed to a decode: the curve matched to the file and the strength
- *  the reader last chose for that lens (0 when they never did). */
+ *  it opens at, full with a matched lens (`lensStrengthAtOpen`, decision 085). */
 export interface LensPlan {
   curve: LensCurve;
   strength: number;
