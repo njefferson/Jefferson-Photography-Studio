@@ -4738,6 +4738,17 @@ correction cuts blue against red by about 5 to 6.5% at the centre, and on foliag
 to 13% saturation, that cut moves it toward neutral. What the general finding above does describe is the other half: at strength
 1 more already-pale bright values pass white in green and blue, which is where a cloud is.
 
+**And the cut is the lens's own cast (decision 085, "Second check", 2026-09-30).** A hot spot carries colour, not only
+brightness. David Kennard's blog posts 1126, 976 and 978 report three things. Under a red-foliage rendering, the centre sky
+turns reddish. The hot spot is much stronger in the pure-infrared channel. A white-card flat corrected with CornerFix takes
+the red out. Per-channel division is how RawTherapee, Siril, PixInsight, the DNG GainMap, darktable, Lightroom and CornerFix
+remove such a cast. The field checks the result on neutral things: clouds, pavement, samplers. On three of the owner's raws,
+neutral things at the centre move toward the same material at the frame's edge by 57 to 91% of the gap, and none crosses it.
+Some tools normalise the flat to its centre, which keeps the centre's colour. That is not open here at strength 1 while white
+balance at open is gray-world. At strength 1, inside the gain's clamp, two flats that differ by one scale per channel give
+gains that differ the same way, and gray-world absorbs that. At other strengths the gain is not a plain scale, so this does not
+hold exactly. This is arithmetic from `lensGain` and `grayWorldWB`, not a measurement.
+
 **Refused on this topic:** rawpedia.rawtherapee.com (challenge page),
 helpx.adobe.com, support.captureone.com and userguides.dxo.com (403), blog.kasson.com
 (403), www.edwardnoble.com (503), and siril.readthedocs.io, docs.rawtherapee.com,

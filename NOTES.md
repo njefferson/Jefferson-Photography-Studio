@@ -1103,8 +1103,12 @@ user-scalable=no.
   its own first check (2026-09-29): on three of the owner's raws the whitening
   foliage passes white less often at 1, not more. Its colour is flattened from white
   balance onward by the correction's colour half, which cuts blue against red by
-  about 5 to 6.5% at the centre. Re-opened for research: whether that cut is the
-  lens's own cast coming off or more than the lens put there. Nothing is built.
+  about 5 to 6.5% at the centre. The second check (2026-09-30) says that cut is the
+  lens's own cast coming off. On the same three raws, neutral things at the centre
+  move toward the same material at the frame's edge and never cross it, and the
+  field's standard correction removes a hot spot's colour the same way. So leaving
+  the correction as it is is the likely answer, and it is a look choice. Nothing is
+  built.
 
 - [ ] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
   **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.

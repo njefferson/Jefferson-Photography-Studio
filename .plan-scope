@@ -1,33 +1,8 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=0fd05b51e61ffa2c
-diffhash=c9960325b3d75895
-verdict=IN-SCOPE: step 1, record 071 gains the 2026-09-30 PC reading, its start-up line and the worker-line finding as owed, and 066 Rank says where it sits and why without moving
-# IN-SCOPE: every change sits inside step 1 and every figure matches the pasted report, but one sentence in record 071 states the worker-line problem as already fixed when step 3 has built nothing, and it must be reworded before the commit.
-# 
-# Scope
-# - Two files are staged and nothing else: docs/decisions/066-aerochrome-is-rendered-from-a-model-of-the-film.md and docs/decisions/071-the-first-launch-after-an-update-froze-with-nothing-said-and-every-update-downloads-the-whole-app.md. git status shows no unstaged change, so the working tree equals the index. No NOTES.md, source, tool or gate file is touched.
-# - 071 gains exactly the three things step 1 names: the 2026-09-30 reading (lines 311-317), the start-up line (lines 331-334) and the worker line as a finding (lines 335-344).
-# - 066 does not move. NOTES.md open bullets run 085, 075, 076, 070, 069, 071, 077, 052, 073, 013, 068, 065, 066 (NOTES.md lines 1098 to 1366), so 066 is thirteenth, and `node tools/decisions-check.mjs` prints it as rank 13. Rank line 139 says thirteenth as of 2026-09-30.
-# - The count of five is right. The order the Rank used to list had seven items above 066; twelve sit above it now; the five new ones are 085, 075, 076, 077 and 073. The claim that 070 now sits above 069 is right (NOTES.md line 1131 against 1153).
-# - The reasons for staying below 069, 070, 052, 013 and 065 are each written in those records: 069's Rank (line 951) says 013 and 066 tune the sky the guard changes; 052's Rank (lines 248-253) says the tuning 066 replaces is measured over its selection; 013's Rank (line 320) says 066 is tuned against the chroma 013 leaves; 065's Rank (line 137) puts the fill above 066. The added paragraph's claim that each argues in writing that it comes first is supported.
-# - The added paragraph's claim about the white guard is supported by 069 (line 246, line 473, lines 920-921 and 928): the cloud's white point can move only with the look derived again at it, which 069 calls 066's ground, and 069's cloud checks become 066's.
-# - 066's own Depends is untouched apart from the one added line, and it contradicts nothing: every edge there is `touches`, none is `needs`, so no order constraint applies.
-# - Borderline, not a scope breach: the added Depends line (066 line 87, `touches 085`) is not named in the plan's step 1 text and is not forced by the gate, because `citesOf` in tools/decisions-check.mjs (line 404) matches only bold-number, backtick-number and "decision NNN" forms, and the new Rank cites 085 in parentheses. It is the declared form of one new Rank sentence, it mirrors 085's own touches lines for 069 and 013 (085 lines 90-96), and the check reports the declared dependencies agree with the order. It can stay; dropping it would lose nothing the plan asks for.
-# 
-# Support, figure by figure against the pasted report
-# - Taken 00:30 UTC on 2026-09-30 (report 00:30:46Z), Firefox 156, ANGLE over Direct3D 11 on the GTX 980, v2.64.4 on staging: matches.
-# - As shipped 42,420 ms, loop counts hidden 42,639 ms, mask loops taken out 715 ms, both 660 ms: all four match. 42,420 minus 715 is 41,705, so 41.7 of 42.4 seconds is right. The comparison "44.6 of 45.4 the day before" matches the record's own 2026-09-29 reading (45,361 and 789 ms, record lines 295-300).
-# - Start-up 0.18 s, longest pause 0 ms, no update this launch: matches. Recording it beside the earlier 0.17 s and 3 ms reading (record line 326) rests on the plan's Context item 1 saying it is a second such reading on this machine; the record never says in words which machine gave the 0.17 s figure, so the attribution is inferred, though only two reports preceded it.
-# - Worker line: a 2.64.4 worker waiting while v2.63.42 serves the page matches the report. The three refusal grounds match public/sw.js adoptIfAlone (lines 584-589): another build id, a cache that is absent or has a gap (`missingFrom`), and a window count other than one. The reassurance wording is what src/diagnostic.ts line 142 prints when the waiting worker's version equals the page's. The cache-gap refusal has no check in tools/offline-shell-walk.mjs (checks 10, 16, 17 and 21 exist; nothing plants a gap), and the walk launches Chromium only (lines 54 and 408), so the Firefox remark holds.
-# 
-# Gaps to fix before the commit
-# - Required. 071 lines 343-344 end the finding with a sentence saying it was fixed in the plan that recorded the reading. No commit carries a fix and step 3 is unbuilt, so the record would assert finished work that does not exist, on main, until step 3 lands. The plan is also outside the repository and unreadable to a later reader. Reword to say the fix is owed and open.
-# - Minor wording. 071 lines 340-341 say the report knows only the waiting worker's version. src/diagnostic.ts lines 138-146 also reads and prints the serving worker's version (the report showed v2.63.42). What the report lacks is anything about what the worker decided. The plan's own text says the same, so this is not a scope matter.
-# - Cosmetic. 066 line 156 runs to 106 characters where the rest of the paragraph wraps near 78; the Depends line at 87 is long in keeping with the other Depends lines.
-# - Optional. The 066 Rank gives a reason for 085 only among the five newly placed items; 075, 076, 077 and 073 are counted but not named, and the prior prose gave no reason for 071 either. Not required by step 1.
-# 
-# Gate
-# - `node tools/decisions-check.mjs` in /home/user/Jefferson-Photography-Studio exited 0. Every section printed ok, including "every declared dependency is real, acyclic, and agrees with the order". It ran on the working tree, which equals the index.
-# 
-# After this finding was written, its required gap was fixed: 071 now says the fix to the worker line is owed and open, and that the report knows both workers versions and nothing of what the waiting one decided; 066 paragraph rewrapped.
+diffhash=2d94899ad771330c
+verdict=IN-SCOPE: record 085's second research and second check, with its IR-SCIENCE and roadmap lines, answer plan step 2; no option chosen, nothing built; two over-claims narrowed
+# Scope watcher, 2026-09-30, on the 085 docs diff (IR-SCIENCE.md, NOTES.md, record 085), reading the plan by path:
+# IN-SCOPE: every hunk serves plan step 2 ("085's question") or the standing rules it rests on (IR-SCIENCE for research, the roadmap bullet stating its record's state); docs only, straight to main per the Throughout line. Nothing outside the plan: no code change, no other record, no new record, no option chosen for the owner.
+# Two claims went further than their support; both were narrowed before this record: the normalisation arithmetic now names strength 1 and the gain's clamp (lensGain), and the Rejected bullet now says "less of the hot spot's red", noting the check measured neutral things, not the leaves.

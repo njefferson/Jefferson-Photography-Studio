@@ -69,6 +69,55 @@ each claim against its source.
   values past white, then a per-channel clip) is the sources' general finding
   applied to this app, and is this record's to measure.
 
+**Second research, 2026-09-30**, on option 6's question: whether a hot spot
+carries colour, how a flat field treats that colour, and how the field checks
+it. One researcher and one skeptic, web only. The skeptic opened 37 claims'
+sources: 22 confirmed, 6 partly, none contradicted, 9 unreachable.
+
+- **A hot spot carries colour, not only brightness** (David Kennard, read,
+  confirmed). Kennard's blog posts 1134, 1126, 976 and 978 report:
+  - with a Lee 101 filter, a magenta centre and yellow edges;
+  - under a hue shift that makes foliage red and sky blue, the sky near the
+    centre turns reddish while the edges stay blue;
+  - on a full-spectrum body behind a yellow filter, a much stronger hot spot in
+    the pure-infrared blue channel than in red plus infrared or green plus
+    infrared, corrected on its own with a curve;
+  - CornerFix, profiled from a white card, taking the slightly red sky out.
+
+  None gives a number.
+- **Per-channel division is the field's standard, and removing a colour cast is
+  what it is for.** RawTherapee, Siril and PixInsight do it, and so do the DNG
+  SDK's GainMap, darktable, Lightroom's Flat-Field Correction and CornerFix (read
+  in source or documentation, confirmed). Adobe's page says shading can carry a
+  colour cast and offers an option that removes only the cast. What the tools
+  normalise to differs:
+  - to the centre, so the centre keeps its colour: RawTherapee, Siril, CornerFix;
+  - to the mean: PixInsight, the textbook formula, Kolari's recipe.
+
+  No source says how that choice meets a later gray-world balance.
+- **The field checks a correction on neutral things and by eye** (read,
+  confirmed):
+  - colour samplers on clouds (Kennard);
+  - a white-balance pick on clouds or pavement (Rob Shea);
+  - the correction toggled on and off (Kennard);
+  - PixInsight's check for under-correction and for over-correction, which it
+    calls negative vignetting;
+  - a published test with coloured light at the centre and in a corner (Bowman
+    and others, arXiv 1911.13295).
+- **What goes wrong, as documented.**
+  - A flat whose light differs from the scene's (mostly snippets; the hosts were
+    refused).
+  - A wrong black level (pixls.us, read).
+  - Crosstalk: per-channel gains leave the edges less saturated, and a 3×3
+    matrix per position is needed (arXiv 1911.13295, read).
+  - A diffuser that is not neutral in infrared (Kennard, read).
+- **Not found.** Nothing on what a hot-spot correction does to foliage colour,
+  and no source for an internally converted camera with no external filter.
+- **Refused, not read:** irrecams.de, leeramsden.com, patents.google.com,
+  www.spiedigitallibrary.org, www.markshelley.co.uk and www.cloudynights.com
+  (egress proxy); blog.kasson.com, lenscraft.co.uk and
+  rawpedia.rawtherapee.com (challenge pages). Nine claims rest on those.
+
 ## Weighed against
 
 - **015** (archived with this record): the correction, its anchor, and its
@@ -112,7 +161,10 @@ each claim against its source.
 day ("First check, 2026-09-29", below). The foliage that whitens does not pass
 white; its colour is flattened from white balance onward, by the correction's
 own colour half. So clip control does not answer this defect, and option 6
-names what the check found, open for research.
+names what the check found. The second check (2026-09-30, below) answers
+option 6's question: the cut is the lens's own cast coming off. That makes 5,
+leave it, the likely answer. It is not chosen here, because what the centre
+foliage should look like is a look choice, shown and not described.
 
 1. **Clip control: hold the corrected values under white with one shared
    factor, computed from the photograph.** Chosen 2026-09-29, and not
@@ -157,9 +209,12 @@ names what the check found, open for research.
    slightly (by 3 to 4%): white balance is only the first place where white is
    defined. Aerochrome's mixer, whose green output carries minus 1.44 times the
    matrix's blue, supplies about half to three quarters of the rise in green.
-   Open: whether that cut is the lens's own cast coming off, which is what the
-   correction is for, or more than the lens put there. That needs research
-   before any option here can be chosen.
+   **Answered 2026-09-30: the lens's own cast** ("Second check", below). Neutral
+   things at the centre move toward the same material at the frame's edge and
+   stop short of it; none crosses. The field's standard correction removes a
+   hot spot's colour (Looked up), and a red-foliage rendering shows the hot
+   spot as red at the centre. So part of the centre foliage's red at strength 0
+   is the lens's.
 
 ## Rejected
 
@@ -185,7 +240,12 @@ names what the check found, open for research.
 - **Re-opened with the Options (2026-09-29).** 2 to 5 were rejected against
   clip control. With none chosen, 5 is live again under option 6: if the cut is
   the lens's own cast coming off, the correction is right and leaving it is the
-  answer.
+  answer. The second check (2026-09-30) found exactly that, so 5 is the likely
+  answer. Its objection above still describes the pictures: the leaves at
+  strength 1 are paler than at 0. What changed is what that paleness is: less
+  of the hot spot's red on them. The check measured the neutral things beside
+  the leaves, not the leaves, and the gaps it left at 1 may be hot spot still
+  there.
 
 ## First check, 2026-09-29: the whitening is not a clip
 
@@ -276,13 +336,82 @@ red by about 5 to 6.5%, and on this weakly coloured foliage, which after white
 balance leans blue, that cut is what turns red to pale. Nothing here shows that
 the correction is wrong, or that any change would bring the red back.
 
+## Second check, 2026-09-30: the cut is the lens's own cast
+
+**The question.** Option 6 asked whether the correction's centre cut is the
+lens's own cast coming off or more than the lens put there. The field checks a
+correction on neutral things (Looked up). So the test was this: take something
+at the centre that should carry no colour of its own, and the same material at
+the frame's edge. If the correction is right, the centre moves toward the edge.
+If it takes too much, the centre moves past the edge.
+
+**What was run.** The six captures from the first check were used, with no new
+render. They are whole frames at 2800 by 1864, under the Aerochrome chip, at
+strength 0 and 1. The regions were drawn on each capture's own render and
+opened before any number was read (Looked at). Each region's mean was then read
+after exposure and white balance, the stage where the first check found the
+colour falls. The figure is the log of blue over red, and the centre's figure
+minus the edge's.
+
+- **NIR_3716.NEF.** The gravel road at the centre against the asphalt road at
+  the right edge: 0.087 at strength 0, 0.008 at 1. The pale ground by the fence
+  at the centre against the same asphalt: 0.126 at 0, 0.047 at 1.
+- **NIR_3700.NEF.** The grey sky between the towers against sky at the same
+  height at each edge: 0.112 and 0.108 at 0, 0.036 and 0.033 at 1.
+- **NIR_1376.NEF.** The sky above the crown against sky at the same height at
+  each edge: 0.095 and 0.092 at 0, 0.041 and 0.038 at 1. These regions sit
+  near the top of the frame, so they are further from the centre than the
+  other two frames' regions.
+
+On every pair the centre moves toward the edge, by 57 to 91% of the gap, and
+none crosses it. Green against red moves the same way on every pair, from
+0.030 to 0.041 at 0 to 0.001 to 0.012 at 1. On screen, NIR_3716's gravel
+goes from saturation 0.56 to 0.19, and the asphalt at the edge from 0.05 to
+0.14. At 1 the two are nearer each other than at 0, and both carry a little
+red.
+
+**What it supports.** The correction takes off less than the whole gap between
+centre and edge on neutral things, and never more. So the cut on the foliage
+beside them is the lens's own cast coming off, as the correction intends. The
+red the centre foliage keeps at strength 0 is partly that cast. This is what
+Kennard describes: under a red-foliage rendering, a hot spot shows as red at
+the centre.
+
+**Why keeping the centre's colour is not open here.** This is arithmetic, not
+a measurement. RawTherapee, Siril and CornerFix normalise the flat to its
+centre, so the centre keeps its colour; this app normalises to the area mean
+(`lensAreaMean`). The gain at a bin is `1 / (1 + (k − 1) × strength)`
+(`lensGain`), held between `LENS_GAIN_LO` and `LENS_GAIN_HI`. At strength 1,
+where every matched frame opens, and inside that clamp, two flats that differ
+by one scale per channel give gains that also differ by one scale per channel.
+Gray-world (`grayWorldWB`, `src/decode.ts`) then sets one scale per channel
+from the means of the corrected copy, which absorbs that difference. The only
+exceptions are the white-balance slider's steps and `lumNormalize`'s clamp. So
+at strength 1, while white balance at open is gray-world, the choice of
+normalisation cannot bring the centre's red back. At any other strength the
+gain is not a plain scale of `k`, and this arithmetic does not hold exactly.
+
+**Caveats.**
+- NIR_3716's edge is asphalt and its centre regions are gravel and pale ground:
+  similar materials, not the same one.
+- The sky can have a gradient of its own across the frame.
+- The gaps left at 1 (0.008 to 0.047) may be what is left of the hot spot, or
+  real differences between the materials. This check cannot tell which.
+- Three raws, one camera, one look.
+- The skeptic could not read nine claims; none of them is needed for this
+  finding.
+
+**Not tested.** Any remedy; any other look; anything on a device.
+
 ## Rank
 
 First, where 015 stood, now that 078 is archived. Re-opened for research
 (2026-09-29), it stays first: 069 and 013 each touch it. The correction's cut
 changes the centre colours 013's foliage is tuned against, and pushes pale
 bright values past white where 069's clouds are, so either one tuned first
-would be tuned again. It goes above both.
+would be tuned again. It goes above both. The second check (2026-09-30) leaves
+it first: until 5 is settled, 069 and 013 do not know which centre they are
+tuned against.
 
 ## Looked at
 
@@ -330,3 +459,17 @@ touches `applyLensFlat` or `lensGainsFor` (read in their diffs).
   white as at 1. In the whole frame, the reddish-grey patch in the sky between
   the two towers at 0 is grey at 0.5 and slate at 1. Here 0.5 sits nearer 1
   than 0.
+- NIR_3716.NEF, 2026-09-30, the second check's regions drawn on the whole
+  frame at 0 and 1: the gravel box sits on the pale track just above the
+  frame's middle, the pale-ground box on the grass by the middle fence, and
+  the edge box on the grey asphalt road at the right. At 0 the gravel and the
+  grass around both centre boxes carry the red cast; at 1 they are paler and
+  nearer the asphalt, which looks grey at both.
+- NIR_3700.NEF, 2026-09-30, the second check's regions on the whole frame at 0
+  and 1: the centre box sits on the sky between the two towers. At 0 that sky
+  is a brownish grey patch among blue; at 1 it is slate blue like the sky in
+  the two edge boxes at the same height, a little lighter.
+- NIR_1376.NEF, 2026-09-30, the second check's regions on the whole frame at 0
+  and 1: three boxes on the sky near the top, one above the crown and one at
+  each edge. At 0 the sky above the crown is a grey teal and the edges a deeper
+  blue; at 1 the gradient is gentler and the crown's sky is bluer.
