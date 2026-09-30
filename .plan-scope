@@ -1,6 +1,7 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=0fd05b51e61ffa2c
-diffhash=59ffb54811669696
-verdict=IN-SCOPE: plan step 5 — the NOTES staging entry for f9dd4b8 (ips-2.64.18, Gates 988, deploy 948) naming the one PC run
-# Scope watcher (a subagent reading the plan by path), 2026-09-30: IN-SCOPE for plan step 5, one staging entry naming the single PC run; closes nothing the plan leaves open and picks nothing for the owner. Its three minor points were fixed before this record: when the worker line can answer is now stated, the refused-draw claim names its basis (WebGL2 rule, measured headless, not on the PC), and the time estimate rests on the PC readings.
+planhash=6c15a77508194d98
+diffhash=0b46de997cccceda
+verdict=IN-SCOPE: Part 1 step 2 — a row with no number carries its reason into Copy the results, folded to one line; measured rows unchanged; the editor untouched; the module map's line count regenerated
+# Scope watcher (a subagent reading the plan by path), 2026-09-30: IN-SCOPE for Part 1 step 2. The diff touches only src/debug.ts; gl.ts and FRAG are untouched, so the editor program is unchanged; no measured row value can match NOT_MEASURED, so measured rows copy byte-identically; contract gate 321/321. Named: the value set is wider than the plan five words (refused, not available), the same class, stated in the commit body; the fold in timedBuild is redundant and harmless; not produced and not comparable stay outside the set.
+# The generated module map changes only the test page's line count.

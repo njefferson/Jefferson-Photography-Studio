@@ -31,13 +31,22 @@ const $ = (id: string) => document.getElementById(id)!;
 const results = $("dResults");
 const out: string[] = [];
 
+/** A value that says its row produced no number: did not build, did not draw,
+ *  not run, failed, refused, not available, WebGL2 unavailable. */
+const NOT_MEASURED = /^(did not (build|draw)|not run|failed|refused|not available|WebGL2 unavailable)\b/;
+
 /** `samples` is the raw run-to-run spread, and it goes into the COPIED text as
  *  well as the panel. It did not, at first: the spread was added to make a
  *  median trustworthy, printed only in the panel's prose, and "Copy the results"
  *  builds its block from name and value alone — so the pasted report, which is
  *  how these numbers actually travel, carried the median with nothing to judge
  *  it by. A measurement's uncertainty has to survive the copy or it is not part
- *  of the measurement. */
+ *  of the measurement.
+ *  AND A ROW WHOSE VALUE IS ONE OF THE NOT_MEASURED WORDS CARRIES ITS REASON
+ *  into the copy, on one line under it, because that reason can hold the
+ *  driver's or the browser's own words: a PC reading of 2026-09-30 said "did
+ *  not build" and nothing else, while the log that said why stayed on the
+ *  screen. A measured row's copied line is exactly what it was. */
 function row(name: string, value: string, meaning: string, samples?: string) {
   const d = document.createElement("div");
   d.className = "dbg-row";
@@ -46,7 +55,10 @@ function row(name: string, value: string, meaning: string, samples?: string) {
   (d.querySelector(".dbg-v") as HTMLElement).textContent = value;
   (d.querySelector(".dbg-m") as HTMLElement).textContent = samples ? `${meaning} Runs: ${samples}.` : meaning;
   results.appendChild(d);
-  out.push(`${name}: ${value}` + (samples ? `   [${samples}]` : ""));
+  // Folded here, where the copy is built, so every source of a reason is one
+  // line with no control characters, the editor's own build error included.
+  out.push(`${name}: ${value}` + (samples ? `   [${samples}]` : "")
+    + (NOT_MEASURED.test(value) ? `\n    ${meaning.replace(/[\u0000-\u001f\s]+/g, " ").trim()}` : ""));
 }
 function note(text: string) {
   const p = document.createElement("p");
@@ -332,7 +344,9 @@ function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string,
   const t1 = performance.now();
   if (!ok) {
     // THE DRIVER'S OWN WORDS, so a rewritten variant that fails says why.
-    const log = (gl.getShaderInfoLog(fs) || gl.getProgramInfoLog(prog) || "").trim().slice(0, 300);
+    // One line, with no control characters: drivers end the log with a newline
+    // and a NUL, and the copied results put this under its row as one line.
+    const log = (gl.getShaderInfoLog(fs) || gl.getProgramInfoLog(prog) || "").replace(/[\u0000-\u001f\s]+/g, " ").trim().slice(0, 300);
     gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
     throw new Error(`the editor's picture code did not build on this device${log ? ` (${log})` : ""}`);
   }
