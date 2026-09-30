@@ -1,18 +1,20 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=6c15a77508194d98
-diffhash=ce25d848eaf35cc3
-verdict=IN-SCOPE: second scope check on record 085's third check, NOTES and IR-SCIENCE (plan Part 2 step 4): docs only, no remedy or look chosen, no other record or code; its six accuracy problems were fixed in the text, with the pampas sky box re-measured, before this record
-# Scope check, second pass, on record 085's third check, NOTES.md's 085 bullet and IR-SCIENCE §9r (plan Part 2 step 4), by a subagent reading the plan by path, the diff, the whole record, the measurement files and the pictures.
+planhash=90b08fbfee8caad4
+diffhash=f5c867b8742bac25
+verdict=IN-SCOPE: the plan's last Staging step, the 085 decision, NOTES' 085 bullet and 2026-09-14 reversal line, and IR-SCIENCE 9r, docs only, straight to main
+# IN-SCOPE: I read the diff again (it matches the working tree byte for byte), and it is still only the four docs items the plan's Staging section sends straight to main. It touches three files, with no source and no product change, and the branch sits at origin/main (7943614).
 # 
-# Verdict line as returned: IN-SCOPE: the diff is docs only (record 085, NOTES.md's 085 bullet, IR-SCIENCE §9r), it is Part 2 step 4, it chooses no remedy or look, and it changes no other record or code.
+# - **The requested fix is made correctly.** In 085's Rejected section, bullet 4 is followed by a blank line and then the "Re-opened with the Options (2026-09-29)" paragraph as ordinary prose. 5's objection is now stated in the paragraph itself ("5 because the whitening is on the reported frame at the strength every matched frame opens at"), and "Its objection above" now reads "5's objection".
+# - **Changes in that paragraph:** apart from the objection and "5's", the only changes are tense: "is live again" to "was live again", and "withdraws" to "withdrew". It also ends with one new pointer sentence, "Chosen 2026-09-30 (Options): 5, with the opening strength made 1". That sentence is true, agrees with the Options section, and changes nothing the paragraph already said.
+# - **What the tools print:** `tools/session-brief.mjs` and `tools/decisions-check.mjs` both exit 0. Both print 085 at rank 1 as chosen "5, leave the correction as it is…", with REJECTED 2, 3 and 4 only.
+# - **The rest of what the previous pass confirmed still holds.**
+#   - 085 records the decision and where it stands. Its "Built already" bullet and Rejected 2 now describe remembering as production only, with the staging behaviour stated.
+#   - The NOTES 085 bullet is updated.
+#   - The IR-SCIENCE text lands under §9r.
+#   - The dated reversal line lands under NOTES' "The correction strength would not stay where it was put, 2026-09-14".
+#   - v2.64.26 (d9e5110) is the staging head: 26 commits since VERSION 2.64 was declared.
+#   - Staging's code matches what the docs describe. `lensStrengthAtOpen` returns 1 or 0. `forgetStoredLensStrengths` runs at start-up. `lensStrengthTarget` gives 1 or 0, and a hand pick sets `hsFix` to 1. The `#hsStrength` range is 0 to 1.5.
+# - **Rules:** the owner is not named or quoted, there are no chat links or trailers, and there is no table. The no-grid, privacy, quote and third-person gates are all green.
 # 
-# It confirmed every frame named has a Looked at entry, and these figures match the files: sky at one height, the band-mean alternatives, the cloud chroma and sRGB, the linear middle and outer band, the per-strength ranges, the plants, and the darkest-third shares and medians.
-# 
-# Its six accuracy problems, each fixed before this record:
-# 1. "drops up to 7% of a ring" held only for the middle; recomputed from rings.json's counts (up to 23% of an outer ring on NIR_1661, 44% on NIR_1703) and stated.
-# 2. "the centre never falls below the edges" was false on the pampas; now "never falls below where it stood against the edges at 0", on two frames, with the oak's boxes placed near the top of the frame (about radius 0.39). The pampas centre box was re-measured with every pixel counted (0.62, 0.74, 0.82), since the pixels the red filter had dropped there were the red spot in the sky.
-# 3. The outer frame's darkening: now "mostly its sky", with NIR_1661's and NIR_1703's non-sky edge pixels holding within 3% or brightening; the pictures sentence names the four frames where the corners visibly darken.
-# 4. Which instrument and frame each plant covered is now listed, including that the capture's ring figures had only the strength-0 self-check.
-# 5. The half-size copies and the thirds' exclusions are stated, and "the middle" is defined for rings and thirds.
-# 6. "9 to 89%" is now "9 to 88%"; the cloud now turns "toward blue from 1, plainly at 1.25 and 1.5" in the record, NOTES and IR-SCIENCE.
+# I edited nothing.

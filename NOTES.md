@@ -1096,7 +1096,7 @@ user-scalable=no.
 > continues as the parallel design track below.
 
 - [ ] **The lens correction whitens bright centre foliage** <!-- decision: 085 -->
-  **Shown as:** Sunlit leaves in the middle of a photo keep their colour when the lens correction is on.
+  **Shown as:** Every photo with a matched lens opens with the lens correction at full strength, and a double tap on its slider goes back there.
   015's next half. At lens strength 1 the sunlit leaves in the middle of the reported
   frame go white and pale pink where strength 0 keeps them red. Clip control, the
   reference guard the outside research named, was chosen and then not confirmed by
@@ -1113,7 +1113,14 @@ user-scalable=no.
   at strength 1, 43 to 56% of the darkest third within radius 0.2 is more than 5%
   darker than at 0. On one frame a cloud at the middle turns from neutral toward
   blue from 1, plainly at 1.25 and 1.5. The recommendation to leave it rested on colour alone and is withdrawn.
-  Nothing is built.
+  **Chosen 2026-09-30, after the six raws were looked at whole: the correction stays as it is.**
+  At 1 the hot spot's colour comes off the middle; above 1 the middle washes out.
+  What was wrong was the slider's memory: a strength set for a lens became every
+  later photograph's opening strength, and a double tap went back to it. On
+  staging, every photograph opens at 1 (0 with no profile), nothing is remembered per lens,
+  a double tap goes back to 1 with a matched or hand-picked lens and to 0 without
+  one, and the range stays 0 to 1.5. On staging in
+  v2.64.26 (d9e5110), waiting on the device pass.
 
 - [ ] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
   **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.
@@ -2831,6 +2838,17 @@ chroma distance that divided by a green channel sitting at zero and reported
 canopy where fractions swing on rounding; a `location.reload()` that only queues
 a navigation; and a strength sweep that drove `stkMatchStrength` because it was
 the first id matching /stren/i. Every one of them produced a confident number.
+
+**Reversed 2026-09-30 (decision 085).** The six raws of 085's third check,
+looked at whole, put the right opening strength at the profile's full
+correction, and the memory was carrying a high setting from one photograph to
+the next, where it washed out the middle. On staging (v2.64.26, waiting on the
+device pass) every photograph opens at 1 with a matched profile and at 0 without
+one, a
+strength set stays with that photograph's own edit, the stored entry is removed
+at start-up, and a double tap goes back to 1 with a matched or hand-picked lens
+and to 0 without one. The cost this section was written
+to remove comes back: a reader who turns a lens down does so on each photograph.
 
 ## Healed spots cloning the wrong colour — RETRACTED, it was the measurement, 2026-09-14
 

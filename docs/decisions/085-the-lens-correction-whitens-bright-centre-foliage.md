@@ -187,14 +187,39 @@ partly, 1 not supported at the page it was credited to, and 4 unreachable.
   (`src/lensflat.ts`, `src/pipeline.ts`), with the strength slider
   (`#hsStrength`) remembered per lens at every aperture for a shipped
   profile, and per stored profile (lens, focal length and aperture) for a
-  reader's own measurement.
+  reader's own measurement. That is still production. On staging since
+  2026-09-30 (v2.64.26, waiting on the device pass), every photograph opens at
+  1 with a matched profile and at 0 without one, nothing is carried to the
+  next, and a double tap on the slider goes back to 1 with a matched or
+  hand-picked lens and to 0 without one (Options).
 - **The report's line.** `lensCentreLine` prints the applied centre gains.
 - **The instruments.** `tools/lens-order-walk.mjs`, `tools/lens-diagnostic-check.mjs`
   and `tools/preview-version-check.mjs`, which hashes `src/lensflat.ts`.
 
 ## Options
 
-**Re-opened 2026-09-29: none is chosen.** Option 1's first check ran the same
+**Chosen 2026-09-30: 5, leave the correction as it is, with the strength a
+photograph opens at made the profile's full correction.** The six raws of the
+third check were looked at whole, four to a sheet: strength 0, as the photograph
+opened (1), 1 again after the slider had moved, and 1.5. At 1 the hot
+spot's colour comes off the middle; above 1 the middle of every frame washes
+out. So the correction is right at 1, and the slider keeps its range of 0 to
+1.5. What was wrong was the slider's memory. A strength once set for a lens
+became the strength every later photograph with that lens opened at, and a
+double tap went back to that remembered value rather than to 1, so a high
+setting washed out the middle of every later photograph and a double tap kept
+returning to it. On staging, nothing remembered decides a photograph's
+opening strength (production still remembers until the device pass and the
+go): a photograph opens at 1 with a matched profile and at 0 with none, what was
+stored is removed at start-up, a strength set on one photograph stays with
+that photograph's own edit, and a double tap on the slider goes back to 1 with
+a matched or hand-picked lens and to 0 without one. The objection that
+rejected 5 before, that the whitening is on the reported frame at the strength
+every matched frame opens at, is answered by the looking: at 1 that paleness
+is the hot spot's colour coming off, and it is where the correction belongs. On
+staging 2026-09-30 in v2.64.26 (d9e5110), waiting on the device pass.
+
+**Re-opened 2026-09-29, before the choice above: none was chosen then.** Option 1's first check ran the same
 day ("First check, 2026-09-29", below). The foliage that whitens does not pass
 white; its colour is flattened from white balance onward, by the correction's
 own colour half. So clip control does not answer this defect, and option 6
@@ -203,7 +228,7 @@ option 6's question for colour: the cut is the lens's own cast coming off. It
 made 5, leave it, look like the likely answer. The third check (2026-09-30,
 below) withdraws that: the second check measured colour only, and in the
 rendered picture the correction also changes brightness across the whole
-frame. Option 7 names what it found. None is chosen.
+frame. Option 7 names what it found. None was chosen then.
 
 1. **Clip control: hold the corrected values under white with one shared
    factor, computed from the photograph.** Chosen 2026-09-29, and not
@@ -267,7 +292,9 @@ frame. Option 7 names what it found. None is chosen.
 ## Rejected
 
 - **2, a per-image strength.** Practitioners do correct by hand, per image, and
-  the app already has the slider, remembered from photo to photo. But it asks
+  the app already has the slider (remembered from photo to photo on
+  production; on staging since 2026-09-30 it opens at 1 on every matched
+  photograph instead). But it asks
   the reader to find, on every bright frame, the strength at which the leaves
   stop whitening. That is the cost the automatic mode exists to remove. And
   on NIR_1376.NEF strength 0.5 carries about half of each defect, and on
@@ -283,20 +310,20 @@ frame. Option 7 names what it found. None is chosen.
 - **4, a per-channel clamp.** It clips each channel on its own, which is the
   per-channel loss of colour this record took to be its defect before its first
   check. Clip control uses one shared factor for exactly that reason.
-- **5, leave it.** The whitening is on the reported frame at the strength every
-  matched frame opens at.
-- **Re-opened with the Options (2026-09-29).** 2 to 5 were rejected against
-  clip control. With none chosen, 5 is live again under option 6: if the cut is
-  the lens's own cast coming off, the correction is right in colour. The second
-  check (2026-09-30) found that, and 5 looked like the likely answer. The third
-  check (2026-09-30) withdraws that: the second check's basis was colour alone,
-  and the correction also changes brightness in the rendered picture, which it
-  did not measure. Whether that change is wanted is a look choice. Its
-  objection above still describes the pictures: the leaves at
-  strength 1 are paler than at 0. What changed is what that paleness is: less
-  of the hot spot's red on them. The check measured the neutral things beside
-  the leaves, not the leaves, and the gaps it left at 1 may be hot spot still
-  there.
+
+Re-opened with the Options (2026-09-29): 2 to 5 were rejected against clip
+control, 5 because the whitening is on the reported frame at the strength
+every matched frame opens at. With none chosen, 5 was live again under option
+6: if the cut is the lens's own cast coming off, the correction is right in
+colour. The second check (2026-09-30) found that, and 5 looked like the likely
+answer. The third check (2026-09-30) withdrew that: the second check's basis
+was colour alone, and the correction also changes brightness in the rendered
+picture, which it did not measure. Whether that change is wanted is a look
+choice. 5's objection still describes the pictures: the leaves at strength 1
+are paler than at 0. What changed is what that paleness is: less of the hot
+spot's red on them. The check measured the neutral things beside the leaves,
+not the leaves, and the gaps it left at 1 may be hot spot still there. Chosen
+2026-09-30 (Options): 5, with the opening strength made 1.
 
 ## First check, 2026-09-29: the whitening is not a clip
 
@@ -647,7 +674,9 @@ would be tuned again. It goes above both. The second check (2026-09-30) leaves
 it first: until 5 is settled, 069 and 013 do not know which centre they are
 tuned against. The third check (2026-09-30) keeps it first: in the rendered
 picture the correction changes brightness across the whole frame, and 069's
-clouds and 013's foliage are both judged in it.
+clouds and 013's foliage are both judged in it. Chosen 2026-09-30 and on
+staging, it stays first until the device pass: 069 and 013 are tuned against
+the centre it settles.
 
 ## Looked at
 

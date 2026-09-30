@@ -4758,6 +4758,14 @@ the darkest third within radius 0.2 is more than 5% darker than at 0 while the b
 a cloud at the middle turns from neutral toward blue from 1, plainly at 1.25 and 1.5. The second check above measured colour on neutral things at
 strength 1 only.
 
+**Chosen: the correction at full strength (decision 085, 2026-09-30).** The six raws of the third check were looked at whole, four
+to a sheet: strength 0, as opened (1), 1 again after the slider had moved, and 1.5. At 1 the hot spot's colour comes off the middle, as the field's per-channel division is meant to take
+it; above 1 the middle of every frame washes out. So the correction stays as it is, and on staging (v2.64.26, waiting on the
+device pass) every photograph opens at 1 with a matched profile and at 0 without one. What was
+wrong was a strength remembered per lens deciding later photographs' opening strength, which carried a high setting from one
+photograph to the next; on staging that memory is gone. Nothing here measured the brightness change the third check found against a
+reference; the choice was made by looking.
+
 **Refused on this topic:** rawpedia.rawtherapee.com (challenge page),
 helpx.adobe.com, support.captureone.com and userguides.dxo.com (403), blog.kasson.com
 (403), www.edwardnoble.com (503), and siril.readthedocs.io, docs.rawtherapee.com,
