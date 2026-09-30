@@ -14,6 +14,7 @@
 // its name. Anything added here has to survive the same test.
 
 import { startupLine } from "./startup";
+import { adoptAnswer, type AdoptAnswer } from "./swupdate";
 import { device } from "./platform";
 
 export interface DiagLine { k: string; v: string }
@@ -117,6 +118,34 @@ async function installLine(version: string): Promise<string> {
   }
 }
 
+/** WHAT THE WAITING WORKER SAID WHEN ASKED TO TAKE OVER, in words (071,
+ *  2026-09-30). Takes the page's record of its last ADOPT (`adoptAnswer()`).
+ *  Returns a clause beginning " · ". What the caller relies on: it states only
+ *  what the worker answered, or that no answer has come, never a guessed
+ *  reason; the PC's report of 2026-09-30 could not tell a refusal from a
+ *  takeover still running, and this is the clause that tells them apart. */
+function adoptClause(asked: { answer: AdoptAnswer | null } | null): string {
+  if (!asked) return " · this page has not asked it to take over";
+  const a = asked.answer;
+  if (!a) return " · asked to take over, no answer yet";
+  if (a.taken) return " · it took over when this page asked";
+  // A REFUSAL IS AN ANSWER TO ONE REQUEST, not a forecast: the worker still
+  // takes over in the ordinary way once every window of the app is closed.
+  if (a.why === "build") return ` · it declined when this page asked: it is build ${a.worker ?? "?"} and this page is build ${a.page ?? "?"}`;
+  if (a.why === "cache") {
+    return a.missing === "all"
+      ? " · it declined when this page asked: its offline copy is gone"
+      : ` · it declined when this page asked: its offline copy is missing ${a.missing} file${a.missing === 1 ? "" : "s"}${a.first ? ` (the first is ${a.first})` : ""}`;
+  }
+  if (a.why === "windows") {
+    return a.windows === 1
+      ? " · it declined when this page asked: the one window of the app it can see is not this page"
+      : ` · it declined when this page asked: ${a.windows} windows of the app are open; this page asks again each time it comes back to the front, and it can take over once the others are closed`;
+  }
+  if (a.why === "error") return ` · asked to take over, and its check failed: ${a.error ?? "no reason given"}`;
+  return " · it gave an answer this page does not know";
+}
+
 async function swLine(version: string): Promise<string> {
   try {
     if (!("serviceWorker" in navigator)) return "not supported";
@@ -133,17 +162,36 @@ async function swLine(version: string): Promise<string> {
     // caches are present and correct: the active worker's and the waiting one's,
     // the latter filled at install so the update works offline the moment it is
     // taken. Nothing is leaking.
+    const active = reg.active ? await workerVersion(reg.active) : null;
     let waitingNote = "";
     if (reg.waiting) {
       const v = await workerVersion(reg.waiting);
+      // "NOTHING TO TAKE" WAS TRUE ONLY WHEN THE PAGE'S OWN VERSION ALSO SERVES
+      // IT. With an older worker serving (v2.63.42 under a 2.64.4 page on the
+      // PC, 2026-09-30), taking the waiting one changes which worker answers,
+      // so the line says what the waiting worker said when it was asked.
+      // No controller means no worker serves this page (a hard reload does
+      // that), and the page only asks for a takeover when one does.
+      const served = !!navigator.serviceWorker.controller;
       waitingNote = v === null
         ? " · a worker is waiting (version unknown — an older one without the handler)"
         : v === version
-          ? ` · a worker is waiting, but it is this same version (${v}) — the offline copy catching up, nothing to take`
+          ? (!served
+            ? ` · a worker of this same version (${v}) is waiting; no worker serves this page (a hard reload does that), so it has not asked the waiting one to take over`
+            : (active === version
+              ? ` · a worker of this same version (${v}) is waiting, beside the one serving this page`
+              : ` · a worker of this same version (${v}) is waiting to take over from v${active ?? "?"}`) + adoptClause(adoptAnswer()))
           : ` · an update is WAITING (v${v})`;
     }
-    const active = reg.active ? await workerVersion(reg.active) : null;
-    const activeNote = active && active !== version ? ` · the worker serving this page is v${active}` : "";
+    const activeNote = active && active !== version
+      ? (navigator.serviceWorker.controller ? ` · the worker serving this page is v${active}` : ` · the active worker is v${active}, and it does not serve this page`)
+      : "";
+    // AND A TAKEOVER THIS PAGE ASKED FOR, once there is nothing left waiting
+    // for the clause above to describe: the worker's own answer, said once.
+    const asked = adoptAnswer();
+    const takenNote = !reg.waiting && asked?.answer?.taken && navigator.serviceWorker.controller
+      ? " · the worker serving this page took over when this page asked it to"
+      : "";
     const installNote = active ? await installLine(active) : "";
     // THE CACHE LIST IS READ LAST, AND THAT ORDER IS THE POINT.
     //
@@ -159,7 +207,7 @@ async function swLine(version: string): Promise<string> {
     // facts gathered at different moments as though they were one moment
     // invents contradictions for its reader to chase.
     const names = await caches.keys();
-    return `${state}${waitingNote}${activeNote}${installNote} · caches: ${names.join(", ") || "none"}`;
+    return `${state}${waitingNote}${takenNote}${activeNote}${installNote} · caches: ${names.join(", ") || "none"}`;
   } catch {
     return "unavailable";
   }

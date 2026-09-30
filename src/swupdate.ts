@@ -215,6 +215,48 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 | null {
 // strip's data-state for the stylesheet and the walks.
 type StripState = "downloading" | "ready" | "confirm" | "applying" | "failed";
 
+/** WHAT A WAITING WORKER SAID WHEN THIS PAGE ASKED IT TO TAKE OVER (071,
+ *  2026-09-30). `taken` true means it did; false comes with `why`: "build"
+ *  (`worker` and `page` name the two builds), "cache" (`missing`, a count or
+ *  "all", and `first`, the first file missing) or "windows" (`windows` open). */
+export interface AdoptAnswer {
+  taken: boolean;
+  why?: "build" | "cache" | "windows" | "error";
+  worker?: string;
+  page?: string;
+  missing?: number | "all";
+  first?: string | null;
+  windows?: number;
+  error?: string;
+}
+
+/** The last ADOPT this page sent: null when none was sent; `answer` null while
+ *  none has come back (or the worker is older than the answer). */
+let lastAdopt: { answer: AdoptAnswer | null } | null = null;
+
+/** What the last takeover request got back, for the diagnostic's "Offline
+ *  worker" line. Takes nothing. Returns null when this page never asked,
+ *  `{ answer: null }` when it asked and no answer has come, or the worker's own
+ *  answer. What the caller relies on: it reports only what the worker said,
+ *  never a reason guessed on the page side. Consumer: `swLine` in
+ *  diagnostic.ts. */
+export function adoptAnswer(): { answer: AdoptAnswer | null } | null {
+  return lastAdopt;
+}
+
+const adoptHeard: (() => void)[] = [];
+
+/** Call `fn` each time a takeover request this page sent gets its answer. Takes
+ *  the function; returns nothing. When `fn` runs, `adoptAnswer()` already holds
+ *  the new answer: an answer to a request since superseded wakes nobody. Why: the test page builds its report once at load, and the
+ *  worker checks its whole offline copy before it answers, which takes longer,
+ *  so that report's worker line read "asked to take over, no answer yet" on
+ *  five loads out of five (offline walk, 2026-09-30). Consumer: debug.ts, which
+ *  rebuilds its report. */
+export function onAdoptAnswer(fn: () => void): void {
+  adoptHeard.push(fn);
+}
+
 /** §7h's other half: the reader is TOLD, without having to go looking.
  *  wireForceUpdate above is a PULL — it only helps somebody who already
  *  suspects there is a new version and knows which panel to open. A newcomer
@@ -318,7 +360,19 @@ export function wireUpdateStrip(): void {
   // other build, any cache with a gap in it, and any second window. No
   // controllerchange listener is armed here, so nothing reloads.
   const adopt = (w: ServiceWorker) => {
-    try { w.postMessage({ type: "ADOPT", build: __BUILD_ID__ }); } catch { /* gone; the next launch asks again */ }
+    lastAdopt = { answer: null };
+    const asked = lastAdopt;
+    try {
+      const ch = new MessageChannel();
+      ch.port1.onmessage = (e) => {
+        asked.answer = (e.data ?? null) as AdoptAnswer | null;
+        // An answer to a request this page has since asked again is kept on
+        // its own record and wakes nobody: `adoptAnswer()` holds the newer one.
+        if (asked !== lastAdopt) return;
+        for (const f of adoptHeard) { try { f(); } catch { /* one listener's failure is not the others' */ } }
+      };
+      w.postMessage({ type: "ADOPT", build: __BUILD_ID__ }, [ch.port2]);
+    } catch { /* gone; the next launch asks again */ }
   };
 
   const settle = async (w: ServiceWorker) => {
