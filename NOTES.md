@@ -54,6 +54,74 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**v2.64.26 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-30 (d9e5110).** v2.64.20 below, plus two changes, the lens change as
+ed3870d and the test page's rows as d9e5110. Staging's offline worker was read
+naming d9e5110 as `ips-2.64.26`, the live pages carry both changes, and the
+Gates run (997) and the deploy (953) for it both passed; the work branch's
+Gates run (996) passed too.
+- **Every photograph opens with the lens correction at full strength (085).**
+  Strength 1 with a matched profile, 0 with none. Nothing remembered per lens
+  decides it any more, and the stored `ips-lens-strength` entry is removed at
+  start-up. A strength set on one photograph stays with that photograph's own
+  edit. A double tap on the strength slider goes back to where the photograph
+  opens, 1 with a matched lens and 0 without one, as one undo step, and the
+  same holds for its copy in Aerochrome's finishing panel and for the slider
+  on your own measured profile. The range stays 0 to 1.5. Picking a
+  lens by hand applies its full correction; before, the pick named the lens
+  and corrected nothing. A photograph whose own strength is not 1 shows that
+  strength on its tile when the tile is next drawn. The lens-order walk's new
+  checks fail eight times on the build before this change (a run made before
+  (d2) existed) and all 22 pass on this one: a strength chosen on one frame, and a chosen 0, do not reach the
+  next frame; a planted stored strength in a fresh browser is removed and
+  decides nothing; a double tap returns to 1 as one undo step; and a double
+  tap on Aerochrome's finishing copy returns to 1, which fails with the
+  tap-time target taken out. A scratch check draws a photograph's tile from
+  its own edit at strengths 0 and 1 in two separate browser contexts: in blue
+  the tiles differ
+  by -0.240 where the photographs differ by -0.239, and with the tile's
+  strength change taken out the tiles differ by 0.003. The double-tap and
+  agreement walks pass on this build, and so does the accessibility walk, 205
+  of 205 in both themes, run on this build's code after the last change. What this costs: a
+  reader who turns a lens down now does so on each photograph, which is what the 2026-09-14
+  entry "The correction strength would not stay where it was put" was written
+  to stop, and a chosen 0 no longer carries to the next photograph.
+- **The test page builds the picture code with the mask loops counted (071).**
+  "What makes the picture code slow to build" now builds the editor's program eight ways; the
+  two new rows run the mask loops to 2 and to 8, a count the compiler can see,
+  which is the per-mask-count build 071 is weighing. They run last, and a lost
+  graphics context makes every row after it say so instead of timing nothing.
+  Checked headless in SwiftShader: all eight rows build and draw; a planted
+  extra use of the count makes the two new rows print "not run"; a planted
+  change to how the loops are written makes the new rows and the two "taken
+  out" rows print "not run"; the same check fails six times on the six-row
+  build; "Copy the results" keeps its shape. SwiftShader's times are not the
+  PC's and are not reported as measurements. A planted loss of the graphics
+  context while the count-8 row builds makes that row say "did not build
+  (context lost)"; with that handling taken out it said "did not build".
+
+**Found and not fixed:** a lens picked by hand is not saved with the
+photograph's edit, so Undo leaves it picked at strength 0, a return to the
+photograph asks for the lens again with Strength reading 1 and nothing
+corrected, and that photograph's tile shows no correction; moving Strength
+alone never redraws a tile, because the tile's stamp does not carry it; after
+picking a lens by hand, Reset returns the strength to 0 while a double tap goes
+to 1; a restored edit is decoded at 1 and then re-applied by ratio; the
+finishing panel's copy of the slider moves nothing while your own profile is
+in use; after a return visit to a photograph, a double tap on sliders other
+than the lens strength can go back to a stale value; and the double-tap walk
+failed once on the mask Saturation slider while a second headless browser
+loaded the machine (its first tap moved the value to 1.39 and the pair did not
+register as a double tap), then passed three times alone. From 085's checks, still open: the stepped banding
+in the sky, the slider not returning exactly to the opening picture, and the disc edge in the
+change maps.
+
+**The device pass.** On the iPad: open a photograph, move the lens strength,
+open the next photograph — it should read 1; move it again, double-tap it —
+it should read 1; press Undo — it should read the moved value. On the Windows
+PC: one run of "What makes the picture code slow to build" in the browser the earlier readings
+came from, and "Copy the results".
+
 **v2.64.20 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-30 (32a5285).** v2.64.18 below, plus one fix to the test page: "Copy
 the results" now carries the explanation under any row with no number (did not
