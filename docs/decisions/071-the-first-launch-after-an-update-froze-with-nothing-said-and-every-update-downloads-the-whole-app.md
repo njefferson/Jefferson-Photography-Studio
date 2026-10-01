@@ -46,6 +46,23 @@ the app at v2.55, so this launch went from 2.55 to 2.63.7 in one step.
   release that changes it compiles from scratch. That matches a painted start
   screen with every button dead, then "came through". Not measured.
 
+**CORRECTED 2026-09-30: in Firefox the build is paid at every load, not once
+per release.** This record was framed from Edge's readings, where the browser
+kept the built program and a second build cost 20 ms. Firefox on the GTX 980 PC
+never showed that:
+- its "Building it again (a normal launch)" row read 44,233 ms on 2026-09-28
+  (under 1);
+- NOTES has recorded since 2026-09-26 that this Firefox keeps no built copy
+  that it reuses and pays the build on every start;
+- on the evening of 2026-09-30, Pacific, after the run below taken at 03:46
+  UTC on 2026-10-01, going back to the editor from the test page paid the same
+  wait again; by the same code path, the practice photographs on the start
+  card stay empty through it.
+
+So on that PC in Firefox every load of the editor holds the page for about 44
+seconds, not only the first after a release. What the outside sources say about
+why is in Looked up, under that date.
+
 **And two live defects in the same path, found while it was read, each with a
 known remedy.**
 
@@ -287,6 +304,25 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
     - A canvas holds one context type (MDN), so WebGPU and WebGL need separate
       canvases.
 
+- **Why Firefox pays the build at every load, looked up 2026-09-30** (for the
+  correction in Context; read in Firefox's own source and in MDN's
+  compatibility data, each claim checked against its source by a second
+  reader):
+  - Firefox offers no `KHR_parallel_shader_compile`: MDN's data lists no
+    Firefox version, and Firefox's current list of WebGL extensions has no
+    entry for it.
+  - Firefox's `linkProgram` is only queued to the process that runs the WebGL
+    commands; `getProgramParameter(LINK_STATUS)`, `useProgram` and
+    `getUniform` all wait on a synchronous message for the link's result
+    (`ClientWebGLContext.cpp`, `PWebGL.ipdl`).
+  - ANGLE keeps built programs in memory, and can keep them on disk only when
+    the browser hands it a blob cache; Firefox's EGL wrapper has no mention of
+    one. That Firefox keeps no built program across loads is an inference from
+    that absence. Whether ANGLE's in-memory cache survives a reload within one
+    session was not checked, and caches inside the graphics driver were not
+    examined. Mozilla's bug for a WebGL shader cache (918941) could not be
+    read: bugzilla.mozilla.org is refused by this container's network.
+
 ## Built already
 
 - `servableCopy` and `alsoAt` in `public/sw.js`: every stored page stays
@@ -511,6 +547,46 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
        from 2.64.4 kept 205 files, downloaded 12 and took 2.9 s. Nothing was
        waiting when the page loaded, so the takeover half of that pass is not
        answered.
+     - **The same PC, v2.64.35 on staging, taken 2026-10-01 03:46 UTC**
+       (the evening of 2026-09-30, Pacific; Firefox 157, ANGLE over Direct3D
+       11 on the GTX 980), each built once
+       from nothing, then its first picture drawn:
+       - as shipped, 43,585 + 815 ms;
+       - with every loop's count hidden, 41,904 + 430 ms;
+       - with the mask loops taken out, 666 + 276 ms;
+       - with both, 644 + 91 ms;
+       - with the mask settings in uniform blocks, 29,033 + 268 ms;
+       - with the mask settings in a texture, with the mask loops counted to
+         2, and counted to 8: "did not build", each with a reason line that
+         held no words from the driver.
+
+       The build and the mask loops' share stand as before, and the blocks
+       again save about a third. The same report says the update kept 216
+       files, downloaded 2 and took 0.4 s.
+     - **The three rows that did not build cannot be read yet.** They are the
+       last three rows, one after another; their rewrites are valid GLSL ES
+       3.00 and built and drew headless. The test page had three gaps:
+       - it read `shader log || program log`, so a fragment log holding only
+         a newline hid the program log, where ANGLE over Direct3D 11 would put
+         a refusal made at link (that location is the researcher's inference
+         in Looked up, under "Routes around FXC, 2026-09-30");
+       - it kept no time and no GL error for a failed build;
+       - all eight rows share one graphics context. The page asked whether it
+         was lost before every row and after a failure, and never heard that
+         it was, so a loss the browser reported is ruled out.
+
+       A context that failed without reporting a loss fits the three as well
+       as three refusals do. Headless, a planted context that fails every link
+       silently from the texture row on produces that copy's three reason
+       lines word for word; a planted loss the browser reports produces other
+       words, "did not build (context lost)" and then "not run".
+     - **Fixed for staging, 2026-09-30.** Every log is read and labelled, as the
+       editor's own build reads them. A failed build keeps its time and its GL
+       error. The context's loss is listened for, and the row it was first
+       seen in is named. A row that does not build is built once more in a
+       fresh context, so its reason says whether the program or the context
+       failed. Each part was planted headless: red on the build before, green
+       after. The next PC run of the test page answers which it is.
      - The options that follow are 8 to 12. Option 8 was measured short on
        2026-09-30 (under 8), and 9 to 12 were added from outside research the
        same day; none is chosen.
@@ -597,9 +673,13 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
    - **Measured 2026-09-30, and neither form does it.** On the PC the blocks
      built in 29,235 ms against 42,933 as shipped, about a third saved and
      nowhere near the 667 ms of the loops taken out. The texture did not build
-     on the PC, though it built and drew headless. The driver's reason was on
-     the screen and not in "Copy the results", which carried only each row's
-     value; the copy fix, on staging as v2.64.20, carries it next time.
+     on the PC, though it built and drew headless. "Copy the results" carried
+     only each row's value; the copy fix, on staging as v2.64.20, carried the
+     reason line on the reading taken 2026-10-01 03:46 UTC (the evening of
+     2026-09-30, Pacific), and the line held no words from the
+     driver (under 1: the log was read in a way that could hide it). CORRECTED
+     2026-09-30: this used to say the driver's reason was on the screen; the
+     screen showed the same reason line, so nothing supported that.
    - **Why the blocks saved only a third is not known.** Two explanations are
      open, and nothing here tells them apart:
      - The fast translation did not engage on the PC. The session's own
@@ -790,7 +870,8 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
   performance is low or if no hardware GPU is available", and `powerPreference`
   is a hint about which GPU to prefer; none requests software. The reasoning
   that software would then pay at every draw, where the 43 s build is paid once
-  per release that changes the picture code, is not measured here.
+  per release that changes the picture code, is not measured here. (In Firefox
+  on the PC the build is paid at every load, Context, 2026-09-30.)
 - **9 to 12 are not rejected and not chosen (2026-09-30).** They go to the
   owner as a decision.
 
@@ -803,17 +884,28 @@ does not move until then.
 
 - **It invalidates nothing above it.** The sky work touches none of the update
   path, the precache or the start-up.
-- **The one item above it has nothing to build yet.** The sky record has no
-  option left and is being researched. The sky records ranked below this one
-  (the rotation fix, the reader-visible sky selection, the round spots) share no
-  ground with the update path either, so this record declares no relation to
-  them; it goes above them because it can be built now and they are ranked
-  behind the sky record's answer. Option 9, if chosen, would change how the
-  mask-gated stages get their weights, the Sky and Foliage bands among them;
-  that edge is declared when a route is chosen, not before.
+- **The items above it, CORRECTED 2026-09-30.** This bullet used to say that
+  one item was above it, the sky record, and that the rotation fix was ranked
+  below it. The rotation (070) is above it, beside the device passes on the
+  lens and the open path's two waits; the paragraph below names them all. The
+  sky records still ranked below it (the reader-visible sky selection, the
+  round spots) share no ground with the update path, so this record declares
+  no relation to them. Option 9, if chosen, would change how the mask-gated
+  stages get their weights, the Sky and Foliage bands among them; that edge is
+  declared when a route is chosen, not before.
 - **Above 068.** 068's learned finder would download 23.5 MB of models on
   demand, and today anything fetched on demand outside the practice photos lands
   in the release's cache and is deleted at the next activate. 068 declares that
   it needs this.
 - **What waiting costs.** Every release, and every staging push for a device
-  pass, re-stores the whole app on every installed device, silently.
+  pass, re-stores the whole app on every installed device, silently. And on the
+  PC in Firefox, every load of the editor holds the page for about 44 seconds.
+
+**Re-argued 2026-09-30, after the every-load correction, and the rank does not
+move.** Argued by dependency, as before: nothing ranked above this would be
+redone once it is fixed. The items above are device passes on the lens, the
+open path's two waits, the rotation and the sky record, and none of them builds
+on how the picture code is built. That the PC pays the build at every load
+makes waiting cost more, and severity alone does not move a rank. The empty
+practice tiles have a record of their own, which declares its relation to this
+one from its own side.

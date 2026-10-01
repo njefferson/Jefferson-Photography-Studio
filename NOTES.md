@@ -1473,6 +1473,28 @@ user-scalable=no.
   parameters out of those arrays, measured on the PC as a test-page variant
   before the editor changes.
   See `docs/decisions/071-the-first-launch-after-an-update-froze-with-nothing-said-and-every-update-downloads-the-whole-app.md`.
+  **Corrected 2026-09-30: in Firefox the build is paid at every load**, not
+  only after an update. The record's own repeat build read 44 s, and going
+  back to the editor from the test page paid the same wait again. The PC's
+  run of v2.64.35 stands as before: 43.6 s to build as shipped, 0.67 s with
+  the mask loops taken out, 29.0 s with the uniform blocks. Its three last
+  rows did not build with no reason given, and the way the test page read the
+  driver's logs could have hidden one; a fix for that goes to staging, and the
+  next PC run says whether the program or the graphics context failed.
+- [ ] **On Firefox the practice photographs stay empty while the editor builds** <!-- decision: 086 -->
+  **Shown as:** The practice photographs on the start card show their pictures straight away, even while the editor is still getting ready.
+  Reported from the PC on the evening of 2026-09-30, Pacific: every practice
+  tile on the start card was an empty box with its name, for the 44 seconds
+  the editor took to build in Firefox. There the build holds the page at every
+  load, so by the same code path the tiles stay empty each time. The pictures
+  are small files the device already
+  holds, and nothing in the code holds them back: the build holds the whole
+  page, and by Firefox's source, as read, a newly arrived picture needs the
+  page's own thread to be drawn. The tiles also load lazily, which adds steps
+  before their pictures can be drawn. Chosen: where the browser cannot build off the page, the
+  tiles in view load first and are painted before the build starts, with a
+  ceiling on the wait. Directly below 071, whose build this is.
+  See `docs/decisions/086-on-firefox-the-practice-photographs-stay-empty-while-the-editor-builds.md`.
 - [ ] **The open photo's edits are lost on a reload or a closed tab** <!-- decision: 077 -->
   **Shown as:** Your edits to the open photo are kept if the page reloads or the tab is closed.
   The edit was written only when you moved to another photo, went Home or

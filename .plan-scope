@@ -1,41 +1,37 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=9a06484f9f8973cd
-diffhash=d8eea101122478c2
-verdict=IN-SCOPE: the delta from the third read is exactly the two corrected phrases, both match Siril's source and documentation and the sheets, and the diff still touches only NOTES.md and the 069 record, inside plan steps 3 and 5.
-# IN-SCOPE: the delta from the third read is exactly the two corrected phrases, both match Siril's source and documentation and the sheets, and the diff still touches only NOTES.md and the 069 record, inside plan steps 3 and 5.
+planhash=5f18d5948ae4941a
+diffhash=eadb9636c72acf45
+verdict=IN-SCOPE: records 069, 071 and 086 with their NOTES lines, plan steps 2 to 4, every claim matched to its source after four checks; docs only
+# IN-SCOPE: the round-4 delta makes only the two corrections, plus the index and hunk-header lines they shift; both now match research086.txt, nothing else moved since round 3, and `decisions-check` exits 0.
 # 
-# **1. The delta**
-# - I diffed `staged-read3.diff` against `staged.diff`. Three things differ, and `read4-delta.txt` shows the same three:
-#   - the record's index line (`6ca3fe6` → `ee0806a`), which has to change when the file changes;
-#   - option 11's "What the field does" sentence;
-#   - Rejected 11's "the dark corners" → "in the darkest sky".
-# - Every other line is byte-identical to what the third read judged.
-# - `git diff --cached` matches `staged.diff` byte for byte (cmp), so what was checked is what is staged.
+# ## The delta
+# - I diffed `docs-round3.diff` against `docs.diff` myself. The output is byte-identical to `docs-round4-delta.txt`.
+# - All of it falls in 069's section:
+#   - its `index` line (`ee0806a..c3fc47b` → `ee0806a..d8b8863`);
+#   - its two Ghonima-bullet and PixInsight lines;
+#   - five hunk headers, shifted by the one line each correction adds (`+43`→`+44`, `+20`→`+21`, later offsets +1 or +2).
+# - NOTES, 071 and 086 are unchanged from what the third check judged.
 # 
-# **2. The Siril sentence matches the source and the documentation**
-# - The new text says Siril "keeps only the pixels whose residual lies within med − 4σ to med + 2σ (σ = 1.4826 × MAD) and outside protected bright structure, fits again on those, and stops when the kept set settles".
-# - In `siril-bkg.c`:
-#   - `AG_HIGH_K 2.0f` and `AG_LOW_K 4.0f`.
-#   - `ag_mad_sigma` sets σ = 1.4826 × MAD, taken over the pixels currently kept.
-#   - The keep rule is `residual <= med + 2σ && residual >= med − 4σ`, and then `smask` removes the structure mask.
-#   - `ag_structure_mask` flags `residual − med > protect_threshold`. That is bright structure only, so "bright" is right.
-#   - The fit runs again on `new_keep` and stops when the change is below 1e-4, or after 20 iterations.
-# - `siril-background.rst` (Theory) says the same: an asymmetric clip of [med − k_lo σ, med + k_hi σ] with the upper bound tighter, structure protection "of extended bright structures" on by default, and "repeats until the kept set stabilises".
-# - The sentence now agrees with Looked up, which already said "clips residuals outside med − 4σ to med + 2σ".
+# ## Correction 1: the PixInsight phrase in 069
+# - Now reads: a tutorial on its multiscale gradient correction "that does not describe how DynamicBackgroundExtraction or AutomaticBackgroundExtractor work."
+# - This matches research086.txt line 1 (pixinsight.com refusal): "the page had no DBE or ABE mechanics". It no longer claims the page has nothing on those tools.
 # 
-# **3. "in the darkest sky" is supported**
-# - The floor keeps the lowest residuals, in Siril's source (`min_keep` = 2% of n, `residual <= sortbuf[rank]`) and in `measure.mjs` lines 72–75. In `measure.mjs` the 2% is taken over sky blocks only, and 3,932 of 196,598 is 2.0%.
-# - I opened all three sheets. What option 11 left uncovered is the darkest sky in each frame:
-#   - NIR_1703: the dark blue at the top-left edge and down the right side.
-#   - NIR_3466: the dark blue top corners.
-#   - NIR_1827: the dark blue patch at the upper right, around the cyan box. These are not corners, so the new phrase fixes the looseness the third read noted.
+# ## Correction 2: the Ghonima bullet's "ratio" in 069
+# - Now reads: Shields et al. 2010 "used the spatial variance of the pixel's ratio to the library's to help tell heavy haze from thin cloud".
+# - This matches claim [16] (research086.txt lines 96–99): perturbation ratio Prt = RBR/CSL, and "the spatial variance in this perturbation ratio". Two lines up, the bullet already defines the ratio as "a pixel's red/blue ratio", so "the pixel's ratio to the library's" is RBR/CSL without ambiguity.
+# - Cosmetic only: the rewrap leaves a short line ("its own algorithm, as described,"). Nothing to fix.
 # 
-# **4. Files and plan steps**
-# - `--stat` lists two files: NOTES.md (+12) and the 069 decision record (+232).
-# - The NOTES hunk sits inside the 069 bullet: its line 1378 is 069's bullet, the hunk covers 1425–1437, and 071's bullet starts at 1440.
-# - The record changes are option 11, Rejected 11, the 2026-09-30 measured section, the Rank paragraph and the Looked at entries. Those are plan steps 3 and 5. No source file is touched.
+# ## Working tree against docs.diff
+# - The working-tree diff of NOTES, 069 and 071, plus untracked 086 against /dev/null, is byte-identical to `docs.diff`.
+# - Blob hashes match its index lines: 08e0c5d, d8b8863, 55cfeb0, 2cb84db.
+# - `src/debug.ts` is staged separately and is not in `docs.diff`. That fits the plan's split (step 5 rides to staging, step 8 is the docs-only commit to main).
 # 
-# **Other notes**
-# - I edited no files and created none.
-# - The relayed user message ("that photo was during the delayed load. The images load as soon as the app is ready") is about something other than this scope check, and this read did not act on it.
+# ## The gate
+# - `node tools/decisions-check.mjs` exited 0. Every "ok" line passed.
+# - The rank print places 086 at 7, directly below 071 at 6, as 086's Rank argues.
+# - It printed backlog notices only (unlooked, undeclared pairs, the practice-frame backlog).
+# - `git status --porcelain --ignored` was identical before and after the run.
+# - I edited nothing. I deleted the two temp files I made in the scratchpad; nothing of mine is left.
+# 
+# Files: `/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md`, `/tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/v10/docs.diff`, `/tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/v10/docs-round4-delta.txt`, `/tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/research086.txt`, `/home/user/Jefferson-Photography-Studio/docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md`

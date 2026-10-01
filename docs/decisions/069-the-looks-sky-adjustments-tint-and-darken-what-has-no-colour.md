@@ -190,8 +190,9 @@ film decides what the guard keeps: a cloud comes out white.
     through Crossref:
     - a fixed red/blue threshold misses thin cloud and fails near the sun
       under high aerosol;
-    - the clear sky library (Shields et al.) holds the clear sky's value by
-      sun–pixel angle and solar zenith;
+    - the clear sky library holds the clear sky's value by sun–pixel angle
+      and solar zenith (Shields et al.; Ghonima et al., read in full below, add
+      the pixel's zenith angle in the image);
     - Ghonima et al. subtract that value at the same zenith angle, with a haze
       correction, and their abstract gives thin cloud classified at 60%;
     - Schmidt et al. make the threshold depend on the pixel's position;
@@ -202,6 +203,44 @@ film decides what the guard keeps: a cloud comes out white.
       green channel, and their abstract opens on non-uniform clear-sky
       brightness making thin cloud, and the sky near the sun and the horizon,
       hard.
+  - **Ghonima et al. 2012, read in full** (amt.copernicus.org, 2026-09-30,
+    after the host was opened):
+    - the difference between a pixel's red/blue ratio and the library's, not
+      their ratio, gave the more accurate classification;
+    - after the subtraction every clear area takes a similar value, so one
+      threshold serves the whole sky;
+    - thick cloud is decided on that difference, and clear against thin on the
+      difference with a haze correction: one factor per frame, taken from the
+      frame's own clear pixels and iterated, left at 1 when there are none or
+      it would move more than 20%;
+    - on 30 validation images, clear sky 96.0%, thin cloud 60.0% and thick
+      cloud 96.3%, against 89.3%, 56.1% and 91.5% for fixed thresholds the
+      authors had optimised;
+    - a thin cloud's ratio is close to clear sky's, especially in haze, and
+      the paper counts errors in its own hand annotation among the causes;
+    - the method needs the sun's position, and its imager's shadowband hides
+      much of the sky round the sun;
+    - it notes that Shields et al. 2010 used the spatial variance of the
+      pixel's ratio to the library's to help tell heavy haze from thin cloud;
+      its own algorithm, as described,
+      has no such step (read from the algorithm, not stated in the paper).
+  - **Yang et al. 2016, read in full** (amt.copernicus.org, 2026-09-30), "A
+    total sky cloud detection method using real clear sky background":
+    - the difference is on the green channel, chosen because a Bayer sensor
+      has more green sites and operations between channels magnify the
+      demosaicing error;
+    - the library is indexed by solar elevation at 1°, each frame turned about
+      its centre by the sun's azimuth and scaled by one brightness factor from
+      the peaks of the two green histograms, so the method needs the sun's
+      position;
+    - cloud is what stands above the residual background, by a threshold the
+      paper gives no number for;
+    - named limitations: the sky round the sun fails when the sun is covered,
+      and optically thick, low-based cloud darker than the clear background
+      may be read as clear;
+    - it gives no accuracy figures; its comparison with other methods is by
+      eye, and claims better results near the sun and the horizon and for thin
+      cloud while the sun is visible.
   - **Dev et al.** (arXiv 1606.03669): thin cloud is the hardest case for
     colour-based sky/cloud segmentation.
   - **Siril's background extraction**, read in its documentation
@@ -212,6 +251,12 @@ film decides what the guard keeps: a cloud comes out white.
     method fits a smooth multiscale surface and clips residuals outside
     med − 4σ to med + 2σ, with σ = 1.4826 × MAD. It protects bright structure
     0.05 above the model, fits again, and stops when the kept set settles. Its
+    published manual (siril.readthedocs.io, read 2026-09-30 after the host
+    was opened) carries the automatic method only in its "latest" version, for
+    Siril 1.5.0; the stable manual, for 1.4.4, has only the sample-based
+    polynomial and RBF methods. The latest manual states the same defaults and
+    the asymmetric clip, without numbers for the clip; the numbers are the
+    source's. Its
     tip names a gradient whose amplitude rivals the objects as the case for its
     stiff polynomial pre-fit.
   - **A thermal sky imager** (arXiv 2012.06930) removes a fitted clear-sky
@@ -253,6 +298,21 @@ film decides what the guard keeps: a cloud comes out white.
     Where a paper's host refused, its abstract was read through
     api.crossref.org, api.openalex.org or Semantic Scholar instead, and only
     what an abstract says is cited from it.
+  - **Opened afterwards, 2026-09-30.** amt.copernicus.org and
+    siril.readthedocs.io answered, and Ghonima et al., Yang et al. and Siril's
+    manual were read in full (above). Three answered with a refusal of their
+    own: journals.ametsoc.org with 403 from its CloudFront, so Jayadevan et
+    al. 2015 stays read by its abstract only; www.sciencedirect.com with 403
+    from a Cloudflare bot challenge, so Chauvin et al. 2015 stays unread; and
+    pixinsight.com, which answered a script's headers with 406 and a
+    browser's with a tutorial on its multiscale gradient correction that does
+    not describe how DynamicBackgroundExtraction or AutomaticBackgroundExtractor
+    work.
+    Two addresses for those two tools' documents, one guessed and one built
+    from the documentation's naming rule, answered 404, so neither is known to
+    exist; PixInsight's documentation repository on GitLab has neither (its
+    background-named tools there, BackgroundNeutralization and
+    GradientCorrection, were not read).
   - **Refused by the hosts themselves:** helpx.adobe.com, support.captureone.com
     and www.researchgate.net answered 403; photographylife.com answered 402;
     patents.google.com and manpages.ubuntu.com answered 503; and
@@ -561,7 +621,9 @@ What exists that this item will use, so a second one does not get written
       clear sky's value by sun–pixel angle and solar zenith (Shields et al.).
       Ghonima et al. and Yang et al. subtract the clear sky's value at the same
       place and read cloud as the excess, and Schmidt et al. make the threshold
-      depend on where the pixel sits. Astrophotography removes a sky
+      depend on where the pixel sits. After the subtraction every clear area
+      takes a similar value, so one threshold serves the whole sky (Ghonima et
+      al.). Astrophotography removes a sky
       gradient the same way with no library: Siril's automatic background
       extraction fits a smooth surface to the frame, keeps only the pixels
       whose residual lies within med − 4σ to med + 2σ (σ = 1.4826 × MAD) and
@@ -589,9 +651,15 @@ What exists that this item will use, so a second one does not get written
         cannot tell the two apart.
       - Sky imagers: thin cloud is the hardest case in a benchmark of
         colour-based segmentation (Dev et al.), and clear-sky differencing
-        classified thin cloud at 60% (Ghonima et al.'s abstract).
-      - Yang et al.'s abstract opens on non-uniform clear-sky brightness
-        making thin cloud, and the sky near the sun and the horizon, hard.
+        classified thin cloud at 60% on 30 validation images, against 96% for
+        clear sky and thick cloud, a thin cloud's value being close to clear
+        sky's, especially in haze (Ghonima et al.).
+      - Yang et al. name thin cloud, the sky near the sun and the horizon as
+        hard for earlier methods, and claim by eye, with no figures, that
+        their own differencing does better there while the sun is visible.
+        The failures they name for their own method are a covered sun, and
+        optically thick, low-based cloud darker than the clear background,
+        which may be read as clear.
       - Haze shifts the clear sky's reference.
     - **Measured 2026-09-30 against bars hashed before the run, and failed.**
       It separates NIR_1651's band from NIR_3461's clear band (Ashman's D 7.4).
@@ -1127,6 +1195,9 @@ band at 0.64. So the bars tell this option from Rejected 9.
   known.
 - The sky imagers' references are indexed by the sun's position, which a single
   photograph does not carry, so their library route was not measured.
+- Siril's automatic method, whose defaults were used, is documented only in
+  the manual's latest version, for Siril 1.5.0; the stable manual, for 1.4.4,
+  does not have it (read 2026-09-30).
 
 ## Rank
 
