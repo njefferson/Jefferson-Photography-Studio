@@ -1,12 +1,14 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=06a8bb3d5d449a79
-diffhash=9f6d9716371fd3a4
-verdict=IN-SCOPE: the diff against main is docs-only (IR-SCIENCE.md, decisions 069 and 084, plus the scope record) and sits inside plan steps 6 and 7.
-# Fifth watcher, on the committed records diff plus one reworded sentence: the work against main is
-# docs-only (IR-SCIENCE.md, decisions 069 and 084, plus the scope record) and sits inside plan steps
-# 6 and 7. The reworded Murray Foote sentence (Capture One, unlike Lightroom, already has the full
-# range of colours for infrared without a custom camera profile) matches murrayfoote.txt line 19;
-# the rest of that bullet matches its source. NOTES.md has no PixInsight mention, so step 7's NOTES
-# clause owes nothing. Four earlier watchers judged earlier states IN-SCOPE and found eight
-# overstated or loose sentences, each corrected.
+diffhash=185a515f4c50997a
+verdict=IN-SCOPE: the diff only withdraws or corrects claims the audit found were read around a refusal (step 7), and the Lightroom fix is accurate and consistent.
+# Final watcher, on the exact diff (IR-SCIENCE.md, decisions 015 and 085): it only withdraws or
+# corrects claims the refusal audit found were read around a refusal (plan step 7). IR-SCIENCE's
+# per-channel list leaves Lightroom out and says it is named but not read; 085's tally becomes 23
+# confirmed and 1 withdrawn and its bullet says the same; no other Lightroom flat-field or
+# helpx.adobe.com claim rests on the withdrawn page. The previous watcher verified against the
+# transcripts: the page-request challenge (plain curl -sI, 2026-09-29T16:22), the headless Chromium
+# run failing with ERR_CERT_AUTHORITY_INVALID (12:59:45Z), the Safari-UA comments-feed read (200,
+# 7905 bytes, 2026-09-30T01:51:28Z), the skeptic's browser-UA 403 then plain-curl 200 on helpx, and
+# the Adobe claim among the confirmed with the note "Page read with browser headers".

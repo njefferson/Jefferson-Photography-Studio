@@ -79,7 +79,10 @@ ui.adsabs.harvard.edu and hagenlab.org (which did not connect). A second
 reading covered five of the unread claims. Hagen's abstract was read through
 Crossref and OpenAlex, not on the publisher's page, and claim 26 on
 markshelley.co.uk alone, one of the two pages first cited. With those, the tally is 24 confirmed, 8
-partly, 1 not supported at the page it was credited to, and 4 unreachable.
+partly, 1 not supported at the page it was credited to, and 4 unreachable. One of
+the 24, Adobe's page on Lightroom's Flat-Field Correction, was confirmed from a
+copy fetched in a browser's identity, and is withdrawn (2026-10-01): 23 confirmed
+and 1 withdrawn.
 
 - **A hot spot carries colour, not only brightness** (David Kennard, read,
   confirmed). Kennard's blog posts 1134, 1126, 976 and 978 report:
@@ -102,9 +105,12 @@ partly, 1 not supported at the page it was credited to, and 4 unreachable.
   looks worse.
 - **Per-channel division is the field's standard, and removing a colour cast is
   what it is for.** RawTherapee, Siril and PixInsight do it, and so do the DNG
-  SDK's GainMap, darktable, Lightroom's Flat-Field Correction and CornerFix (read
-  in source or documentation, confirmed). Adobe's page says shading can carry a
-  colour cast and offers an option that removes only the cast. What the tools
+  SDK's GainMap, darktable and CornerFix (read in source or documentation,
+  confirmed). Lightroom's Flat-Field Correction is named here, not read: the
+  only copy of Adobe's page on it came from a request in a browser's identity
+  after the page had refused this session's own, so that read is withdrawn, and
+  what it was taken to say (that shading can carry a colour cast, and an option
+  removes only the cast) waits for the page to be asked again. What the tools
   normalise to differs:
   - to the centre, so the centre keeps its colour: RawTherapee, Siril, CornerFix;
   - to the mean: PixInsight, the textbook formula, Kolari's recipe.
