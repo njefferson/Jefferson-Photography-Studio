@@ -40,6 +40,7 @@ EditParams.lensFix = selection : the measured lens correction is radial and blin
 EditParams.lensBypass = not-pixels
 EditParams.forceBalance = not-pixels
 EditParams.hsFix = selection : same radial blindness as lensFix, on the brightness half, and aimed by the same bit
+EditParams.lensPick = selection : a lens picked by hand chooses which radial curve lensFix and hsFix apply, so it carries their radial blindness and is aimed by the same bit (085's follow-through, 2026-09-30)
 EditParams.hsBypass = not-pixels
 EditParams.hsl = selection
 EditParams.bwOn = whole-frame : a mono conversion is a decision about the whole photograph

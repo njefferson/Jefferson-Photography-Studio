@@ -135,6 +135,14 @@ export interface EditParams {
    *  are: they know different things and are turned down for different reasons. */
   hsFix: number;
   hsBypass: boolean;
+  /** THE LENS THE READER PICKED BY HAND for a photograph whose EXIF matches no
+   *  profile: the shipped lens's short name and the focal length picked, or
+   *  null for none. Part of the edit (085's follow-through, 2026-09-30), so
+   *  Undo, Reset, a return to the photograph and a resumed session all carry
+   *  it, and a tile drawn from the edit takes this lens's curve. Per-shot
+   *  corrective, so it does not ride a SavedLook, for the same reason white
+   *  balance does not. Optional: an edit stored before it existed has no pick. */
+  lensPick?: { short: string; fl: number } | null;
   /** 8-channel HSL colour mixer: flat [hueShiftDeg, satScale, lumScale] × 8
    *  bands at HSL_CENTERS (red, orange, yellow, green, aqua, blue, purple,
    *  magenta). Weights interpolate smoothly between ADJACENT band centres, so
