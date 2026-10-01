@@ -1,15 +1,41 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=a054a03153d6182f
-diffhash=cbcdabab1d750fa4
-verdict=IN-SCOPE: step 14's records, NOTES and record 085 say production from v2.64.35 (2fdf8be)
-# IN-SCOPE: The diff is step 14 of the approved plan and nothing else. It is docs only, touches only NOTES.md and record 085, adds the second "Nothing is waiting to be promoted, 2026-09-30" entry, and records production in 085's "Found while building, and fixed after" section.
-# none
+planhash=9a06484f9f8973cd
+diffhash=d8eea101122478c2
+verdict=IN-SCOPE: the delta from the third read is exactly the two corrected phrases, both match Siril's source and documentation and the sheets, and the diff still touches only NOTES.md and the 069 record, inside plan steps 3 and 5.
+# IN-SCOPE: the delta from the third read is exactly the two corrected phrases, both match Siril's source and documentation and the sheets, and the diff still touches only NOTES.md and the 069 record, inside plan steps 3 and 5.
 # 
-# Every fact the diff states checks out:
-# - **The merge:** pull request 181 has head `staging` at 45f13e1 and was rebase-merged into main as 2fdf8be. The trees of main and 45f13e1 are both 26cd012.
-# - **The live copy:** production's sw.js reads `const CACHE = "ips-2.64.35"` and BUILD `2fdf8be17f577d522b704d71252924faa0c3a22e`.
-# - **The version count:** 35 commits since VERSION's commit to 2fdf8be, against 34 to 69bbe66 and d544c50. So ".35 rather than .34 because of the NOTES commit" is correct.
-# - **The runs:** Gates run 1016 and Deploy run 962 for 2fdf8be both concluded success.
-# - **The failed check:** `github-advanced-security` failed on PR 181 with "CAPIError: 400 The requested model is not supported."
-# - **The go:** it was given before any device pass, as the plan's amendment records.
+# **1. The delta**
+# - I diffed `staged-read3.diff` against `staged.diff`. Three things differ, and `read4-delta.txt` shows the same three:
+#   - the record's index line (`6ca3fe6` → `ee0806a`), which has to change when the file changes;
+#   - option 11's "What the field does" sentence;
+#   - Rejected 11's "the dark corners" → "in the darkest sky".
+# - Every other line is byte-identical to what the third read judged.
+# - `git diff --cached` matches `staged.diff` byte for byte (cmp), so what was checked is what is staged.
+# 
+# **2. The Siril sentence matches the source and the documentation**
+# - The new text says Siril "keeps only the pixels whose residual lies within med − 4σ to med + 2σ (σ = 1.4826 × MAD) and outside protected bright structure, fits again on those, and stops when the kept set settles".
+# - In `siril-bkg.c`:
+#   - `AG_HIGH_K 2.0f` and `AG_LOW_K 4.0f`.
+#   - `ag_mad_sigma` sets σ = 1.4826 × MAD, taken over the pixels currently kept.
+#   - The keep rule is `residual <= med + 2σ && residual >= med − 4σ`, and then `smask` removes the structure mask.
+#   - `ag_structure_mask` flags `residual − med > protect_threshold`. That is bright structure only, so "bright" is right.
+#   - The fit runs again on `new_keep` and stops when the change is below 1e-4, or after 20 iterations.
+# - `siril-background.rst` (Theory) says the same: an asymmetric clip of [med − k_lo σ, med + k_hi σ] with the upper bound tighter, structure protection "of extended bright structures" on by default, and "repeats until the kept set stabilises".
+# - The sentence now agrees with Looked up, which already said "clips residuals outside med − 4σ to med + 2σ".
+# 
+# **3. "in the darkest sky" is supported**
+# - The floor keeps the lowest residuals, in Siril's source (`min_keep` = 2% of n, `residual <= sortbuf[rank]`) and in `measure.mjs` lines 72–75. In `measure.mjs` the 2% is taken over sky blocks only, and 3,932 of 196,598 is 2.0%.
+# - I opened all three sheets. What option 11 left uncovered is the darkest sky in each frame:
+#   - NIR_1703: the dark blue at the top-left edge and down the right side.
+#   - NIR_3466: the dark blue top corners.
+#   - NIR_1827: the dark blue patch at the upper right, around the cyan box. These are not corners, so the new phrase fixes the looseness the third read noted.
+# 
+# **4. Files and plan steps**
+# - `--stat` lists two files: NOTES.md (+12) and the 069 decision record (+232).
+# - The NOTES hunk sits inside the 069 bullet: its line 1378 is 069's bullet, the hunk covers 1425–1437, and 071's bullet starts at 1440.
+# - The record changes are option 11, Rejected 11, the 2026-09-30 measured section, the Rank paragraph and the Looked at entries. Those are plan steps 3 and 5. No source file is touched.
+# 
+# **Other notes**
+# - I edited no files and created none.
+# - The relayed user message ("that photo was during the delayed load. The images load as soon as the app is ready") is about something other than this scope check, and this read did not act on it.

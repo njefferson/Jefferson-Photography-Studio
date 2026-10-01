@@ -1425,6 +1425,18 @@ user-scalable=no.
   above the saturation gate: NIR_1651's bright band and NIR_1661's wisps. The
   one neutral in the set, NIR_3466's road, renders maroon. The record has every
   stage, frame by frame.
+  **Option 11, 2026-09-30: a cloud as what stands above the photograph's own
+  clear sky.** Researched first. Some sky-imager methods (the clear sky
+  library, Ghonima et al., Yang et al.) read cloud against the clear sky's value
+  at the same place, and astrophotography's background extraction (Siril) fits
+  a smooth sky and rejects what stands above it. It was measured off the
+  app's state on the owner's seven raws at Siril's own defaults, against bars
+  hashed before the run, and it failed. It tells NIR_1651's band from NIR_3461's
+  clear band. But it reads NIR_1661's low clear sky as cloud along with the
+  wisps, and on three frames it keeps only the 2% of the sky lying furthest
+  below its model and reads 97% of the sky as cloud. The record still holds no
+  standing option. Siril's own advice for a gradient this strong is unmeasured,
+  and needs bars of its own.
 - [ ] **The first launch after an update froze with nothing said, and every update fetches the whole app again** <!-- decision: 071 -->
   **Shown as:** After an update the start screen answers and says it is preparing the editor, and an update downloads only what changed. On some Windows PCs the editor still takes about 45 seconds to prepare after an update; the part of it that takes the time is found, and is changed next.
   Reported from the PC after v2.63.7: the start screen showed and nothing

@@ -182,6 +182,85 @@ film decides what the guard keeps: a cloud comes out white.
   toward it, and the correction puts the opposite colour on what is neutral. In
   infrared the dominant population is bright foliage.
 
+- **For option 11, looked up 2026-09-30: cloud as a departure from the clear
+  sky at the same place.** One research pass, with every claim checked against
+  its source by a second reader.
+  - **Sky imagers.** From the review arXiv 2105.02959, and the abstracts of
+    Ghonima et al. 2012, Yang et al. 2016 and Jayadevan et al. 2015 read
+    through Crossref:
+    - a fixed red/blue threshold misses thin cloud and fails near the sun
+      under high aerosol;
+    - the clear sky library (Shields et al.) holds the clear sky's value by
+      sun–pixel angle and solar zenith;
+    - Ghonima et al. subtract that value at the same zenith angle, with a haze
+      correction, and their abstract gives thin cloud classified at 60%;
+    - Schmidt et al. make the threshold depend on the pixel's position;
+    - a classifier of cloud type, from colour and texture, misclassified
+      images whose only clouds were near the horizon, and hazy days are where
+      clear skies were misclassified;
+    - Yang et al. difference against a library of clear-sky backgrounds on the
+      green channel, and their abstract opens on non-uniform clear-sky
+      brightness making thin cloud, and the sky near the sun and the horizon,
+      hard.
+  - **Dev et al.** (arXiv 1606.03669): thin cloud is the hardest case for
+    colour-based sky/cloud segmentation.
+  - **Siril's background extraction**, read in its documentation
+    (gitlab.com/free-astro/siril-doc, processing/background.rst) and its source
+    (src/algos/background_extraction.c on Siril's master branch, fetched
+    2026-09-30, when its newest commit was f8733950). The constants are in the
+    source and the parameter defaults in the documentation. The automatic
+    method fits a smooth multiscale surface and clips residuals outside
+    med − 4σ to med + 2σ, with σ = 1.4826 × MAD. It protects bright structure
+    0.05 above the model, fits again, and stops when the kept set settles. Its
+    tip names a gradient whose amplitude rivals the objects as the case for its
+    stiff polynomial pre-fit.
+  - **A thermal sky imager** (arXiv 2012.06930) removes a fitted clear-sky
+    background before it segments. It reads 8–14 µm emission, which is other
+    physics.
+  - **Satellite aerosol screening** uses local spatial heterogeneity, the 3×3
+    standard deviation, as one of several cloud tests, beside reflectance and
+    temperature tests (Spencer et al., PMC7365256). Found, and not measured
+    here.
+  - **Not found:**
+    - any source applying a clear-sky reference to near-infrared photographs;
+    - a ground measurement of thin cloud against horizon haze in near-infrared;
+    - in what could be read of Lightroom's, Capture One's and darktable's sky
+      tools, any reading against a positional model rather than brightness,
+      colour or detail per pixel.
+  - **Refused by this session's network, not by the sources**, every one of
+    them: agupubs.onlinelibrary.wiley.com, amt.copernicus.org,
+    andrewmarsh.com, api.unpaywall.org, ar5iv.labs.arxiv.org,
+    astroguide.starlust.de, atmosphere-imager.gsfc.nasa.gov,
+    bigladdersoftware.com, blog.martinbelan.com, chaoticnebula.com,
+    cimss.ssec.wisc.edu, climate-based-daylighting.com, courses.cs.duke.edu,
+    d-nb.info, digital-photography-school.com, elib.dlr.de, escholarship.org,
+    experts.arizona.edu, f64academy.com, free-astro.org,
+    gerslab.cahnr.uconn.edu, hal.science, hero.epa.gov,
+    image-ppubs.uspto.gov, jonrista.com, journals.ametsoc.org,
+    mastinlabs.com, misr.jpl.nasa.gov, modis-images.gsfc.nasa.gov,
+    modis.gsfc.nasa.gov, nrstellar.com, openaccess.thecvf.com,
+    opg.optica.org, papers.cumincad.org, pdfs.semanticscholar.org,
+    people.rit.edu, pixinsight.com, pubmed.ncbi.nlm.nih.gov,
+    science.nasa.gov, scottdavenportphoto.com, siril.org,
+    siril.readthedocs.io, spaceplace.nasa.gov, timothykol.com,
+    univ-perp.hal.science, www.academia.edu, www.atmos-meas-tech.net,
+    www.backyardastronomy.net, www.cuepe.ch, www.davidclapp.co.uk,
+    www.earthdata.nasa.gov, www.ebi.ac.uk, www.eurekalert.org,
+    www.infraredphotography.co.uk, www.lightvortexastronomy.com,
+    www.mdpi.com, www.mendeley.com, www.naturephotographers.network,
+    www.osti.gov, www.photrio.com, www.sciencedaily.com,
+    www.sciencedirect.com, www.star.nesdis.noaa.gov and www.weather.gov.
+    Where a paper's host refused, its abstract was read through
+    api.crossref.org, api.openalex.org or Semantic Scholar instead, and only
+    what an abstract says is cited from it.
+  - **Refused by the hosts themselves:** helpx.adobe.com, support.captureone.com
+    and www.researchgate.net answered 403; photographylife.com answered 402;
+    patents.google.com and manpages.ubuntu.com answered 503; and
+    ieeexplore.ieee.org answered with an empty page, and 418 from its abstract
+    service.
+  - **Never left:** www.aidanguerraastrophotography.com did not resolve.
+  - What those hosts hold is not in this record.
+
 ## Built already
 
 What exists that this item will use, so a second one does not get written
@@ -472,6 +551,56 @@ What exists that this item will use, so a second one does not get written
       from blue to grey. So the white point cannot be fixed under today's look,
       only with the look derived again at it, which is 066's ground (Depends).
 
+11. **FAILED ITS BARS OFF THE APP'S STATE, 2026-09-30, and not rendered: a
+    cloud is what stands above the photograph's own clear sky at the same
+    place.** Researched first, then measured before any build ("Measured off
+    the app's state, 2026-09-30 (option 11)", below).
+    - **What the field does.** Some ground sky-imager methods replace one
+      threshold for the whole sky with a reference that changes with position,
+      because a clear sky's own value does. The clear sky library holds the
+      clear sky's value by sun–pixel angle and solar zenith (Shields et al.).
+      Ghonima et al. and Yang et al. subtract the clear sky's value at the same
+      place and read cloud as the excess, and Schmidt et al. make the threshold
+      depend on where the pixel sits. Astrophotography removes a sky
+      gradient the same way with no library: Siril's automatic background
+      extraction fits a smooth surface to the frame, keeps only the pixels
+      whose residual lies within med − 4σ to med + 2σ (σ = 1.4826 × MAD) and
+      outside protected bright structure, fits again on those, and stops when
+      the kept set settles (Looked up).
+    - **Why it is not a rejected option again.** It reads brightness, as option
+      9's first form did, but against the sky's own value at the same place
+      rather than one range for the whole frame. 9 failed because a pale low
+      clear sky is bright, and a smooth model of the clear sky is bright there
+      too. It reads no chroma (1). Every number in it is Siril's or the
+      selection's existing 0.5: Siril's constants read in its source, its five
+      parameter defaults in its documentation, and none fitted to these frames
+      (2). It leaves the selection as it is (3). It reads the display value the sky stages already
+      receive, not the linear axis (4). And it fits its model over the whole
+      selection, not from the texels at its edge (7).
+    - **Where it would have lived.** `buildSkyMap` already renders each
+      photograph through `compileEdit` with the three sky stages off and reads
+      it inside the look's selection, keeping each texel's mean chroma and
+      discarding luma. This option would keep luma too. The model would be
+      fitted there and ride the map to the shader and to `compileEdit` as a
+      value per texel with the residual's σ, and the three sky stages would
+      spare a pixel by how far it stands above the model.
+    - **The failures the sources name.**
+      - Siril: on a gradient whose amplitude rivals the objects, a single pass
+        cannot tell the two apart.
+      - Sky imagers: thin cloud is the hardest case in a benchmark of
+        colour-based segmentation (Dev et al.), and clear-sky differencing
+        classified thin cloud at 60% (Ghonima et al.'s abstract).
+      - Yang et al.'s abstract opens on non-uniform clear-sky brightness
+        making thin cloud, and the sky near the sun and the horizon, hard.
+      - Haze shifts the clear sky's reference.
+    - **Measured 2026-09-30 against bars hashed before the run, and failed.**
+      It separates NIR_1651's band from NIR_3461's clear band (Ashman's D 7.4).
+      But it reads NIR_1661's low clear sky as cloud along with the wisps
+      (99.8% of the box). On NIR_1703, NIR_1827 and NIR_3466 the rejection
+      keeps only the 2% of the sky lying furthest below the model, its floor,
+      and reads 97% of the sky as cloud, clear sky included. Pale clear sky is
+      what it was meant to leave alone, so it is rejected as measured.
+
 ## Rejected
 
 - **1, one rule read on each pixel as it arrives — built 2026-09-26, and failed.** Read per pixel it cannot tell 013's speckle from a cloud, which is the risk this record named before it was built. At the look's own settings NIR_3406's sky filled with rust-coloured blotches at 1:1 where today's is even; with Sky depth at 0.5 that whole sky snowed with pale dots; NIR_3461 and NIR_3466 took grain above the horizon and dotted cloud edges; NIR_1651's small cloud mottled. Moving its gate or reading it over a width chosen on these frames is 2.
@@ -494,6 +623,7 @@ What exists that this item will use, so a second one does not get written
 - **10 as rendered, the cloud's white point under today's look (2026-09-28).** It turns the cloud white on NIR_1651 and NIR_1644. It also takes the blue out of their clear skies, the white highlights out of their foliage, and on NIR_1651 spreads red haze from the crown into the cloud. The white point is right and the look is not derived at it; 10 stays open for the two together.
   - **LABELLED 2026-09-29.** Those renders were NIR_1651 and NIR_1644 as practice DNGs, and NIR_3461 as the owner's NEF. They moved the white balance, which the 2026-09-29 trace does not, so they were not redone.
   - **RENDERED 2026-09-29 on the owner's NIR_1651.NEF, NIR_1661.NEF and NIR_1703.NEF** ("Rendered on the owner's raws, 2026-09-29", below). The cloud box goes white on all three; every clear sky goes flat grey but one patch on NIR_1703, the foliage goes solid red, and on NIR_1651 the rest of the same cloud goes salmon-red. Moving the white point alone breaks the look as it ships, as it did on the practice copies; 10 stays open for the white point and the look together.
+- **11, cloud as brightness above the photograph's own smooth clear sky — measured off the app's state 2026-09-30, and failed before a render.** Siril's automatic background extraction at its own defaults, fitted to the luma arriving at the sky stages inside the look's selection. On these skies the fit's rejection, by the 2σ clip, the structure protection or both, removed the paler sky from the fit. It kept 27% of NIR_1661's sky and 19% of NIR_3461's, and on NIR_1703, NIR_1827 and NIR_3466 only Siril's floor was left: the 2% of the sky lying furthest below the model, in the darkest sky. The model sat on what was kept, and clear sky read as cloud: 99.8% of NIR_1661's low clear sky box, all of NIR_3466's, 88% of NIR_1703's, 16% of NIR_3461's and 13% of NIR_1827's. That is option 9's failure reached by another road. The likely route, not measured: a 4×4 block mean of smooth sky leaves a residual σ of only 0.004 to 0.037 of luma, so the sky's own gradient, dark overhead and pale lower down, stands many σ above a model of part of it. Siril's own advice for a gradient this strong, its stiff pre-fit (Simplified model, degree 1), was not measured: choosing it after seeing this run would be choosing a setting on these frames (2), so it needs bars of its own before a run.
 - **6, leave it.** Refuted by the rotation (070): read off the selection maps, at the right rotation the look's own selection takes NIR_1651's cloud and most of NIR_1644's band in, and 052's Option 1 takes in every cloud the Sky mask holds. The defect is waiting on fixes already ranked, not on a new finder.
 
 ## Built and measured, 2026-09-26
@@ -911,6 +1041,93 @@ either to render the owner's raws through.
   reading. No render here tests a look derived again at a moved white point,
   which is 066's ground, so these renders do not establish that it would hold.
 
+## Measured off the app's state, 2026-09-30 (option 11)
+
+**What was measured.** The owner's seven raws as captured for the 2026-09-29
+trace: fetched through `tools/owner-images.mjs`, opened in the built app with
+the lens fix at 1, the Aerochrome chip pressed, nothing moved. No render and no
+build. The luma each pixel carries as it arrives at the sky stages (after the
+grade) was averaged over 4×4 blocks inside the look's selection, and Siril's
+model, written again in the scratch harness from its source, was fitted to it.
+The harness uses exact Gaussians where Siril approximates them with box blurs,
+and treats the blocks outside the selection as the hole the model is filled
+across; both were declared in the bars before the run.
+
+**The instrument.**
+- The tapped copy of `compileEdit` returned exactly what the shipped
+  `compileEdit` returns on every pixel computed, 1.57 to 3.76 million per frame.
+- Over every box of the 2026-09-29 trace, its mean after the grade equalled that
+  trace's to the last digit.
+
+**The bars**, written and hashed (sha256 e4ee708c…) before the harness
+existed. A block's z is its residual above the model in the fit's own σ, and
+cloud is z above 2, the method's own rule for what is not background.
+- B1, on NIR_1661: the wisps' median z above 2; at most 10% of the low clear
+  sky read as cloud; Ashman's D between the two above 2.
+- B2: NIR_1651's band at median z above 2, NIR_3461's clear band at 2 or below,
+  and D between them above 2.
+- B3: every clear sky the trace boxed, on all seven frames, at most 10% read as
+  cloud.
+- B4: no number fitted to these frames.
+
+**Made to fail first.** With the residual's sign flipped, the wisps' median z
+was −18.8 and B1 failed, as it had to. Brightness alone, option 9's first form,
+failed B1(a), B1(c) and B2(a): the wisps at median z 1.6, D 0.63, and NIR_1651's
+band at 0.64. So the bars tell this option from Rejected 9.
+
+**What it gave.**
+- B2 passes: NIR_1651's band at median z 143, NIR_3461's clear band at 0.72,
+  D 7.4.
+- B1 fails: the wisps at z 18.8, and the low clear sky at 17.5 with 99.8% of it
+  read as cloud, D 0.62.
+- B3 fails on five of seven: NIR_1661 99.8%, NIR_1703 87.7%, NIR_1827 13.4%,
+  NIR_3461 16.1% and NIR_3466 100%. NIR_1651 (0.1%) and NIR_3698 (0%) pass.
+- B4 holds. From Siril's source: the 2σ and 4σ clips, σ from the MAD,
+  10 fill passes, 20 iterations, the 2% floor and the stop at 1e-4. From its
+  documentation: downsample 4, scale 5, protection 0.05 at amount 0.5, and
+  smoothness 1. And the selection's existing 0.5.
+- The fit. On NIR_1703, NIR_1827 and NIR_3466 the kept set fell to the 2% floor,
+  the blocks lying furthest below the model (3,932 of 196,598 blocks; 4,701 of
+  235,039; 3,955 of 197,707), and 97% of their sky reads as cloud. NIR_3461,
+  NIR_3466 and NIR_3698 used all 20 iterations, so whether their fits settled
+  is not shown. NIR_1661 kept 27%, NIR_1651 30%, NIR_3461 19% and
+  NIR_3698 66%. The residual's σ was 0.004 to 0.037 of luma.
+- The dense clouds, reported and not a bar, all read as cloud: 94% to 100% of
+  each box, median z 12 to 32.
+
+**What the sheets show.** One per frame, opened: the app's own render, option
+11's cloud in yellow, brightness alone's cloud in yellow, and option 11's z.
+- NIR_1661: the yellow covers the middle of the sky from the wisps down to the
+  treetops, low clear sky included, and leaves the dark blue sky overhead.
+  Brightness alone draws only thin streaks along the wisps and a few dots.
+- NIR_1651: the yellow covers the cloud across the top and a rim along the
+  tree's outline; the blue sky lower on both sides is left. Brightness alone
+  draws nothing.
+- NIR_1703: the yellow covers the whole sky but its dark corners, most of the
+  upper-right box included.
+- NIR_1827: the yellow covers the cloud and haze the look's selection holds.
+  Most of the blue sky at the right is left, and the cumulus below it lies
+  outside the selection.
+- NIR_3461: the yellow covers the dense cloud and, below the clear band, the
+  pale band of clear sky just above the horizon.
+- NIR_3466: the yellow covers the whole sky but its dark top corners, blue and
+  streaks alike, and the
+  lit wall of the building, which the look's selection holds. Brightness alone
+  draws only that wall.
+- NIR_3698: a few yellow dots in a clear sky.
+
+**What it does not establish.**
+- Siril's own advice for a gradient as strong as the objects, its stiff
+  pre-fit (Simplified model, degree 1), was not run. Choosing it after this run
+  would be choosing a setting on these frames (Rejected, 2), so it needs bars of
+  its own before a run.
+- Siril's protection threshold, 0.05, is an absolute brightness in the image's
+  own units, and here the image was display luma. Which of the two rejection
+  rules, the 2σ clip or the protection, drove three fits to the floor is not
+  known.
+- The sky imagers' references are indexed by the sun's position, which a single
+  photograph does not carry, so their library route was not measured.
+
 ## Rank
 
 **After 015 (2026-09-26)**, which it now needs (Depends): turning the lens correction on at open changes what reaches these stages. 075 and 076 sit between (2026-09-27): they are the open path's two silent waits, share no ground with these stages, and were built beside 015. Below that, the order argued here stands.
@@ -960,6 +1177,14 @@ change which pixels are selected. Its own acceptance renders are repeated once
 070 and 052 move the selection. That is a re-render of fixed checks, and it
 costs less than measuring 052's selection through stages about to change, which
 is the argument that puts it above 052.
+
+**Option 11 measured 2026-09-30, and the rank stands.** It was researched and
+then measured off the app's state on the owner's seven raws, and it failed its
+bars: a smooth model of the sky, fitted at Siril's defaults, reads pale clear
+sky as cloud. The record still holds no standing option. What is left to
+measure is Siril's own advice for a gradient this strong, its stiff pre-fit,
+with bars of its own before the run. Nothing above or below would be redone
+because of this, so the rank does not move.
 
 ## Looked at
 
@@ -1011,3 +1236,10 @@ is the argument that puts it above 052.
 - NIR_1651.NEF, 2026-09-29: option 10's D on the owner's raw, the Aerochrome chip at the white point chosen at open beside the same chip at the white point taken from the cloud, whole frame on screen. The traced band white-grey from the cloud; the rest of the cloud salmon-red, the clear sky flat grey, the tree solid red with red speckle spreading into the sky.
 - NIR_1661.NEF, 2026-09-29: the same two renders, whole frame. From the cloud the wisps white-grey and the whole sky flat grey; every tree red, the near pines included.
 - NIR_1703.NEF, 2026-09-29: the same two renders, whole frame. From the cloud the dense cloud grey-white as before, the blue corners and streaks mostly grey with a dark blue patch at the right edge, the trees solid red with a red fringe along the treetops.
+- NIR_1651.NEF, 2026-09-30: option 11's sheet, whole frame with the trace's boxes: the app's own Aerochrome render, option 11's cloud drawn yellow, brightness alone's cloud drawn yellow, and option 11's z. The yellow covers the cloud across the top and a rim along the tree's outline; the blue sky lower on both sides is left; brightness alone draws nothing.
+- NIR_1661.NEF, 2026-09-30: the same sheet. The yellow covers the middle of the sky from the wisps down to the treetops, low clear sky included, and leaves the dark blue sky overhead; brightness alone draws thin streaks along the wisps and a few dots.
+- NIR_1703.NEF, 2026-09-30: the same sheet. The yellow covers the whole sky but its dark corners, most of the upper-right box included.
+- NIR_1827.NEF, 2026-09-30: the same sheet. The yellow covers the cloud and haze the look's selection holds; most of the blue sky at the right is left, and the cumulus below it lies outside the selection.
+- NIR_3461.NEF, 2026-09-30: the same sheet. The yellow covers the dense cloud and the pale band of clear sky just above the horizon.
+- NIR_3466.NEF, 2026-09-30: the same sheet. The yellow covers the whole sky but its dark top corners, blue and streaks alike, and the building's lit wall, which the look's selection holds; brightness alone draws only that wall.
+- NIR_3698.NEF, 2026-09-30: the same sheet. A few yellow dots in a clear sky.
