@@ -92,17 +92,18 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
   const pat = raw.num(33422);
   const pattern = pat.length === 4 ? pat : [0, 1, 1, 2];
   // White (sensor saturation): the top of the file's own linearization curve
-  // when one exists (lossy NEFs — D5300 16383).
-  // Lossless NEFs (0x46) carry NO curve, so the identity top would be the
-  // bit-depth ceiling, NOT saturation — for those fall back to 15520 at
-  // 14-bit, the pre-branch behavior. CORRECTED 2026-10-01: 15520 is not a value
-  // LibRaw reports. LibRaw sets maximum = (1 << tiff_bps) - 1, 16383 here, with
-  // no Z 50 entry, and lowers it only to the frame's own data maximum
-  // (adjust_maximum); RawTherapee's camconst.json measures the Z 50 clipping at
-  // 16374 at ISO 100. The Z 50 writes only lossless NEFs (its manual offers a
-  // bit depth, no compression choice), so it always takes this branch. Its
-  // source is unrecorded; Adobe's DNG WhiteLevel (50717) on one of the owner's
-  // Z 50 DNGs is the reading that would settle it. The
+  // when one exists (lossy NEFs — D5300 16383), and otherwise the bit-depth
+  // ceiling, (1 << bps) - 1, which is what LibRaw takes (maximum =
+  // (1 << tiff_bps) - 1, no Z 50 entry). Lossless NEFs (0x46) carry no curve,
+  // and the Z 50 writes only those (its manual offers a bit depth and no
+  // compression choice). MEASURED on the owner's own Z 50 NEFs, 2026-10-01:
+  // NIR_3716 and NIR_1688 have photosites pinned at exactly 16383 (12 and 16
+  // of them), with only 6 and 7 between 15520 and 16383 — the sensor clips at
+  // the ceiling, as RawTherapee's camconst.json measures it (16383, its table
+  // backing off 6x read noise, 16374 at ISO 100). This was 15520 until then, a
+  // value no source read gives for this body and only ever checked on
+  // synthetic files, which pushed every Z 50 frame 5.6% brighter and made
+  // autoRecover's 0.985 pin fire from raw 15302, below where the sensor clips. The
   // black pedestal scales with bit depth (1008 is the 14-bit convention).
   // MakerNote 0x003D is written at 14-bit scale whatever the file's depth, so a
   // 12-bit file's pedestal is a quarter of it, as LibRaw's open_datastream
@@ -113,7 +114,7 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
   const black = raw.num(50714)[0] ?? mnBlack ?? (bps === 14 ? 1008 : bps === 12 ? 252 : 0);
   const white =
     raw.num(50717)[0] ??
-    (params.hasCurve && curveWhite > black ? curveWhite : bps === 14 ? 15520 : (1 << bps) - 1);
+    (params.hasCurve && curveWhite > black ? curveWhite : (1 << bps) - 1);
   return { cfa, width, height, pattern, black, white };
 }
 
@@ -125,10 +126,11 @@ interface NikonParams {
   huff: number;
   /** True only when a real linearization table was read from the file. When
    *  false the curve is the identity DEFAULT (lossless 0x46 NEFs carry no
-   *  table) and its top is (1<<bps)-1 — NOT the sensor's saturation, so it
-   *  must never be used as the white level (audit find, 2026-07-25: doing so
-   *  regressed the Z 50's calibrated 15520 to 16383 on lossless files and
-   *  silently disabled highlight recovery for them). */
+   *  table) and its top tells nothing about the file, so readNefCfa takes the
+   *  bit-depth ceiling as white instead, as LibRaw does. (The 2026-07-25 audit
+   *  read 16383 on lossless files as a regression from a "calibrated" 15520
+   *  that disabled recovery; that was synthetic-verified only, and the owner's
+   *  real Z 50 NEFs clip at 16383 — measured 2026-10-01.) */
   hasCurve: boolean;
 }
 
