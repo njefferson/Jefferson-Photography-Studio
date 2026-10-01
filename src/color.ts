@@ -3,7 +3,12 @@
 // that was missing: without it, infrared chroma collapses onto a single
 // (magenta) axis, so sky and foliage can't separate into different colors.
 
-// Nikon Z 50 ColorMatrix1 (XYZ -> camera, D65), public Adobe coefficients.
+// Nikon Z 50 ColorMatrix (XYZ -> camera, D65). NOT Adobe's, though this line
+// said so until 2026-10-01: Adobe DNG Converter's Z 50 D65 matrix is
+// 11640, -4829, -1079, -5107, 13006, 2325, -972, 1711, 7380 (/10000), as
+// LibRaw's colordata.cpp and RawTherapee's camconst.json carry it. Where these
+// numbers came from is unrecorded; they are the NEF default, the .dcp
+// fallback and the matrix in the practice DNGs.
 export const NIKON_Z50_COLOR_MATRIX = [
   1.1853, -0.4189, -0.1024, -0.4292, 1.2041, 0.2569, -0.1336, 0.2599, 0.5824,
 ];
