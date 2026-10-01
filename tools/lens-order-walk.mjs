@@ -59,6 +59,37 @@
 // target (`lensStrengthTarget`) the tap does nothing. Red on the build before
 // it, where it left the strength where it was set.
 //
+// THE SLIDER'S OTHER PATHS (085's follow-through, 2026-09-30). Each of these
+// was found while building 085 and shipped as found and not fixed; each was
+// made to fail on production's build, 3bb7e37, before its fix.
+//
+// (e) A LENS PICKED BY HAND IS PART OF THE PHOTOGRAPH'S EDIT. On a practice
+// frame, which carries no lens and so matches nothing: Undo takes the pick back
+// to no lens at 0, Redo brings it back at 1, Reset returns to how the photo
+// opened, a return to the photograph keeps the pick and its strength, and so
+// does a reload and resume. Until then the pick lived beside the edit, so Undo
+// and Reset left it picked and a return asked for the lens again.
+//
+// (e2) AFTER RESET, A DOUBLE TAP AGREES WITH IT. Reset left the pick in place
+// at 0, so a double tap then went to 1.
+//
+// (f) THE TILE FOLLOWS THE LENS. Picking a lens, and moving Strength alone,
+// redraw the photograph's tile, and the tile at 1 carries the picked lens's
+// correction. The tile's stamp did not carry the strength, so it never
+// redrew, and a tile drawn from the edit took the lens from the file's EXIF,
+// which names no lens here.
+//
+// (g) AEROCHROME'S FINISHING COPY DRIVES THE CARD THAT OWNS THE CORRECTION.
+// With the reader's own profile planted for the frame, moving the copy moves
+// the own card's Strength and the picture, and a double tap on the copy puts
+// the own card back to 1. The copy was wired to the shipped card, which is
+// superseded while an own profile matches, so it moved nothing.
+//
+// (h) A DOUBLE TAP AFTER A RETURN GOES TO THIS PHOTOGRAPH'S OPENING VALUE.
+// Exposure opens per frame; after opening two frames and returning to the
+// first, a double tap on Exposure went to the second frame's opening value,
+// because the defaults were captured only on a fresh open.
+//
 // AND THE CARD SAYS WHAT THE PROFILE KNOWS: "colour only" for a profile with no
 // brightness curve, "brightness and colour" only when it has both. It said the
 // second of every colour profile. The expectation is read off the same matched
@@ -290,5 +321,142 @@ try {
   await settle(p);
   const c7 = await card(p);
   check(`(d2) a double tap on the copy puts the Strength back to ${STRENGTH}`, Number(c7.strength) === STRENGTH, `Strength ${c7.strength}`);
+
+  // ── THE SLIDER'S OTHER PATHS: (e) to (h), each in a browser of its own ──
+  const freshCtx = async () => {
+    const ctx = await b.newContext({ viewport: { width: 1280, height: 950 } });
+    const q = await ctx.newPage(); q.on("dialog", (d) => d.accept());
+    await q.goto(`http://127.0.0.1:${PORT}/ir.html`);
+    return { ctx, q };
+  };
+  const idle = (q) => q.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+  // A SET through the app's own front door, every tile a real render.
+  async function openSet(q, files) {
+    await q.setInputFiles("#welcomeFile", files);
+    await q.waitForFunction((n) => { const t = [...document.querySelectorAll("#sessionThumbs .session-thumb")]; return t.length === n && t.every((x) => !x.classList.contains("provisional") && !x.classList.contains("saving") && !!x.querySelector("img")); }, files.length, { timeout: 600000 });
+    await idle(q); await settle(q);
+  }
+  async function goTo(q, i) {
+    await q.evaluate((k) => document.querySelectorAll("#sessionThumbs .session-thumb")[k]?.click(), i);
+    await q.waitForFunction((k) => !!document.querySelectorAll("#sessionThumbs .session-thumb")[k]?.classList.contains("active"), i, { timeout: 300000 });
+    await idle(q); await settle(q);
+  }
+  const pickState = (q) => q.evaluate(() => ({ status: document.getElementById("hsStatus")?.textContent || "", strength: document.getElementById("hsStrength")?.value ?? "", asks: !document.getElementById("hsPrompt")?.hidden }));
+  const picked = (s) => / · manual · /.test(s.status) && !s.asks;
+  const unpicked = (s) => s.asks && !/ · manual · /.test(s.status);
+  const say = (s) => `${s.asks ? "asks for a lens" : "no prompt"} · ${s.status || "no status"} · Strength ${s.strength}`;
+  const pick = async (q) => { await q.evaluate(() => document.getElementById("hsApplyManual")?.click()); await settle(q); };
+  const tap = async (q, id) => { await q.evaluate((i) => document.getElementById(i)?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true })), id); await settle(q); };
+  const pressId = async (q, id) => { await q.evaluate((i) => document.getElementById(i)?.click(), id); await settle(q); };
+  // A TILE IS REDRAWN BY REPLACING ITS PICTURE (tile-truth-walk.mjs): read the
+  // src, and wait for a different one. The redraw waits for the reader to stop
+  // (THUMB_IDLE_MS) and the open-tile check's debounce (restripOpen), so the
+  // wait is generous.
+  const tileSrc = (q, i) => q.evaluate((k) => document.querySelectorAll("#sessionThumbs .session-thumb")[k]?.querySelector("img")?.getAttribute("src") || "", i);
+  const tileRedrawn = (q, i, before) => q.waitForFunction(([k, s]) => { const im = document.querySelectorAll("#sessionThumbs .session-thumb")[k]?.querySelector("img"); return !!im && (im.getAttribute("src") || "") !== s && im.complete; }, [i, before], { timeout: 30000 }).then(() => true, () => false);
+  const tileSig = (q, i) => q.evaluate(async (k) => { const im = document.querySelectorAll("#sessionThumbs .session-thumb")[k]?.querySelector("img"); if (!im) return null; await im.decode().catch(() => {}); const c = document.createElement("canvas"); c.width = 32; c.height = 32; const g = c.getContext("2d"); g.drawImage(im, 0, 0, 32, 32); return [...g.getImageData(0, 0, 32, 32).data]; }, i);
+  const sigDiff = (a, z) => { if (!a || !z) return NaN; let s = 0, n = 0; for (let k = 0; k < a.length; k += 4) for (let c = 0; c < 3; c++) { s += Math.abs(a[k + c] - z[k + c]); n++; } return s / n; };
+  // Practice frames: no lens, no focal length, no aperture, so no profile
+  // matches and the card asks for one. Behaviour only; nothing is calibrated on them.
+  const EXDIR = join(ROOT, "public", "examples");
+  const SET = [join(EXDIR, "NIR_0063.dng"), join(EXDIR, "NIR_0102.dng")];
+  for (const f of SET) if (!existsSync(f)) { console.log(`\nno practice frame at ${f}\n`); process.exit(2); }
+
+  const S = await freshCtx();
+  try {
+    const s = S.q;
+    await openSet(s, SET);
+    const expo1 = await s.evaluate(() => document.getElementById("expo")?.value ?? "");
+    const e0 = await pickState(s);
+    console.log(`  ${SET[0].split("/").pop()} opened in a set: ${say(e0)}`);
+    check("(e) precondition: the practice frame matches no lens, so the card asks for one at 0", unpicked(e0) && Number(e0.strength) === 0, say(e0));
+    // (f) FIRST, from the tile as the photograph opened: the pick, then
+    // Strength alone, each redraw it. First because each check needs a tile
+    // drawn for a different state from the one it moves to; a pick repeated
+    // into a state the tile was already drawn for redraws nothing, rightly.
+    const before = await tileSrc(s, 0);
+    await pick(s);
+    const e1 = await pickState(s);
+    check(`(e) precondition: a pick names the lens and lands at ${STRENGTH}`, picked(e1) && Number(e1.strength) === STRENGTH, say(e1));
+    const f1 = await tileRedrawn(s, 0, before);
+    check("(f) picking a lens redraws the photograph's tile", f1, f1 ? "redrawn" : "the same picture after 30 s");
+    const sigOn = await tileSig(s, 0);
+    const before2 = await tileSrc(s, 0);
+    await setSlider(s, "hsStrength", 0);
+    const f2 = await tileRedrawn(s, 0, before2);
+    check("(f) moving Strength alone redraws the tile", f2, f2 ? "redrawn" : "the same picture after 30 s");
+    const dTile = sigDiff(sigOn, await tileSig(s, 0));
+    check(`(f) and the tile at ${STRENGTH} carries the picked lens's correction: it differs from the tile at 0`, dTile > 0.5, `mean difference ${Number.isNaN(dTile) ? "—" : dTile.toFixed(2)} levels on a 32×32 reading`);
+
+    // (f) AND UNDO REDRAWS IT TOO: the tile is a claim about the edit, and
+    // Undo changes the edit (a review finding, 2026-09-30).
+    const before3 = await tileSrc(s, 0);
+    await pressId(s, "undoBtn");
+    const f3 = await tileRedrawn(s, 0, before3);
+    check("(f) Undo of the Strength move redraws the tile too", f3, f3 ? "redrawn" : "the same picture after 30 s");
+
+    // (e) Undo, Redo, Reset. The history held the pick (one step) and the
+    // Strength move (one step, undone just above): one more Undo goes back
+    // past the pick.
+    await pressId(s, "undoBtn");
+    const e2 = await pickState(s);
+    check("(e) Undo takes the pick back: the card asks for a lens again, at 0", unpicked(e2) && Number(e2.strength) === 0, say(e2));
+    await pressId(s, "redoBtn");
+    const e3 = await pickState(s);
+    check(`(e) Redo brings the pick back, at ${STRENGTH}`, picked(e3) && Number(e3.strength) === STRENGTH, say(e3));
+    await pressId(s, "resetBtn");
+    const e4 = await pickState(s);
+    check("(e) Reset returns to how the photo opened: no lens, at 0", unpicked(e4) && Number(e4.strength) === 0, say(e4));
+    await tap(s, "hsStrength");
+    const e5 = await pickState(s);
+    check("(e2) and a double tap after Reset agrees with it: 0", Number(e5.strength) === 0, say(e5));
+    await pick(s);
+
+    // (e) A return, then (h) the double tap after it, then (e) a reload and resume.
+    await setSlider(s, "hsStrength", CHOSEN);
+    await goTo(s, 1);
+    const expo2 = await s.evaluate(() => document.getElementById("expo")?.value ?? "");
+    await goTo(s, 0);
+    const e6 = await pickState(s);
+    check(`(e) a return to the photograph keeps the pick and its Strength, ${CHOSEN}`, picked(e6) && Number(e6.strength) === CHOSEN, say(e6));
+    check("(h) precondition: the two frames open at different Exposure", expo1 !== "" && expo2 !== "" && expo1 !== expo2, `first ${expo1}, second ${expo2}`);
+    const moved = String(Number(expo1) + (Number(expo1) > 500 ? -100 : 100));
+    await setSlider(s, "expo", moved);
+    await tap(s, "expo");
+    const expoBack = await s.evaluate(() => document.getElementById("expo")?.value ?? "");
+    check("(h) after a return, a double tap on Exposure goes back to THIS photograph's opening value", expoBack === expo1, `opened at ${expo1}, the other frame at ${expo2}, moved to ${moved}, tapped to ${expoBack}`);
+    await s.waitForTimeout(1600); // the open edit is written a second after a change (077)
+    await s.reload();
+    await s.waitForSelector("#resumeSession:not([hidden])", { timeout: 60000 });
+    await s.evaluate(() => document.getElementById("resumeSession")?.click());
+    await s.waitForFunction(() => !!document.querySelector("#sessionThumbs .session-thumb.active"), null, { timeout: 300000 });
+    await idle(s); await settle(s);
+    const e7 = await pickState(s);
+    check(`(e) after a reload and resume the pick and its Strength, ${CHOSEN}, are still there`, picked(e7) && Number(e7.strength) === CHOSEN, say(e7));
+  } finally { await S.ctx.close(); }
+
+  // (g) The reader's own profile, planted for the frame: the shipped profile
+  // that matches it, stored as theirs, before the app loads.
+  const G = await freshCtx();
+  try {
+    const q = G.q;
+    const own = { ...shipped, key: "walk-own", builtIn: undefined, source: "planted by lens-order-walk", frames: 1 };
+    await q.evaluate((p) => localStorage.setItem("ips-lens-profiles-v1", JSON.stringify([p])), own);
+    await q.goto(`http://127.0.0.1:${PORT}/ir.html`);
+    await open(q, RAW);
+    const ownOf = () => q.evaluate(() => ({ card: !document.getElementById("myLensCard")?.hidden, strength: document.getElementById("myLensStrength")?.value ?? "", shipped: !document.getElementById("hsCard")?.hidden, copy: document.getElementById("finish-hsStrength")?.value ?? null }));
+    const g0 = await ownOf();
+    check(`(g) precondition: the planted own profile matches, its card is shown at ${STRENGTH} and the shipped card is not`, g0.card && Number(g0.strength) === STRENGTH && !g0.shipped, JSON.stringify(g0));
+    await pressId(q, "lookEir");
+    const hBefore = await hash(q);
+    await setSlider(q, "finish-hsStrength", CHOSEN);
+    const g1 = await ownOf();
+    const hAfter = await hash(q);
+    check(`(g) moving Aerochrome's finishing copy moves the own card's Strength to ${CHOSEN}`, Number(g1.strength) === CHOSEN, JSON.stringify(g1));
+    check("(g) and the picture changes with it", hAfter !== hBefore, `${hBefore} → ${hAfter}`);
+    await tap(q, "finish-hsStrength");
+    const g2 = await ownOf();
+    check(`(g) a double tap on the copy puts the own card back to ${STRENGTH}, and the copy shows it`, Number(g2.strength) === STRENGTH && Number(g2.copy) === STRENGTH, JSON.stringify(g2));
+  } finally { await G.ctx.close(); }
 } finally { await b.close(); }
 console.log(failed ? `\n${failed} failed` : "\nall checks passed"); process.exit(failed ? 1 : 0);

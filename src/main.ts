@@ -640,12 +640,34 @@ hsUi.strength.addEventListener("input", () => {
   params.hsFix = Number(hsUi.strength.value);
   syncLensStrength();
   syncHotspot(); // draw() coalesces the drag into one undo step, like every slider
+  restripOpen(); // the photograph's tile is a claim about its correction too
 });
 hsUi.bypassBtn.addEventListener("click", () => {
   params.hsBypass = !params.hsBypass;
   syncHotspot();
   flushRecord(); // one press = one undo step
+  restripOpen();
 });
+
+/** THE CARD FOLLOWS THE EDIT'S PICK (085's follow-through, 2026-09-30).
+ *
+ *  Takes nothing; reads `params.lensPick` and the open photograph's EXIF, and
+ *  sets `hotspotState`. Returns nothing. A photograph whose EXIF matched a
+ *  profile keeps that match: the picker is offered only when nothing matched,
+ *  so such a photograph never carries a pick. Otherwise the state is the pick's
+ *  profile, or none. What it leaves must satisfy `updateHotspotUI`, which reads
+ *  `hotspotState` for the card, and `currentLensCurve`, which reads it for the
+ *  correction. Consumer: `applySnapshot`, which runs it for Undo, Redo, Reset,
+ *  a return to the photograph and a resumed session. Until this, the pick lived
+ *  beside the edit, so Undo and Reset left the lens picked and a return to the
+ *  photograph asked for it again. */
+function hotspotFromPick(): void {
+  if (hotspotState?.source === "exif") return;
+  const pk = params.lensPick;
+  const p = pk ? Hotspot.findShippedManual(pk.short, pk.fl, currentExif) : null;
+  hotspotState = pk && p ? { p, short: pk.short, source: "manual" } : null;
+}
+
 hsUi.applyManualBtn.addEventListener("click", () => {
   const fl = Number(hsUi.fl.value);
   if (!fl) return;
@@ -653,6 +675,9 @@ hsUi.applyManualBtn.addEventListener("click", () => {
   const p = Hotspot.findShippedManual(short, fl, currentExif);
   if (!p) return; // the picker only offers lenses that have profiles
   hotspotState = { p, short, source: "manual" };
+  // THE PICK IS PART OF THE EDIT (085's follow-through), so Undo, Reset, a
+  // return to the photograph and a resumed session carry it (hotspotFromPick).
+  params.lensPick = { short, fl };
   // A PICKED LENS IS A MATCHED LENS, so it lands at the full correction every
   // matched photograph opens at (decision 085). The frame opened unmatched at
   // 0, and a pick that left it there corrected nothing while the card named
@@ -661,10 +686,8 @@ hsUi.applyManualBtn.addEventListener("click", () => {
   syncLensStrength();
   syncHotspot();
   syncMirrors(); // Aerochrome's finishing copy shows the new strength too
-  // One undo step for the strength. The pick itself is not part of the edit:
-  // Undo leaves the lens picked, and the pick is not saved with the photograph,
-  // so a return to it asks for the lens again (NOTES, found and not fixed).
-  flushRecord();
+  flushRecord(); // the pick and its strength, one undo step
+  restripOpen(); // and the tile takes the picked lens
 });
 
 // --- The reader's OWN measured lens profile ---------------------------------
@@ -713,6 +736,9 @@ function syncMyLens() {
   // fell back to the shipped profile correctly and nothing on screen said so.
   updateHotspotUI();
   updateLensCmp();
+  // And the finishing copy: which card it stands for follows `myLens`
+  // (mirrorPrimary), so forgetting a profile must re-read it (a review finding).
+  syncMirrors();
 }
 
 function updateMyLensUI() {
@@ -778,14 +804,23 @@ function decodeWithLens(imported: ImportedFile, opts?: Parameters<typeof decodeO
   return decodeOffThread(imported, { ...(opts ?? {}), lens: lensPlanFor(imported) });
 }
 
-function lensCurveFor(imported: ImportedFile): LensCurve | null {
+/** The lens curve for a file that is not the open photograph.
+ *  @param imported  the file, bytes in hand; its EXIF names the lens.
+ *  @param pick  the lens a photograph's own edit picked by hand, when its EXIF
+ *    matched nothing (`EditParams.lensPick`), or null/undefined for none. Used
+ *    only when the EXIF matches no shipped profile, as the picker is offered only
+ *    then (085's follow-through: a tile drawn from such an edit took no curve).
+ *  @returns the curve, or null when nothing matches. What the result must
+ *    satisfy: it is the curve the open photograph takes for the same file and
+ *    edit (`currentLensCurve`), so a tile and the photograph show one correction. */
+function lensCurveFor(imported: ImportedFile, pick?: EditParams["lensPick"]): LensCurve | null {
   let ex: ExifSubset | null = null;
   try {
     ex = readExifSubset(imported.bytes);
   } catch {
-    return null;
+    ex = null;
   }
-  const shipped = Hotspot.findShipped(ex);
+  const shipped = Hotspot.findShipped(ex) ?? (pick ? Hotspot.findShippedManual(pick.short, pick.fl, ex) : null);
   const measured = ex ? LensStore.findProfile(ex) : null;
   // Same rule as the open photograph: the reader's own measurement is the
   // colour when they have one, and the shipped profile is the brightness.
@@ -1089,12 +1124,14 @@ myLensUi.strength.addEventListener("input", () => {
   if (!myLens) return;
   params.lensFix = Number(myLensUi.strength.value);
   syncMyLens(); // draw() coalesces the drag into one undo step, like every slider
+  restripOpen(); // the photograph's tile is a claim about its correction too
 });
 myLensUi.bypass.addEventListener("click", () => {
   if (!myLens) return;
   params.lensBypass = !params.lensBypass;
   syncMyLens();
   flushRecord(); // one press = one undo step
+  restripOpen();
 });
 myLensUi.forget.addEventListener("click", () => {
   if (!myLens) return;
@@ -2535,6 +2572,7 @@ function cloneParams(p: EditParams): EditParams {
     forceBalance: p.forceBalance ?? false,
     hsFix: p.hsFix ?? 0,
     hsBypass: p.hsBypass ?? false,
+    lensPick: p.lensPick ? { ...p.lensPick } : null,
     vignette: p.vignette,
     clarity: p.clarity,
     dehaze: p.dehaze,
@@ -2628,6 +2666,14 @@ function applySnapshot(s: Snapshot) {
   params.forceBalance = c.forceBalance ?? false;
   params.hsFix = c.hsFix ?? 0;
   params.hsBypass = c.hsBypass ?? false;
+  // The pick from the SNAPSHOT directly, like the LUT below: an edit stored
+  // before the pick was part of the edit has none, and that must mean no pick,
+  // never the live photograph's. The card follows it here, so Undo, Reset and
+  // a return all put the lens back to what the edit says (085's
+  // follow-through). No control holds it, so syncFromUI never reads it back.
+  params.lensPick = s.params.lensPick ? { ...s.params.lensPick } : null;
+  hotspotFromPick();
+  syncLensTexture();
   params.vignette = c.vignette;
   params.clarity = c.clarity ?? 0;
   params.dehaze = c.dehaze ?? 0;
@@ -2755,6 +2801,7 @@ function undo() {
   recordTimer = 0;
   updateEditButtons();
   persistOpenEditSoon();
+  restripOpen(); // the tile is a claim about the edit Undo just changed
 }
 
 function redo() {
@@ -2769,6 +2816,7 @@ function redo() {
   recordTimer = 0;
   updateEditButtons();
   persistOpenEditSoon();
+  restripOpen();
 }
 
 function resetEdit() {
@@ -2776,6 +2824,7 @@ function resetEdit() {
   flushRecord(); // settle current edits so Reset itself is undoable
   applySnapshot(baseline);
   persistOpenEditSoon();
+  restripOpen();
 }
 
 undoBtn.addEventListener("click", undo);
@@ -3261,15 +3310,30 @@ function lookLabel(key: keyof typeof LOOKS): string {
   return btn?.childNodes[0]?.textContent?.trim() || key;
 }
 
+/** THE CONTROL A MIRROR STANDS FOR, asked at the moment it is used.
+ *  @param id  the id a step declares (`data-mirror`).
+ *  @returns that element, except for the lens strength: while the reader's own
+ *    profile matches the open photograph, their card owns the correction and the
+ *    shipped card's Strength is superseded and moves nothing, so the lens step
+ *    stands for the own card's Strength (085's follow-through). Null when
+ *    nothing has that id. What the result must satisfy: it is the control whose
+ *    value reaches `params.lensFix` for the lens step, so the copy shows and
+ *    drives the correction on screen. Consumers: the copy's listeners,
+ *    `syncMirrors` and `lensStrengthTarget`. */
+function mirrorPrimary(id: string): HTMLInputElement | HTMLButtonElement | null {
+  if (id === hsUi.strength.id && myLens) return myLensUi.strength;
+  return document.getElementById(id) as HTMLInputElement | HTMLButtonElement | null;
+}
+
 /** Build the panel's rows for a look: one mirror per declared step, bound to
- *  the tab's own control by id. A step whose control does not exist is skipped
- *  rather than rendered dead. */
+ *  the tab's own control (`mirrorPrimary`). A step whose control does not
+ *  exist is skipped rather than rendered dead. */
 function renderFinish(key: keyof typeof LOOKS): void {
   for (const o of mirrorWatch) o.disconnect();
   mirrorWatch.length = 0;
   finishSteps.replaceChildren();
   for (const st of LOOKS[key].finish ?? []) {
-    const primary = document.getElementById(st.id) as HTMLInputElement | HTMLButtonElement | null;
+    const primary = mirrorPrimary(st.id);
     if (!primary) continue;
     const row = document.createElement("div");
     row.className = "finish-step";
@@ -3279,8 +3343,11 @@ function renderFinish(key: keyof typeof LOOKS): void {
       const m = document.createElement("input");
       m.type = "range"; m.id = "finish-" + st.id; m.dataset.mirror = st.id;
       m.min = primary.min; m.max = primary.max; m.step = primary.step; m.value = primary.value; m.disabled = primary.disabled;
-      m.addEventListener("input", () => { primary.value = m.value; primary.dispatchEvent(new Event("input", { bubbles: true })); });
-      m.addEventListener("change", () => { primary.dispatchEvent(new Event("change", { bubbles: true })); });
+      // THE TARGET IS ASKED ON EACH MOVE, not held from the build: the lens
+      // step's control changes with the photograph (mirrorPrimary).
+      const to = () => mirrorPrimary(st.id) as HTMLInputElement | null;
+      m.addEventListener("input", () => { const t = to(); if (!t) return; t.value = m.value; t.dispatchEvent(new Event("input", { bubbles: true })); });
+      m.addEventListener("change", () => { to()?.dispatchEvent(new Event("change", { bubbles: true })); });
       label.append(m);
       row.append(label);
     } else {
@@ -3310,7 +3377,7 @@ function renderFinish(key: keyof typeof LOOKS): void {
 function syncMirrors(): void {
   if (finishPanel.hidden) return;
   finishSteps.querySelectorAll<HTMLElement>("[data-mirror]").forEach((m) => {
-    const primary = document.getElementById(m.dataset.mirror ?? "") as HTMLInputElement | HTMLButtonElement | null;
+    const primary = mirrorPrimary(m.dataset.mirror ?? "");
     if (!primary) return;
     // The RANGE too: a picked mask gives a control its own range (042), and a
     // mirror left on the whole photo's would show the value on the wrong scale.
@@ -11063,6 +11130,9 @@ function establishFreshEdit() {
   params.recover = base.recover;
   params.swapRB = base.swapRB;
   params.denoise = estimateDenoise(src);
+  // A photograph opens with no lens picked by hand: a pick is this edit's, and
+  // the last photograph's must not reach this one (085's follow-through).
+  params.lensPick = null;
   lookBias = [1, 1, 1];
   lookWb = null;
   // NORMALISE THE MEASUREMENTS TO WHAT THE SLIDERS CAN HOLD, BEFORE ANYTHING
@@ -11163,6 +11233,7 @@ function establishFreshEdit() {
   forceBalance: false,
   hsFix: lensStrengthAtOpen(currentExif, "shipped"),
   hsBypass: false,
+  lensPick: null,
     vignette: 0,
     clarity: 0,
     dehaze: 0,
@@ -11458,6 +11529,13 @@ interface SessionPhoto {
 interface LiveEdit {
   snapshot: Snapshot;
   baseline: Snapshot;
+  /** WHERE A DOUBLE TAP SENDS EACH SLIDER AND CURVE POINT FOR THIS PHOTOGRAPH:
+   *  copies of `sliderDefaults` and `toneDefaults` as they stood when it was
+   *  left. They are captured only on a fresh open, so without these a return
+   *  to a photograph kept the defaults of whichever one was opened fresh last
+   *  (085's follow-through). Absent on edits held before they were kept. */
+  defaults?: [string, string][];
+  toneDefaults?: number[][];
   settled: Snapshot;
   undo: Snapshot[];
   redo: Snapshot[];
@@ -11656,6 +11734,8 @@ function captureActiveEdit(): Promise<void> {
   liveEdits.set(id, {
     snapshot: snapshot(),
     baseline: baseline ?? snapshot(),
+    defaults: [...sliderDefaults],
+    toneDefaults: toneDefaults.map((t) => [...t]),
     settled: settled ?? snapshot(),
     undo: [...undoStack],
     redo: [...redoStack],
@@ -11745,6 +11825,9 @@ function restoreLiveEdit(st: LiveEdit) {
   baseline = st.baseline;
   settled = st.settled;
   origParams = st.orig;
+  // This photograph's own double-tap targets, not the last fresh open's.
+  if (st.defaults) { sliderDefaults.clear(); for (const [k, v] of st.defaults) sliderDefaults.set(k, v); }
+  if (st.toneDefaults) { toneDefaults.length = 0; for (const t of st.toneDefaults) toneDefaults.push([...t]); }
   clearTimeout(recordTimer);
   recordTimer = 0;
   applyView(st.rot, st.flip); // before the repaint, so the frame is drawn the right way up
@@ -13833,6 +13916,11 @@ async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
     const img = await decodeWithLens(imported);
     const own = ownEdit(view);
+    // THE CLAIM IS TAKEN WITH THE EDIT IT IS DRAWN FROM, not after the render:
+    // a lens move made while the tile renders and saves would otherwise stamp
+    // a picture of the old strength with the new one, and no later check would
+    // ever find it stale (085's follow-through, a review finding).
+    const stamp = stampFor(view);
     // THE LENS CORRECTION WAS MISSING FROM EVERY STRIP TILE, so a tile wore
     // the hot spot the photograph itself does not have — a bright disc in the
     // middle of the tile and none in the picture it opens into, which reads
@@ -13840,7 +13928,7 @@ async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
     // exactly this (its own comment says "every path that renders a frame
     // other than the one the reader has open") and the quick-look grid has
     // always passed it; this path never did.
-    const thumb = await makeThumb(img, 260, lensCurveFor(imported), own, exifOf(imported));
+    const thumb = await makeThumb(img, 260, lensCurveFor(imported, own?.params.lensPick), own, exifOf(imported));
     if (gen !== thumbPass) return;
     if (!sessionPhotos.some((p) => p.id === view.id)) return; // dropped while we worked
     if (thumb.byteLength) {
@@ -13849,7 +13937,7 @@ async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
       await Session.setThumb(view.id, thumb).catch(() => {});
     }
     view.thumbState = "real";
-    view.thumbGrade = stampFor(view); // what this picture is a claim about
+    view.thumbGrade = stamp; // what this picture is a claim about
     updateSessionStrip();
   } catch {
     // A thumbnail is not worth failing an open over — the tile keeps the
@@ -14014,7 +14102,13 @@ function stampFor(view: { id: string; edit: string | null }): string {
   const own = ownEdit(view);
   if (!own) return gradeStamp();
   const p = own.params;
-  return stampOf(p, own.activeLook, own.lookBias, false);
+  // AND THE LENS, beside the grade and never inside `stampOf` (085's
+  // follow-through). A tile drawn from an own edit takes its correction from
+  // that edit (`makeThumb`), so moving Strength or Bypass, or picking a lens,
+  // makes the tile a different claim; `stampOf` also answers whether a look was
+  // changed by hand, and a lens move is not a grade.
+  return JSON.stringify([stampOf(p, own.activeLook, own.lookBias, false),
+    p.lensFix ?? 0, !!p.lensBypass, p.hsFix ?? 0, !!p.hsBypass, p.lensPick ?? null]);
 }
 
 /** A look (or any grade move) changed: every tile is now showing a picture the
@@ -14079,6 +14173,50 @@ function restripForGrade(): void {
   }, 900);
 }
 
+/** THE OPEN PHOTOGRAPH'S OWN TILE, asked again — and only that one (085's
+ *  follow-through, 2026-09-30).
+ *
+ *  Takes nothing and returns nothing. After the same 900 ms quiet as
+ *  `restripForGrade`, it marks the tile of each photograph that was open when
+ *  it was called waiting, when that tile's stamp no longer matches its edit,
+ *  and starts the redraw pass, which then
+ *  waits for the reader to stop as every redraw does. Consumers: the lens
+ *  controls (Strength, Bypass, a pick, on both cards) and Undo, Redo and
+ *  Reset, which change the open photograph's edit and nothing else.
+ *
+ *  WHY NOT `restripForGrade`: that one checks every tile, and a tile for a
+ *  photograph not yet opened is stamped with the LIVE grade, so after any grade
+ *  slider move it marks every unopened tile stale. Called from a lens move, it
+ *  would redraw every unopened tile whenever a grade slider had moved since
+ *  they were drawn (read from the code, not measured). What the result must
+ *  satisfy: no tile is marked here but one whose photograph was open when it
+ *  was called. */
+let openRestripTimer = 0;
+/** The photographs asked about since the timer was last set: taken when asked,
+ *  not when it fires, so a switch inside the 900 ms checks the photograph whose
+ *  edit changed rather than the one that happens to be open by then. */
+const openRestripIds = new Set<string>();
+function restripOpen(): void {
+  if (activePhotoId) openRestripIds.add(activePhotoId);
+  armOpenRestrip();
+}
+/** The timer alone, so waiting for a set to come in adds no photograph. */
+function armOpenRestrip(): void {
+  clearTimeout(openRestripTimer);
+  openRestripTimer = window.setTimeout(() => {
+    if (adding) { armOpenRestrip(); return; } // come back when the set is in
+    const ids = [...openRestripIds];
+    openRestripIds.clear();
+    if (sessionPhotos.length < 2) return;
+    let stale = 0;
+    for (const v of sessionPhotos) {
+      if (v.id === "lone" || !ids.includes(v.id)) continue;
+      if (v.thumbGrade !== stampFor(v)) { v.thumbState = "waiting"; stale++; }
+    }
+    if (stale) { thumbIdleGate = true; void realThumbnails(); }
+  }, 900);
+}
+
 /** DOUBLE-TAP A SLIDER TO PUT IT BACK. The convention every photo editor
  *  shares — Lightroom and Capture One both reset a control on a double click —
  *  and the reason it matters here is that most of these sliders do NOT default
@@ -14125,11 +14263,10 @@ function captureSliderDefaults(): void {
 
 /** WHERE A DOUBLE TAP SENDS A LENS STRENGTH SLIDER: the opening default,
  *  worked out at the moment of the tap (decision 085). Not the value in
- *  `sliderDefaults`: that is captured only at a fresh open (establishFreshEdit),
- *  so after a return to a photograph from memory it still holds whichever
- *  photograph was last opened fresh, matched or not; and Aerochrome's
- *  finishing copy is built when the look is picked, after any capture, so it
- *  has no captured default at all and its double tap did nothing.
+ *  `sliderDefaults`: that is captured at a fresh open (establishFreshEdit), and
+ *  a hand pick or the reader's own profile can change the answer after it; and
+ *  Aerochrome's finishing copy is built when the look is picked, after any
+ *  capture, so it has no captured default at all and its double tap did nothing.
  *  @param el  the slider tapped: the shipped card's Strength, Aerochrome's
  *    finishing copy of it (`data-mirror`), or the reader's own card's.
  *  @returns "1" when that card has a lens to correct (`hotspotState` for the
@@ -14138,12 +14275,15 @@ function captureSliderDefaults(): void {
  *    keeps its own rule. What the result must satisfy: it equals what
  *    `lensStrengthAtOpen` opens a matched frame at, so a double tap and a
  *    fresh open agree. The lens-order walk holds it for the shipped card's
- *    slider on a matched frame (d) and for the finishing copy (d2, the check
- *    that fails without this function); the reader's own card and the "0"
- *    branch are held by nothing yet. */
+ *    slider on a matched frame (d), for the finishing copy (d2, the check
+ *    that fails without this function), for the "0" branch after Reset (e2)
+ *    and for the copy while the reader's own card owns the correction (g). */
 function lensStrengthTarget(el: HTMLInputElement): string | undefined {
-  if (el === hsUi.strength || el.dataset.mirror === hsUi.strength.id) return hotspotState ? "1" : "0";
-  if (el === myLensUi.strength) return myLens ? "1" : "0";
+  // The finishing copy answers for the card it stands for (mirrorPrimary):
+  // the reader's own while their profile matches, the shipped one otherwise.
+  const card = el.dataset.mirror === hsUi.strength.id ? mirrorPrimary(hsUi.strength.id) : el;
+  if (card === hsUi.strength) return hotspotState ? "1" : "0";
+  if (card === myLensUi.strength) return myLens ? "1" : "0";
   return undefined;
 }
 
@@ -18788,7 +18928,7 @@ async function buildLutGrid(): Promise<void> {
   if (sig === lutGridSig && lutGrid.querySelector(".lut-tile")) { markLutGrid(); return; }
   let base: ImageData;
   try {
-    const buf = await makeThumb(current, 184, lensCurveFor(currentFile), own, currentExif);
+    const buf = await makeThumb(current, 184, currentLensCurve(), own, currentExif); // the open photograph's own curve, a picked lens included
     const bmp = await createImageBitmap(new Blob([buf], { type: "image/jpeg" }));
     const c = document.createElement("canvas");
     c.width = bmp.width;

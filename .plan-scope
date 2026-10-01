@@ -1,21 +1,30 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=a054a03153d6182f
-diffhash=71644abc148b3d08
-verdict=IN-SCOPE: step 0's doctrine drift adopted, and the hub pin moved to 295ff9a with it
-# IN-SCOPE: The diff only adopts the doctrine drift and moves the hub pin from 05008dd to 295ff9a, and the plan names both as the first docs commit of this work.
+diffhash=234465004edf03df
+verdict=IN-SCOPE: 085's five lens-slider fixes, the review's three, the open-tile re-check, walk checks and record section, as steps 1 to 8
+# IN-SCOPE: The diff carries out plan steps 1 to 8 for defects A to E: a new `lensPick` field, a lens-aware tile stamp, the open-tile re-check, `mirrorPrimary`, defaults kept per photograph, the walk checks, record 085's new section and preview version 67. Nothing in it goes past the plan.
 # 
-# Plan lines relied on (/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md):
-# - Line 9 (Context, amended): "The doctrine drift is adopted, with the hub pin moved to 295ff9a to match it."
-# - Line 25 (Step 0): "Doctrine drift first. `doctrine-sync.mjs --repo .` says the hub moved 05008dd to 295ff9a. That is lessons 372 and 373 only, and DOCTRINE.md is unchanged. Read them, then `--adopt`, in the first docs commit."
-# - Line 88 (Verification): "Every commit gate exits 0, with a scope watcher's IN-SCOPE verdict recorded before each commit."
+# On the point asked: only `restripOpen` adds a photograph to `openRestripIds`. The one `add` is at src/main.ts:14200, inside `restripOpen`. `armOpenRestrip` only sets the timer. It is called from two places: `restripOpen` (14201), and its own timer when it re-arms while a set is still being added (14207). That path adds nothing.
 # 
-# Checked:
-# - **What changed.** Nothing is staged. Two files are modified on branch claude/laughing-edison-x0pdv8, one line each.
-#   - `.doctrine-sync`: 05008dda4ce959f6a3e7d30cfb00c6f55a6f0185 becomes 295ff9a7fab237512c707fd07a09bf3578c8e5a7.
-#   - `.github/workflows/gates.yml`: the `hub-gates.yml@` pin moves from 05008dda… to 295ff9a7fab237512c707fd07a09bf3578c8e5a7. The `with:` inputs are unchanged.
-# - **The new pin.** `git rev-parse 295ff9a` gives exactly that full SHA. `branch -r --contains` lists `origin/main`, so the pin is on the hub's main and not left behind by the history rewrite. 05008dd is an ancestor of 295ff9a.
-# - **What the hub changed between the two pins.** Only LESSONS.md plus lessons/372 and lessons/373. DOCTRINE.md is untouched, as step 0 says.
-# - **The commit subject.** "Internal: the doctrine is read up to the hub's 295ff9a, and the shared gates run from that commit" starts with `Internal:`. That matches an internal subject, and both files are dotfiles or workflow files, so it needs no reader-facing prefix.
+# `restripOpen` is called from eight places, all of them lens controls, the pick, Undo, Redo and Reset:
+# - Shipped card's Strength input: 643
+# - Shipped card's Bypass: 649
+# - The pick: 690
+# - Own card's Strength input: 1127
+# - Own card's Bypass: 1134
+# - Undo: 2804
+# - Redo: 2819
+# - Reset: 2827
 # 
-# Not checked: the plan cannot show whether lessons 372 and 373 were actually read before the `--adopt`. That step is the session's to confirm.
+# Aerochrome's finishing copy reaches it only by sending an input event to one of the two Strength sliders. `restoreLiveEdit`, `activateCurrent` and `applySnapshot` never call it, so a return to a photograph or a resume adds nothing.
+# 
+# Untrue or outside the plan: none. Three places where the diff differs from the plan's wording, none outside it:
+# - `syncFromUI` and `syncToUI` are not touched. No control holds `lensPick`, and `syncToUI` already calls `updateHotspotUI`.
+# - `batchParamsFor` is not changed. The record says why, and that is true: a batch builds each file from a fresh opening (`importFile` then `batchParamsFor`), never from an edit.
+# - `buildLutGrid` now uses `currentLensCurve()`. It draws from the open photograph's own edit, so it falls under step 3.
+# 
+# The record's claims that I checked against the code hold:
+# - A Hue or Contrast move never calls `restripForGrade`.
+# - `lookFrom` leaves `lensPick` out of a saved look.
+# - `ownEdit` reads the live edit for the open photograph.

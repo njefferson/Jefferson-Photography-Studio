@@ -154,6 +154,18 @@ partly, 1 not supported at the page it was credited to, and 4 unreachable.
   www.spiedigitallibrary.org and www.cloudynights.com did the same; Hagen's
   abstract was read through Crossref instead, and claim 26 was read on Shelley's
   page alone.
+- **Where a hand-chosen lens profile is kept** (2026-09-30, one search in two
+  queries, for the follow-through below; what the search summaries say, the
+  pages not opened). They say Lightroom keeps lens profile corrections in each
+  photo's own develop settings, and Reset returns a photo to the defaults
+  (mastering-lightroom.com, "The Lens Corrections Panel Explained";
+  lightroomqueen.com, "Lens correction in develop module"), and that darktable's
+  lens correction module lets the lens be chosen by hand, with the module's
+  settings per image, in its history; a full history copy leaves this module out,
+  and it is copied only on its own (darktable 4.6 user manual, "lens
+  correction"; darktable issue 11265). So a pick belongs to the photograph's
+  edit, Reset takes it back, and a full history copy does not carry it to
+  another photograph.
 
 ## Weighed against
 
@@ -664,6 +676,93 @@ falls on three of the four tree frames and not on NIR_1703.
   patch shows; it is one box on one frame.
 
 **Not tested.** Any remedy; any other look; anything on a device.
+
+## Found while building, and fixed after
+
+Five defects in the slider were found while the chosen option was built. They
+shipped to production in v2.64.31 as found and not fixed, and were fixed on
+2026-09-30. None of them changes an option above. Each fix has a check in
+`tools/lens-order-walk.mjs`, and each of those checks failed on production's
+build (3bb7e37) before the fix. Each fix was then planted out of the fixed
+build, and exactly its own checks failed.
+
+- **A lens picked by hand was not part of the edit (e).** The pick set the card's
+  state (`hotspotState`) and nothing in `EditParams`. Undo left the lens picked at
+  0, and a return to the photograph asked for the lens again. The pick is now
+  `EditParams.lensPick`, the lens and the focal length, and `applySnapshot`
+  derives the card from it (`hotspotFromPick`). So Undo, Redo, Reset, a return
+  and a resumed session all say what the edit says. It is per-shot and rides no
+  saved look, as the editors in Looked up keep it.
+- **After a pick, Reset and the double tap disagreed (e2).** Reset went to 0 with
+  the lens still picked, and a double tap then went to 1. This follows from the
+  first fix: Reset now takes the pick back, and both give 0.
+- **The tile did not follow the lens (f).** A tile was redrawn only when its
+  grade stamp moved, and the stamp carried no lens. A tile drawn from an edit
+  also took its curve from the file's EXIF, which on a picked photograph names
+  nothing. The tile stamp now carries the strength, bypass and pick (`stampFor`,
+  not `stampOf`, which also answers whether a look was changed by hand). The
+  lens controls ask for the open photograph's tile to be checked
+  (`restripOpen`), and a tile takes the picked lens's curve (`lensCurveFor`). The colour-file grid, drawn from the open
+  photograph's own edit, now takes the open photograph's curve
+  (`currentLensCurve`), a picked lens included. A batch needs no change: it is
+  built from each file's fresh opening (`batchParamsFor`), never from an edit,
+  so it never carries a pick. Measured on a 32 by 32 reading of the tile, the
+  pick at 1 and at 0 differ by 1.01 levels; with the curve planted out, by 0.00.
+- **Aerochrome's finishing copy moved nothing while the reader's own profile was
+  in use (g).** It was wired to the shipped card's Strength, which that profile
+  supersedes. It now asks at each move which card owns the correction
+  (`mirrorPrimary`).
+- **After a return, a double tap on other sliders went to the last fresh open's
+  value (h).** The defaults were captured only at a fresh open. Each
+  photograph's are now kept with its live edit and restored on a return.
+  Measured on Exposure: opened at 615, the other frame at 687, and a double tap
+  after the return went to 687 before and to 615 after.
+
+A review of the change, three reviewers with a skeptic on each finding, confirmed
+three more defects in the code it touches. All three were fixed before the commit:
+- **Undo, Redo and Reset never asked the strip to look again**, so a tile kept
+  the correction those had just taken off. Now they ask for the open
+  photograph's tile to be checked, and the walk holds it:
+  Undo of a Strength move redraws the tile, and with the call planted out it
+  does not. That check was added after the review, so it was not run on
+  production's build; it was made to fail by planting its fix out.
+- **A tile was stamped after it was drawn and saved**, so a lens move made in
+  that window left a picture of the old strength marked as current, and nothing
+  would ever redraw it. The stamp is now taken with the edit the tile is drawn
+  from. No walk check holds this one: the window is a render's length, and no
+  check here times a move into it.
+- **"Forget this profile" left Aerochrome's copy of the slider on the forgotten
+  profile's value.** The copy is now read again whenever the reader's own
+  profile changes. No walk check holds this one either.
+
+One finding was judged not a defect: each lens move restarts the redraw pass,
+which repeats work, but every tile still ends up drawn from the right edit.
+
+**What it costs.** The preview version moves from 66 to 67, because the new
+field is in `src/pipeline.ts`, which the preview gate hashes whole. So every
+quick-look preview stored on a device is rendered again once, the first time it
+is needed after the update. A move of the lens strength now also marks the
+open photograph's tile for a redraw, which waits for the reader to stop, as
+every tile redraw does. Undo, Redo and Reset now ask for the same check after
+any change, not only a lens one. By the code, that redraws the open
+photograph's tile when the edit they land on differs, in the grade or the lens,
+from the one the tile was drawn under, which a move of a grade slider such as
+Hue or Contrast never asks for. No check measured this. These calls check the
+tile of the photograph that was open when they were made, and no other. The first version used the strip-wide check, and a scope watcher
+reading the code found the cost: a tile for a photograph not yet opened is
+stamped with the live grade, so after any grade slider move a lens move would
+have redrawn every unopened tile.
+
+**Not established.** Whether balance, exposure and highlight recovery have the
+same tile gap. A tile drawn from an edit takes them from that edit
+(`makeThumb`; denoise is not among them, every tile is drawn at 0), and the
+stamp that decides a redraw does not carry them, so by the code a move of one of
+them alone does not mark the tile stale. No check here measured it, and nothing
+here fixes it.
+
+**Found and not fixed, older than this change.** Adding or forgetting the
+reader's own profile changes the curve a tile takes (`lensCurveFor` reads the
+stored profiles), and nothing asks the strip to look again when it happens.
 
 ## Rank
 
