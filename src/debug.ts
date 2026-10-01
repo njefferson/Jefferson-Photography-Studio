@@ -1630,7 +1630,7 @@ async function aCanvasTheSizeOfTheFrame(): Promise<void> {
   const cv = document.createElement("canvas");
   cv.width = 1;
   cv.height = 1;
-  const probe = cv.getContext("webgl2", { preserveDrawingBuffer: true });
+  const probe = cv.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false, depth: false, stencil: false });
   if (!probe) { row("A drawing surface the size of the frame", "WebGL2 unavailable", "This device has no WebGL2 at all, so nothing below applies."); return; }
   const lose = () => { try { probe.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* already gone */ } };
 
