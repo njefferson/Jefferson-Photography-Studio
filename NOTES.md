@@ -54,6 +54,59 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**v2.64.34 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-30 (d544c50).** Production's code (v2.64.31) plus 085's follow-through,
+and the doctrine read up to the hub's 295ff9a with the shared gates pinned
+there (5a9e163). Staging's offline worker was read naming d544c50 as
+`ips-2.64.34`, and the Gates run (1012, on the new pin) and the deploy (960)
+for it both passed. The go to promote was given the same day, before any device
+pass.
+- **A lens picked by hand stays with the photograph (085).** Undo takes the
+  pick back, Redo brings it, Reset returns to how the photograph opened, and a
+  return to the photograph or a resumed session keeps it with its strength. The
+  photograph's tile shows the picked lens. Before, the pick lived beside the
+  edit: Undo and Reset left it picked at 0, a return asked for the lens again,
+  and after Reset a double tap went to 1.
+- **The tile follows the lens.** Picking a lens, moving Strength or Bypass on
+  either card, and Undo, Redo and Reset ask for the open photograph's tile to be
+  checked, and it is redrawn when the grade or the lens it was drawn under no
+  longer matches the edit.
+- **Aerochrome's copy of the lens slider works with your own profile.** It drove
+  the shipped card, which your own profile supersedes, so it moved nothing. It
+  also follows a forgotten profile now.
+- **A double tap after a return goes to that photograph's own opening value.**
+  It went to the value of whichever photograph was last opened fresh.
+- Checked: each of the five fixes has a check in the lens-order walk that
+  failed on production's build. Of the review's three, the Undo tile check was
+  added afterwards and made to fail by planting its fix out instead, and two have
+  no walk check: the tile stamped with the edit it is drawn from, and the copy
+  following a forgotten profile. The walk passes 40 of 40 on this build, and
+  each fix with a check, planted out, turns exactly its own checks red. The
+  agreement, double-tap, tile and accessibility walks pass on this build.
+  A review (three reviewers, a skeptic on each finding) confirmed three more
+  defects in the touched code, all fixed: Undo, Redo and Reset did not ask for
+  the tile to be checked; a tile was stamped after it was drawn, so a lens move
+  in that window left it stale for good; and "Forget this profile" left the
+  finishing copy on the forgotten value. The record is 085's "Found while
+  building, and fixed after".
+- **Its true costs.** Every quick-look preview stored on a device is rendered
+  again once after the update, because the preview version moved from 66 to 67
+  (the new field is in `src/pipeline.ts`, which the preview gate hashes whole).
+  And the open photograph's tile is redrawn after a lens move, Undo, Redo or
+  Reset when the grade or the lens it was drawn under no longer matches the
+  edit; the redraw waits for you to stop, as every tile redraw does.
+
+**Found and not fixed:** whether balance, exposure and highlight recovery have
+the same tile gap is not measured (by the code, a move of one alone does not
+mark the tile); adding or forgetting your own profile does not ask the strip to
+look again; and a redraw pass whose render is discarded can leave a tile
+waiting until the next check, which is older than this change.
+
+**The device pass.** On the iPad: open a set, pick a lens by hand on a photo
+the app does not recognise, press Undo, then Redo, then go to another photo and
+back. The lens should still be named, at the strength it had, and the tile
+should show it.
+
 **Nothing is waiting to be promoted, 2026-09-30.** v2.64.26 went to production
 on the go the same day, by pull request 180 opened from `staging` itself and
 rebase-merged as 3bb7e37. Production serves the offline copy `ips-2.64.31`,

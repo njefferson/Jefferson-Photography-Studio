@@ -60,8 +60,10 @@
 // it, where it left the strength where it was set.
 //
 // THE SLIDER'S OTHER PATHS (085's follow-through, 2026-09-30). Each of these
-// was found while building 085 and shipped as found and not fixed; each was
-// made to fail on production's build, 3bb7e37, before its fix.
+// was found while building 085 and shipped as found and not fixed; each fix's
+// own check failed on production's build, 3bb7e37, before the fix. The check
+// that Undo redraws the tile was added after a review and was made to fail by
+// planting its fix out instead.
 //
 // (e) A LENS PICKED BY HAND IS PART OF THE PHOTOGRAPH'S EDIT. On a practice
 // frame, which carries no lens and so matches nothing: Undo takes the pick back
