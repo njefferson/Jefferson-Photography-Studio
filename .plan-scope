@@ -1,37 +1,57 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=5f18d5948ae4941a
-diffhash=eadb9636c72acf45
-verdict=IN-SCOPE: records 069, 071 and 086 with their NOTES lines, plan steps 2 to 4, every claim matched to its source after four checks; docs only
-# IN-SCOPE: the round-4 delta makes only the two corrections, plus the index and hunk-header lines they shift; both now match research086.txt, nothing else moved since round 3, and `decisions-check` exits 0.
+diffhash=6f8aa4debb731a92
+verdict=IN-SCOPE: the test-page fix (plan step 5) judged in scope after four checks, plus its one generated module-map line
+# IN-SCOPE: the staged commit is the step-5 src/debug.ts diff, unchanged from the one already judged in scope (staged-fix4.diff, byte-identical), plus the one generated module-map line it requires (src/debug.ts 2038 -> 2115 lines by the tool's own count); architecture-check passes; only those two files staged.
+# IN-SCOPE: the fourth fix changes only the two `freshBuild` sentences and the index line. Both now describe only what the fresh context did. The rest is byte-identical to what the third check judged, and the new plant fails on the previous build and passes on the final one.
+# 
+# ## Plan read
+# - I read `/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md` in full (139 lines) before anything else. This is step 5: `timedBuild` and the row loop in `src/debug.ts`, with logs, time, `getError`, the context-loss listener and the fresh-context retry. Step 6's plants and walks are the evidence.
 # 
 # ## The delta
-# - I diffed `docs-round3.diff` against `docs.diff` myself. The output is byte-identical to `docs-round4-delta.txt`.
-# - All of it falls in 069's section:
-#   - its `index` line (`ee0806a..c3fc47b` → `ee0806a..d8b8863`);
-#   - its two Ghonima-bullet and PixInsight lines;
-#   - five hunk headers, shifted by the one line each correction adds (`+43`→`+44`, `+20`→`+21`, later offsets +1 or +2).
-# - NOTES, 071 and 086 are unchanged from what the third check judged.
+# - `diff staged-fix3.diff staged-fix4.diff` differs in exactly three lines: the `index` line and the two `freshBuild` catch sentences. `fix4-delta.txt` shows the same thing.
+# - `git diff --cached -- src/debug.ts` matches `staged-fix4.diff` byte for byte, and the working-tree `src/debug.ts` matches the staged blob.
+# - Only `src/debug.ts` is staged. The docs files (NOTES, 069, 071, 086) are unstaged and are not part of this commit.
 # 
-# ## Correction 1: the PixInsight phrase in 069
-# - Now reads: a tutorial on its multiscale gradient correction "that does not describe how DynamicBackgroundExtraction or AutomaticBackgroundExtractor work."
-# - This matches research086.txt line 1 (pixinsight.com refusal): "the page had no DBE or ABE mechanics". It no longer claims the page has nothing on those tools.
+# ## The two sentences
+# - **Lost context:** "Built again in a fresh context, and that context was lost during the build: …"
+#   - `freshBuild` already returns early if the fresh context is lost before the build.
+#   - The catch is reached only by a throw from `timedBuild`. That means the link-failure throw, or a TypeError when a lost context returns a null shader or program.
+#   - After a successful link, a lost context cannot throw: `bindSamplers` loops zero times, and neither prep passes null where null is refused. So "during the build" is accurate.
+# - **Did not build:** "Built again in a fresh context, and it did not build there: …"
+#   - Without "either", it no longer implies the first build failed the same way. That makes it true under both "did not build" and "did not draw (context lost)".
+# - Both sentences meet the contract `freshBuild` states for itself: they "must say what the fresh context did".
+# - One wording note, not blocking: "Built again …, and it did not build there" uses "Built again" to mean the attempt. Every branch uses this pattern, and the previous checks accepted it.
 # 
-# ## Correction 2: the Ghonima bullet's "ratio" in 069
-# - Now reads: Shields et al. 2010 "used the spatial variance of the pixel's ratio to the library's to help tell heavy haze from thin cloud".
-# - This matches claim [16] (research086.txt lines 96–99): perturbation ratio Prt = RBR/CSL, and "the spatial variance in this perturbation ratio". Two lines up, the bullet already defines the ratio as "a pixel's red/blue ratio", so "the pixel's ratio to the library's" is RBR/CSL without ambiguity.
-# - Cosmetic only: the rewrap leaves a short line ("its own algorithm, as described,"). Nothing to fix.
+# ## Plant and harness
+# - `rows.mjs` has six arms (plain, linkonly, lost, silent, drawlost, freshlost). Its MADE TO FAIL line names `freshlost` and predicts a FAIL on the previous build.
+#   - The header usage comment still lists four arms. That is cosmetic in a scratch file.
+# - **`freshlost` plant:** the shared context refuses the texture row's link. The retry's own context is then lost at `linkProgram`, and the check asserts "lost during the build" with no "lost too" or "there either".
+# - **`prev3-freshlost.log` (previous build):** 2 FAIL, as predicted. The row read "and that context was lost too".
+# - **Final build, all six arms "all as expected":**
+#   - plain: eight rows timed;
+#   - linkonly: "program: PLANTED-LINK-REFUSAL" plus time and GL error, and "and it did not build there";
+#   - lost: fresh context built it, and rows 7 and 8 say "not run" naming the texture row;
+#   - silent: rows 6 to 8 read "the driver gave no reason; no GL error" and the fresh context built each;
+#   - drawlost: "did not draw (context lost)", rebuilt and drawn in a fresh context;
+#   - freshlost: "did not build", then "that context was lost during the build: … GL error 37442", with rows 7 and 8 still timed.
+# - The second sentence has no plant run on the previous build, but its check would have been red there. The previous bundle contains "it did not build there either" once and "and it did not build there" zero times, and the `linkonly` regex requires the latter.
 # 
-# ## Working tree against docs.diff
-# - The working-tree diff of NOTES, 069 and 071, plus untracked 086 against /dev/null, is byte-identical to `docs.diff`.
-# - Blob hashes match its index lines: 08e0c5d, d8b8863, 55cfeb0, 2cb84db.
-# - `src/debug.ts` is staged separately and is not in `docs.diff`. That fits the plan's split (step 5 rides to staging, step 8 is the docs-only commit to main).
+# ## Final build
+# - In `dist-final/assets/debug-lD0ZT6sF.js.map`, the `sourcesContent` for `../../src/debug.ts` is byte-identical to the staged `src/debug.ts`.
+# - The bundle contains each new sentence once and "lost too" / "there either" zero times. The previous build's bundle (`dist-new3`) still contains "lost too", which matches its FAIL.
+# - `diff -rq` shows the repo's `dist/` and `dist-final` are identical. That matters because `walks4.sh` serves the repo's `dist/`.
 # 
-# ## The gate
-# - `node tools/decisions-check.mjs` exited 0. Every "ok" line passed.
-# - The rank print places 086 at 7, directly below 071 at 6, as 086's Rank argues.
-# - It printed backlog notices only (unlooked, undeclared pairs, the practice-frame backlog).
-# - `git status --porcelain --ignored` was identical before and after the run.
-# - I edited nothing. I deleted the two temp files I made in the scratchpad; nothing of mine is left.
+# ## Untouched and unexported
+# - `git diff HEAD -- src/gl.ts src/main.ts` is empty.
+# - The staged diff adds no line containing `export`. `freshBuild` is module-private.
 # 
-# Files: `/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md`, `/tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/v10/docs.diff`, `/tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/v10/docs-round4-delta.txt`, `/tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/research086.txt`, `/home/user/Jefferson-Photography-Studio/docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md`
+# ## Walks, as found at 05:12:14
+# - `agreement4.log`: running. Every check so far reads `ok`, the last one "aimed: preview and export agree with a spatial stage aimed". Its `agreement-walk.mjs`, its Chromium and the `walks4.sh` server are all alive, about 120 s in.
+# - `a11y4.log`: not started.
+# - `offline4.log`: not started.
+# - `walks4.done`: absent. So no walk verdict exists yet, and step 6's "walks pass" is still open.
+# 
+# ## Left behind
+# - Nothing. The one temporary copy I made (`.w-staged-debug.ts` in the scratchpad) has been removed. I edited no file and started no process.

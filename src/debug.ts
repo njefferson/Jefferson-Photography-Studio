@@ -45,8 +45,13 @@ const NOT_MEASURED = /^(did not (build|draw)|not run|failed|refused|not availabl
  *  AND A ROW WHOSE VALUE IS ONE OF THE NOT_MEASURED WORDS CARRIES ITS REASON
  *  into the copy, on one line under it, because that reason can hold the
  *  driver's or the browser's own words: a PC reading of 2026-09-30 said "did
- *  not build" and nothing else, while the log that said why stayed on the
- *  screen. A measured row's copied line is exactly what it was. */
+ *  not build" and nothing else. (The next reading carried the reason line, and
+ *  it held no driver's words either. The driver may have given none, the
+ *  context may have died, or a fragment log holding only whitespace may have
+ *  hidden the program log, which `timedBuild` read only when the fragment log
+ *  was empty; reading every log, labelled, with the GL error and a build in a
+ *  fresh context, tells these apart.) A measured
+ *  row's copied line is exactly what it was. */
 function row(name: string, value: string, meaning: string, samples?: string) {
   const d = document.createElement("div");
   d.className = "dbg-row";
@@ -316,8 +321,9 @@ function bindSamplers(gl: WebGL2RenderingContext, prog: WebGLProgram): () => voi
  *  and returns its own undo; builds them, then draws once so the driver has to
  *  finish. Gives back the build and the first picture in milliseconds, and
  *  `err`, the GL error that draw raised (0 for none), so a "first picture" that
- *  never drew cannot pass for one; throws, with the driver's log, if the
- *  program did not build.
+ *  never drew cannot pass for one; throws if the program did not build, with
+ *  every one of the driver's logs that says anything, labelled, the time the
+ *  failed build took and the GL error read after it.
  *  `buildingThePictureCode` and `whatMakesTheBuildSlow` both read these two
  *  numbers against each other's, so they must stay one measurement.
  *  Everything queued before a run is finished first, so no run is billed for
@@ -343,12 +349,27 @@ function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string,
   const ok = gl.getProgramParameter(prog, gl.LINK_STATUS);
   const t1 = performance.now();
   if (!ok) {
-    // THE DRIVER'S OWN WORDS, so a rewritten variant that fails says why.
-    // One line, with no control characters: drivers end the log with a newline
-    // and a NUL, and the copied results put this under its row as one line.
-    const log = (gl.getShaderInfoLog(fs) || gl.getProgramInfoLog(prog) || "").replace(/[\u0000-\u001f\s]+/g, " ").trim().slice(0, 300);
+    // THE DRIVER'S OWN WORDS, EVERY LOG, LABELLED, as the editor's own build
+    // reads them (gl.ts). This read `shader log || program log` until
+    // 2026-09-30, so a fragment log holding only a newline would count as
+    // present and hide the program log, where, by decision 071's reading of
+    // ANGLE's source (an inference, not documented or measured), a refusal
+    // made at link would be. Three rows on the PC read "did not build" with no
+    // words from the driver; whether this, a context that had died, or a driver
+    // that gave no words explains them is not known. One line each, with no control characters: drivers
+    // end a log with a newline and a NUL, and the copied results put this under
+    // its row as one line.
+    // AND THE TIME AND THE GL ERROR, so a refusal can be told from a context
+    // that had already died: a lost context answers every log with nothing and
+    // the first `getError` after the loss with CONTEXT_LOST_WEBGL (37442).
+    const fold = (s: string | null) => (s ?? "").replace(/[\u0000-\u001f\s]+/g, " ").trim().slice(0, 300);
+    const logs = ([["program", gl.getProgramInfoLog(prog)], ["fragment", gl.getShaderInfoLog(fs)], ["vertex", gl.getShaderInfoLog(vs)]] as [string, string | null][])
+      .map(([what, log]) => [what, fold(log)])
+      .filter(([, log]) => log)
+      .map(([what, log]) => `${what}: ${log}`);
+    const glErr = gl.getError();
     gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
-    throw new Error(`the editor's picture code did not build on this device${log ? ` (${log})` : ""}`);
+    throw new Error(`the editor's picture code did not build on this device after ${ms(t1 - t0)} (${logs.join(" · ") || "the driver gave no reason"}; ${glErr ? `GL error ${glErr}` : "no GL error"})`);
   }
   gl.useProgram(prog);
   const loc = gl.getAttribLocation(prog, "a_pos");
@@ -590,6 +611,42 @@ function bindZeroMaskTexture(gl: WebGL2RenderingContext, prog: WebGLProgram): ()
   return () => { gl.deleteTexture(tex); };
 }
 
+/** ONE MORE BUILD OF A ROW THAT FAILED, IN A CONTEXT OF ITS OWN (decision 071).
+ *  Takes the fragment source a row failed with, a number to make it unique, and
+ *  the row's `prep`; builds and draws it once in a fresh 16-pixel context, then
+ *  gives that context up. Gives back one sentence for the row's reason.
+ *  Why: every row shares one context, and on the PC the last three rows failed
+ *  in a row with no reason given, which fits a context that had died as well as
+ *  three refusals. Built again where nothing came before it, a program that
+ *  builds was not refused by the driver; one that fails again, in a context
+ *  that was not lost, points at the program (a device or graphics process
+ *  that had itself failed could fail a fresh context too). A fresh context
+ *  that is lost before or during the build says so rather than reading as the
+ *  program failing. What the sentence has to satisfy: it is read in the copied
+ *  results under a row whose value says it did not build, or did not build or
+ *  draw because the context was lost, so it must say what the fresh context
+ *  did, and its time is never compared with the other rows'. */
+function freshBuild(src: string, tag: number, prep?: (gl: WebGL2RenderingContext, prog: WebGLProgram) => () => void): string {
+  const f = buildFrame();
+  if (!f) return "A fresh context could not be made, so it was not built again.";
+  if (f.gl.isContextLost()) {
+    f.gl.deleteBuffer(f.tri);
+    return "A fresh context was lost before anything was built in it, so it was not built again.";
+  }
+  try {
+    const r = timedBuild(f.gl, VERT, uniqueFrag(src, tag), prep);
+    if (f.gl.isContextLost()) return `Built again in a fresh context in ${ms(r.link)}, and that context was lost before its first picture.`;
+    if (r.err) return `Built again in a fresh context in ${ms(r.link)}; its first picture raised GL error ${r.err}.`;
+    return `Built again in a fresh context: ${ms(r.link)} + ${ms(r.draw)} (built + first picture). So this device builds this program; what failed was the context it was first built in.`;
+  } catch (err) {
+    if (f.gl.isContextLost()) return `Built again in a fresh context, and that context was lost during the build: ${(err as Error).message}.`;
+    return `Built again in a fresh context, and it did not build there: ${(err as Error).message}.`;
+  } finally {
+    f.gl.deleteBuffer(f.tri);
+    f.gl.getExtension("WEBGL_lose_context")?.loseContext();
+  }
+}
+
 /** WHICH PART OF THE PICTURE CODE THE 44 SECONDS IS (decision 071). The PC in
  *  Firefox took 44,527 ms to build it on v2.63.34, and changing how its loops
  *  sample did nothing, because ANGLE already did that itself. The sources name
@@ -602,13 +659,26 @@ function bindZeroMaskTexture(gl: WebGL2RenderingContext, prog: WebGLProgram): ()
  *  loops counted to 2 and to 8, a count the compiler can see. Each is built
  *  and drawn once here and never used by the editor. A row whose rewrite does
  *  not fit the source prints "not run", and one whose draw fails prints no
- *  time; the rest are compared, and the one that saves the most names the cause. */
+ *  time; the rest are compared, and the one that saves the most names the cause.
+ *  A row that does not build is built once more in a fresh context
+ *  (`freshBuild`), and the context's loss is listened for, so a refusal can be
+ *  told from a context that died: the PC's last three rows failed in a row with
+ *  no reason given, 2026-09-30. */
 async function whatMakesTheBuildSlow(): Promise<void> {
-  const p = note("Building the editor's picture code eight ways… this takes about eight builds, which on a Windows PC can be five minutes or more; the last row may take longer than all the others.");
+  const p = note("Building the editor's picture code eight ways… this takes about eight builds, which on a Windows PC can be five minutes or more; the last row may take longer than all the others, and a row that does not build is built once more on its own.");
   const frame = buildFrame();
   if (!frame) { p.remove(); row("What makes the build slow", "WebGL2 unavailable", "The editor cannot run on this device."); return; }
   const { gl, tri } = frame;
   const tot = (r: { link: number; draw: number }) => r.link + r.draw;
+  // THE ROW A LOSS WAS FIRST SEEN IN. The event is fired from a queued task, so
+  // it cannot arrive during a synchronous build; it is read in the tick after
+  // each row. A browser that learns of a loss later may name a later row,
+  // which is why the words are "first seen during".
+  let building = "the warm-up";
+  let lostDuring: string | null = null;
+  const onLost = () => { lostDuring ??= building; };
+  const canvas = gl.canvas as HTMLCanvasElement;
+  canvas.addEventListener("webglcontextlost", onLost);
   try {
     timedBuild(gl,
       "#version 300 es\nin vec2 a_pos;\nvoid main() { gl_Position = vec4(a_pos, 0.0, 1.0); }",
@@ -650,8 +720,8 @@ async function whatMakesTheBuildSlow(): Promise<void> {
     const timed: { name: string; t: number }[] = [];
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
-      if (gl.isContextLost()) {
-        row(v.name, "not run", "The graphics context was lost during an earlier row, so nothing after it can be built here.");
+      if (gl.isContextLost() || lostDuring) {
+        row(v.name, "not run", `The graphics context was lost during an earlier row${lostDuring ? ` (first seen during "${lostDuring}")` : ""}, so nothing after it can be built here.`);
         continue;
       }
       if (!v.ok) {
@@ -659,19 +729,25 @@ async function whatMakesTheBuildSlow(): Promise<void> {
           "The picture code has changed shape since this test was written, so this rewrite no longer finds what it changes. Timing it would time a program that is not what this row says.");
         continue;
       }
+      building = v.name;
+      // A ROW THAT DID NOT BUILD, OR WHOSE CONTEXT WAS LOST, IS BUILT ONCE MORE
+      // ON ITS OWN, with a tag no earlier build used, so no stored copy answers
+      // it either. A row whose draw raised a GL error is not.
+      const again = () => freshBuild(v.src, stamp + 100 + i, v.prep);
       try {
         const r = timedBuild(gl, VERT, uniqueFrag(v.src, stamp + i), v.prep);
         // A FIRST PICTURE THAT RAISED AN ERROR DID NOT DRAW: its time is the
         // build alone, and the row says so rather than passing it for a picture.
-        // A CONTEXT LOST IN THIS ROW is the device giving up on the program,
-        // not the program failing, and it is the case the last rows are placed
-        // for; said in this row, not only in the rows after it. Asked of the
+        // A CONTEXT LOST IN THIS ROW may be the device giving up on the program
+        // rather than the program failing, the case the last rows are placed
+        // for, and the build in a fresh context says which; said in this row,
+        // not only in the rows after it. Asked of the
         // context itself, not only when the draw raised an error: a loss after
         // the error was read, or one the clearing read absorbed, would
         // otherwise be timed as a picture.
         if (gl.isContextLost()) {
           row(v.name, "did not draw (context lost)",
-            `Built once, from nothing: ${v.changed}. The graphics context was lost before the first picture, which is the device giving up on this program rather than the program being wrong; nothing after it can be built here.`,
+            `Built once, from nothing: ${v.changed}. The graphics context was lost before the first picture; nothing after it can be built here. ${again()}`,
             `${ms(r.link)} to build; no picture drawn`);
         } else if (r.err) {
           row(v.name, `did not draw (GL error ${r.err})`,
@@ -684,9 +760,9 @@ async function whatMakesTheBuildSlow(): Promise<void> {
       } catch (err) {
         if (gl.isContextLost()) {
           row(v.name, "did not build (context lost)",
-            `The graphics context was lost while this was being built, with ${v.changed}. That is the device giving up on this program, not the program failing to build; nothing after it can be built here.`);
+            `The graphics context was lost while this was being built, with ${v.changed}: ${(err as Error).message}. Nothing after it can be built here. ${again()}`);
         } else {
-          row(v.name, "did not build", `${(err as Error).message}, with ${v.changed}.`);
+          row(v.name, "did not build", `${(err as Error).message}, with ${v.changed}. ${again()}`);
         }
       }
       await tick();
@@ -703,6 +779,7 @@ async function whatMakesTheBuildSlow(): Promise<void> {
     p.remove();
     row("What makes the build slow", "failed", (err as Error).message);
   } finally {
+    canvas.removeEventListener("webglcontextlost", onLost);
     gl.deleteBuffer(tri);
   }
 }
