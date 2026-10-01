@@ -1700,9 +1700,12 @@ returned with.
   Kolari's advanced page takes yellow's saturation to 0 and raises its
   lightness for white leaves. A Digital Camera World tutorial for Affinity,
   made on an ordinary photograph, raises cyan's saturation and lowers its
-  luminosity to deepen the blues. A search summary (snippet) says Lightroom
-  still reads a swapped blue sky as orange, so its targeted picker finds the
-  band better than its name.
+  luminosity to deepen the blues. Kept Light (read 2026-10-01) says that after
+  a swap profile the sky will most likely be darkened with Lightroom's Red,
+  Orange and Yellow sliders, and the foliage may be found under Blue, Purple or
+  Magenta. That the
+  targeted picker finds the band better than its name rests on a search
+  summary (snippet).
 - **A strength control on a look is common.** Luminar's Mood slider (default 30
   of 100, read), ON1's effect opacity (read), Kolari's Soft and Deep LUT pairs
   (read), and Photomator's LUT intensity (read).
@@ -1737,6 +1740,67 @@ from youtube.com; and refused by this environment's egress proxy,
 order.robsheaphotography.com, www.on1.com, exposure.software,
 marketplace.skylum.com, lifeafterphotoshop.com, fullspectrumuk.com,
 discussions.apple.com, gentlemencoders.com and 9to5mac.com.
+
+**Read on 2026-10-01, when hosts on this list were opened to this
+environment.** Each was asked once, as curl in its own identity with the
+headers shown.
+- **Answered and read:** www.keptlight.com, www.capturemonkey.com,
+  johnnyjoo.substack.com, murrayfoote.com, infraredatelier.wordpress.com and
+  www.decopix.com. earthobservatory.nasa.gov answered with a redirect to
+  science.nasa.gov, read once that host was opened as well.
+- **Still unread:** www.usgs.gov's CloudFront answered 403, "Request blocked",
+  with "Try again later, or contact the app or website owner", and is left for
+  one later retry. www.alex-kunz.com answered with a Cloudflare challenge,
+  "Enable JavaScript and cookies to continue", which only a browser passes.
+- **Kept Light (A. Cemal Ekin, 2018, read).** Lightroom's white-balance sliders
+  do not reach far enough for infrared; the fix is a camera profile made in
+  Adobe's DNG Profile Editor with the White Balance Calibration temperature at
+  -100. The swap is a Photoshop Channel Mixer exported as a lookup table (red
+  output: red 0, blue +100; blue output: blue 0, red +100) and loaded into a
+  Camera Raw profile. Many articles set the Blue Primary saturation to -100;
+  the author tried -50 and -75 and saw subtle differences. After the swap the
+  sky will most likely be darkened with the Red, Orange and Yellow sliders, and
+  the foliage may be under Blue, Purple or Magenta.
+- **Johnny Joo (2025, read)** gives the same mixer numbers, white-balance
+  profiles at -100 and -50, and an Invert lookup table (an Invert layer in
+  Color or Hue blend mode) as the alternative. The profiles reach Lightroom on
+  the iPad by being imported into desktop Lightroom, not Classic, which syncs
+  them. HSL, the tone curve and local Temperature can partly undo the table. A
+  590 nm conversion is described as giving yellow, gold or white foliage,
+  depending on white balance and processing, and skies typically blue, cyan or
+  magenta.
+- **Capture Monkey (2014, read)** made Lightroom swap profiles as DCP camera
+  profiles whose colour matrices have the red and blue components reversed,
+  built with dcpTool. On a 550 nm frame: at daylight white balance it is
+  heavily orange; at a custom white balance with auto tone the sky is dark
+  yellow; with the swap profile added the sky is blue.
+- **Murray Foote (2022, read)** says Capture One, unlike Lightroom, already has
+  the full range of colours for infrared without a custom camera profile. Its
+  swap is done with hue rotations in the Color Editor, not a mixer: the red
+  sector is turned toward blue and a blue sector
+  toward red in steps of 30 degrees, and matching a Photoshop channel swap also
+  needs a cyan-yellow rotation. Foliage is recoloured on a masked layer through
+  the Skin Tone editor with Hue Uniformity at its maximum.
+- **Infrared Atelier (2010, read)** calls the B+W 090 590 nm filter the Goldie:
+  golden foliage and bright blue skies. It passes visible red as well as
+  infrared, so the red channel over-exposes while the camera's histogram
+  usually does not show it, and the author dials -3 to -7 EV of exposure
+  compensation.
+- **Decopix (Randy Juster, read)** compared eleven filters on a converted
+  camera, each swapped with the channel mixer above. Almost all the skies came
+  out too dark or too cyan; they were lightened where needed and moved from cyan
+  to blue with Lightroom's blue hue slider where necessary. With every filter that passes some visible light, the adjustment that
+  made the sky blue turned other things blue too. For the PR-60, white balance
+  taken from a grey card gave less of that than white balance taken from green
+  foliage; for the #25 the grey-card result is called "a bit more subtle"; for
+  the Tiffen #29, other things turned blue with either. It
+  names the B+W 091 as the Goldie, where Infrared Atelier names the 090; the
+  two sources disagree.
+- **NASA's Earth Observatory (read)** gives the traditional colour-infrared
+  band combination as near infrared shown as red, red as green and green as
+  blue: plants deep red, cities grey or tan, clear water black, and water
+  carrying sediment blue. That is the film's three-way rotation in section 4b,
+  from a third source.
 
 ## 4c. THE CRUX IS NIR CONTAMINATION, AND A ROTATION ALONE CANNOT FIX IT
 

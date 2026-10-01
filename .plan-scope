@@ -1,37 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=5f18d5948ae4941a
-diffhash=eadb9636c72acf45
-verdict=IN-SCOPE: records 069, 071 and 086 with their NOTES lines, plan steps 2 to 4, every claim matched to its source after four checks; docs only
-# IN-SCOPE: the round-4 delta makes only the two corrections, plus the index and hunk-header lines they shift; both now match research086.txt, nothing else moved since round 3, and `decisions-check` exits 0.
-# 
-# ## The delta
-# - I diffed `docs-round3.diff` against `docs.diff` myself. The output is byte-identical to `docs-round4-delta.txt`.
-# - All of it falls in 069's section:
-#   - its `index` line (`ee0806a..c3fc47b` → `ee0806a..d8b8863`);
-#   - its two Ghonima-bullet and PixInsight lines;
-#   - five hunk headers, shifted by the one line each correction adds (`+43`→`+44`, `+20`→`+21`, later offsets +1 or +2).
-# - NOTES, 071 and 086 are unchanged from what the third check judged.
-# 
-# ## Correction 1: the PixInsight phrase in 069
-# - Now reads: a tutorial on its multiscale gradient correction "that does not describe how DynamicBackgroundExtraction or AutomaticBackgroundExtractor work."
-# - This matches research086.txt line 1 (pixinsight.com refusal): "the page had no DBE or ABE mechanics". It no longer claims the page has nothing on those tools.
-# 
-# ## Correction 2: the Ghonima bullet's "ratio" in 069
-# - Now reads: Shields et al. 2010 "used the spatial variance of the pixel's ratio to the library's to help tell heavy haze from thin cloud".
-# - This matches claim [16] (research086.txt lines 96–99): perturbation ratio Prt = RBR/CSL, and "the spatial variance in this perturbation ratio". Two lines up, the bullet already defines the ratio as "a pixel's red/blue ratio", so "the pixel's ratio to the library's" is RBR/CSL without ambiguity.
-# - Cosmetic only: the rewrap leaves a short line ("its own algorithm, as described,"). Nothing to fix.
-# 
-# ## Working tree against docs.diff
-# - The working-tree diff of NOTES, 069 and 071, plus untracked 086 against /dev/null, is byte-identical to `docs.diff`.
-# - Blob hashes match its index lines: 08e0c5d, d8b8863, 55cfeb0, 2cb84db.
-# - `src/debug.ts` is staged separately and is not in `docs.diff`. That fits the plan's split (step 5 rides to staging, step 8 is the docs-only commit to main).
-# 
-# ## The gate
-# - `node tools/decisions-check.mjs` exited 0. Every "ok" line passed.
-# - The rank print places 086 at 7, directly below 071 at 6, as 086's Rank argues.
-# - It printed backlog notices only (unlooked, undeclared pairs, the practice-frame backlog).
-# - `git status --porcelain --ignored` was identical before and after the run.
-# - I edited nothing. I deleted the two temp files I made in the scratchpad; nothing of mine is left.
-# 
-# Files: `/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md`, `/tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/v10/docs.diff`, `/tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/v10/docs-round4-delta.txt`, `/tmp/claude-0/-home-user/bb510599-a6ed-55be-9d45-399394d4fdd8/scratchpad/research086.txt`, `/home/user/Jefferson-Photography-Studio/docs/decisions/069-the-looks-sky-adjustments-tint-and-darken-what-has-no-colour.md`
+planhash=06a8bb3d5d449a79
+diffhash=9f6d9716371fd3a4
+verdict=IN-SCOPE: the diff against main is docs-only (IR-SCIENCE.md, decisions 069 and 084, plus the scope record) and sits inside plan steps 6 and 7.
+# Fifth watcher, on the committed records diff plus one reworded sentence: the work against main is
+# docs-only (IR-SCIENCE.md, decisions 069 and 084, plus the scope record) and sits inside plan steps
+# 6 and 7. The reworded Murray Foote sentence (Capture One, unlike Lightroom, already has the full
+# range of colours for infrared without a custom camera profile) matches murrayfoote.txt line 19;
+# the rest of that bullet matches its source. NOTES.md has no PixInsight mention, so step 7's NOTES
+# clause owes nothing. Four earlier watchers judged earlier states IN-SCOPE and found eight
+# overstated or loose sentences, each corrected.

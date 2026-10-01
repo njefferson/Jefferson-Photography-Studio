@@ -68,8 +68,10 @@ their sources; they are not infrared science, so they are not in IR-SCIENCE.
 - **Colour controls are shifts, and they are keyed on colour.** Lightroom's
   Color Mixer, Capture One's Color Editor and darktable's color zones move a
   band relative to where it is (first round, read). After a swap profile,
-  Lightroom's HSL and Temp act reversed (Rob Shea, read), and a tip is to use
-  the targeted picker because the swapped sky still reads as orange (snippet).
+  Lightroom's HSL and Temp act reversed (Rob Shea, read). The swapped sky will
+  most likely be darkened with the Red, Orange and Yellow sliders, and the
+  foliage may be under Blue, Purple or Magenta (Kept Light, read 2026-10-01);
+  the tip to reach it with the targeted picker rests on a snippet.
   Per-band hue reaches only neighbouring hues in Lightroom mobile (forum, read);
   this record reads that as the big changes coming from the remap.
 - **On a tablet.** Lightroom on the iPad swaps only through a profile installed

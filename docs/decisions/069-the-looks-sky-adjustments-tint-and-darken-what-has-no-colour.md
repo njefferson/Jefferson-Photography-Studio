@@ -304,15 +304,20 @@ film decides what the guard keeps: a cloud comes out white.
     own: journals.ametsoc.org with 403 from its CloudFront, so Jayadevan et
     al. 2015 stays read by its abstract only; www.sciencedirect.com with 403
     from a Cloudflare bot challenge, so Chauvin et al. 2015 stays unread; and
-    pixinsight.com, which answered a script's headers with 406 and a
-    browser's with a tutorial on its multiscale gradient correction that does
-    not describe how DynamicBackgroundExtraction or AutomaticBackgroundExtractor
-    work.
+    pixinsight.com, which answered curl with 406 Not Acceptable, and again on
+    2026-10-01 when curl asked with an honest Accept (text/html, English),
+    naming nothing it could serve. The fetch tool, which names itself, was
+    served the site's tutorial on its multiscale gradient correction, and the
+    tutorial does not describe how DynamicBackgroundExtraction or
+    AutomaticBackgroundExtractor work.
     Two addresses for those two tools' documents, one guessed and one built
-    from the documentation's naming rule, answered 404, so neither is known to
+    from a search summary of the documentation index (tool documents live
+    under doc/tools), answered 404 to the fetch tool, so neither is known to
     exist; PixInsight's documentation repository on GitLab has neither (its
     background-named tools there, BackgroundNeutralization and
-    GradientCorrection, were not read).
+    GradientCorrection, were not read). A checking agent read that
+    documentation index in a browser's identity; that reading is withdrawn,
+    and nothing here rests on it.
   - **Refused by the hosts themselves:** helpx.adobe.com, support.captureone.com
     and www.researchgate.net answered 403; photographylife.com answered 402;
     patents.google.com and manpages.ubuntu.com answered 503; and
