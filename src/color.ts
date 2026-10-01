@@ -3,14 +3,16 @@
 // that was missing: without it, infrared chroma collapses onto a single
 // (magenta) axis, so sky and foliage can't separate into different colors.
 
-// Nikon Z 50 ColorMatrix (XYZ -> camera, D65). NOT Adobe's, though this line
-// said so until 2026-10-01: Adobe DNG Converter's Z 50 D65 matrix is
-// 11640, -4829, -1079, -5107, 13006, 2325, -972, 1711, 7380 (/10000), as
-// LibRaw's colordata.cpp and RawTherapee's camconst.json carry it. Where these
-// numbers came from is unrecorded; they are the NEF default, the .dcp
-// fallback and the matrix in the practice DNGs.
+// Nikon Z 50 ColorMatrix (XYZ -> camera, D65): Adobe DNG Converter's, the
+// ColorMatrix2 its DNGs carry, as LibRaw's colordata.cpp ("Z 50") and
+// RawTherapee's camconst.json both list it, /10000. Until 2026-10-01 this was
+// 1.1853, -0.4189, -0.1024, -0.4292, 1.2041, 0.2569, -0.1336, 0.2599, 0.5824
+// under a label calling it Adobe's, which it is not; no source for those
+// numbers was ever recorded, and no Z 50 DNG among the owner's files carries
+// them. The practice DNGs in public/examples were written with the old numbers
+// and keep them in their own tags.
 export const NIKON_Z50_COLOR_MATRIX = [
-  1.1853, -0.4189, -0.1024, -0.4292, 1.2041, 0.2569, -0.1336, 0.2599, 0.5824,
+  1.164, -0.4829, -0.1079, -0.5107, 1.3006, 0.2325, -0.0972, 0.1711, 0.738,
 ];
 
 // Nikon D5300 ColorMatrix2 (XYZ -> camera, D65) as the owner's own Lightroom

@@ -617,9 +617,9 @@ cannot describe something the code does not say about itself.
 
 - **`src/batchstore.ts`** (174 lines) — Crash-safe store for finished batch frames.
 - **`src/chooser.ts`** (65 lines) — Two-door landing page.
-- **`src/color.ts`** (108 lines) — Camera color science.
+- **`src/color.ts`** (110 lines) — Camera color science.
 - **`src/cubeimport.ts`** (136 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
-- **`src/dcp.ts`** (257 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
+- **`src/dcp.ts`** (259 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 - **`src/debug.ts`** (2115 lines) — The test page behind the version number.
 - **`src/decode.ts`** (406 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (59 lines) — Decoding, off the main thread.
