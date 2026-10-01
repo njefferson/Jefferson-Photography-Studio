@@ -38,7 +38,11 @@
 
 /** Emphasis on homogeneity in the sky region, the paper's γ in its equation 6.
  *  Its value there is 2, chosen experimentally; it is kept because the channels
- *  below are scaled into the same numeric range the paper's were. */
+ *  below are scaled into the same numeric range the paper's were. That answers
+ *  scale only (noted 2026-10-01): the paper's Σ and λ1 are on RGB, these are on
+ *  gamma luma and two chroma shares, and the paper's reason for dropping λ2 and
+ *  λ3 holds on these frames in RGB (λ2/λ1 ≤ 0.009) and not here (ground
+ *  0.16-0.29). IR-SCIENCE 9o lists it as an unmeasured departure. */
 export const SKY_ENERGY_GAMMA = 2;
 
 /** How many thresholds the sweep tries. The paper searches 120 sample points
@@ -67,9 +71,13 @@ export const SKY_T_QUANTILE_HI = 0.999;
 export const SKY_NO_SKY_AVE = 1 / 30;
 /** THE PAPER'S SECOND CLAUSE IS MEASURED AND DELIBERATELY NOT USED TO REFUSE.
  *  Its equation 14 also calls a photograph sky-less when the border sits above
- *  a quarter of the depth AND zigzags — average absolute step over thresh3,
- *  which it sets to 5 pixels. Wired up as written it refused NIR_0063, which
- *  has real sky in it: an oak fills the top-left of that frame, so the border
+ *  a TENTH of the depth AND zigzags — average absolute step over thresh3,
+ *  which it sets to 5 pixels (eq. 15: thresh2 = H/10). Until 2026-10-01 this
+ *  constant was 1/4, taken from the cnelson/skydetector notebook, which
+ *  misquotes eq. 15; at 1/4 the clause refused NIR_0063 (border 0.168 of the
+ *  depth), and at the paper's 1/10 it does not. It still fires at 1/10 on
+ *  frames with real sky, NIR_1688 among them. NIR_0063 has real sky in
+ *  it: an oak fills the top-left of that frame, so the border
  *  is high on the left and low on the right and steps hard in between, which is
  *  what a canopy IS rather than a sign there is no sky.
  *  The priority here is not the paper's. A robot that mistakes a wall for sky
@@ -77,7 +85,7 @@ export const SKY_NO_SKY_AVE = 1 / 30;
  *  WITH sky must have all of it selected and no more, and a photograph with no
  *  sky selecting one is not a failure — the reader turns the mask off. So the
  *  jagged clause is computed and reported (`jagged`) and never refuses. */
-export const SKY_NO_SKY_AVE_JAGGED = 1 / 4;
+export const SKY_NO_SKY_AVE_JAGGED = 1 / 10;
 export const SKY_NO_SKY_JAGGED = 1 / 100;
 /** The paper's thresh4: a single column-to-column step larger than a third of
  *  the depth means some columns hold no sky at all and the refinement runs.
@@ -463,7 +471,10 @@ export function skyHorizon(
 /** How close a cluster's mean may sit to the GROUND population before it is
  *  taken to be part of it. Squared Mahalanobis distance under the ground's own
  *  covariance; a three-dimensional Gaussian puts 95% of itself inside 7.81
- *  (the χ²₃ point), so a mean inside that is not distinguishable from ground.
+ *  (the χ²₃ point), so a mean inside that would be a TYPICAL ground pixel.
+ *  It is a typicality test, not a test that the mean differs from the
+ *  ground's: that would scale the distance by the cluster's size, and almost
+ *  any separate cluster would pass it (reworded 2026-10-01).
  *  The reference implementation makes no such test — it always names one of the
  *  two clusters the fake sky and clears against it, which on a photograph whose
  *  sky is simply GRADED from horizon to zenith names half the real sky as

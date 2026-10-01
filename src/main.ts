@@ -1522,7 +1522,7 @@ function updateBandLabels() {
   folSub.textContent = swapped ? "(teals & blues — swapped)" : "(reds & golds)";
 }
 
-// Auto: brightness-preserving white balance + auto-exposure.
+// Auto: gray-world white balance scaled to unit Rec.709 luma + auto-exposure.
 ui.autoBtn.addEventListener("click", () => {
   if (!current) return;
   autoAdjust(current);
@@ -1577,9 +1577,11 @@ interface Look {
    *  distribution together. Solved against the EIR target on five camera JPEGs
    *  and five raws, the best any diagonal gain could do was put foliage at
    *  289-298deg and sky at 240-254deg — about 50deg apart, against targets
-   *  130deg apart (foliage magenta 330, sky cyan 200). It is not a tuning
-   *  problem; a rank-preserving transform cannot open an angle between two
-   *  populations that start nearly coincident. That is why `red` and `goldie`
+   *  130deg apart (foliage magenta 330, sky cyan 200). (Corrected 2026-10-01:
+   *  that is a measured limit on those frames, not an impossibility. A diagonal
+   *  gain moves colours relative to neutral and can reorder a pixel's channels:
+   *  (1, 0.5, 0.45) and (1, 0.45, 0.5), 10.9deg apart, land 120deg apart under
+   *  (1, 2, 2).) That is why `red` and `goldie`
    *  are right to use wbBias — they shift everything one way — and why
    *  Aerochrome never worked with one.
    *
@@ -1726,8 +1728,9 @@ const LOOKS: Record<string, Look> = {
   // Measured on five camera JPEGs and five raws: a wbBias (a DIAGONAL gain,
   // which is what `red` and `goldie` use) could at best put foliage 289-298deg
   // and sky 240-254deg — about 50deg apart against targets 130deg apart. A
-  // diagonal gain multiplies every pixel by the same three factors, so it
-  // cannot open an angle between two populations; no value of it ever could.
+  // diagonal gain multiplies every pixel by the same three factors; on these
+  // ten frames it could not open the angle further (a measured limit, corrected
+  // 2026-10-01 — a diagonal gain CAN reorder near-neutral channels, see Look.hsl).
   // The per-colour mixer can, because a band shift acts differentially on
   // nearby hues: it took one frame from 36deg of separation to 95deg.
   //
@@ -1748,6 +1751,12 @@ const LOOKS: Record<string, Look> = {
   // is row-major [0,0,1, 1,0,0, 0,1,0] (IR-SCIENCE.md section 4b). That
   // rotation is what this look SHIPPED, and it is still on the `Aerochrome`
   // chip in MIX3_PRESETS for anyone who wants the film's own mapping bare.
+  // (Corrected 2026-10-01: applied to THIS camera's R, G, B it is not the
+  // film's mapping. The 665-720 nm conversion blocks visible green before the
+  // sensor, so camera green is an infrared record and camera red carries deep
+  // red with infrared; the matrix is a cycle over three mostly infrared
+  // samples. The film route needs a synthesised green layer, 066, or a second
+  // frame, 067.)
   //
   // WHAT SHIPS HERE IS NOT THAT ROTATION. It is the matrix solved against
   // anchors measured on SIX of the owner's frames -- hold-one-out worst error
@@ -1822,7 +1831,10 @@ const LOOKS: Record<string, Look> = {
   //
   // A GLOBAL HUE SHIFT IS NOT THE FIX AND WAS MEASURED, NOT ASSUMED. At +38deg
   // the foliage lands on target and the two populations MERGE: 94-98% of the
-  // coloured frame collapses into one 30deg bin. Aerochrome IS the separation.
+  // coloured frame collapses into one 30deg bin. (Corrected 2026-10-01: that
+  // was measured through the app's hue control while it applied its YIQ matrix
+  // transposed, which tints grey; the figure is owed a re-measurement through
+  // the corrected control, IR-SCIENCE 4b-iii.) Aerochrome IS the separation.
   // `hslAt` is the only knob here that moves two populations differently, which
   // is what the field's own comment above says it is for.
   //
@@ -4748,7 +4760,9 @@ const MIX3_PRESETS: { label: string; m: number[] }[] = [
   { label: "R⇄B swap", m: [0, 0, 1, 0, 1, 0, 1, 0, 0] },
   // THE TWO LABELS WERE THE WRONG WAY ROUND, for as long as both existed.
   // Aerochrome's mapping is red<-infrared, green<-visible red, blue<-visible
-  // green, which is row-major [0,0,1, 1,0,0, 0,1,0] -- the third chip below.
+  // green, which is row-major [0,0,1, 1,0,0, 0,1,0] -- the third chip below,
+  // though on this camera's channels it is a cycle over mostly infrared
+  // samples, since camera green records no visible green (corrected 2026-10-01).
   // The first cycles the other way and is not any film: it keeps its matrix
   // and loses the claim. ORDER AND MATRICES ARE UNTOUCHED on purpose -- the
   // chips carry no ids, so tools/look-sheet.mjs presses them by index, and
@@ -4760,8 +4774,10 @@ const MIX3_PRESETS: { label: string; m: number[] }[] = [
   // film's layer order BARE — red←blue, green←red, blue←green — and bare it
   // renders teal and pale; the Aerochrome LOOK is that rotation's other half,
   // the R⇄B swap plus a mixer solved on six frames, and it lives on the Looks
-  // tab (IR-SCIENCE.md 4b-ii). Under the film's name the chip read as the look
-  // and was reported as "the colours are not swapped" (2026-09-19). The matrix
+  // tab (IR-SCIENCE.md 4b-ii). On this camera's channels it is a cycle over
+  // mostly infrared samples rather than the film's order, camera green holding
+  // no visible green (corrected 2026-10-01). Under the film's name the chip read
+  // as the look, and was taken for a swap that had not happened (2026-09-19). The matrix
   // and the POSITION are untouched: the chips carry no ids and
   // tools/look-sheet.mjs presses them by index.
   //
@@ -15681,8 +15697,9 @@ function paintQuickCell(cell: HTMLElement, it: QuickItem): void {
  *  What it must hold: a cell in `preview` carries the word "Preview" in TEXT
  *  and a title saying whose rendering it is. That is not decoration. The
  *  camera's own JPEG on an infrared conversion is a different colour world
- *  from this app's render (IR-SCIENCE.md section 3 — the camera cannot store
- *  an infrared white point), and a reader judging colour from it without being
+ *  from this app's render (IR-SCIENCE.md section 3 — the camera's recorded
+ *  balance is a 5200 K daylight default, not an infrared white point), and a
+ *  reader judging colour from it without being
  *  told would be judging the camera's guess. Lightroom bypasses the embedded
  *  preview the moment its Develop module opens for the same reason; the
  *  difference is that culling is composition, focus and the moment, which the
@@ -16013,7 +16030,7 @@ async function openQuickLook(files: File[]) {
    *  raw, and Lightroom answered with an Embedded & Sidecar import of its own.
    *  This app's render replaces it a moment later, so the reader is never left
    *  judging colour by the camera's guess — which on an infrared conversion is
-   *  a clamp artefact, not a white point. */
+   *  the preset's 5200 K daylight default, not a white point. */
   const one = async (i: number): Promise<void> => {
     const f = files[i];
     const it = quickItems[i];
@@ -19007,7 +19024,9 @@ canvas.addEventListener("click", (e) => {
   }
   const [r, g, b] = sample.lin;
   const mean = (r + g + b) / 3;
-  // Brightness-preserving so tapping recolors without darkening.
+  // Scaled to unit Rec.709 luma (lumNormalize). That is not brightness-
+  // preserving on camera channels: a coloured patch balanced to neutral lands
+  // at the luma-weighted harmonic mean, below its luma (corrected 2026-10-01).
   params.wb = lumNormalize([mean / r, mean / g, mean / b]);
   lookBias = [1, 1, 1]; // fresh neutral WB — no look bias baked in
   syncToUI();
@@ -19066,7 +19085,7 @@ function autoAdjust(img: DecodedImage) {
  *  full-spectrum reference frame — the lowest clean value there is 0.6 (green
  *  edge artifacts fully gone), plus margin; Lightroom-class raw apps apply
  *  their (stronger) reconstruction unconditionally, so a measured 0.7 is the
- *  conservative version of industry-normal. Clipping test: >0.1% of sampled
+ *  conservative version of industry-normal. Clipping test: >0.05% of sampled
  *  pixels with a channel at >=98.5% of white — the same pin the slider keys on. */
 function autoRecover(img: DecodedImage): number {
   if (!img.linear) return 0;

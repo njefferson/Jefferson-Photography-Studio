@@ -145,7 +145,10 @@ export function skyPrepare(
   // was chosen on is BOUNDED, where `ln` is scene-linear normalised to the
   // frame's own 95th percentile and runs freely past 1 on anything specular.
   // Gamma is also what `buildSkyGuide` encodes its own luma with one module
-  // over, so the two instruments mean the same thing by the word.
+  // over, so the two instruments mean the same thing by the word. That covers
+  // S0 only: the border's gradient below is still a central difference on
+  // LINEAR luma, where the paper uses Sobel on display values (IR-SCIENCE 9o,
+  // noted 2026-10-01 as an unmeasured departure).
   const S0 = new Float32Array(N), S1 = new Float32Array(N), S2 = new Float32Array(N);
   for (let p = 0; p < N; p++) {
     S0[p] = Math.pow(Math.min(1, Math.max(0, fields.ln[p])), 1 / 2.2) * 255;

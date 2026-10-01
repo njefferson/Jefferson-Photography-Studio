@@ -16,8 +16,10 @@
 // outside any plausible hot-spot (REF_LO..REF_HI). That one step makes every
 // number below invariant to white balance and to exposure, which is what lets
 // a raw frame (un-white-balanced sensor values, red-flooded) and a camera JPEG
-// (already balanced and gamma-encoded) be measured by the same code and
-// averaged together.
+// (already balanced and gamma-encoded) be measured by the same code. They are
+// NOT averaged together: averageProfiles refuses that mix, because rendered
+// ratios differ from raw by 3.5x in red, 2.3x in blue and 1.24x in brightness
+// (corrected 2026-10-01; this line said they could be).
 //
 //   n_c[i] = f_c[i] / f_c[ref]                         per channel, = 1 at ref
 //   L[i]   = mean(n_r, n_g, n_b)                       achromatic falloff

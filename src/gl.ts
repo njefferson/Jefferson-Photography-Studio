@@ -192,7 +192,7 @@ uniform float u_vigMid;      // vignette midpoint 0..1
 uniform float u_outAspect;   // output (cropped) frame aspect, for the vignette
 uniform vec2 u_outPx;        // output frame size in pixels, for grain coords
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
-uniform float u_chroma;  // 0..1 how far COLOUR is mixed to the plain 5x5 blur (raw/denoise.ts)
+uniform float u_chroma;  // 0..1 how far COLOUR is mixed to the plain 13 px blur, 7x7 taps at stride 2 (raw/denoise.ts)
 uniform float u_despeckle; // 0..1 decision-based median on the centre pixel (raw/denoise.ts)
 uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/detail.ts
 uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
@@ -562,7 +562,8 @@ void main() {
   }
 
   // Denoise FIRST, on linear sensor data, before the big IR gains amplify the
-  // noise. Same 5x5 brightness-adaptive bilateral as raw/denoise.ts.
+  // noise. Same 13x13 brightness-adaptive bilateral as raw/denoise.ts, whose
+  // header says what the position really changes (corrected 2026-10-01).
   // DESPECKLE FIRST, AND THE ORDER IS THE POINT. lc below is the centre's
   // luma and every neighbour's weight is measured against it, so a centre that
   // is an impulse makes every neighbour look wrong and collapses the bilateral
@@ -737,7 +738,8 @@ void main() {
   // luminance. Post-WB "neutral" is the one hue the row-normalized camera
   // matrix preserves exactly, so a recovered pixel cannot shift colour; the
   // pull is scale-invariant, so exposure folding is safe. Raw only, user
-  // slider, default 0 (photos open untouched — owner rule 2026-07-25).
+  // slider, default 0 in the parameters; at open autoRecover sets 0.7 when
+  // the frame has real clipping (the at-open ruling, rev. 2 of 2026-07-25).
   if (srcClip > 0.0) {
     float F = u_recover * srcClip;
     float Yr = dot(c, LUMA_W);

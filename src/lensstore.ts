@@ -466,7 +466,11 @@ function cameraOf(ex: ExifSubset | null): string {
  *  So a colour curve measured on one converted body is not a fact about that
  *  lens on anybody else's. The brightness half is different: a hot-spot is
  *  internal reflection inside the lens barrel, which is geometry, and it
- *  transfers.
+ *  transfers. (Corrected 2026-10-01: it does not, reliably. Kolari shows the
+ *  sensor stack and the conversion filter making or removing the spot on the
+ *  same lens, and RawTherapee's ffInfo::distance refuses a flat from any other
+ *  make, model or lens. EXIF records no conversion, so a second body of the
+ *  same model cannot be told apart from the file. IR-SCIENCE 9c.)
  *
  *  This mattered little while the profiles that shipped carried colour measured
  *  from camera JPEGs, which was wrong for everyone including the photographer

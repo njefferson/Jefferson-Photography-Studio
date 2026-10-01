@@ -92,10 +92,17 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
   const pat = raw.num(33422);
   const pattern = pat.length === 4 ? pat : [0, 1, 1, 2];
   // White (sensor saturation): the top of the file's own linearization curve
-  // when one exists (lossy NEFs — exact per body: Z 50 ~15520, D5300 16383).
+  // when one exists (lossy NEFs — D5300 16383).
   // Lossless NEFs (0x46) carry NO curve, so the identity top would be the
-  // bit-depth ceiling, NOT saturation — for those fall back to the Z-series
-  // value LibRaw reports (15520 at 14-bit), the pre-branch behavior. The
+  // bit-depth ceiling, NOT saturation — for those fall back to 15520 at
+  // 14-bit, the pre-branch behavior. CORRECTED 2026-10-01: 15520 is not a value
+  // LibRaw reports. LibRaw sets maximum = (1 << tiff_bps) - 1, 16383 here, with
+  // no Z 50 entry, and lowers it only to the frame's own data maximum
+  // (adjust_maximum); RawTherapee's camconst.json measures the Z 50 clipping at
+  // 16374 at ISO 100. The Z 50 writes only lossless NEFs (its manual offers a
+  // bit depth, no compression choice), so it always takes this branch. Its
+  // source is unrecorded; Adobe's DNG WhiteLevel (50717) on one of the owner's
+  // Z 50 DNGs is the reading that would settle it. The
   // black pedestal scales with bit depth (1008 is the 14-bit convention).
   // MakerNote 0x003D is written at 14-bit scale whatever the file's depth, so a
   // 12-bit file's pedestal is a quarter of it, as LibRaw's open_datastream
@@ -287,14 +294,16 @@ function findLinearizationTable(bytes: Uint8Array, main: Reader): { offset: numb
     // 0x000C (WB_RBLevels) IS IN THIS IFD AND IS DELIBERATELY NOT READ.
     // It is the camera's own white balance, [R, B, G, G], and on a visible-
     // light body it would be the right thing to open on. On an infrared
-    // conversion it is not: the gains an IR white point needs fall outside what
-    // a custom PRE preset can store, so the camera clamps and records what it
-    // could reach. Measured on this repo's own files — NIR_1376.NEF developed
+    // conversion it is not: on these files it is the 5200 K daylight default
+    // the Z 50 manual gives a PRE preset slot holding no measured value
+    // ("If no value currently exists for the selected preset, white balance
+    // will be set to 5200 K, the same as Direct sunlight"), not a measurement of
+    // the scene. Measured on this repo's own files — NIR_1376.NEF developed
     // at its own [1.8574, 1.4668, 1, 1] renders rgb(158, 0, 241), green at
     // ZERO, two hues; gray-world on the same frame gives rgb(175, 178, 178)
-    // and five. The tell that it is a ceiling rather than a measurement: a NEF
-    // on PRESET4 and five JPEGs on PRESET6 record that identical number to
-    // four decimals.
+    // and five. Why a NEF on PRESET4 and five JPEGs on PRESET6 record that
+    // identical number to four decimals: both slots were empty and fell back
+    // to 5200 K. This comment read that as a clamp until 2026-10-01.
     // So the white point is found BELOW what the camera allows, from the data.
     // A session shipped it the other way round and took it back out the same
     // day; the physics and the numbers are in IR-SCIENCE.md, section 3.

@@ -1326,7 +1326,7 @@ async function whatColourNoiseCosts(): Promise<void> {
     const on = time(1);
     const mo = mid(off), mn = mid(on);
     const per = (m: number) => `${(m / px * 1e6).toFixed(0)} ms per megapixel`;
-    row("Denoise with colour noise OFF", ms(mo), `${per(mo)}, over a ${W}x${H} block of a ${(img.width * img.height / 1e6).toFixed(1)}-megapixel photograph. This is the 5x5 brightness filter alone, which is what every raw already pays.`,
+    row("Denoise with colour noise OFF", ms(mo), `${per(mo)}, over a ${W}x${H} block of a ${(img.width * img.height / 1e6).toFixed(1)}-megapixel photograph. This is the 13x13 brightness filter alone, which is what every raw already pays.`,
       off.map((x) => Math.round(x) + " ms").join(", "));
     row("…and with it at full", ms(mn), `${per(mn)} — ${(mn / Math.max(mo, 0.001)).toFixed(1)}x the line above. The colour half samples a 7x7 grid spaced two apart to reach a mottle three to five pixels across, which is forty-nine taps on top of the twenty-five. A full-frame export of this photograph would be about ${((mn - mo) / px * img.width * img.height / 1000).toFixed(1)} s of extra work.`,
       on.map((x) => Math.round(x) + " ms").join(", "));

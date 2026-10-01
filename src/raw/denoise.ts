@@ -1,13 +1,25 @@
-// Edge-preserving denoise (5x5 bilateral) on LINEAR sensor data.
+// Edge-preserving denoise (13x13 bilateral, colour on a 7x7 grid at stride 2) on LINEAR sensor data.
 //
 // Placement matters: this runs immediately after decode, BEFORE white balance,
 // exposure and saturation — IR editing multiplies channels by large factors
 // (blue gain ~1.7x, exposure up to 16x), so noise must be removed while it is
 // still small. The GPU preview shader implements the same formula; keep the
 // constants in sync (see gl.ts).
+// (Corrected 2026-10-01: "still small" is not what the position buys. A filter
+// whose range is relative to brightness gives the same result before or after
+// a per-channel gain; what running before white balance changes is the edge
+// guide, luma of unbalanced channels, and the 0.02 floor. darktable and
+// RawTherapee both white-balance first.)
 //
-// Range weighting is relative to local brightness, so shadows (where sensor
-// noise dominates) are smoothed harder than bright, detailed areas.
+// Range weighting is relative to local brightness (rel = dLuma / (lc + 0.02)),
+// which models noise whose spread is proportional to the signal. Raw noise is
+// Poisson-Gaussian (variance a*y + b), so one slider value is a growing
+// multiple of the noise as brightness rises: at 0.45, 1.3x the noise at
+// y = 0.03 and 3.3x at y = 0.5, measured on synthetic Poisson-Gaussian data
+// through makeRowDenoiser. Shadows are therefore smoothed LESS hard relative to
+// their noise than bright areas, not harder, as this line said until
+// 2026-10-01. darktable's denoiseprofile stabilises the variance first
+// (generalized Anscombe) and filters with a fixed range.
 
 // THIRTEEN PIXELS ACROSS, DENSE, AND THE WIDTH IS THE WHOLE FIX.
 //
@@ -24,6 +36,9 @@
 // 0.0109, radius 6 **0.0075** — a 76% reduction. The busiest block's own noise
 // is unchanged across all of it (0.0873 to 0.0892), because the range weight is
 // what protects an edge and widening the SPATIAL support does not weaken it.
+// That held on that block and not on foliage: IR-SCIENCE 9i measured the oak
+// canopy's fine texture at 34.11 under the 5x5 and 30.76 under this 13x13 (see
+// the look's floor comment in main.ts).
 //
 // DENSE, NOT STRIDED, and that is not a detail. The colour half spans the same
 // thirteen pixels with 49 taps at stride two, which is affordable there because
@@ -166,7 +181,7 @@ export function makeRowDenoiser(
 
   // Preview runs this bilateral on a downscaled proxy, tapping in proxy texels
   // (see gl.ts). At native resolution one proxy texel spans `step` pixels, so
-  // tap the same 5x5 grid `step` pixels apart to match the previewed footprint;
+  // tap the same 13x13 grid `step` pixels apart to match the previewed footprint;
   // the SPATIAL weights are in tap-index units and stay identical. step === 1
   // keeps the sampling byte-identical.
   const tapOff = new Int32Array(R * 2 + 1);
@@ -187,6 +202,11 @@ export function makeRowDenoiser(
   // samples a noise field periodically and periodic sampling of noise IS a
   // pattern. Visible in the picture at full strength and invisible in every
   // number the sheet reports, which is the reason the pictures are the test.
+  // (Corrected 2026-10-01: stride two moved that pattern rather than removing
+  // it. A kernel supported only on even offsets has a response of exactly 1 at
+  // (0.5, 0), (0, 0.5) and (0.5, 0.5) cycles per pixel, so period-2 chroma noise
+  // passes untouched; on white noise it leaves 1.9x the residual of a dense
+  // Gaussian over the same 13 px span, three quarters of it in those bands.)
   //
   // Stride two leaves one-pixel gaps and forty-nine taps over the same span. It
   // is double the cost of the sparse version and still a fifth of the 169 a

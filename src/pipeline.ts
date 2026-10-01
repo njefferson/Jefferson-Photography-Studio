@@ -17,7 +17,7 @@ export interface EditParams {
   /** 0..1 bilateral strength, applied to LINEAR data BEFORE everything else
    *  (see raw/denoise.ts) — not part of compileEdit's per-pixel math. */
   denoise: number;
-  /** 0..1 how far COLOUR is mixed toward a plain blur of the same 5x5 that
+  /** 0..1 how far COLOUR is mixed toward a plain blur over the same 13 px span
    *  `denoise` bilaterally filters — the LUMINANCE half keeps the bilateral's
    *  edge-preserving mean either way. Its own strength because the two are not
    *  the same problem: colour blotches carry almost no real information and can
@@ -46,8 +46,9 @@ export interface EditParams {
    *  see NOTES.md 2026-07-24/25 ledger). Per-pixel only: no neighbourhoods,
    *  no spatial search — structurally incapable of seams or squares. Clip is
    *  detected on the SOURCE value at the sensor pin (>=98.5% of white), so
-   *  real data below the pin is never touched. Raw sources only. DEFAULT 0 —
-   *  a photo opens untouched (owner rule 2026-07-25); this is an explicit
+   *  real data below the pin is never touched. Raw sources only. DEFAULT 0 in
+   *  the parameters; at open autoRecover sets 0.7 when the frame has real
+   *  clipping (the at-open ruling, rev. 2 of 2026-07-25); this is an explicit
    *  per-shot control, excluded from saved looks like WB. */
   recover?: number;
   /** Per-channel tone tint applied after saturation (e.g. sepia over mono).
@@ -74,8 +75,9 @@ export interface EditParams {
    *  INDEPENDENTLY per channel in display space right AFTER the master tone
    *  curve (master shapes the light, these steer the colour per tonal band)
    *  and before the HSL mixer, so the mixer classifies the steered hue. Pure
-   *  per-pixel colour math -> rides saved looks and bakes into .cube/.dcp
-   *  like the mixer. Identity = TONE_DEFAULT each. */
+   *  per-pixel colour math -> rides saved looks and bakes into .cube like
+   *  the mixer; the .dcp writer never reads them. Identity = TONE_DEFAULT
+   *  each. */
   toneR: [number, number, number, number, number];
   toneG: [number, number, number, number, number];
   toneB: [number, number, number, number, number];
