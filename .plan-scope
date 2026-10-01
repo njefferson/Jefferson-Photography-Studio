@@ -1,20 +1,15 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=a054a03153d6182f
-diffhash=43bcb7936d0db28e
-verdict=IN-SCOPE: step 9's NOTES staging entry for v2.64.34, and the lens walk's header made true
-# IN-SCOPE: The diff is step 9's NOTES staging entry plus a correction to the comment in `tools/lens-order-walk.mjs`, which makes the claims of the step 2 walk true, and it does nothing the plan does not name.
+diffhash=cbcdabab1d750fa4
+verdict=IN-SCOPE: step 14's records, NOTES and record 085 say production from v2.64.35 (2fdf8be)
+# IN-SCOPE: The diff is step 14 of the approved plan and nothing else. It is docs only, touches only NOTES.md and record 085, adds the second "Nothing is waiting to be promoted, 2026-09-30" entry, and records production in 085's "Found while building, and fixed after" section.
+# none
 # 
-# Untrue: none. I checked the "Checked:" sentence against record 085's "Found while building, and fixed after", and it agrees on four points:
-# - Each of the five fixes has a walk check that failed on production's build 3bb7e37.
-# - The review's Undo tile check (`(f) Undo of the Strength move redraws the tile too`) was added after the review and made to fail by planting its fix out.
-# - The review's other two fixes have no walk check: the stamp taken with the edit the tile is drawn from, and the copy following a forgotten profile.
-# - The walk file has 40 `check()` calls, which matches "40 of 40".
-# 
-# The new walk comment ("each fix's own check failed on production's build ... The check that Undo redraws the tile was added after a review and was made to fail by planting its fix out instead") matches the record.
-# 
-# The other facts in the entry also hold:
-# - v2.64.34 is three commits after 3bb7e37 (v2.64.31).
-# - `PREVIEW_PIPELINE` is 67.
-# - The hub pin and `.doctrine-sync` are both 295ff9a, set in 5a9e163.
-# - The lens Strength and Bypass controls on both cards, the pick, Undo, Redo and Reset all call `restripOpen`.
+# Every fact the diff states checks out:
+# - **The merge:** pull request 181 has head `staging` at 45f13e1 and was rebase-merged into main as 2fdf8be. The trees of main and 45f13e1 are both 26cd012.
+# - **The live copy:** production's sw.js reads `const CACHE = "ips-2.64.35"` and BUILD `2fdf8be17f577d522b704d71252924faa0c3a22e`.
+# - **The version count:** 35 commits since VERSION's commit to 2fdf8be, against 34 to 69bbe66 and d544c50. So ".35 rather than .34 because of the NOTES commit" is correct.
+# - **The runs:** Gates run 1016 and Deploy run 962 for 2fdf8be both concluded success.
+# - **The failed check:** `github-advanced-security` failed on PR 181 with "CAPIError: 400 The requested model is not supported."
+# - **The go:** it was given before any device pass, as the plan's amendment records.

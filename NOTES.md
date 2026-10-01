@@ -54,6 +54,17 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**Nothing is waiting to be promoted, 2026-09-30, the second time that day.**
+v2.64.34 went to production on the go the same day, given before any device
+pass, by pull request 181 opened from `staging` itself and rebase-merged as
+2fdf8be. Production serves the offline copy `ips-2.64.35`, read off the live
+site naming 2fdf8be, and the Gates run (1016) and the deploy (962) for 2fdf8be
+both passed. Staging holds the same files as production, compared tree for
+tree. The number reads .35 rather than .34 because the count includes the NOTES
+commit that rode with it. What it carried is the v2.64.34 entry below; its
+device pass now runs on production. `github-advanced-security` failed on the
+pull request with GitHub's own model error, as on every head before it.
+
 **v2.64.34 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-30 (d544c50).** Production's code (v2.64.31) plus 085's follow-through,
 and the doctrine read up to the hub's 295ff9a with the shared gates pinned

@@ -681,7 +681,8 @@ falls on three of the four tree frames and not on NIR_1703.
 
 Five defects in the slider were found while the chosen option was built. They
 shipped to production in v2.64.31 as found and not fixed, and were fixed on
-2026-09-30. None of them changes an option above. Each fix has a check in
+2026-09-30: on production from 2026-09-30 in v2.64.35 (2fdf8be), on the go
+given before any device pass. None of them changes an option above. Each fix has a check in
 `tools/lens-order-walk.mjs`, and each of those checks failed on production's
 build (3bb7e37) before the fix. Each fix was then planted out of the fixed
 build, and exactly its own checks failed.
