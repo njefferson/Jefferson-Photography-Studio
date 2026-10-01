@@ -54,6 +54,36 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**v2.64.39 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-09-30 (fcbf876).** Production's code (v2.64.35) plus one fix to the test
+page, for 071. Staging's offline worker was read naming fcbf876 as
+`ips-2.64.39`, and the Gates run (1023) and the deploy (966) for it both
+passed. The editor itself is unchanged.
+- **The test page says why a build of the picture code failed.** A row that
+  does not build now carries every log the driver wrote, labelled, how long the
+  failed build took, and the GL error read after it. The page listens for the
+  loss of its graphics context and names the row it was first seen in. A row
+  that does not build, or whose context was lost, is built once more in a fresh
+  context, and its reason says what that fresh context did. Before, the page
+  could hide the driver's program log behind a fragment log holding only
+  whitespace, kept no time or error for a failure, and shared one context,
+  asking only whether it had been lost, so a context that failed without
+  reporting a loss read exactly like a refusal.
+- Checked headless, against five planted failures and one arm with none: a
+  link refused with the reason only in the program log; a context lost as a
+  row links; a context that fails every link without reporting a loss; a
+  context lost before a row's first picture; and the fresh context lost during
+  the retry. The first four fail on the build before the fix; the fifth fails
+  on the fix's previous version, whose wording assumed how the first build
+  went. All pass on this build. With the context failing silently, the build
+  before the fix gives the PC's copy of 2026-09-30 word for word. The
+  agreement, accessibility and offline-shell walks pass on this build.
+- **The one device run it needs:** on the PC in Firefox, open the test page,
+  press "What makes the picture code slow to build", then "Copy the results".
+  The three rows that did not build then say whether the program builds in a
+  fresh context, which rules out a refusal if it does, in the driver's own
+  words where it gave any.
+
 **Nothing is waiting to be promoted, 2026-09-30, the second time that day.**
 v2.64.34 went to production on the go the same day, given before any device
 pass, by pull request 181 opened from `staging` itself and rebase-merged as
