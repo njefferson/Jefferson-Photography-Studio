@@ -241,6 +241,18 @@ raw.githubusercontent.com/exiftool/exiftool, `lib/Image/ExifTool/XMP.pm`
 system", 2021 (fetched); helpx.adobe.com and captureone.com (search extracts
 only; both hosts refused).
 
+The record's version before 2026-09-24 cited these as well, and they are kept:
+Adobe, Apply Masking for local adjustments
+(helpx.adobe.com/lightroom-classic/help/masking.html) and Apply local
+adjustments based on color, luminance and depth
+(helpx.adobe.com/lightroom-classic/help/apply-local-adjustments.html); Greg
+Benz, Masking 2.0 in Lightroom and ACR
+(gregbenzphotography.com/photography-tips/masking-2-0-in-lightroom-and-acr/),
+for the list of what masks cannot reach; Adobe Camera Raw idea board, HSL
+adjustments for local adjustment tools; darktable user manual, masking and
+blending — overview, parametric masks, and combining drawn and parametric masks
+(docs.darktable.org/usermanual/development/en/darkroom/masking-and-blending/).
+
 ## Built already
 
 These EXIST, and this record is the next layer over them, not a second version.
