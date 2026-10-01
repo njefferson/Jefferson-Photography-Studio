@@ -97,8 +97,13 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
   // bit-depth ceiling, NOT saturation — for those fall back to the Z-series
   // value LibRaw reports (15520 at 14-bit), the pre-branch behavior. The
   // black pedestal scales with bit depth (1008 is the 14-bit convention).
+  // MakerNote 0x003D is written at 14-bit scale whatever the file's depth, so a
+  // 12-bit file's pedestal is a quarter of it, as LibRaw's open_datastream
+  // corrects ("Adjust BL for Nikon 12bit"). Taken unscaled, a 12-bit Z 50 frame
+  // (floor 250-256) lost 1008 and 77-94% of its photosites read zero.
   const curveWhite = params.curve[params.curveMax - 1] || 0;
-  const black = raw.num(50714)[0] ?? meta.black ?? (bps === 14 ? 1008 : bps === 12 ? 252 : 0);
+  const mnBlack = meta.black === undefined ? undefined : bps === 12 ? Math.round(meta.black / 4) : meta.black;
+  const black = raw.num(50714)[0] ?? mnBlack ?? (bps === 14 ? 1008 : bps === 12 ? 252 : 0);
   const white =
     raw.num(50717)[0] ??
     (params.hasCurve && curveWhite > black ? curveWhite : bps === 14 ? 15520 : (1 << bps) - 1);

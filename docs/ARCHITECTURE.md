@@ -671,7 +671,7 @@ cannot describe something the code does not say about itself.
 - **`src/raw/detail.ts`** (239 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
 - **`src/raw/dngRaw.ts`** (124 lines) — Decode a mosaiced (Bayer) DNG whose raw image is lossless-JPEG compressed (Compression 7, PhotometricInterpretation 32803 = CFA).
 - **`src/raw/lj92.ts`** (240 lines) — Lossless JPEG (ITU-T T.81, process 14 / SOF3) decoder — pure TypeScript.
-- **`src/raw/nef.ts`** (300 lines) — Nikon NEF (Compression 34713) decoder — pure TypeScript.
+- **`src/raw/nef.ts`** (305 lines) — Nikon NEF (Compression 34713) decoder — pure TypeScript.
 - **`src/raw/tiff.ts`** (92 lines) — Minimal TIFF/DNG reader shared by the JPEG and mosaiced-raw decode paths.
 - **`src/savefile.ts`** (66 lines) — GETTING A FILE OUT OF THE APP, and the one decision that governs it.
 - **`src/session.ts`** (599 lines) — Crash-safe store for a photo SESSION — the set you opened and are moving between, each photo keeping its own edit.
