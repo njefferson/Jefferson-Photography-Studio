@@ -48,11 +48,6 @@ export function nikonColorMatrix(model?: string): number[] {
   if (model && /D5300/i.test(model)) return NIKON_D5300_COLOR_MATRIX;
   return NIKON_Z50_COLOR_MATRIX;
 }
-
-const XYZ_TO_SRGB = [
-  3.2406, -1.5372, -0.4986, -0.9689, 1.8758, 0.0415, 0.0557, -0.204, 1.057,
-];
-
 function inv3(m: number[]): number[] {
   const [a, b, c, d, e, f, g, h, i] = m;
   const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
@@ -70,18 +65,38 @@ function mul3(m: number[], n: number[]): number[] {
   return o;
 }
 
+/** sRGB (D65) -> XYZ, dcraw's xyz_rgb, row-major. */
+const SRGB_TO_XYZ = [
+  0.412453, 0.35758, 0.180423, 0.212671, 0.71516, 0.072169, 0.019334, 0.119193, 0.950227,
+];
 /**
- * camera-native RGB -> linear sRGB, row-normalized so neutral (gray) is
- * preserved (white balance keeps working) while chroma is expanded.
- * Returns a row-major 3x3.
+ * Camera-native RGB -> linear sRGB, built as dcraw and LibRaw build it in
+ * cam_xyz_coeff: multiply out cam_rgb = ColorMatrix * xyz_rgb (sRGB -> camera),
+ * divide each ROW of that by its sum so cam_rgb * (1,1,1) = (1,1,1), and
+ * invert. The row sums are the camera's D65 neutral, so normalising there is
+ * the same as scaling the INPUT by its white balance — the construction that is
+ * exact for white-balanced data, which is what this matrix is applied to (the
+ * gains run first).
+ *
+ * Until 2026-10-01 this inverted first and normalised the rows of the OUTPUT.
+ * Both keep (1,1,1) neutral, so "neutrals survive" never chose between them,
+ * and the output-side form distorts every colour that is not neutral: with the
+ * Z 50 constant a D65-balanced sRGB green rendered (0.098, 1.438, 0.108) rather
+ * than (0, 1, 0), and the green row read [-0.537, 2.703, -1.166] against
+ * [-0.189, 1.717, -0.528] here.
+ *
+ * @param colorMatrix1  the camera's XYZ -> camera matrix at D65, row-major.
+ * @returns a row-major 3x3 taking white-balanced camera RGB to linear sRGB;
+ *   each of its rows sums to 1, so a neutral input stays neutral — the
+ *   invariant tap-WB and gray-world rely on.
  */
 export function camToSrgbLinear(colorMatrix1: number[]): number[] {
-  const m = mul3(XYZ_TO_SRGB, inv3(colorMatrix1));
+  const camRgb = mul3(colorMatrix1, SRGB_TO_XYZ);
   for (let r = 0; r < 3; r++) {
-    const s = m[r * 3] + m[r * 3 + 1] + m[r * 3 + 2] || 1;
-    m[r * 3] /= s;
-    m[r * 3 + 1] /= s;
-    m[r * 3 + 2] /= s;
+    const s = camRgb[r * 3] + camRgb[r * 3 + 1] + camRgb[r * 3 + 2] || 1;
+    camRgb[r * 3] /= s;
+    camRgb[r * 3 + 1] /= s;
+    camRgb[r * 3 + 2] /= s;
   }
-  return m;
+  return inv3(camRgb);
 }
