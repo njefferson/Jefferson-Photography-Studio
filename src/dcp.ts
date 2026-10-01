@@ -70,14 +70,15 @@ function creativeLinear(r: number, g: number, b: number, p: EditParams): [number
     const xb = m[6] * r + m[7] * g + m[8] * b;
     r = xr; g = xg; b = xb;
   }
-  const a = (p.hue * Math.PI) / 180;
+  // Rows applied as rows, angle negated: the same matrix as compileEdit.
+  const a = (-p.hue * Math.PI) / 180;
   const cos = Math.cos(a), sin = Math.sin(a);
   const c00 = 0.299 + 0.701 * cos + 0.168 * sin, c01 = 0.587 - 0.587 * cos + 0.33 * sin, c02 = 0.114 - 0.114 * cos - 0.497 * sin;
   const c10 = 0.299 - 0.299 * cos - 0.328 * sin, c11 = 0.587 + 0.413 * cos + 0.035 * sin, c12 = 0.114 - 0.114 * cos + 0.292 * sin;
   const c20 = 0.299 - 0.3 * cos + 1.25 * sin, c21 = 0.587 - 0.588 * cos - 1.05 * sin, c22 = 0.114 + 0.886 * cos - 0.203 * sin;
-  let nr = c00 * r + c10 * g + c20 * b;
-  let ng = c01 * r + c11 * g + c21 * b;
-  let nb = c02 * r + c12 * g + c22 * b;
+  let nr = c00 * r + c01 * g + c02 * b;
+  let ng = c10 * r + c11 * g + c12 * b;
+  let nb = c20 * r + c21 * g + c22 * b;
   const luma = nr * 0.2126 + ng * 0.7152 + nb * 0.0722;
   nr = luma + (nr - luma) * p.sat;
   ng = luma + (ng - luma) * p.sat;

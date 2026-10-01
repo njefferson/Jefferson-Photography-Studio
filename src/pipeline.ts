@@ -1969,7 +1969,12 @@ export function compileEdit(
    *  bitmap, which at 260 px is finer than the tile. */
   skyFine?: BrushMask | null,
 ): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number) => void {
-  const a = (p.hue * Math.PI) / 180;
+  // The YIQ hue rotation, written as its ROWS (cRC = weight of input C in
+  // output R) and applied as rows, so grey stays grey. It was applied
+  // transposed until 2026-10-01, which tinted every neutral. Applied as rows,
+  // +angle lowers HSV hue, so the angle is negated to keep the slider turning
+  // the way it always has.
+  const a = (-p.hue * Math.PI) / 180;
   const cos = Math.cos(a);
   const sin = Math.sin(a);
   const c00 = 0.299 + 0.701 * cos + 0.168 * sin;
@@ -2202,9 +2207,9 @@ export function compileEdit(
       const xb = m6 * r + m7 * g + m8 * b;
       r = xr; g = xg; b = xb;
     }
-    let nr = c00 * r + c10 * g + c20 * b;
-    let ng = c01 * r + c11 * g + c21 * b;
-    let nb = c02 * r + c12 * g + c22 * b;
+    let nr = c00 * r + c01 * g + c02 * b;
+    let ng = c10 * r + c11 * g + c12 * b;
+    let nb = c20 * r + c21 * g + c22 * b;
     const luma = nr * REC709[0] + ng * REC709[1] + nb * REC709[2];
     // Match the shader: saturation boosts fade out in deep shadows
     // (smoothstep(0.02, 0.20, luma)) so they don't amplify chroma noise.
@@ -2300,14 +2305,14 @@ export function compileEdit(
         nr = L + (nr - L) * sf; ng = L + (ng - L) * sf; nb = L + (nb - L) * sf;
         // hue rotate by hue*w degrees (same matrix as the global hue)
         if (m.hue !== 0) {
-          const a = (m.hue * Math.PI) / 180 * w;
+          const a = (-m.hue * Math.PI) / 180 * w;
           const cs = Math.cos(a), sn = Math.sin(a);
           const k00 = 0.299 + 0.701 * cs + 0.168 * sn, k01 = 0.587 - 0.587 * cs + 0.33 * sn, k02 = 0.114 - 0.114 * cs - 0.497 * sn;
           const k10 = 0.299 - 0.299 * cs - 0.328 * sn, k11 = 0.587 + 0.413 * cs + 0.035 * sn, k12 = 0.114 - 0.114 * cs + 0.292 * sn;
           const k20 = 0.299 - 0.3 * cs + 1.25 * sn, k21 = 0.587 - 0.588 * cs - 1.05 * sn, k22 = 0.114 + 0.886 * cs - 0.203 * sn;
-          const rr = k00 * nr + k10 * ng + k20 * nb;
-          const gg = k01 * nr + k11 * ng + k21 * nb;
-          const bb = k02 * nr + k12 * ng + k22 * nb;
+          const rr = k00 * nr + k01 * ng + k02 * nb;
+          const gg = k10 * nr + k11 * ng + k12 * nb;
+          const bb = k20 * nr + k21 * ng + k22 * nb;
           nr = rr; ng = gg; nb = bb;
         }
         // contrast (linear, around mid grey)

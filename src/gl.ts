@@ -795,14 +795,17 @@ void main() {
   // same output = M * input as pipeline.ts. Identity when off.
   if (u_mix3On) c = u_mix3 * c;
 
-  // Hue rotation in linear space via the standard YIQ-style matrix.
-  float cosA = cos(u_hue), sinA = sin(u_hue);
+  // Hue rotation in linear space via the standard YIQ-style matrix. The
+  // literals are the matrix ROWS, so it is applied as c * hueMat (GLSL fills
+  // a mat3 by column; hueMat * c applied it transposed and tinted grey), with
+  // the angle negated to keep the slider's direction (pipeline.ts says why).
+  float cosA = cos(-u_hue), sinA = sin(-u_hue);
   mat3 hueMat = mat3(
     0.299 + 0.701*cosA + 0.168*sinA, 0.587 - 0.587*cosA + 0.330*sinA, 0.114 - 0.114*cosA - 0.497*sinA,
     0.299 - 0.299*cosA - 0.328*sinA, 0.587 + 0.413*cosA + 0.035*sinA, 0.114 - 0.114*cosA + 0.292*sinA,
     0.299 - 0.300*cosA + 1.250*sinA, 0.587 - 0.588*cosA - 1.050*sinA, 0.114 + 0.886*cosA - 0.203*sinA
   );
-  c = hueMat * c;
+  c = c * hueMat;
 
   // Saturation around luma. Boosts (sat > 1) fade out in deep shadows so the
   // look doesn't amplify chroma noise there; reductions apply everywhere.
@@ -901,14 +904,14 @@ void main() {
     c = mix(vec3(ml), c, 1.0 + (adj.z - 1.0) * w);
     float hue = u_maskHue[i];
     if (hue != 0.0) {
-      float a = radians(hue) * w;
+      float a = -radians(hue) * w;
       float cs = cos(a), sn = sin(a);
       mat3 hm = mat3(
         0.299 + 0.701*cs + 0.168*sn, 0.587 - 0.587*cs + 0.330*sn, 0.114 - 0.114*cs - 0.497*sn,
         0.299 - 0.299*cs - 0.328*sn, 0.587 + 0.413*cs + 0.035*sn, 0.114 - 0.114*cs + 0.292*sn,
         0.299 - 0.300*cs + 1.250*sn, 0.587 - 0.588*cs - 1.050*sn, 0.114 + 0.886*cs - 0.203*sn
       );
-      c = hm * c;
+      c = c * hm;
     }
     c = (c - 0.5) * (1.0 + (adj.y - 1.0) * w) + 0.5;
   }
@@ -1312,7 +1315,11 @@ export class Renderer {
    *  only when the browser gives no WebGL2 context at all. Everything that does
    *  not need the program — the quad, every texture — is set up here, at once. */
   constructor(private canvas: HTMLCanvasElement, opts: BuildOptions = {}) {
-    const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
+    // No antialias, depth or stencil: the renderer draws one triangle that
+    // covers the canvas, with no depth test, and the defaults (all true) made
+    // WebKit allocate a multisampled colour buffer and a depth buffer at the
+    // full canvas size, up to the native working copy's 24 MP, for nothing.
+    const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false, depth: false, stencil: false });
     if (!gl) throw new Error("WebGL2 is required and not available on this device.");
     this.gl = gl;
     // A LOST CONTEXT USED TO BE A BLANK EDITOR WITH NO EXPLANATION, AND IT
