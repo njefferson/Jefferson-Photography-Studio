@@ -1,30 +1,20 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
 planhash=a054a03153d6182f
-diffhash=234465004edf03df
-verdict=IN-SCOPE: 085's five lens-slider fixes, the review's three, the open-tile re-check, walk checks and record section, as steps 1 to 8
-# IN-SCOPE: The diff carries out plan steps 1 to 8 for defects A to E: a new `lensPick` field, a lens-aware tile stamp, the open-tile re-check, `mirrorPrimary`, defaults kept per photograph, the walk checks, record 085's new section and preview version 67. Nothing in it goes past the plan.
+diffhash=43bcb7936d0db28e
+verdict=IN-SCOPE: step 9's NOTES staging entry for v2.64.34, and the lens walk's header made true
+# IN-SCOPE: The diff is step 9's NOTES staging entry plus a correction to the comment in `tools/lens-order-walk.mjs`, which makes the claims of the step 2 walk true, and it does nothing the plan does not name.
 # 
-# On the point asked: only `restripOpen` adds a photograph to `openRestripIds`. The one `add` is at src/main.ts:14200, inside `restripOpen`. `armOpenRestrip` only sets the timer. It is called from two places: `restripOpen` (14201), and its own timer when it re-arms while a set is still being added (14207). That path adds nothing.
+# Untrue: none. I checked the "Checked:" sentence against record 085's "Found while building, and fixed after", and it agrees on four points:
+# - Each of the five fixes has a walk check that failed on production's build 3bb7e37.
+# - The review's Undo tile check (`(f) Undo of the Strength move redraws the tile too`) was added after the review and made to fail by planting its fix out.
+# - The review's other two fixes have no walk check: the stamp taken with the edit the tile is drawn from, and the copy following a forgotten profile.
+# - The walk file has 40 `check()` calls, which matches "40 of 40".
 # 
-# `restripOpen` is called from eight places, all of them lens controls, the pick, Undo, Redo and Reset:
-# - Shipped card's Strength input: 643
-# - Shipped card's Bypass: 649
-# - The pick: 690
-# - Own card's Strength input: 1127
-# - Own card's Bypass: 1134
-# - Undo: 2804
-# - Redo: 2819
-# - Reset: 2827
+# The new walk comment ("each fix's own check failed on production's build ... The check that Undo redraws the tile was added after a review and was made to fail by planting its fix out instead") matches the record.
 # 
-# Aerochrome's finishing copy reaches it only by sending an input event to one of the two Strength sliders. `restoreLiveEdit`, `activateCurrent` and `applySnapshot` never call it, so a return to a photograph or a resume adds nothing.
-# 
-# Untrue or outside the plan: none. Three places where the diff differs from the plan's wording, none outside it:
-# - `syncFromUI` and `syncToUI` are not touched. No control holds `lensPick`, and `syncToUI` already calls `updateHotspotUI`.
-# - `batchParamsFor` is not changed. The record says why, and that is true: a batch builds each file from a fresh opening (`importFile` then `batchParamsFor`), never from an edit.
-# - `buildLutGrid` now uses `currentLensCurve()`. It draws from the open photograph's own edit, so it falls under step 3.
-# 
-# The record's claims that I checked against the code hold:
-# - A Hue or Contrast move never calls `restripForGrade`.
-# - `lookFrom` leaves `lensPick` out of a saved look.
-# - `ownEdit` reads the live edit for the open photograph.
+# The other facts in the entry also hold:
+# - v2.64.34 is three commits after 3bb7e37 (v2.64.31).
+# - `PREVIEW_PIPELINE` is 67.
+# - The hub pin and `.doctrine-sync` are both 295ff9a, set in 5a9e163.
+# - The lens Strength and Bypass controls on both cards, the pick, Undo, Redo and Reset all call `restripOpen`.
