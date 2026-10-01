@@ -1,26 +1,21 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=afa1d04169393365
-diffhash=67db7fdbb89eb8fb
-verdict=IN-SCOPE: the step 5 records, NOTES, IR-SCIENCE and 085 saying production from v2.64.31 (3bb7e37), 085 open for the iPad pass
-# IN-SCOPE: the diff is the docs-only records update that the plan's step 5 describes, in the three files it names, and every factual statement in it checks out against the repository, GitHub and the live site.
+planhash=a054a03153d6182f
+diffhash=71644abc148b3d08
+verdict=IN-SCOPE: step 0's doctrine drift adopted, and the hub pin moved to 295ff9a with it
+# IN-SCOPE: The diff only adopts the doctrine drift and moves the hub pin from 05008dd to 295ff9a, and the plan names both as the first docs commit of this work.
 # 
-# The plan lines I relied on are step 5 and the Leaves open list. Step 5 asks for a "Nothing is waiting to be promoted, 2026-09-30" paragraph under NOTES "On staging", like the 2026-09-29 one, giving what went, the merge SHA, the version, the runs and the live copy. It asks for every "on staging while production remembers" statement to become "on production from 2026-09-30 in v2.64.N (SHA)" in six places: 085's Options chosen paragraph, Built already, Rejected 2 and Rank, NOTES' 085 bullet and the reversal under 2026-09-14, and IR-SCIENCE §9r. It also says 085 stays open for the iPad pass, and that its bullet should say so as 077's does. Leaves open repeats that the iPad pass on the lens slider was not run.
+# Plan lines relied on (/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md):
+# - Line 9 (Context, amended): "The doctrine drift is adopted, with the hub pin moved to 295ff9a to match it."
+# - Line 25 (Step 0): "Doctrine drift first. `doctrine-sync.mjs --repo .` says the hub moved 05008dd to 295ff9a. That is lessons 372 and 373 only, and DOCTRINE.md is unchanged. Read them, then `--adopt`, in the first docs commit."
+# - Line 88 (Verification): "Every commit gate exits 0, with a scope watcher's IN-SCOPE verdict recorded before each commit."
 # 
-# The diff changes exactly those six places and adds the paragraph, and touches nothing else. The paragraph follows the 2026-09-29 one sentence by sentence. It also records the CodeQL commit and the `github-advanced-security` failure. I read both as part of "what went" and "the runs" rather than new scope. The 085 bullet now ends "Shipped 2026-09-30 in v2.64.31 (3bb7e37 on main). Left open: the device pass … with no result recorded", the same form as 077's. The 085 record says it "stays open for it", and its Rank now waits on "the iPad pass on the slider".
+# Checked:
+# - **What changed.** Nothing is staged. Two files are modified on branch claude/laughing-edison-x0pdv8, one line each.
+#   - `.doctrine-sync`: 05008dda4ce959f6a3e7d30cfb00c6f55a6f0185 becomes 295ff9a7fab237512c707fd07a09bf3578c8e5a7.
+#   - `.github/workflows/gates.yml`: the `hub-gates.yml@` pin moves from 05008dda… to 295ff9a7fab237512c707fd07a09bf3578c8e5a7. The `with:` inputs are unchanged.
+# - **The new pin.** `git rev-parse 295ff9a` gives exactly that full SHA. `branch -r --contains` lists `origin/main`, so the pin is on the hub's main and not left behind by the history rewrite. 05008dd is an ancestor of 295ff9a.
+# - **What the hub changed between the two pins.** Only LESSONS.md plus lessons/372 and lessons/373. DOCTRINE.md is untouched, as step 0 says.
+# - **The commit subject.** "Internal: the doctrine is read up to the hub's 295ff9a, and the shared gates run from that commit" starts with `Internal:`. That matches an internal subject, and both files are dotfiles or workflow files, so it needs no reader-facing prefix.
 # 
-# No statement that the lens change is only on staging, or that production still remembers the strength, is left in the three files. Three older passages are still there and are correct as they stand:
-# - NOTES' v2.64.26 staging entry, kept as the record.
-# - NOTES line 200, "until the go", which belongs to v2.64.18's entry.
-# - IR-SCIENCE line 3384, from 2026-09-17, which the plan does not cover because it was not written today.
-# 
-# Facts checked:
-# - **Production:** `origin/main` is 3bb7e37. The live sw.js reads `const CACHE = "ips-2.64.31"` and names 3bb7e375d878…. Gates run 1008 and deploy run 958 for 3bb7e37 both concluded success.
-# - **Pull request 180:** its head ref is `staging` at b6776e4 and its base was a3c0047. It was merged at 20:30:33Z, and main's commit SHAs differ from staging's, which fits a rebase merge.
-# - **Staging matches production:** the trees are identical (`fd2c980`), so "compared tree for tree" holds.
-# - **Version .31 rather than .26:** `rev-list` from VERSION's last change (9eeea5d) counts 26 at d9e5110 and 31 at 3bb7e37. The five commits between are 11c0206, a3c0047, 76331bd and f0b33fb, which touch only docs, NOTES, IR-SCIENCE and `.plan-scope`, plus 3bb7e37, which touches only `tools/offline-shell-walk.mjs` and `.plan-scope`. That matches "four docs commits and one tools commit".
-# - **What it carried:** 085 for the lens; 071's test page rows in v2.64.18, v2.64.20 and v2.64.26; the report's Offline worker line in v2.64.18. All match the NOTES staging entries.
-# - **The PR's two heads and the failed job:** the two heads were a7721c7 and b6776e4. Job 110082946394's log shows the repo checked out at b6776e4 and "Built prompt with 10756 tokens". It then shows "CAPIError: 400 The requested model is not supported" from api.individual.githubcopilot.com, before any finding, so "at its first request to its model … GitHub's own error" is accurate. I did not read the log for the a7721c7 run myself; that half is taken from the facts given.
-# - **CodeQL on the new head:** the new head is b6776e4, and the passing CodeQL check there is taken from the facts given, not re-read.
-# 
-# Factual errors found: none.
+# Not checked: the plan cannot show whether lessons 372 and 373 were actually read before the `--adopt`. That step is the session's to confirm.
