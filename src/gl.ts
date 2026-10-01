@@ -242,6 +242,23 @@ vec3 sampleLut3d(vec3 c) {
 // Mirrored by srgbToLinear / srgbFromLinear in icc.ts, which the CPU uses.
 vec3 toLinear(vec3 c){ return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }
 vec3 toGamma(vec3 c){ c = max(c, 0.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0/2.4)) - 0.055, step(vec3(0.0031308), c)); }
+// CONTRAST ABOUT 18% GREY, ON LUMINANCE, WITH THE COLOUR KEPT: Y' = 0.1845 *
+// (Y / 0.1845)^k and the pixel scaled by Y'/Y, as darktable's colorbalancergb
+// does it (its grey fulcrum, 0.1845). Black stays black and mid grey stays mid
+// grey at every k. Mirrored by contrastGain in pipeline.ts.
+vec3 contrastMap(vec3 c, float k){
+  float Y = dot(max(c, 0.0), vec3(0.2126, 0.7152, 0.0722));
+  if (Y <= 1e-6) return c;
+  return c * (0.1845 * pow(Y / 0.1845, k) / Y);
+}
+// THE SHOULDER: below 0.8 nothing moves; above it the pixel's largest channel
+// rolls toward 1 instead of being clipped, and the other two are scaled with
+// it so the colour's ratios survive. Mirrored by shoulderGain in pipeline.ts.
+vec3 shoulderMap(vec3 c){
+  float n = max(max(c.r, c.g), c.b);
+  if (n <= 0.8) return c;
+  return c * ((0.8 + 0.2 * (1.0 - exp(-(n - 0.8) / 0.2))) / n);
+}
 // Warp: read the displacement field (RG encoded, 0.5 = none) and remap the
 // source coordinate — every fetchLin (centre AND neighbourhood taps) warps
 // together, so denoise/detail follow the moved image. Mirrored in warp.ts.
@@ -393,7 +410,7 @@ float maskWeight(int i, vec2 uv){
 // Pure ALU on purpose — routing it through the tone LUT texture broke GPU==CPU
 // (8-bit filtered lookup vs exact float math; field lesson 2026-07-05).
 vec3 keyDisplay(vec3 c){
-  return toGamma(clamp((c - 0.5) * u_con + 0.5, 0.0, 1.0));
+  return toGamma(clamp(shoulderMap(contrastMap(c, u_con)), 0.0, 1.0));
 }
 // Colour mask (type 3): weight from the pixel's DISPLAY-space hue/saturation
 // distance to the tapped target, chroma-key style. c is the running LINEAR
@@ -919,11 +936,11 @@ void main() {
       );
       c = c * hm;
     }
-    c = (c - 0.5) * (1.0 + (adj.y - 1.0) * w) + 0.5;
+    c = contrastMap(c, 1.0 + (adj.y - 1.0) * w);
   }
 
-  // Contrast around mid grey.
-  c = (c - 0.5) * u_con + 0.5;
+  // Contrast about 18% grey, then the shoulder into white.
+  c = shoulderMap(contrastMap(c, u_con));
 
   vec3 g = toGamma(clamp(c, 0.0, 1.0));
   // Tone curve (blacks/shadows/mids/whites/highlights), display space.

@@ -2280,9 +2280,11 @@ export function compileEdit(
       // so stacking order can't shift the selection.
       let kr = 0, kg = 0, kb = 0;
       if (hasColorMask) {
-        kr = toGamma((nr - 0.5) * con + 0.5);
-        kg = toGamma((ng - 0.5) * con + 0.5);
-        kb = toGamma((nb - 0.5) * con + 0.5);
+        const kc = contrastGain(nr, ng, nb, con);
+        const ks = shoulderGain(nr * kc, ng * kc, nb * kc) * kc;
+        kr = toGamma(nr * ks);
+        kg = toGamma(ng * ks);
+        kb = toGamma(nb * ks);
       }
       if (keepW) groupW.fill(0);
       for (let gi = 0; gi < maskGroupsActive.length; gi++) {
@@ -2318,14 +2320,16 @@ export function compileEdit(
           const bb = k20 * nr + k21 * ng + k22 * nb;
           nr = rr; ng = gg; nb = bb;
         }
-        // contrast (linear, around mid grey)
-        const cf = 1 + (m.contrast - 1) * w;
-        nr = (nr - 0.5) * cf + 0.5; ng = (ng - 0.5) * cf + 0.5; nb = (nb - 0.5) * cf + 0.5;
+        // contrast about 18% grey, colour kept (contrastGain)
+        const cf = contrastGain(nr, ng, nb, 1 + (m.contrast - 1) * w);
+        nr *= cf; ng *= cf; nb *= cf;
       }
     }
-    out[0] = toGamma((nr - 0.5) * con + 0.5);
-    out[1] = toGamma((ng - 0.5) * con + 0.5);
-    out[2] = toGamma((nb - 0.5) * con + 0.5);
+    const cg = contrastGain(nr, ng, nb, con);
+    const sg = shoulderGain(nr * cg, ng * cg, nb * cg) * cg;
+    out[0] = toGamma(nr * sg);
+    out[1] = toGamma(ng * sg);
+    out[2] = toGamma(nb * sg);
     if (toneFn) {
       out[0] = toneFn(out[0]);
       out[1] = toneFn(out[1]);
@@ -2523,6 +2527,48 @@ export function compileEdit(
       out[2] += (lutTmp[2] - out[2]) * s;
     }
   };
+}
+
+/** Contrast's grey fulcrum: linear 18% grey, darktable colorbalancergb's
+ *  default (0.1845). The shader's contrastMap carries the same number. */
+const CONTRAST_GREY = 0.1845;
+/** Where the highlight shoulder begins, on a pixel's largest channel. The
+ *  shader's shoulderMap carries the same number. */
+const SHOULDER_KNEE = 0.8;
+
+/**
+ * The factor contrast multiplies a linear pixel by: its Rec.709 luminance
+ * pivoted at 18% grey, Y' = 0.1845 * (Y / 0.1845)^k, with all three channels
+ * scaled by Y'/Y so the colour's ratios are kept.
+ * @param r,g,b  linear RGB after white balance, exposure and the matrix.
+ * @param k  the contrast, 1 = none.
+ * @returns the gain to multiply r, g and b by; 1 for a pixel with no light.
+ *   Black stays black and 0.1845 grey stays grey at every k — the property
+ *   the old (c - 0.5) * k + 0.5 broke, crushing everything below linear
+ *   0.065 at k = 1.15. Must equal the shader's contrastMap or GPU and CPU
+ *   disagree.
+ */
+function contrastGain(r: number, g: number, b: number, k: number): number {
+  const Y = 0.2126 * Math.max(r, 0) + 0.7152 * Math.max(g, 0) + 0.0722 * Math.max(b, 0);
+  if (Y <= 1e-6) return 1;
+  return (CONTRAST_GREY * Math.pow(Y / CONTRAST_GREY, k)) / Y;
+}
+
+/**
+ * The factor the highlight shoulder multiplies a linear pixel by: nothing
+ * below SHOULDER_KNEE on its largest channel, and above it that channel rolls
+ * toward 1 (knee + (1 - knee)(1 - e^(-(n - knee)/(1 - knee)))) with the
+ * other two scaled alike.
+ * @param r,g,b  linear RGB after contrast.
+ * @returns the gain to multiply r, g and b by, at most 1; a pixel brighter
+ *   than white keeps its colour instead of clipping channel by channel. Must
+ *   equal the shader's shoulderMap.
+ */
+function shoulderGain(r: number, g: number, b: number): number {
+  const n = Math.max(r, g, b);
+  if (n <= SHOULDER_KNEE) return 1;
+  const w = 1 - SHOULDER_KNEE;
+  return (SHOULDER_KNEE + w * (1 - Math.exp(-(n - SHOULDER_KNEE) / w))) / n;
 }
 
 /** The display encode, clamped to 0..1: the piecewise sRGB curve, the same as

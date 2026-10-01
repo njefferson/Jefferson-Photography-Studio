@@ -111,13 +111,17 @@ function buildHueSatMap(p: EditParams): number[] {
   return data;
 }
 
-/** ProfileToneCurve: a few (x,y) points approximating RGB contrast about 0.5. */
+/** ProfileToneCurve: a few (x,y) points of the app's contrast about 18% grey
+ *  and its highlight shoulder, as they act on a neutral — the same two
+ *  formulas as contrastGain and shoulderGain in pipeline.ts, with the last
+ *  point pinned to (1, 1) so a profile's white stays white. */
 function buildToneCurve(contrast: number): number[] {
   const pts: number[] = [];
   for (let i = 0; i <= 8; i++) {
     const x = i / 8;
-    const y = Math.min(1, Math.max(0, (x - 0.5) * contrast + 0.5));
-    pts.push(x, y);
+    let y = x > 0 ? 0.1845 * Math.pow(x / 0.1845, contrast) : 0;
+    if (y > 0.8) y = 0.8 + 0.2 * (1 - Math.exp(-(y - 0.8) / 0.2));
+    pts.push(x, i === 8 ? 1 : Math.min(1, Math.max(0, y)));
   }
   return pts;
 }
