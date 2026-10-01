@@ -626,7 +626,7 @@ cannot describe something the code does not say about itself.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (258 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1127 lines) — Full-resolution export.
+- **`src/export.ts`** (1128 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
@@ -640,7 +640,7 @@ cannot describe something the code does not say about itself.
 - **`src/histogram.ts`** (114 lines) — Lightroom-style floating histogram.
 - **`src/hotspot.ts`** (197 lines) — The per-lens IR hot-spot correction that comes WITH the app, as opposed to one the reader measured for themselves (lensstore.ts).
 - **`src/hotspotProfiles.ts`** (32 lines) — GENERATED — do not hand-edit.
-- **`src/icc.ts`** (241 lines) — Embed a colour profile in every export so files are never emitted untagged (untagged JPEG/TIFF is a real-world failure: viewers guess the colour space).
+- **`src/icc.ts`** (278 lines) — Embed a colour profile in every export so files are never emitted untagged (untagged JPEG/TIFF is a real-world failure: viewers guess the colour space).
 - **`src/iconpicker.ts`** (202 lines) — Home-Screen icon picker for the installed Studio launcher.
 - **`src/import.ts`** (162 lines) — Hardened image import.
 - **`src/keepfile.ts`** (258 lines) — THE KEEP FILE: a photograph the reader owns, as one file they hold.

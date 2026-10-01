@@ -824,11 +824,12 @@ export async function exportImage(
     if (!blob) throw new Error("JPEG encoding failed.");
     __mark("encode", __a);
     __a = performance.now();
-    // canvas.toBlob passes our bytes through UNTAGGED (putImageData values are
-    // canvas-space, never converted); embed the Display P3 profile so viewers
-    // read them as written, the honest EXIF subset (capture date, camera,
-    // lens, exposure — freshly built, never GPS or orientation), then the
-    // traveling recipe, when asked for.
+    // canvas.toBlob passes our pixel values through unconverted (putImageData
+    // values are canvas-space), but it may tag them: Chromium 141 writes an
+    // sRGB profile. embedIccInJpeg replaces any such profile with the Display
+    // P3 one so viewers read them as written. Then the honest EXIF subset
+    // (capture date, camera, lens, exposure — freshly built, never GPS or
+    // orientation), then the traveling recipe, when asked for.
     let tagged = embedIccInJpeg(new Uint8Array(await blob.arrayBuffer()), DISPLAY_P3_ICC);
     const exif = readExifSubset(file.bytes);
     if (exif) tagged = embedExifInJpeg(tagged, buildExifApp1(exif)); // lands BEFORE the ICC (convention)

@@ -206,13 +206,50 @@ export function srgbDisplayToP3Display(r: number, g: number, b: number, out: Flo
 }
 
 /**
+ * A JPEG with every APP2 `ICC_PROFILE` segment in its leading marker run taken
+ * out. Takes the JPEG's bytes; returns them unchanged when there is none (or
+ * when they are not a JPEG), otherwise a copy without those segments. The
+ * caller adds its own profile afterwards, and the file must end up with exactly
+ * one ICC chain: two chains each marked 1 of 1 make libjpeg-turbo's reader
+ * reject both, so the pixels are read untagged. Chromium's canvas.toBlob JPEG
+ * already carries an sRGB profile (measured on Chromium 141), and the HTML
+ * standard asks every encoder for one.
+ */
+function stripIccFromJpeg(jpeg: Uint8Array): Uint8Array {
+  if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) return jpeg;
+  const id = "ICC_PROFILE\0";
+  const keep: Uint8Array[] = [jpeg.subarray(0, 2)];
+  let o = 2;
+  let dropped = false;
+  // Walk APPn (E0-EF) and COM (FE) segments only; the first other marker
+  // starts the image proper and everything from it on is kept as is.
+  while (o + 4 <= jpeg.length && jpeg[o] === 0xff && ((jpeg[o + 1] >= 0xe0 && jpeg[o + 1] <= 0xef) || jpeg[o + 1] === 0xfe)) {
+    const len = (jpeg[o + 2] << 8) | jpeg[o + 3];
+    if (len < 2 || o + 2 + len > jpeg.length) break;
+    let isIcc = jpeg[o + 1] === 0xe2 && len >= 2 + id.length;
+    for (let i = 0; isIcc && i < id.length; i++) if (jpeg[o + 4 + i] !== id.charCodeAt(i)) isIcc = false;
+    if (isIcc) dropped = true;
+    else keep.push(jpeg.subarray(o, o + 2 + len));
+    o += 2 + len;
+  }
+  if (!dropped) return jpeg;
+  keep.push(jpeg.subarray(o));
+  const out = new Uint8Array(keep.reduce((n, k) => n + k.length, 0));
+  let p = 0;
+  for (const k of keep) { out.set(k, p); p += k.length; }
+  return out;
+}
+
+/**
  * Insert an ICC profile into a JPEG as an APP2 `ICC_PROFILE` segment. Our
  * profile fits in a single segment (well under the 65 519-byte data cap), so we
- * emit exactly one chunk (1 of 1). The segment goes right after the APP0/JFIF
- * block if present, else right after SOI.
+ * emit exactly one chunk (1 of 1). Any ICC segment the encoder already wrote is
+ * removed first (stripIccFromJpeg), so the result carries one chain, ours. The
+ * segment goes right after the APP0/JFIF block if present, else right after SOI.
  */
-export function embedIccInJpeg(jpeg: Uint8Array, icc: Uint8Array = SRGB_ICC): Uint8Array {
-  if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) return jpeg; // not a JPEG — leave as-is
+export function embedIccInJpeg(input: Uint8Array, icc: Uint8Array = SRGB_ICC): Uint8Array {
+  if (input[0] !== 0xff || input[1] !== 0xd8) return input; // not a JPEG — leave as-is
+  const jpeg = stripIccFromJpeg(input);
   // Find the insertion point: after SOI, skipping a leading APP0 (JFIF) if any.
   let insertAt = 2;
   if (jpeg[2] === 0xff && jpeg[3] === 0xe0) {
