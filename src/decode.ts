@@ -158,9 +158,8 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
         rotate: orientationToRotate(ifds),
       };
     } catch {
-      // Only claim High-Efficiency when the file's own Compression tag says
-      // so — a damaged classic NEF blamed on HE sends the user chasing the
-      // wrong fix.
+      // Only claim High-Efficiency when the file's own data says so — a
+      // damaged classic NEF blamed on HE sends the user chasing the wrong fix.
       throw new Error(
         nefLooksHighEfficiency(file.bytes)
           ? "This NEF couldn't be decoded — it's a Nikon “High Efficiency” NEF (Z8/Z9, Z50 II HE/HE*), which isn't supported. " +
@@ -189,15 +188,23 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
   }
 }
 
-/** True when a NEF's raw IFD carries a Compression tag OTHER than the classic
- *  values this app decodes (34713 = Nikon compressed, 1 = uncompressed) — the
- *  signature of the newer High-Efficiency (TicoRAW) files. Any parse trouble
- *  returns false: never claim HE without the tag saying so. */
+/** True when a NEF's raw data is High Efficiency (TicoRAW / JPEG XS), which
+ *  this app does not decode. Takes the file's bytes; returns true only when the
+ *  CFA raw IFD's first strip opens with the JPEG XS start-of-codestream and
+ *  capabilities markers (ff 10 ff 50), the test LibRaw makes, or when that IFD
+ *  carries a Compression other than 34713. HE files keep Compression 34713, so
+ *  the Compression test alone never fired on one, and the reader got the
+ *  generic "damaged" text instead of the HE one. Any parse trouble returns
+ *  false: never claim HE without the data saying so. The caller shows the HE
+ *  message only after the classic decode has already failed. */
 function nefLooksHighEfficiency(bytes: Uint8Array): boolean {
   try {
     const ifds = new Tiff(bytes).allIfds();
     const cfa = ifds.find((d) => d.num(262)[0] === PHOTO_CFA);
     const comp = cfa?.num(259)[0];
+    const off = cfa?.num(273)[0];
+    if (off !== undefined && off + 4 <= bytes.length
+      && bytes[off] === 0xff && bytes[off + 1] === 0x10 && bytes[off + 2] === 0xff && bytes[off + 3] === 0x50) return true;
     return comp !== undefined && comp !== 34713 && comp !== 1;
   } catch {
     return false;
