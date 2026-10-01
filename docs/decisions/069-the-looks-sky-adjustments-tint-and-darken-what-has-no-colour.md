@@ -316,8 +316,7 @@ film decides what the guard keeps: a cloud comes out white.
     exist; PixInsight's documentation repository on GitLab has neither (its
     background-named tools there, BackgroundNeutralization and
     GradientCorrection, were not read). A checking agent read that
-    documentation index in a browser's identity; that reading is withdrawn,
-    and nothing here rests on it.
+    documentation index in a browser's identity.
   - **Refused by the hosts themselves:** helpx.adobe.com, support.captureone.com
     and www.researchgate.net answered 403; photographylife.com answered 402;
     patents.google.com and manpages.ubuntu.com answered 503; and

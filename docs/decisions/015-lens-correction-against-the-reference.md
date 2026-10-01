@@ -97,7 +97,7 @@ headless browser was tried here to run the challenge and failed because it does
 not trust the proxy's certificate; that was a request in a browser's identity,
 which is not a route (hub LESSONS 374). A challenge for browsers is a question for
 the owner, who can open the page in one. One request to the site's comments feed in a browser's identity, on
-2026-09-30, was answered; nothing here rests on it, and it is withdrawn. It is the only source likely
+2026-09-30, was answered; nothing here rests on it. It is the only source likely
 to carry a measurement of how the spot scales with scene brightness, which is what
 the per-image strength turns on.
 

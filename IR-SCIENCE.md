@@ -4807,8 +4807,8 @@ to 13% saturation, that cut moves it toward neutral. What the general finding ab
 **And the cut is the lens's own cast (decision 085, "Second check", 2026-09-30).** A hot spot carries colour, not only
 brightness. David Kennard's blog posts 1126, 976 and 978 report three things. Under a red-foliage rendering, the centre sky
 turns reddish. The hot spot is much stronger in the pure-infrared channel. A white-card flat corrected with CornerFix takes
-the red out. Per-channel division is how RawTherapee, Siril, PixInsight, the DNG GainMap, darktable and CornerFix
-remove such a cast; Lightroom's Flat-Field Correction is named but not read (decision 085 withdraws the only copy). The field checks the result on neutral things: clouds, pavement, samplers. On three of the owner's raws,
+the red out. Per-channel division is how RawTherapee, Siril, PixInsight, the DNG GainMap, darktable, Lightroom and CornerFix
+remove such a cast. The field checks the result on neutral things: clouds, pavement, samplers. On three of the owner's raws,
 neutral things at the centre move toward the same material at the frame's edge by 57 to 91% of the gap, and none crosses it.
 Some tools normalise the flat to its centre, which keeps the centre's colour. That is not open here at strength 1 while white
 balance at open is gray-world. At strength 1, inside the gain's clamp, two flats that differ by one scale per channel give
@@ -4834,7 +4834,6 @@ reference; the choice was made by looking.
 
 **Refused on this topic:** rawpedia.rawtherapee.com (challenge page),
 helpx.adobe.com (403 to the web fetcher and to a browser-identity curl; its
-flat-field page was then fetched in a browser's identity, a read withdrawn in
-decision 085), support.captureone.com and userguides.dxo.com (403), blog.kasson.com
+flat-field page was then fetched in a browser's identity), support.captureone.com and userguides.dxo.com (403), blog.kasson.com
 (403), www.edwardnoble.com (503), and siril.readthedocs.io, docs.rawtherapee.com,
 www.captureintegration.com and www.on1.com (egress proxy).
