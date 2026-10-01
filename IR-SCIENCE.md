@@ -72,7 +72,7 @@ file's own metadata means.**
 
 ---
 
-## 3. THE CAMERA CANNOT STORE AN INFRARED WHITE POINT
+## 3. THE CAMERA'S RECORDED WHITE BALANCE IS NOT AN INFRARED WHITE POINT
 
 This is the single most expensive fact here and the one most likely to be
 rediscovered by accident.
@@ -84,9 +84,9 @@ reciprocals are the gains. Reading either is easy and the NEF MakerNote walker
 in `src/raw/nef.ts` already navigates to the right IFD for the black level and
 the linearization curve.
 
-**The tag is not usable.** The gains an IR white point requires fall outside the
-range a custom preset can hold, so the camera clamps and records what it could
-reach. Measured, on this repository's own files:
+**The tag is not usable.** What it holds on these files is the camera's
+daylight balance, not a measurement of the infrared scene. Measured, on this
+repository's own files:
 
 - `NIR_1376.NEF` carries WhiteBalance `PRESET4` and `0x000C
   [1.8574, 1.4668, 1, 1]` — R 1.86, B 1.47, G 1, which reads like an ordinary
@@ -96,21 +96,38 @@ reach. Measured, on this repository's own files:
 - Gray-world on the same frame renders **rgb(175, 178, 178)**, neutral, **five**
   hues.
 
-**The tell that it is a ceiling and not a measurement:** a NEF on `PRESET4` and
-five camera JPEGs on `PRESET6` record that identical number to four decimals.
-Two different custom preset slots landing on one value is a clamp.
+**Why two slots record one number — corrected 2026-10-01.** A NEF on `PRESET4`
+and five camera JPEGs on `PRESET6` record that identical number to four
+decimals. This section used to read that as a clamp: the gains an IR white
+point needs falling outside what a preset can hold, so the camera recording
+what it could reach. The camera's own manual explains it differently. The Z 50
+Online Manual, *The i Menu > White Balance > Preset Manual*
+(onlinemanual.nikonimglib.com/z50/en/07_the_i_menu_02.html): "If no value
+currently exists for the selected preset, white balance will be set to 5200 K,
+the same as Direct sunlight." `NIR_1376.NEF` records WhiteBalance `PRESET4`,
+fine-tune `0x000B [0, 0]` and `0x000C` = 951/512, 751/512 — within 1.3% (R) and
+2.2% (B) of darktable's Z 50 *Direct Sunlight* preset at fine-tune 0 (R 1.8828,
+B 1.4355, `data/wb_presets.json`), and at no edge of the camera's preset range.
+Two slots holding no measured value both fall back to 5200 K, which is why they
+agree. These files do not settle whether the camera can store an infrared
+preset at all: none of them was shot on a slot that holds one.
 
-**So an infrared raw converter has to find the white point BELOW what the camera
-allows, from the data.** That is what gray-world does here and what this app's
-"no 2000K floor" claim has always meant — ordinary raw converters refuse to go
-below roughly 2000K because no visible-light illuminant is down there, and an IR
-white point is.
+**So an infrared raw converter has to find the white point from the data.**
+That is what gray-world does here and what this app's "no 2000K floor" claim has
+always meant. The floor belongs to KELVIN sliders on stock profiles, because no
+visible-light illuminant is down there and an IR white point is: Lightroom's
+stops at 2000 K, darktable's at 1901 K (`DT_IOP_LOWEST_TEMPERATURE` in
+`src/iop/temperature.c`), RawTherapee's at 1500 K (`MINTEMP` in
+`rtengine/colortemp.h`). It does not belong to raw converters as such:
+darktable's channel-coefficient sliders take raw gains from 0 to 8 directly,
+and Lightroom reaches an IR white point through an IR-shifted camera profile,
+such as the Temp −100 profile this repository's Lightroom DNGs carry.
 
 **Consequence, and it inverts the obvious design:** "open as shot" is meaningful
-for a camera-rendered JPEG, which was developed through the clamped preset and
-should be left alone. It is **not** meaningful for a raw file, where the stored
-white balance is an artefact of the camera's range rather than a record of
-intent. A session read the standing "opens as shot" rule as an instruction to
+for a camera-rendered JPEG, which was developed through the preset's daylight
+default and should be left alone. It is **not** meaningful for a raw file, where
+the stored white balance is a 5200 K default rather than a record of the
+scene. A session read the standing "opens as shot" rule as an instruction to
 develop raws at `0x000C`, shipped it, and took it back out the same day.
 
 `src/raw/nef.ts` carries a comment at the MakerNote walker saying the tag is
@@ -445,6 +462,15 @@ target and the two populations MERGE — 94–98% of the coloured frame into one
 bin. The separation IS the film. The app's own `hue` control is not a uniform
 rotation either: measured at +20, foliage moved +31° while sky moved −7°.
 
+**Corrected 2026-10-01: these hue figures were taken through a defective
+control.** The app's `hue` applied the YIQ rotation TRANSPOSED — GLSL fills a
+`mat3` by column, the CPU path copied that order, and the result is a matrix
+that tints grey (lime at 180°) rather than a rotation. The +38° merge and the
++31°/−7° split were both measured through it, so they say what that matrix did,
+not what a hue rotation does. The control is fixed on the session branch
+("Fixed: Hue no longer tints grey…"); both figures are owed a re-measurement
+through the corrected control before "ruled out" is relied on again.
+
 **WHAT SHIPS INSTEAD: eight band hue shifts on `LOOKS.eir.raw.hsl`.** `hslAt` is
 the only knob in this pipeline that moves two populations differently. Solved
 against the film's angles on six frames, with the film's own spread as a ceiling
@@ -634,8 +660,10 @@ named as what it needs, and this note is the three built, on 2026-09-18.
 `buildSkyMask`'s 384 px feathered bitmap is taken up to 1024 px on the long
 edge and snapped to the photograph's own edges with a GUIDED FILTER (He, Sun
 and Tang, *Guided Image Filtering*, ECCV 2010 / TPAMI 2013 — the field's tool
-for joint upsampling and mask feathering, and the one Adobe-class mask
-refinement rests on): in every window the output is a linear function of the
+for joint upsampling and mask feathering; its authors compare it against
+Photoshop CS4's Refine Edge, which they call "a similar function", in ECCV
+2010 Fig. 9 and TPAMI 2013 Fig. 15 — a tool that already existed, so not one
+built on this filter): in every window the output is a linear function of the
 guide, so it inherits the guide's edges and keeps the mask's values away from
 them, in O(N) through summed-area tables. **The guide is two channels of the
 gray-world-balanced frame, gamma luma and blue share**, not luma alone: in an
@@ -643,7 +671,16 @@ infrared frame IR-bright foliage and a bright sky sit close in luma and far
 apart in colour, which is the same fact the bitmap's own cluster rests on.
 Radius 6, eps 0.005 (guide units squared); the luma channel is normalised to
 the frame's 99.5th percentile so a dark frame's edges weigh what a bright
-one's do. Built once per photograph beside the bitmap, cached per decoded
+one's do.
+
+**Corrected 2026-10-01, against `src/skyfine.ts`:** the guide is THREE
+channels — red share, blue share and gamma luma (`SkyGuide`) — and the radius
+is 12 (`SKY_FINE_RADIUS`); eps is 0.005 as stated (`SKY_FINE_EPS`). And one eps
+for all three is not neutral: a guide channel earns a coefficient only where
+its variance in the window is comparable to eps (He, Sun and Tang, TPAMI 2013,
+section 3), and the two colour shares vary 16–50× less than 0.005, so the
+filter follows luma alone. Scaling the channels to comparable spread, or an
+eps near 1e-4, is what lets colour separate. Built once per photograph beside the bitmap, cached per decoded
 image (a WeakMap, so a set of forty tiles never grows one twice), uploaded as
 one R8 texture and sampled by the brush sampler on the CPU — the same texel-
 centre bilinear the shader does.
@@ -742,7 +779,10 @@ instrument, which was green on all three.
    crown's side and left a halo; colour shares alone (red, blue) read the pale
    haze above 3406's roofline as roof and left a pale band (rim +0.130). Both
    at once — the per-window fit takes whichever separates there — and the
-   crown is crisp and the haze is sky.
+   crown is crisp and the haze is sky. (Corrected 2026-10-01: at eps 0.005
+   the colour shares get almost no coefficient, see above, so what this
+   measured is mostly luma's; the colour half is owed its own measurement once
+   the channels are scaled.)
 3. *The input.* Fed the FEATHERED bitmap, the guided filter kept the feather
    wherever its window did not reach an edge, and learned the sky's gradient
    as "less sky": the refined mask sloped to 0.85 over the 200 px above the
@@ -3088,7 +3128,8 @@ pixls.us, "what is the best way to boost the colors (saturation)"
 
 ## 5. What a camera JPEG is, and why it is a different animal
 
-A camera-rendered JPEG was developed **through** the clamped custom preset, then
+A camera-rendered JPEG was developed **through** the empty custom preset's 5200 K
+daylight default (section 3), then
 tone-curved and written as 8-bit sRGB. So:
 
 - It is already white balanced. Applying gray-world under a look is a **second**
@@ -3299,7 +3340,13 @@ ask which end of the curve is trustworthy.
 
 **This app has neither.** It divides by the curve and by no reference level, so
 the correction moves the frame's overall colour balance as well as redistributing
-it — measured in 9d.
+it — measured in 9d. (Corrected 2026-10-01: it had an anchor, just not either of
+these. Every curve was already normalised to 1 in the r 0.55–0.72 reference ring
+(`src/lensprofile.ts`, `REF_LO`/`REF_HI`), an outer-ring anchor of the same kind
+as Kolari's working step of picking a colour "about halfway out from the
+center", though further out — halfway on a 3:2 frame is roughly r 0.3–0.5 of the
+half-diagonal. What it lacked was the flat's AVERAGE, which `lensAreaMean` now
+supplies, and which is the formula Kolari states.)
 
 ### 9c. Where a flat-field correction belongs, and what it is known to break
 
@@ -3344,6 +3391,20 @@ One thing the reference **validates**: RawTherapee's auto-match key is camera
 make, model, lens, focal length and aperture, resolved by nearest in time among
 exact matches and otherwise by nearest in lens and aperture. That is the same
 two-stage shape `matchIn` in `src/lensstore.ts` already implements.
+
+**Corrected 2026-10-01: it is not the same shape.** RawTherapee's
+`ffInfo::distance` (`rtengine/ffmanager.cc`) returns INFINITY when maker, model
+or lens differ, and `find()` returns nothing when every distance is infinite —
+it refuses a flat from any other make, model or lens. And it weights aperture
+as `dAperture = 2 * (log(a1) - log(a2)) / log(2)` ("more important for
+vignette") against a log2 focal-length ratio, so one stop counts as much as a
+doubling of focal length; `matchIn` uses |ln| for both, so one stop counts half
+of one. `src/lensstore.ts` keys on the lens string alone (`matchAny`) and
+withholds only the colour half, only when make and model differ, calling the
+brightness half lens geometry that "transfers" — while Kolari shows the sensor
+stack and the conversion filter making or removing the spot on the same lens.
+EXIF records no conversion, so a second body of the same model cannot be told
+apart from the file at all.
 
 ### 9d. What this app does, measured on its own shipped table
 
@@ -3924,11 +3985,20 @@ it is the clean one.
 frame the three channels are nearly equal (the colour is a 1–3% residual, 4c-xxi),
 so a row's SIGNAL gain is about its sum while its NOISE gain is its norm:
 
-- red `[0.99, −0.06, 0.07]` — signal 1.00, noise ×0.99 uncorrelated to ×1.12
+- red `[0.99, −0.06, 0.07]` — signal 1.00, noise ×0.99 uncorrelated to ×1.00
   correlated. Harmless.
-- **green `[−1.44, 1.37, 1.02]` — signal 0.95, noise ×2.23 to ×3.83.** A
-  difference of two large opposite-signed numbers.
-- blue `[−0.47, 0.81, 0.65]` — signal 0.99, noise ×1.14 to ×1.93.
+- **green `[−1.44, 1.37, 1.02]` — signal 0.95, noise ×2.23 uncorrelated, falling
+  to ×0.95 fully correlated.** A difference of two large opposite-signed numbers.
+- blue `[−0.47, 0.81, 0.65]` — signal 0.99, noise ×1.14 uncorrelated to ×0.99
+  correlated.
+
+(Corrected 2026-10-01. These ranges read ×0.99–1.12, ×2.23–3.83 and ×1.14–1.93,
+taking the sum of absolute weights as the "correlated" end. For noise of equal
+variance and correlation ρ ≥ 0 the variance is σ²[Σa² + ρ((Σa)² − Σa²)], so the
+sum of absolute weights is reached only by noise anticorrelated in the weights'
+sign pattern, and correlated noise is amplified LESS in a row that mixes signs.
+The point the green row makes still stands: its component orthogonal to
+(1, 1, 1), norm ≈ 2.17, is what carries chroma noise.)
 
 **THE FIRST INSTRUMENT WAS BLIND AND ITS OWN GATE REFUSED IT.** A chroma residual
 averaged over 652,339 sky pixels at a four-pixel lag read Pink IR 9.26 against
@@ -4119,7 +4189,14 @@ surface with high NIR reflectance goes red whether it is a leaf or a wing.
 White and light greys are frequently strongly NIR-reflective, which is exactly
 the case here: the red sits on the sunlit faces. **So the film would do
 something similar on this aircraft**, and appealing to the film cannot justify
-protecting it. What justifies protecting it is that it is a photograph and the
+protecting it. (Corrected 2026-10-01: the film would NOT. Kodak TI-2562 pp. 1–2:
+"Infrared radiation appears as red, which is the result of yellow dye formation
+in one layer, magenta dye formation in a second layer, and the absence of cyan
+dye", and "numerous other colors will be formed, depending on the proportions of
+green, red, and infrared". White or light-grey paint is bright in green and red
+as well, exposes all three layers and renders light or white. The red here is
+this camera's: it records only infrared, so it has nothing to tell paint from a
+leaf by. The mask remedy below stands.) What justifies protecting it is that it is a photograph and the
 subject is the aircraft.
 
 **THE FIELD'S ANSWER IS SELECTIVE, AND IT IS A MASK, NOT A BETTER GLOBAL
@@ -4467,8 +4544,12 @@ Navigation", International Journal of Advanced Robotic Systems 10(10), 2013
   above it and a varied one below scores high. Its ancestor is Ettinger,
   Nechyba, Ifju and Waszak's horizon energy for micro air vehicles (2002).
 - Two post-processing tests. **§2.3.1**, a photograph with no sky in it: the
-  border averages less than H/30, or less than H/4 with an average absolute
-  step over 5 px. **§2.3.2**, columns with no sky in them: where the border
+  border averages less than H/30, or less than H/10 with an average absolute
+  step over 5 px (eq. 15: "thresh1 = H/30, thresh2 = H/10, thresh3 = 5", the
+  H/10 chosen in §3.3 from a sweep over thresh2/H). This line read H/4 until
+  2026-10-01: that value is the cnelson/skydetector notebook's, which misquotes
+  eq. 15 and codes `image.shape[0]/4`, and it is what `SKY_NO_SKY_AVE_JAGGED`
+  in `src/skyhorizon.ts` still carries. **§2.3.2**, columns with no sky in them: where the border
   steps by more than H/3 somewhere, split the region above it into two clusters
   and clear the columns whose contents belong to the cluster nearer the ground.
 
@@ -4484,7 +4565,8 @@ strongly and a canopy is all structure. The separation the method needs is
 wider in infrared than in the visible, not narrower.
 
 **FOUR THINGS HAD TO CHANGE, and each one is a measurement rather than a
-preference.**
+preference.** (Two further departures were made and not listed here until
+2026-10-01; they follow the four, marked as unmeasured.)
 
 - **The thresholds are quantiles of the frame's own gradients, not numbers.**
   The paper searches t over 5..600 in 120 steps, stating 1443 as the
@@ -4502,7 +4584,13 @@ preference.**
   was found on — see hillside below — which is worth saying, because the
   argument for it is sound and the fix it was reached for was elsewhere.)
 - **The no-sky test's SECOND clause is measured and never allowed to refuse.**
-  Equation 14's zigzag clause, wired as written, called NIR_0063 sky-less. That
+  Equation 14's zigzag clause, wired as written, called NIR_0063 sky-less.
+  (Corrected 2026-10-01: it was wired at the notebook's H/4, not as written.
+  Before refinement NIR_0063's border averages 0.168 of the depth with an
+  average absolute step of 3.43 against the app's 2.56, so it fires at H/4 and
+  does NOT fire at the paper's H/10. At H/10 the clause still fires on frames
+  with real sky — NIR_1688 is one — so the conclusion below stands on those
+  frames and on the stated priority, not on NIR_0063.) That
   frame has real sky; an oak fills its top-left, so the border sits high on the
   left and low on the right and steps hard in between, which is what a canopy
   IS. The paper's priority is a robot that must not drive into a wall. This
@@ -4522,6 +4610,24 @@ preference.**
   step weaker. Applying equation 15's bar to every candidate rather than only
   to the winner removes the floor from the search, and `noSky` then means what
   it ought to: no threshold anywhere put a sky-sized region above the border.
+- **Unlisted until 2026-10-01: the energy and the k-means split run on luma and
+  chroma, not RGB.** `src/sky.ts` hands `skyHorizon` gamma luma, cx and cy,
+  each ×255; the paper's Σ, μ and §2.3.2 clusters are on RGB values (eqs. 1–3).
+  Its reason for keeping only λ1 (eq. 6: λ2 and λ3 "very small") holds on these
+  frames in gamma RGB ×255 — λ2/λ1 ≤ 0.009 in both regions on NIR_0063, NIR_1644
+  and NIR_1651 at the app's chosen border — and fails in the app's space, where
+  the ground's λ2/λ1 is 0.16–0.29. `skyhorizon.ts` keeps γ = 2 because the
+  channels sit in the paper's numeric range, which answers scale only. Owed: a
+  measurement of γ = 2 and the λ1-only term in this space, or a move to RGB.
+- **Unlisted until 2026-10-01: the border's gradient is on LINEAR luma.** The
+  paper takes a Sobel gradient of the greyscale image (§2.1), which for its
+  8-bit input is display-encoded; this app takes a central difference on
+  linear luma over its 95th percentile. Quantiles remove a scale, not a
+  transfer curve, so the two rank edges differently — linear weakens edges in
+  dark regions. In infrared that may be the better one, since the sky is often
+  the darkest region and the separation measured in `sky.ts` (sky 0.004–0.03
+  against foliage 0.1–0.4) was taken in linear. Owed: both versions measured
+  on the corpus before either is called right.
 
 **AND THE METHOD HAS A DOMAIN, WHICH IT ANNOUNCES.** The paper assumes the
 optimum is interior — its own words are that Jn(t) is nearly constant once t
@@ -4807,7 +4913,12 @@ to 13% saturation, that cut moves it toward neutral. What the general finding ab
 **And the cut is the lens's own cast (decision 085, "Second check", 2026-09-30).** A hot spot carries colour, not only
 brightness. David Kennard's blog posts 1126, 976 and 978 report three things. Under a red-foliage rendering, the centre sky
 turns reddish. The hot spot is much stronger in the pure-infrared channel. A white-card flat corrected with CornerFix takes
-the red out. Per-channel division is how RawTherapee, Siril, PixInsight, the DNG GainMap, darktable, Lightroom and CornerFix
+the red out. (Added 2026-10-01: post 978 also says the CornerFix method "doesn't work when the image contains a well defined
+hotspot", and replaces it with a curve on the pure-infrared channel under a painted mask; 976's spot was "not a really bad IR
+hotspot". The shipped 16-50 profiles at 25 mm f/13–f/22 are peaked — centre bumps 0.29 at f/13, 0.43 at f/16, 0.30 at f/22,
+falling to 0.14–0.16 by bin 5 — so they are owed a render at strength 0 and 1 on the owner's frames before this stage is
+changed for them. 978 is one qualitative report from a mixed visible-plus-infrared capture; on its own it does not establish
+that division fails on these profiles.) Per-channel division is how RawTherapee, Siril, PixInsight, the DNG GainMap, darktable, Lightroom and CornerFix
 remove such a cast. The field checks the result on neutral things: clouds, pavement, samplers. On three of the owner's raws,
 neutral things at the centre move toward the same material at the frame's edge by 57 to 91% of the gap, and none crosses it.
 Some tools normalise the flat to its centre, which keeps the centre's colour. That is not open here at strength 1 while white

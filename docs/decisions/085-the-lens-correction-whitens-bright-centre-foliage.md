@@ -90,6 +90,14 @@ partly, 1 not supported at the page it was credited to, and 4 unreachable.
     the pure-infrared blue channel than in red plus infrared or green plus
     infrared, corrected on its own with a curve;
   - CornerFix, profiled from a white card, taking the slightly red sky out.
+    Post 978 adds the limit (recorded 2026-10-01): the CornerFix method "doesn't
+    work when the image contains a well defined hotspot", replaced there by a
+    curve on the pure-infrared channel under a painted mask; 976's spot was
+    "not a really bad IR hotspot". The shipped 16-50 profiles at 25 mm
+    f/13–f/22 are peaked (centre 0.29, 0.43, 0.30, falling to 0.14–0.16 by bin
+    5) and are owed a render at strength 0 and 1 before the stage is changed
+    for them; 978 alone, one qualitative report from a mixed capture, does not
+    show division failing on them.
 
   None gives a number. irrecams.de says the same without a measurement (read
   2026-09-30, confirmed): "Often the blue channel of the image is more affected

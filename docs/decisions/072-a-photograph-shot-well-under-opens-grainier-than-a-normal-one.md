@@ -40,7 +40,15 @@ exposure it was made at is not on record.
 - **RawTherapee, `rtengine/FTblockDN.cc`**: luminance strength multiplies a
   noise variance measured every time from wavelet coefficients (the median of
   |coefficient| / 0.6745, Donoho's estimator), so its slider is relative to the
-  measured noise as this app's is. Read in source.
+  measured noise as this app's is. Read in source. Added 2026-10-01, from the
+  same source: its DEFAULT models an exposure push. `autoGain` is true
+  (`rtengine/procparams.cc`, UI label "Compensate for lightness"); RawTherapee
+  computes the frame's auto exposure compensation during preprocessing
+  (`rawimagesource.cc`, `getAutoExp`) and multiplies the data by 2^expcomp
+  before its gamma transform and wavelet denoise (`FTblockDN.cc`: `const float
+  gain = dnparams.autoGain ? static_cast<float>(std::pow(2.0, expcomp)) :
+  1.f;`). Its stated effect: "Strength is reduced for dark images and increased
+  for bright images".
 - **Adobe, "Denoise demystified"** (2023-04-18): noise reduction is left to the
   reader's setting. Read.
 - Search summaries only, not verified: Foi et al., IEEE TIP 17(10) 2008, on
@@ -48,7 +56,10 @@ exposure it was made at is not on record.
   webpages.tuni.fi, imjohnstone.su.domains, www.mathworks.com,
   www.computer-darkroom.com.
 
-The field's answer to an underexposed frame is the reader's slider.
+The field's answer to an underexposed frame is the reader's slider — in
+darktable. Corrected 2026-10-01: RawTherapee's default answers it
+automatically, from the frame's own auto exposure (above), and in the
+direction opposite to option 2.
 
 ## Built already
 
@@ -78,13 +89,18 @@ The field's answer to an underexposed frame is the reader's slider.
 
 1. **Leave the rule, and say what it does.** A frame shot well under opens with
    the grain its exposure gave it and the reader raises Noise reduction by hand,
-   which is the field's answer too. Proposed.
+   which is darktable's answer. Proposed.
 2. **Set the strength from the grain the reader will see**: measure after the
    exposure the app applies and aim at a fixed amount left rather than a fixed
    share. It needs the exposure the owner's calibration was made at, which is not
    on record, so choosing it is the owner's call, made from renders of frames at
    several exposures, and it has to leave camera-rendered files alone.
 3. **Move the denoiser's own floor** so a pushed frame is smoothed harder.
+4. **Scale strength by the frame's own auto exposure, as RawTherapee's
+   "Compensate for lightness" does** (added 2026-10-01). It uses the exposure
+   the app already measures at open (`autoExposure`), so it needs no fitted
+   reference exposure, which is what sank the rejected 7x design; its direction
+   is the opposite of option 2's. Not yet weighed on renders.
 
 ## Rejected
 

@@ -49,8 +49,9 @@ reach, which exists because scene-referred data runs past 100%.
 **Which channels is the part this app has to answer for itself, and its own
 research answers it.** darktable picks per module group — Lab's `L a b C h`,
 display RGB's `g R G B H S L`, scene-referred's `g R G B Jz Cz hz`. **Lab is
-the wrong choice here and IR-SCIENCE.md §3 says why: the camera cannot store an
-infrared white point**, its recorded balance being a clamp artefact, so `a` and
+the wrong choice here and IR-SCIENCE.md §3 says why: the camera's recorded white
+balance is not an infrared white point**, it being the preset's 5200 K daylight
+default, so `a` and
 `b` would be defined against a white point the file does not have. Meanwhile
 §4c-v measures that a population's chromaticity DIRECTION is a property of this
 camera rather than of a photograph — spread 2.1–5.7% of the mean over six

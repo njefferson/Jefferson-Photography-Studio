@@ -52,7 +52,11 @@ exposure of the center of the flat-field image", lifting the periphery and
 leaving the centre alone.
 
 **This app has neither anchor.** It divides by the curve and by no reference
-level. Measured across the shipped table, that moves the whole frame's
+level. (Corrected 2026-10-01: every curve was already 1 in the r 0.55–0.72
+reference ring, `src/lensprofile.ts` `REF_LO`/`REF_HI` — an outer-ring anchor of
+the kind Kolari's working steps pick "about halfway out from the center",
+though further out. What it lacked was the flat's average, which is the formula
+Kolari states and what `lensAreaMean` supplies.) Measured across the shipped table, that moves the whole frame's
 red-against-blue by **+1.49%** on the blend matched to this photograph, **+3.79%**
 on the worst profile, and past 2% on **14 of 72**. Gray-world white balance is
 measured before this stage runs, so nothing downstream restores it.

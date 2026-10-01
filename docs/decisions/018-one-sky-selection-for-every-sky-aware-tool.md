@@ -91,7 +91,8 @@ The reader's Sky-mask coverage overlay, opened as an image on both builds —
   being reported as working. A 12-pixel guided-filter window
   (`SKY_FINE_RADIUS` at `SKY_FINE_EDGE`) cannot resolve a conifer silhouette,
   so "snapped to the picture's own edges" overstates what a refinement can do
-  on this subject.
+  on this subject. (Corrected 2026-10-01: the boundary's softness here is not
+  the window's; see the correction at the end of this record.)
 - **NIR_0063** and **NIR_1651** — same shape of boundary, same conclusion.
 
 ## Outcome
@@ -166,3 +167,15 @@ said the outline is "snapped to the picture's own edges". On conifers it is
 not — `SKY_FINE_RADIUS` is a fixed 12 px at 1024 and cannot resolve a needle.
 That fixed radius is the next thing, and it is what Photoshop's Smart Radius
 exists to solve.
+
+**Corrected 2026-10-01: the window is not what loses the needles.** In a guided filter the output's fine structure comes from the guide,
+through each window's coefficients, and a guide channel earns a coefficient
+only where its variance in the window is comparable to ε (He, Sun and Tang,
+TPAMI 2013, section 3). `refineSkyMask` gives luma and both colour shares one
+ε of 0.005 (`SKY_FINE_EPS`), and the colour shares vary 16–50× less than that,
+so the filter follows luma alone. Liba et al. (*Sky Optimization*, arXiv 2020,
+sections 3.1 and 4.3) refine at 1024 × 768 — this app's working size — with a
+support of 64, and show 16, close to this window, losing sky between leaves.
+He's own feathering example is r = 60 on a 6 MP frame. So the order is ε and
+the channel scaling first, then LARGER supports, not a smaller or adaptive
+window.

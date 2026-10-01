@@ -61,8 +61,8 @@ raw (lightroomsolutions.com/embedded-sidecar-workflow-in-lightroom-classic/).
 On an ordinary camera that difference is a profile away. On an IR-converted
 body it is a different colour world — this repository's own comment above
 `realThumbnails` already says so, and IR-SCIENCE.md section 3 says why: the
-camera cannot store an infrared white point, so its own JPEG is rendered at a
-clamp artefact.
+camera's recorded white balance is not an infrared white point, so its own JPEG
+is rendered at the preset's 5200 K daylight default.
 
 **Which is survivable, because culling is not a colour judgement.** A pick or a
 reject is composition, focus, and whether the moment is there; the app's own

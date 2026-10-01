@@ -252,11 +252,11 @@ same infrared facts, shipping a regression, and rediscovering them again a week
 later. Design from IR physics first and reach for general photography only where
 it fills a gap and still applies; that file marks where those places are.
 
-**The one most likely to be rediscovered by accident: the camera CANNOT store an
-infrared white point.** Its recorded white balance is a clamp artefact, not a
-measurement, and developing a raw at it renders a magenta wall with the green
-channel at zero. The white point is found BELOW what the camera allows, from the
-data. A session read "opens as shot" as an instruction to do the opposite,
+**The one most likely to be rediscovered by accident: the camera's recorded
+white balance is not an infrared white point.** On these files it is the 5200 K
+daylight default the Z 50 uses for a preset slot holding no measured value, not
+a measurement, and developing a raw at it renders a magenta wall with the green
+channel at zero. The white point is found from the data. A session read "opens as shot" as an instruction to do the opposite,
 shipped it, and took it back out the same day (IR-SCIENCE.md §3).
 
 This app processes INFRARED and full-spectrum photography ONLY. Every

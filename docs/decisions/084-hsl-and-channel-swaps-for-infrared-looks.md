@@ -269,6 +269,16 @@ through the app's own pipeline with controls a reader has.
     each mapping only as "green fully to" an output, and what their full
     matrices are, and whether they give the stated results on this camera, was
     not established.
+  - Corrected 2026-10-01, for both frames: the casts in these four readings
+    are at least partly the app's. Hue 180 went through a hue control that
+    applied the YIQ rotation transposed, which turns grey lime at 180°, so
+    its lime frame is that defect's (fixed on the session branch, "Fixed: Hue
+    no longer tints grey…"). The three green-reassigned matrices have rows
+    summing to 2/1/1, 1.5/1/1.5 and 1/1/2, so each adds a red, magenta or blue
+    gain over the whole frame before any mapping shows; darktable's channel
+    mixer offers "normalize channels" for exactly this. Both are owed a
+    re-render — Hue 180 through the corrected control, the three readings with
+    each row normalised to 1 — before they are read as what the mappings do.
 - NIR_1376.NEF, 2026-09-29, the oak: three band moves on the plain swap,
   each one band of the eight-band mixer.
   - Orange band (30 degrees, the Sky box's centre under the swap),

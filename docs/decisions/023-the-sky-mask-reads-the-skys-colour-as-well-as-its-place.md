@@ -81,7 +81,10 @@ is the boundary.
 - **018, one sky selection for every sky-aware tool** — the mask reading the
   REFINED selection snaps its boundary to the picture's edges, which removes
   the rim round a roofline. It cannot put back sky between twigs finer than
-  the guided filter's window (radius 12 at 1024 px), and it cannot reach a
+  the guided filter's window (radius 12 at 1024 px) — corrected 2026-10-01:
+  as 018's closing correction records, that limit is the filter's single ε,
+  which leaves the colour channels without a coefficient, not the window's
+  size — and it cannot reach a
   patch of sky the seed never touched. The colour gate does both, per pixel.
   The two are complementary: 018 fixes the boundary, this fixes the interior
   and the gaps. Same shader stage, same selection; this follows 018 directly.

@@ -3546,6 +3546,18 @@ rim back out — edge 73% down to 62%, spill 14% up to 26%, measured on the
 graded-weight build before binary membership landed. The filter reads its input as a hard selection and re-derives the edge
 from a 12 px window, which suits a smooth cloud edge and cannot follow a
 conifer crown. The crowns are the reported defect, so the fine boundary wins.
+(Corrected 2026-10-01: what keeps it from following a crown is ε, not the
+window. In a guided filter the output's fine structure comes from the guide,
+through each window's coefficients, and a guide channel earns a coefficient
+only where its variance in the window is comparable to ε (He, Sun and Tang,
+TPAMI 2013, section 3). `refineSkyMask` gives luma and both colour shares one
+ε of 0.005 (`SKY_FINE_EPS`), and the colour shares vary 16–50× less than that,
+so the filter follows luma alone. Liba et al. (*Sky Optimization*, arXiv 2020,
+sections 3.1 and 4.3) refine at 1024 × 768 — this app's working size — with a
+support of 64, and show 16, close to this window, losing sky between leaves.
+He's own feathering example is r = 60 on a 6 MP frame. So the order is ε and
+the channel scaling first, then LARGER supports, not a smaller or adaptive
+window.)
 
 **What is left, seen rather than measured:** the selection's boundary is
 RAGGED where the sky is noisy — a colour threshold on a grainy gradient, made
@@ -3994,7 +4006,11 @@ there.
 
 **The mixer chip labelled "Aerochrome" is not the look.** It is the film's
 layer order bare — red←blue, green←red, blue←green — and bare it renders teal
-and pale; the Aerochrome look is that rotation's other half, the swap plus a
+and pale (corrected 2026-10-01: on this camera it is a channel cycle over three
+mostly infrared samples, not the film's order — the 665–720 nm conversion
+blocks visible green before the sensor, so camera green is an infrared record,
+IR-SCIENCE 4b-ix; the film's green layer has to be synthesised, 066, or taken
+from a second frame, 067); the Aerochrome look is that rotation's other half, the swap plus a
 mixer solved on six frames (IR-SCIENCE 4b-ii), and it lives on the Looks tab.
 Under the film's name the chip read as the look, and its bare rotation was
 taken for a look whose swap had failed. It is **Film rotation** now, with a title naming
@@ -8533,6 +8549,12 @@ read as authoritative, and an invented one is worse than a missing one.
   Pre-existing, invisible in practice, candidate for a future increment
   (switching the sRGB profile's TRC would subtly change every existing
   export's rendering — owner's call, not urgent).
+  (Corrected 2026-10-01: not invisible. Through Little CMS, a 16-bit TIFF
+  tagged gamma 2.2 renders 8-bit-equivalent codes 5/10/20/40 as 1/3/12/35 —
+  at code 10 that is 3.8× less linear light than the preview, whose bytes
+  every browser reads as piecewise sRGB, CSS Color 4 "Color Spaces of Untagged
+  Colors". The help text still calls the file "16-bit TIFF in sRGB". The
+  JPEG's profile already uses the piecewise curve, `curvTableSrgb`.)
   VERIFIED: fail-first proven TWO ways (planted "sRGB red unchanged by
   the conversion" unit + the strip-the-ICC walk plant — the exact
   pair-mismatch failure — flipped at maxDiff 9.8 vs tolerance 5). 9 unit
@@ -13560,7 +13582,15 @@ Undo/Reset ignored the slider.
 FIXED 2026-07-24 (native NEF highlights on non-Z50 bodies — unusable on any
 body but the Z 50; D5300 full-spectrum frame DSC_4940):
 - The native-NEF white level was HARDCODED to 15520, which is the Nikon Z 50's
-  saturation point. NEFs carry no DNG level tags, so every OTHER camera got the
+  saturation point. (Corrected 2026-10-01: no source read gives 15520 as that.
+  LibRaw sets `maximum = (1 << tiff_bps) - 1`, 16383 at 14-bit, has no Z 50
+  entry, and lowers it at processing only to the frame's own data maximum
+  (`adjust_maximum`, threshold 0.75), never to a Nikon curve top. RawTherapee's
+  `camconst.json` measures the Z 50 clipping at 16374 at ISO 100, 15521 only at
+  ISO 40731. With white 15520, `autoRecover`'s 0.985 test fires from raw 15302.
+  If 15520 is kept so NEFs match Adobe DNG twins, its source is Adobe's DNG
+  WhiteLevel (50717), to be read from one of the owner's Z 50 DNGs and recorded
+  as that.) NEFs carry no DNG level tags, so every OTHER camera got the
   Z 50's ceiling too. A D5300 saturates at 16383 — feeding it 15520 pushed the
   whole frame ~6% over and pinned ~14% of it (all the sky + IR-lit foliage) past
   white with NO headroom to recover. It went unseen because the test files had been
@@ -18929,6 +18959,14 @@ thing this build does not do.
 
 ## The camera's white balance is a clamp, not a measurement — reverted, 2026-09-15
 
+**Corrected 2026-10-01: the recorded value is the empty preset's 5200 K default,
+not a clamp.** The Z 50 Online Manual (Preset Manual) says a preset slot with no
+stored value sets white balance to 5200 K, the same as Direct sunlight, and
+`NIR_1376.NEF` records 951/512, 751/512 at fine-tune [0, 0], within 1.3% and 2.2%
+of darktable's Z 50 Direct Sunlight. That is why two slots record one number.
+The revert below stands: the value is still not the scene's white point.
+IR-SCIENCE.md section 3 carries the detail.
+
 **Shipped wrong and caught the same day.** The previous
 entry recorded reading NEF MakerNote 0x000C and opening raws on it. That is
 correct for a visible-light body and wrong here, and the reason is the one thing
@@ -18983,7 +19021,13 @@ cannot open an angle between two populations. Solved against the EIR target on
 five camera JPEGs and five raws, the best any diagonal gain reached was foliage
 289-298 degrees and sky 240-254 — about **50 degrees apart, against targets 130
 apart**. Both file kinds hit the same ceiling, and the red multiplier ran to the
-edge of every range it was given. `red` and `goldie` are right to use it: they
+edge of every range it was given. (Corrected 2026-10-01: "provable" and "cannot open an
+angle" overstate it. A diagonal gain moves colours relative to neutral and can
+reorder a pixel's channels: through the app's own rgb2hsv, (1, 0.5, 0.45) and
+(1, 0.45, 0.5) sit 10.9° apart, and under gains (1, 2, 2) they land at 60° and
+300°, 120° apart — near-neutral infrared populations are where a diagonal gain
+has the most leverage. What stands is the measurement: about 50° on these ten
+frames, within the ranges tried.) `red` and `goldie` are right to use it: they
 shift everything one way, which is what a cast is.
 
 **The per-colour mixer can, because a band shift acts differentially on nearby
@@ -19759,7 +19803,12 @@ yellow filter absorbing blue entirely because all three were also blue-sensitive
 — so the film's mapping is a **three-way rotation**: red takes the infrared,
 green takes the visible red, blue takes the visible green. Row-major
 `[0,0,1, 1,0,0, 0,1,0]`. A two-channel exchange is a different operation and no
-amount of tuning turns one into the other. IR-SCIENCE.md §4b carries the sources
+amount of tuning turns one into the other. (Corrected 2026-10-01: that matrix
+is the film's mapping only on channels that ARE infrared, red and green. On this
+camera's R, G, B it is a cycle over three mostly infrared samples: camera red
+carries the 665–700 nm deep red alongside infrared, and camera green carries no
+visible green, because the conversion blocks it before the sensor. The film
+route needs the green layer synthesised, 066, or from a second frame, 067.) IR-SCIENCE.md §4b carries the sources
 and §4b-i carries what shipped.
 
 **What shipped, and what deliberately did not move.** `aero` keeps its key, its
@@ -20036,6 +20085,15 @@ exactly on target and the two populations MERGE — 94–98% of the coloured fra
 into a single 30° bin. Aerochrome IS the separation. The app's `hue` control is
 not a uniform rotation either: at +20 the foliage moved +31° while the sky moved
 −7°, which is why a single number could never have served both.
+
+**Corrected 2026-10-01: these hue figures were taken through a defective
+control.** The app's `hue` applied the YIQ rotation TRANSPOSED — GLSL fills a
+`mat3` by column, the CPU path copied that order, and the result is a matrix
+that tints grey (lime at 180°) rather than a rotation. The +38° merge and the
++31°/−7° split were both measured through it, so they say what that matrix did,
+not what a hue rotation does. The control is fixed on the session branch
+("Fixed: Hue no longer tints grey…"); both figures are owed a re-measurement
+through the corrected control before "ruled out" is relied on again.
 
 **WHAT SHIPS: eight band hue shifts on `LOOKS.eir.raw.hsl`**, solved on six
 frames against the film's angles, with the film's own 20° spread as a CEILING

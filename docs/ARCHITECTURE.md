@@ -20,8 +20,9 @@ lowercase branch names — GitHub Actions trigger matching is case-sensitive.
 
 ## The one sentence that explains everything
 
-Lightroom floors white balance at 2000K, but raw IR needs channel gains far
-beyond that (measured ~R0.42/G7.8/B2.1 on real files) — so this app decodes
+Lightroom's Temp slider floors white balance at 2000K on its stock profiles
+(an IR-shifted camera profile is how Lightroom gets past it), but raw IR needs
+channel gains far beyond that (measured ~R0.42/G7.8/B2.1 on real files) — so this app decodes
 raw itself and applies arbitrary gains, which is the entire reason it exists.
 
 ## Pipeline order (do not reorder casually)
@@ -82,9 +83,12 @@ decode -> LINEAR camera-native RGB
                        whites/highlights, monotone-cubic Fritsch–Carlson,
                        per channel in DISPLAY/gamma space (HSL mixer + global
                        Luminance run after it).
-                       `EditParams.tone`, identity = TONE_DEFAULT. This is the
-                       Lightroom-style tone control; a global Luminance slider
-                       rides on top of it, not a separate set of range sliders.)
+                       `EditParams.tone`, identity = TONE_DEFAULT. A global
+                       Luminance slider rides on top of it, not a separate set
+                       of range sliders. NOT Lightroom-style (corrected
+                       2026-10-01): the master curve and Luminance run on each
+                       channel separately, which rotates hue on a strong curve
+                       (30° to 35.8° on an S-curve); Adobe's RGBTone keeps hue.)
   -> HSL MIXER        (moved AFTER gamma+tone 2026-07-05: it ran mid-pipeline
                        in linear space and chips felt "unbound to live colors"
                        — contrast/gamma/tone shifted hues between there and
@@ -170,7 +174,11 @@ decoder, re-verify against LibRaw before pushing.
   handles types 3/4/5/10/11).
 - camToSrgbLinear = XYZ2sRGB * inverse(CM1), then ROW-NORMALIZED so neutrals
   survive (keeps tap-WB meaningful).
-- Auto WB: gray-world, luminance-normalized (never darkens).
+- Auto WB: gray-world, gains scaled to unit Rec.709 luma (`lumNormalize`).
+  "Never darkens" was wrong (corrected 2026-10-01): Rec.709 weights belong to
+  sRGB primaries, not camera RGB, and a coloured pixel balanced to neutral lands
+  at the luma-weighted harmonic mean, below its luma — 0.072 against 0.266 at
+  the measured R0.42/G7.8/B2.1. LibRaw instead scales so the smallest gain is 1.
 - Auto exposure: 97th-percentile of post-matrix luma -> 0.85, clamp to slider.
 - Auto denoise: median relative neighbor luma diff in darkest 40% ->
   strength = clamp(0.2 + (med-0.013)*25, 0, 0.8).
@@ -189,8 +197,10 @@ without better evidence.
 
 ## Spatial features
 
-- Denoise (`raw/denoise.ts`): 5x5 brightness-adaptive bilateral on linear data,
-  row-cached for exports. Same constants in shader.
+- Denoise (`raw/denoise.ts`): 13x13 brightness-adaptive bilateral on linear
+  data (`R = 6`), with colour averaged on a 7x7 grid at stride 2 (`CR = 3`,
+  `CHROMA_STRIDE = 2`); row-cached for exports. Same constants in shader. (It
+  read 5x5 until 2026-10-01; the window widened in IR-SCIENCE 4c-xxii.)
 - Glow (`glow.ts`): 192px-wide highlight map, p99-normalized, soft threshold,
   wide gaussian; uploaded as R8 texture (UNPACK_ALIGNMENT 1); CPU export
   samples it bilinearly. GLOW_GAIN=0.7 shared.
@@ -214,12 +224,14 @@ without better evidence.
 - Image exports embed an ICC profile (`src/icc.ts`) so files are never untagged.
   The **16-bit TIFF** carries an sRGB/Rec.709-primaries profile (`SRGB_ICC`, tag
   34675 via `writeTiff16`); the **JPEG** carries a Display-P3 profile with the
-  sRGB gamma-2.2 transfer curve, matching the P3-encoded pixels (APP2
-  `ICC_PROFILE` segment via `embedIccInJpeg`, inserted after SOI/APP0). Both are
-  minimal valid ICC v2 display profiles with a gamma-2.2 TRC (what `toGamma`
-  writes, not the sRGB piecewise curve) and D50 PCS with D65→D50-adapted
-  colorants. If the pipeline's encode ever changes to true sRGB piecewise, swap
-  the TRC to a `para` curve to match.
+  sRGB PIECEWISE transfer curve (`curvTableSrgb`, 1024 points), matching the
+  P3-encoded pixels (APP2 `ICC_PROFILE` segment via `embedIccInJpeg`, inserted
+  after SOI/APP0). Both are minimal valid ICC v2 display profiles with D50 PCS
+  and D65→D50-adapted colorants; only the TIFF's `SRGB_ICC` has a gamma-2.2 TRC
+  (what `toGamma` writes). Corrected 2026-10-01: this paragraph said both used
+  gamma 2.2. If the pipeline's encode changes to true sRGB piecewise, the TIFF
+  takes `curvTableSrgb` too — not a `para` curve, which is a v4 type and these
+  are v2.1 profiles.
 
 ## Example photos (`public/examples/`)
 
