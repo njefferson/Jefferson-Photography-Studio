@@ -12,6 +12,7 @@ import { Tiff, type Ifd } from "./raw/tiff";
 import { decodeMosaicedDng } from "./raw/dngRaw";
 import { decodeNef } from "./raw/nef";
 import { camToSrgbLinear, nikonColorMatrix } from "./color";
+import { srgbToLinear } from "./icc";
 import type { BrushMask } from "./pipeline";
 
 /** The photograph's sky selection, built once from the undegraded decode —
@@ -123,7 +124,7 @@ export function linearAt(img: DecodedImage, x: number, y: number): [number, numb
     ];
   }
   const p = img.pixels!;
-  const toLin = (v: number) => Math.max(1e-4, Math.pow(v / 255, 2.2));
+  const toLin = (v: number) => Math.max(1e-4, srgbToLinear(v / 255));
   return [toLin(p[i]), toLin(p[i + 1]), toLin(p[i + 2])];
 }
 

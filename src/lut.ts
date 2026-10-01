@@ -8,6 +8,7 @@
 // reproducing one specific frame's full look elsewhere.)
 
 import { compileEdit, type EditParams } from "./pipeline";
+import { srgbToLinear } from "./icc";
 
 export interface CubeOptions {
   size?: number; // grid per axis (default 33)
@@ -41,7 +42,7 @@ export function generateCube(params: EditParams, opts: CubeOptions = {}): string
 }
 
 function g2l(v: number): number {
-  return Math.pow(v, 2.2);
+  return srgbToLinear(v);
 }
 
 function f(v: number): string {

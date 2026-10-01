@@ -14,6 +14,7 @@
 // FIRST, so its clock starts before anything else this page loads (decision 071).
 import { markStartup } from "./startup";
 import { writeVersionStamp } from "./verstamp";
+import { srgbToLinear } from "./icc";
 import "./style.css";
 // The shared chrome stylesheet. The editor does not use verdlg.ts yet — see the
 // note there — but it uses .more-row, which now lives beside it.
@@ -5384,7 +5385,7 @@ function computeSceneMatch(s: Sticker) {
   }
   renderer.setOverlayOn((params.stickers ?? []).some((k) => stickerAssets[k.asset]));
   if (!n) return;
-  const toLin = (x: number) => Math.pow(x / 255, 2.2);
+  const toLin = (x: number) => srgbToLinear(x / 255);
   s.matchScene = [toLin(r / n), toLin(g / n), toLin(b / n)];
   // Keep the strength the user already dialed (re-matching on a move shouldn't
   // yank it back to full); default it on a first match.
@@ -9327,7 +9328,7 @@ function syncSpotsToTexture() {
       const o = (sy * W + sx) * 4;
       if (previewSrc!.linear) { into[0] = previewSrc!.linear[o]; into[1] = previewSrc!.linear[o + 1]; into[2] = previewSrc!.linear[o + 2]; }
       else if (previewSrc!.linear16) { const l = previewSrc!.linear16; into[0] = fromHalf(l[o]); into[1] = fromHalf(l[o + 1]); into[2] = fromHalf(l[o + 2]); }
-      else { const p = previewSrc!.pixels!; into[0] = Math.pow(p[o] / 255, 2.2); into[1] = Math.pow(p[o + 1] / 255, 2.2); into[2] = Math.pow(p[o + 2] / 255, 2.2); }
+      else { const p = previewSrc!.pixels!; into[0] = srgbToLinear(p[o] / 255); into[1] = srgbToLinear(p[o + 1] / 255); into[2] = srgbToLinear(p[o + 2] / 255); }
     };
     // Rebuild every affected rect (old+new) of a group into its overlay texture,
     // transparent where uncovered. Returns the new baked snapshot (corners deep-

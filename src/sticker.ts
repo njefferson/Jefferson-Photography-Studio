@@ -9,10 +9,11 @@
 // already linear. That single rule is what keeps the preview texture and the
 // CPU export bit-for-bit consistent per source (the parity the walk checks).
 import type { Sticker } from "./pipeline";
+import { srgbFromLinear, srgbToLinear } from "./icc";
 
 const REC709 = [0.2126, 0.7152, 0.0722];
-const toLin = (v: number) => Math.pow(v / 255, 2.2);
-const toGam = (v: number) => Math.pow(Math.min(1, Math.max(0, v)), 1 / 2.2);
+const toLin = (v: number) => srgbToLinear(v / 255);
+const toGam = (v: number) => srgbFromLinear(v);
 
 /** What the occlusion "bright/dark" threshold reads: the DISPLAY luminance the
  *  user sees, not the raw source value. The source is camera-native for RAW

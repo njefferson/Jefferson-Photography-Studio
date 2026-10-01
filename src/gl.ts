@@ -236,8 +236,12 @@ vec3 sampleLut3d(vec3 c) {
   return mix(mix(c00, c10, f.y), mix(c01, c11, f.y), f.z);
 }
 
-vec3 toLinear(vec3 c){ return pow(c, vec3(2.2)); }
-vec3 toGamma(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
+// The sRGB transfer curve, piecewise, both ways: the drawing buffer and every
+// 8-bit source are read as sRGB by the browser, so a pure 2.2 power here
+// rendered deep shadows 1.4-3.3x brighter than computed (until 2026-10-01).
+// Mirrored by srgbToLinear / srgbFromLinear in icc.ts, which the CPU uses.
+vec3 toLinear(vec3 c){ return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }
+vec3 toGamma(vec3 c){ c = max(c, 0.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0/2.4)) - 0.055, step(vec3(0.0031308), c)); }
 // Warp: read the displacement field (RG encoded, 0.5 = none) and remap the
 // source coordinate — every fetchLin (centre AND neighbourhood taps) warps
 // together, so denoise/detail follow the moved image. Mirrored in warp.ts.

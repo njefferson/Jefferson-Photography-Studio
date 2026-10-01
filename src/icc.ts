@@ -3,7 +3,9 @@
 //
 // The profiles are minimal, valid ICC v2 DISPLAY profiles with standard
 // D65->D50 (Bradford) adapted colorants, PCS D50. Two are built:
-// - sRGB at gamma 2.2 (TIFF — unchanged from what has always shipped);
+// - sRGB with the TRUE sRGB transfer curve as a 1024-point table (TIFF — a
+//   pure gamma 2.2 until 2026-10-01, which a colour-managed editor read as
+//   deep shadows up to 3.8x darker than the preview the same bytes came from);
 // - Display P3 with the TRUE sRGB transfer curve as a 1024-point table (JPEG
 //   — that IS Display P3's real TRC; the pixel bytes are converted by
 //   srgbDisplayToP3Display below, and the profile + the encode MUST travel
@@ -23,16 +25,6 @@ function xyzType(x: number, y: number, z: number): number[] {
   p32(b, s15(x));
   p32(b, s15(y));
   p32(b, s15(z));
-  return b;
-}
-
-// curveType with one entry = a pure gamma; value is u8Fixed8 (gamma * 256).
-function curvGamma(gamma: number): number[] {
-  const b: number[] = [];
-  pStr(b, "curv");
-  p32(b, 0);
-  p32(b, 1);
-  p16(b, Math.round(gamma * 256));
   return b;
 }
 
@@ -156,14 +148,17 @@ function writeAscii(out: Uint8Array, at: number, s: string) {
   for (let i = 0; i < s.length; i++) out[at + i] = s.charCodeAt(i);
 }
 
-/** The sRGB profile, built once — UNCHANGED from what has always shipped
- *  (gamma-2.2 curve). TIFF exports carry this: 16-bit TIFF is the "edit
+/** The sRGB profile, built once, with the piecewise sRGB curve — the one the
+ *  pipeline encodes with (toGamma) and the browser decodes the preview with,
+ *  so a colour-managed editor shows the TIFF as the preview looked. A
+ *  `curv` table rather than a `para` curve: these are v2.1 profiles and
+ *  `para` is a v4 type. TIFF exports carry this: 16-bit TIFF is the "edit
  *  elsewhere" interchange format, where sRGB is the safest hand-off. */
-export const SRGB_ICC: Uint8Array = buildIcc("IPS sRGB (Gamma 2.2)", [
+export const SRGB_ICC: Uint8Array = buildIcc("IPS sRGB", [
   [0.43607, 0.22249, 0.01392], // sRGB colorants, D65->D50 (Bradford) adapted
   [0.38515, 0.71687, 0.09708],
   [0.14307, 0.06061, 0.7141],
-], curvGamma(2.2));
+], curvTableSrgb());
 
 /** Display P3 — the REAL thing: P3 colorants + the true sRGB transfer curve
  *  (that is Display P3's actual TRC). JPEG exports carry this; the pixel

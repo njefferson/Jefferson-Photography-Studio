@@ -5,6 +5,7 @@
 import type { HealSpot } from "./heal";
 import type { WarpField } from "./warp";
 import { sampleLut3d } from "./lut3d";
+import { srgbFromLinear, srgbToLinear } from "./icc";
 export type { HealSpot };
 
 export interface EditParams {
@@ -2524,11 +2525,17 @@ export function compileEdit(
   };
 }
 
+/** The display encode, clamped to 0..1: the piecewise sRGB curve, the same as
+ *  the shader's toGamma, because the browser reads every byte this makes as
+ *  sRGB (a pure 2.2 power until 2026-10-01). */
 function toGamma(v: number): number {
-  return Math.pow(Math.min(1, Math.max(0, v)), 1 / 2.2);
+  return srgbFromLinear(v);
 }
 
-/** Linearize an 8-bit gamma-encoded value (matches the shader's toLinear). */
+/** Linearize an 8-bit sRGB-encoded value (matches the shader's toLinear).
+ *  @param v  a byte, 0..255, as a canvas or a decoded JPEG holds it.
+ *  @returns linear light, 0..1, through the piecewise sRGB curve; the shader's
+ *    toLinear must give the same number or GPU and CPU disagree in shadows. */
 export function toLinear8(v: number): number {
-  return Math.pow(v / 255, 2.2);
+  return srgbToLinear(v / 255);
 }
