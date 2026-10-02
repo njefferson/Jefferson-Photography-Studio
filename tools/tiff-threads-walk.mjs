@@ -78,8 +78,13 @@ async function run(b, name, noExportWorkers, opts = {}) {
     // THREE SPOTS, WHICH IS THE CASE THAT WAS REPORTED — dust on a stopped-down
     // infrared frame. Placed through the real control rather than poked into
     // the edit, so the geometry is whatever the app would really store.
-    await p.click("#ptab-corrections");
-    await p.click("#healBtn");
+    // A LONG TIMEOUT, AND IT IS THE RENDERER'S, NOT THE CONTROL'S. Pressing
+    // Heal spots redraws the photograph, and under a software GL that redraw
+    // holds the page about 21 s (profiled 2026-10-02: 20.6 s of it in the
+    // readPixels that waits for it) — past Playwright's 30 s default once the
+    // spot clicks' redraws queue behind it. The press itself is instant.
+    await p.click("#ptab-corrections", { timeout: 180000 });
+    await p.click("#healBtn", { timeout: 180000 });
     const box = await p.evaluate(() => {
       const c = document.querySelector("#stage canvas");
       const r = c.getBoundingClientRect();
@@ -89,14 +94,14 @@ async function run(b, name, noExportWorkers, opts = {}) {
       await p.mouse.click(box.x + box.w * fx, box.y + box.h * fy);
       await p.waitForTimeout(500);
     }
-    await p.click("#healBtn");   // out of heal mode
+    await p.click("#healBtn", { timeout: 180000 });   // out of heal mode
     await p.waitForTimeout(300);
   }
   if (rotate) {
-    await p.click("#ptab-crop");
-    for (let i = 0; i < rotate; i++) { await p.click("#rotateBtn"); await p.waitForTimeout(400); }
+    await p.click("#ptab-crop", { timeout: 180000 });
+    for (let i = 0; i < rotate; i++) { await p.click("#rotateBtn", { timeout: 180000 }); await p.waitForTimeout(400); }
   }
-  await p.click("#ptab-export");
+  await p.click("#ptab-export", { timeout: 180000 });
   await p.evaluate((fmt) => {
     for (const [id, v] of [["exFormat", fmt], ["exScale", "1"]]) {
       const el = document.getElementById(id);
@@ -118,7 +123,7 @@ async function run(b, name, noExportWorkers, opts = {}) {
     } catch { /* the page can be mid-navigation; a missed sample is not a failure */ }
   }, 400);
   const dl = p.waitForEvent("download", { timeout: 1800000 }); dl.catch(() => {});
-  await p.click("#exBtn");
+  await p.click("#exBtn", { timeout: 180000 });
   await p.waitForSelector("#exportSave", { timeout: 1800000 }).catch(() => {});
   await p.click("#exportSave").catch(() => {});
   const d = await dl;
@@ -128,7 +133,7 @@ async function run(b, name, noExportWorkers, opts = {}) {
   await d.saveAs(path);
   // The app's own report, so the thread count is the one the export actually
   // used rather than the one this walk assumes it arranged.
-  await p.click("#verTag");
+  await p.click("#verTag", { timeout: 180000 });
   await p.waitForFunction(() => (document.getElementById("verDlgText")?.value ?? "").includes("Last export"), null, { timeout: 60000 });
   const line = (await p.inputValue("#verDlgText")).split("\n").find((l) => l.startsWith("Last export")) ?? "";
   await ctx.close();

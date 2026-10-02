@@ -342,12 +342,16 @@ function releaseCanvas(canvas: HTMLCanvasElement): void {
  *  neighbour — the selection already travels as `sky` and `skyFine`, so copying
  *  it again would cost every worker a second copy of the same mask. */
 function forTheWire(current: DecodedImage): DecodedImage {
+  // NOT `linear`, the half-size working copy: no worker reads it — `getSource`
+  // builds a lossy DNG's full-resolution source from `lossyCodes`, and an 8-bit
+  // source has no linear copy — and on a lossy DNG it is four bytes per sensor
+  // pixel posted to every worker on top of the codes, which the pool's budget
+  // (exportparallel.ts perWorkerMb) never billed.
   return {
     width: current.width,
     height: current.height,
     isRaw: current.isRaw,
     pixels: current.pixels,
-    linear: current.linear,
     lossyCodes: current.lossyCodes,
     camMatrix: current.camMatrix,
     rotate: current.rotate,
@@ -1177,8 +1181,9 @@ export function getSource(file: ImportedFile, current: DecodedImage): Source {
  * @param rgb  the pixels, w*h*3 unsigned 16-bit samples, row-major RGB.
  * @param w    width in pixels.
  * @param h    height in pixels.
- * @param icc  the ICC profile describing those samples (default SRGB_ICC,
- *   the gamma-2.2 sRGB-primaries profile the TIFF export's encode matches).
+ * @param icc  the ICC profile describing those samples (default SRGB_ICC:
+ *   sRGB primaries and the piecewise sRGB curve, which is the encode the
+ *   pipeline's display output and so the TIFF's samples carry).
  * @param exif the subset read from the original, or undefined to write none.
  * @returns the whole file. What it must satisfy: IFD0's tags ascend by ID
  *   (TIFF requires it; the EXIF extras interleave with the image tags), every
@@ -1195,7 +1200,8 @@ export function writeTiff16(rgb: Uint16Array, w: number, h: number, icc: Uint8Ar
     { tag: 296, typ: 3, cnt: 1, inline: 2 }, // ResolutionUnit: inch
     ...(exif ? ifd0ExtraEntries(exif) : []),
   ].sort((a, b) => a.tag - b.tag);
-  const exifIfd: TiffEntry[] = exif ? exifIfdEntries(exif) : [];
+  // ColorSpace sRGB when the profile is the sRGB one, as it always is today.
+  const exifIfd: TiffEntry[] = exif ? exifIfdEntries(exif, icc === SRGB_ICC ? 1 : 0xffff) : [];
   const entries = 12 + ifd0Extra.length + (exifIfd.length ? 1 : 0);
   const ifdOffset = 8;
   const ifdSize = 2 + entries * 12 + 4;

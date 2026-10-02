@@ -221,17 +221,23 @@ export function ifd0ExtraEntries(s: ExifSubset): TiffEntry[] {
  * The Exif-IFD tags (version, capture settings, colour space, lens), sorted by
  * tag.
  * @param s  the subset read from the original.
+ * @param colorSpace  ColorSpace (0xA001) for the file the block goes into: 1,
+ *   sRGB, for the 16-bit TIFF, whose samples are the sRGB encode on sRGB
+ *   primaries and whose embedded profile is icc.ts SRGB_ICC (the piecewise
+ *   sRGB curve since 2026-10-01); 0xFFFF, Uncalibrated, the default, for the
+ *   JPEG, which is Display P3. Exif reserves 1 for sRGB and says "if a color
+ *   space other than sRGB is used, Uncalibrated is set".
  * @returns entries ascending by tag; never empty, because ExifVersion and
  *   ColorSpace are written whatever the source carried.
  * What the result must satisfy: ExifVersion (0x9000) is "0232" — Exif says its
- *   absence means non-conformance — and ColorSpace (0xA001) is 0xFFFF,
- *   Uncalibrated, because neither export is sRGB: the JPEG is Display P3 and
- *   the TIFF is gamma 2.2 on sRGB primaries, and Exif reserves 1 for sRGB and
- *   says "if a color space other than sRGB is used, Uncalibrated is set". The
- *   embedded ICC profile is what names the space. DateTimeOriginal (0x9003)
- *   appears only when the source had its own.
+ *   absence means non-conformance — and ColorSpace says what the file's own
+ *   embedded ICC profile says: sRGB where the profile is sRGB, Uncalibrated
+ *   otherwise. (It said Uncalibrated for both until 2026-10-02, on the ground
+ *   that the TIFF was a gamma-2.2 encode, which it had stopped being the day
+ *   before.) DateTimeOriginal (0x9003) appears only when the source had its
+ *   own. Consumers: buildExifTiff (the JPEG's APP1) and export.ts writeTiff16.
  */
-export function exifIfdEntries(s: ExifSubset): TiffEntry[] {
+export function exifIfdEntries(s: ExifSubset, colorSpace: 1 | 0xffff = 0xffff): TiffEntry[] {
   const out: TiffEntry[] = [];
   if (s.exposureTime) out.push(rationalEntry(0x829a, s.exposureTime));
   if (s.fNumber) out.push(rationalEntry(0x829d, s.fNumber));
@@ -239,7 +245,7 @@ export function exifIfdEntries(s: ExifSubset): TiffEntry[] {
   out.push({ tag: 0x9000, typ: 7, cnt: 4, data: [0x30, 0x32, 0x33, 0x32] }); // ExifVersion "0232", UNDEFINED
   if (s.dateTime) out.push(asciiEntry(0x9003, s.dateTime));
   if (s.focalLength) out.push(rationalEntry(0x920a, s.focalLength));
-  out.push({ tag: 0xa001, typ: 3, cnt: 1, inline: 0xffff }); // ColorSpace: Uncalibrated
+  out.push({ tag: 0xa001, typ: 3, cnt: 1, inline: colorSpace }); // ColorSpace: 1 sRGB, 0xFFFF Uncalibrated
   if (s.lens) out.push(asciiEntry(0xa434, s.lens));
   return out.sort((a, b) => a.tag - b.tag);
 }

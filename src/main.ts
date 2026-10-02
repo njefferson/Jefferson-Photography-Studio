@@ -9493,19 +9493,25 @@ function uploadPreview() {
   renderer.setTapScale(previewTapScale);
   // HOW MANY SENSOR PIXELS ONE TEXEL OF THIS TEXTURE IS — capture sharpening's
   // radius is in sensor pixels (raw/detail.ts), so on a proxy the shader
-  // narrows it by this. A raw's decode is a half-size bin (2), and an 8-bit
-  // proxy is the decode scaled down by toPreview.
-  decodePitch = currentFile && sourceIsMosaiced(currentFile) ? 2 : 1;
+  // narrows it by this. EVERY raw decode is a half-size bin (2) — a NEF, a
+  // mosaiced or LinearRaw DNG, and a LOSSY DNG too (binRaw), which is why this
+  // asks the decode rather than `sourceIsMosaiced`: that one answers whether an
+  // export re-reads the file, and says no for a lossy DNG whose decode is still
+  // a bin. An 8-bit proxy is the decode scaled down by toPreview.
+  decodePitch = current.isRaw ? 2 : 1;
   renderer.setNativePitch(decodePitch * (current.width / Math.max(1, previewSrc.width)));
   renderer.setImage(previewSrc);
   // ASKED FOR THE WHOLE FRAME; IF THE BROWSER GAVE LESS, THE PROXY. Checked
   // here, synchronously, so the first frame drawn is already the right one;
   // `renderer.onBufferShort` catches a later crop or rotation that asks for
-  // more than this one did.
+  // more than this one did. The pitch is set again with the tap scale: the
+  // proxy's texel spans max(w, h) / MAX_PREVIEW sensor pixels, and the value
+  // set above was the full-size upload's 1.
   if (renderer.bufferShort && previewSrc === current && current.pixels && Math.max(current.width, current.height) > MAX_PREVIEW) {
     proxyRefusedFor = current;
     previewSrc = toPreview(current, true);
     renderer.setTapScale(previewTapScale);
+    renderer.setNativePitch(decodePitch * (current.width / Math.max(1, previewSrc.width)));
     renderer.setImage(previewSrc);
   }
   // AND WHICH LENS FLAT THOSE PIXELS CARRY, beside the upload for the same
@@ -19784,7 +19790,8 @@ let previewH = 0;
 let previewTapScale = 1;
 
 /** How many native sensor pixels one pixel of the open DECODE (`current`)
- *  spans: 2 for a mosaiced raw, whose decode is a half-size bin, 1 otherwise.
+ *  spans: 2 for a raw (`isRaw`), whose decode is a half-size bin whatever the
+ *  file stores — mosaic, LinearRaw or lossy — and 1 otherwise.
  *  Set by uploadPreview. The sky map's CPU pre-pass runs on that decode and
  *  needs it for the sharpening radius, which is in sensor pixels. */
 let decodePitch = 1;
