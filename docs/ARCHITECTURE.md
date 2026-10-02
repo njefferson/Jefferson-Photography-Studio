@@ -276,8 +276,14 @@ without better evidence.
 - `.cube` (`lut.ts`): bakes the color pipeline (verified vs compileEdit to
   rounding). Spatial features (denoise/glow) CANNOT be in a LUT.
 - `.dcp` (`dcp.ts`): TIFF-based, embeds ColorMatrix1 + ProfileHueSatMap.
-  Structure validated with tifffile; color output not yet validated in
-  Lightroom — shipped as beta.
+  The matrix is the one the decode rendered with, under the illuminant its
+  file names (none written when it names none), recentred so the app's
+  infrared neutral reads as D65 — Lightroom's 2000 K floor cannot reach an IR
+  white with a visible-light matrix. The table is built in linear ProPhoto,
+  where a DNG reader applies it, at 360 hue x 8 saturation x 8 sRGB-encoded
+  value divisions, so the swap's two hue wraps cost one degree each and the
+  saturation boost's shadow fade survives. Structure validated with tifffile;
+  color output not yet validated in Lightroom — shipped as beta.
 - Lightroom .xmp presets in `presets/` (Temperature floor 2000 + Calibration
   faux swap; a true swap is impossible in Lightroom without a profile).
 - Image exports embed an ICC profile (`src/icc.ts`) so files are never untagged.
@@ -323,8 +329,15 @@ raw exception string:
 
 ## iOS/Safari landmines (each one bit us)
 
-1. WebGL drawing buffers over ~16.7MP silently clamp -> black canvas. Preview
-   proxies anything over 2800px (`toPreview` in main.ts).
+1. A WebGL drawing buffer the browser cannot give is given SMALLER, and says so
+   in `drawingBufferWidth/Height` (WebGL spec, "The Drawing Buffer"); WebKit
+   clamps each side to the texture, renderbuffer and viewport maxima, with no
+   area cap. 16,777,216 pixels was an old iOS 2D-canvas area cap, not a WebGL
+   one. So an 8-bit source is uploaded at full size and the renderer compares
+   the buffer it got with the one it asked for (`Renderer.bufferShort`); only
+   on a mismatch does `toPreview` in main.ts fall back to the 2800px proxy.
+   Until 2026-10-02 every 8-bit source over 2800px was proxied on the old
+   16.7MP premise.
 2. `hidden` attribute loses to ID display rules -> global
    `[hidden]{display:none!important}` in style.css. Do not remove.
 3. `max-height:100%` in an auto-sized grid track does not constrain portrait
@@ -708,23 +721,23 @@ cannot describe something the code does not say about itself.
 - **`src/chooser.ts`** (65 lines) — Two-door landing page.
 - **`src/color.ts`** (110 lines) — Camera color science.
 - **`src/cubeimport.ts`** (181 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
-- **`src/dcp.ts`** (255 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
-- **`src/debug.ts`** (2116 lines) — The test page behind the version number.
-- **`src/decode.ts`** (731 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
+- **`src/dcp.ts`** (504 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
+- **`src/debug.ts`** (2128 lines) — The test page behind the version number.
+- **`src/decode.ts`** (756 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (60 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
-- **`src/exif.ts`** (292 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1174 lines) — Full-resolution export.
+- **`src/exif.ts`** (333 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
+- **`src/export.ts`** (1262 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (3149 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (3209 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
 - **`src/gpuexport.ts`** (292 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
-- **`src/half.ts`** (69 lines) — IEEE half-precision, both directions, in one place.
+- **`src/half.ts`** (109 lines) — IEEE half-precision, both directions, in one place.
 - **`src/heal.ts`** (1100 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
 - **`src/histogram.ts`** (114 lines) — Lightroom-style floating histogram.
 - **`src/hotspot.ts`** (225 lines) — The per-lens IR hot-spot correction that comes WITH the app, as opposed to one the reader measured for themselves (lensstore.ts).
@@ -748,7 +761,7 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (20189 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (20269 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
 - **`src/pipeline.ts`** (3066 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.

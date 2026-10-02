@@ -1472,10 +1472,36 @@ export class Renderer {
   private straighten = 0; // last-applied straighten angle (degrees), for inverse mapping
   private isLinear = false;
   private isHalf = false;   // the texture is RGBA16F rather than RGBA32F
+  /** OES_texture_float_linear was granted: an RGBA32F texture may be sampled
+   *  LINEAR. RGBA16F needs nothing — it is texture-filterable in core GLES 3.0
+   *  (table 3.13), so WebGL2 filters it everywhere. */
+  private floatLinear = false;
+  /** The MIN/MAG filter currently set on the source texture, so bindPipeline
+   *  changes it only when straighten or warp turns on or off. */
+  private srcFilter = 0;
+  /** The last size applied got a SMALLER drawing buffer than the canvas asked
+   *  for, or the image is over MAX_TEXTURE_SIZE — see applySize. */
+  private short = false;
   private contextLost = false;
   /** Told when the browser takes the graphics away — see the constructor. */
   onContextLost?: () => void;
+  /** Told, after the current call returns, when a size applied to the canvas
+   *  got a smaller drawing buffer than it asked for — see `bufferShort`. */
+  onBufferShort?: () => void;
   onContextRestored?: () => void;
+
+  /** DID THE BROWSER GIVE THE SIZE IT WAS ASKED FOR? True when the last size
+   *  applied (setImage, a crop, a rotation) got a drawing buffer smaller than
+   *  the canvas, or the image is wider or taller than MAX_TEXTURE_SIZE.
+   *
+   *  The WebGL spec's own answer to "what happens when a canvas is too big": "a
+   *  drawing buffer with smaller dimensions shall be created", and its true
+   *  size is drawingBufferWidth/Height — so the honest test is to ASK for the
+   *  whole frame and compare, rather than assume a cap. main.ts falls back to
+   *  a proxy only when this says the request was not met. */
+  get bufferShort(): boolean {
+    return this.short;
+  }
 
   /** True once the browser has taken the context away. Every draw after that is
    *  a no-op whatever this class does, so callers check it rather than painting
@@ -1706,10 +1732,13 @@ export class Renderer {
       this.onContextRestored?.();
     });
     // Float textures (for 14-bit linear raw) need this extension to be color-
-    // renderable; sampling works regardless, and we filter NEAREST. Asked for
-    // BEFORE the build: enabling an extension makes ANGLE release its shader
-    // compiler, and doing that with a compile in flight is a risk with no gain.
+    // renderable; sampling works regardless. OES_texture_float_linear lets an
+    // RGBA32F source be filtered LINEAR under straighten and warp (setImage);
+    // RGBA16F needs no extension. Both asked for BEFORE the build: enabling an
+    // extension makes ANGLE release its shader compiler, and doing that with a
+    // compile in flight is a risk with no gain.
     gl.getExtension("EXT_color_buffer_float");
+    this.floatLinear = !!gl.getExtension("OES_texture_float_linear");
 
     // THE BUILD STARTS HERE AND FINISHES LATER (decision 071). On a PC through
     // Direct3D the link took 42 s the first time after a release, and the page
@@ -2348,6 +2377,14 @@ export class Renderer {
     this.canvas.width = Math.max(1, Math.round(baseW * this.crop.w));
     this.canvas.height = Math.max(1, Math.round(baseH * this.crop.h));
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    // Read back what was actually allocated (see bufferShort). Told after the
+    // current call returns, so a caller mid-upload finishes before reacting.
+    const gl = this.gl;
+    const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+    const short = gl.drawingBufferWidth < this.canvas.width || gl.drawingBufferHeight < this.canvas.height ||
+      Math.max(this.imgW, this.imgH) > maxTex;
+    this.short = short;
+    if (short && this.onBufferShort) queueMicrotask(() => this.onBufferShort?.());
   }
 
   /** Upload the per-image blurred highlight map (or clear it with null). */
@@ -2378,10 +2415,19 @@ export class Renderer {
     this.applySize();
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     if (img.linear || img.linear16) {
-      // Float textures aren't reliably linear-filterable across devices; the
-      // canvas is 1:1 with the texture, so NEAREST is correct anyway.
+      // NEAREST WHILE THE CANVAS IS 1:1 WITH THE TEXTURE, LINEAR WHEN IT IS NOT.
+      // With no straighten and no warp every output pixel lands on a texel
+      // centre (crop and quarter-turns keep the grid), so NEAREST returns the
+      // texel exactly. Straighten and warp move the sample off the grid, and
+      // there NEAREST is a nearest-neighbour resample of the photograph —
+      // bindPipeline switches to LINEAR for them. This used to say float
+      // textures are not reliably linear-filterable, which is true of RGBA32F
+      // (it needs OES_texture_float_linear) and false of RGBA16F, the working
+      // copy's format: GLES 3.0 table 3.13 marks it texture-filterable, so
+      // WebGL2 filters it on every device.
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      this.srcFilter = gl.NEAREST;
       if (img.linear16) {
         // HALF THE MEMORY, and the reason it matters is a device rather than a
         // preference: a full-resolution frame is 16 MB a megapixel as float32 —
@@ -2762,6 +2808,20 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.glowTex);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    // THE LINEAR SOURCE IS FILTERED WHEN THE GRID IS LEFT (see setImage): under
+    // straighten or warp the sample falls between texels, and the computed
+    // export interpolates bilinearly there too (export.ts bilinearTap; warp.ts
+    // warpSampler), so preview and saved file are the same resample. An
+    // RGBA32F source without OES_texture_float_linear cannot filter and stays
+    // NEAREST — the drawn-export probe on the test page is its only user.
+    if (this.isLinear) {
+      const filt = (straighten !== 0 || this.warpOn) && (this.isHalf || this.floatLinear) ? gl.LINEAR : gl.NEAREST;
+      if (filt !== this.srcFilter) {
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filt);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filt);
+        this.srcFilter = filt;
+      }
+    }
   }
 
   /** Release the detail pre-pass target. Takes nothing; returns nothing. Called

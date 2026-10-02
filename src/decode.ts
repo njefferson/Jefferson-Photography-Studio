@@ -640,18 +640,42 @@ export function cameraModel(ifds: Ifd[]): string | undefined {
   return undefined;
 }
 
-/** Camera ColorMatrix (XYZ -> camera), preferring the daylight calibration.
- *  Adobe DNGs carry two: ColorMatrix1 for CalibrationIlluminant1 (often
- *  Illuminant A / tungsten) and ColorMatrix2 for CalibrationIlluminant2
- *  (usually D65). IR shooting is daylight-only and dcraw/LibRaw likewise
- *  render from the D65 matrix — picking the tungsten one bends every color
- *  (the D5300 twins mismatched exactly this way, 2026-07-25). */
+/**
+ * Camera ColorMatrix (XYZ -> camera), preferring the daylight calibration.
+ * Adobe DNGs carry two: ColorMatrix1 for CalibrationIlluminant1 (often
+ * Illuminant A / tungsten) and ColorMatrix2 for CalibrationIlluminant2
+ * (usually D65). IR shooting is daylight-only and dcraw/LibRaw likewise
+ * render from the D65 matrix — picking the tungsten one bends every color
+ * (the D5300 twins mismatched exactly this way, 2026-07-25).
+ * @param ifds  every IFD of the file (Tiff.allIfds()).
+ * @returns the chosen nine numbers, row-major, or undefined when no IFD carries
+ *   a nine-value ColorMatrix (a NEF, a camera JPEG).
+ * What the result must satisfy: it is the SAME matrix `readCameraMatrixTagged`
+ *   picks, because the decode renders from this one and the .dcp export writes
+ *   that one — two choosers would be a profile describing a different
+ *   rendering from the one on screen.
+ */
 export function readCameraMatrix(ifds: Ifd[]): number[] | undefined {
+  return readCameraMatrixTagged(ifds)?.matrix;
+}
+
+/**
+ * The matrix `readCameraMatrix` picks, WITH the illuminant its file says it was
+ * calibrated under — the pair a camera profile has to carry together (DNG:
+ * ColorMatrix1 "under the first calibration illuminant").
+ * @param ifds  every IFD of the file.
+ * @returns { matrix, illuminant } — illuminant is the EXIF LightSource code from
+ *   the matching CalibrationIlluminant tag (21 = D65, 17 = A, ...), undefined
+ *   when the file names none — or undefined when no matrix is present.
+ * Consumers: readCameraMatrix (the decode and the computed export) and the
+ *   .dcp export (dcp.ts), which writes this illuminant rather than guessing one.
+ */
+export function readCameraMatrixTagged(ifds: Ifd[]): { matrix: number[]; illuminant: number | undefined } | undefined {
   // EXIF LightSource ranking, best first: D65, D55, D75, D50, daylight/fine
   // weather, untagged, then anything else (tungsten et al).
   const rank = (ill: number | undefined) =>
     ill === 21 ? 0 : ill === 20 ? 1 : ill === 22 ? 2 : ill === 23 ? 3 : ill === 1 || ill === 9 ? 4 : ill === undefined ? 5 : 6;
-  let best: number[] | undefined;
+  let best: { matrix: number[]; illuminant: number | undefined } | undefined;
   let bestRank = Infinity;
   for (const d of ifds) {
     for (const [mTag, iTag] of [
@@ -660,10 +684,11 @@ export function readCameraMatrix(ifds: Ifd[]): number[] | undefined {
     ] as const) {
       const cm = d.num(mTag);
       if (cm.length !== 9) continue;
-      const r = rank(d.num(iTag)[0]);
+      const ill = d.num(iTag)[0];
+      const r = rank(ill);
       if (r < bestRank) {
         bestRank = r;
-        best = cm;
+        best = { matrix: cm, illuminant: ill };
       }
     }
   }

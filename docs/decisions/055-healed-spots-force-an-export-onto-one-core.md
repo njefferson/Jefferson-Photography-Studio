@@ -67,13 +67,17 @@ a 4 GB iPad show `com.apple.WebKit.GPU` killed at 316–522 MB, reason
 "highwater" — several times smaller than the figure the page-process number
 suggests, and the export draws.
 
-**Two hard limits on the drawing surface, both documented with reproductions**
-(pqina.nl): an area cap of 16,777,216 pixels, which a 5568x3712 frame is already
-over, and a total across every surface the page holds — 384 MB on Safari 15 —
-past which contexts come back null and surfaces draw transparent. Safari also
-keeps a surface alive after the last reference to it is gone. The app's own test
-page now measures both on the device, because the published figures are from
-2022 and the app must not budget against somebody else's iPad.
+**Two limits on the drawing surface, both documented with reproductions in 2022
+and both version-dependent** (pqina.nl): an area cap of 16,777,216 pixels, and a
+total across every surface the page holds — 384 MB on Safari 15 — past which
+contexts come back null and surfaces draw transparent; Safari then also kept a
+surface alive after the last reference to it was gone. Current WebKit
+(CanvasBase.cpp `maxCanvasArea`, read 2026-10-02) allows 8192 x 8192 =
+67,108,864 pixels on iOS and 16384 x 16384 elsewhere, which a 5568x3712 frame is
+well under, and its canvas code has no total-memory check. Which a reader's iPad
+has depends on its Safari. The app's own test page measures both on the device,
+on both sides of both area figures, because the app must not budget against
+somebody else's iPad.
 
 **The swap file that was asked about is real technology and the wrong fit.**
 OPFS with `createSyncAccessHandle` is synchronous, worker-only and POSIX-shaped,

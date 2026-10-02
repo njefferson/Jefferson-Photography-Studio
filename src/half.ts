@@ -11,23 +11,63 @@
 // hub's lessons — one gets a fix and the other does not.
 //
 // WHAT THIS HANDLES AND WHAT IT DOES NOT. The values are linear sensor data in
-// [0, 1] and a little above at clipping: no infinities, no NaNs, nothing
-// subnormal that matters. Subnormals flush to zero — a value that small is far
-// below the sensor's own noise floor — and anything over the largest finite
-// half clamps to it rather than becoming an infinity the shader would have to
-// cope with. Measured against float32 on three devices: the picture differs by
-// 0.018 of 255 on average, worst 4, IDENTICALLY on all of them, which is what a
-// deterministic conversion looks like.
+// [0, 1] and a little above at clipping: no infinities, no NaNs. Anything over
+// the largest finite half clamps to it rather than becoming an infinity the
+// shader would have to cope with. Measured against float32 on three devices:
+// the picture differs by 0.018 of 255 on average, worst 4, IDENTICALLY on all
+// of them, which is what a deterministic conversion looks like.
+//
+// SUBNORMALS ARE KEPT, as Imath's imath_float_to_half keeps them: only a value
+// at or below 2^-25 (half the smallest subnormal) becomes zero. Until
+// 2026-10-02 everything below the smallest NORMAL half, 2^-14, was flushed, on
+// the claim that such a value was "far below the sensor's own noise floor". It
+// is not: on a 14-bit Z 50 normalised as (v - 1008) / (15520 - 1008), 2^-14 is
+// about 0.89 DN, and base-ISO read noise is about 1.5 DN (RawTherapee
+// camconst.json, Z 50 white levels "computed using 16383 - 6 * read_noise").
+// The bilinear demosaic averages two or four photosites into half- and
+// quarter-DN estimates, and every one of those below 0.89 DN was zeroed in the
+// editor's working copy while the float export kept it — negatives are already
+// clamped to zero, so the flush could only pull deep shadows DOWN. A subnormal
+// half holds them to within 2^-25 (about 0.03 DN). GLES 3.0 section 2.1.2 lets
+// a GPU either keep a subnormal half or read it as zero, so on a GPU that
+// flushes, the preview's deepest shadows are what they were before this; the
+// CPU readers (fromHalf: heal, the occlusion read, the probes) get them exact.
 const f32 = new Float32Array(1);
 const i32 = new Int32Array(f32.buffer);
 
+/**
+ * One number, float -> IEEE binary16 bits, round to nearest, ties to even.
+ * @param v  a finite number; the working copy passes linear sensor values in
+ *   [0, ~1.1].
+ * @returns the 16-bit pattern: a normal half, a SUBNORMAL half for
+ *   2^-25 < |v| < 2^-14, signed zero at or below 2^-25, and the largest finite
+ *   half (65504) for anything that would round past it — never an infinity.
+ * What the result must satisfy: fromHalf(toHalf(v)) is within half a unit in
+ *   the last place of v across the whole range, subnormals included (absolute
+ *   error at most 2^-25 below 2^-14); consumers are the RGBA16F working copy
+ *   (gpuexport.ts), the heal patch upload (gl.ts) and every fromHalf reader.
+ */
 export function toHalf(v: number): number {
   f32[0] = v;
   const x = i32[0];
   const sign = (x >> 16) & 0x8000;
   const e = ((x >> 23) & 0xff) - 127 + 15;
   const m = x & 0x7fffff;
-  if (e <= 0) return sign;                    // too small to represent: zero
+  if (e <= 0) {
+    // SUBNORMAL: the half holds hm * 2^-24, hm in 0..1023. The float is
+    // full * 2^(e - 15 - 23) with the implicit leading one put back into
+    // `full`, so hm = v / 2^-24 = full * 2^(e - 14): the 24-bit mantissa
+    // shifted right by 14 - e, rounded to nearest even. A shift past 24 leaves
+    // at most half of hm's last place, which ties or rounds to zero.
+    if (e < -10) return sign;
+    const full = m | 0x800000;
+    const shift = 14 - e;                     // 14..24
+    let hm = full >>> shift;
+    const rest = full & ((1 << shift) - 1);
+    const halfway = 1 << (shift - 1);
+    if (rest > halfway || (rest === halfway && (hm & 1))) hm++; // may carry to 0x400, the smallest normal: correct
+    return sign | hm;
+  }
   if (e >= 31) return sign | 0x7bff;          // too large: the biggest finite half
   // ROUND TO NEAREST, TIES TO EVEN — not truncation, which is what the first
   // version of this did while it lived in gpuexport.ts. Measured over 300,001

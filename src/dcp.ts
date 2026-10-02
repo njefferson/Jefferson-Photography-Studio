@@ -1,8 +1,27 @@
 // DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 //
 // Encodes the creative look (channel swap + hue + saturation, plus a tone curve
-// for contrast) as a ProfileHueSatMap, and embeds the camera's ColorMatrix.
-// White balance stays the user's per-shot adjustment (it is raw-domain).
+// for contrast) as a ProfileHueSatMap, and embeds the camera's ColorMatrix —
+// the one the app rendered with, under the illuminant its file names, with its
+// white point MOVED to the infrared neutral this photograph was balanced to.
+//
+// WHY THE WHITE POINT MOVES (2026-10-02). White balance stays the reader's
+// per-shot adjustment in Lightroom, but Lightroom's Temp slider runs 2,000 to
+// 50,000 K, and an ordinary visible-light matrix puts an infrared white point
+// below that floor (IR-SCIENCE.md section 3): the reader could not neutralise
+// the frame the swap is then applied to. Infrared camera profiles exist for
+// exactly this — they recentre white balance by changing the colour matrix
+// (Rob Shea's Temp -100 profiles; DNG Profile Editor's White Balance
+// Calibration). This one scales the camera side of the matrix so the app's own
+// balance (the gains in `params.wb`) reads as daylight, D65.
+//
+// WHERE LIGHTROOM APPLIES THE TABLE (2026-10-02). DNG 1.7.1.0, "Applying the
+// Hue/Saturation/Value Mapping Table": after camera -> XYZ (D50), "the XYZ (D50)
+// values are converted to linear RGB coordinates, using the ProPhoto RGB
+// primaries", and the table works in the HSV of THAT. The app's look works in
+// linear RGB with sRGB primaries, so until this date the table carried a
+// ProPhoto R/B swap, which lands on different colours. Each node is now taken
+// from ProPhoto to the app's space, through the app's own steps, and back.
 //
 // IMPORTANT: the .cube path is verified numerically here; a .dcp's *colour*
 // can only be confirmed inside Lightroom/ACR (not available in this build env),
@@ -10,23 +29,36 @@
 // TIFF/DNG reader.
 
 import { mix3IsIdentity, MIX3_DEFAULT, hueRotate, type EditParams } from "./pipeline";
-import { Tiff } from "./raw/tiff";
+import { Tiff, type Ifd } from "./raw/tiff";
+import { nikonColorMatrix } from "./color";
+import { cameraModel, readCameraMatrixTagged } from "./decode";
+import { srgbToLinear, srgbFromLinear } from "./icc";
 
-// Nikon Z 50 ColorMatrix (XYZ -> camera, D65): Adobe DNG Converter's, the
-// ColorMatrix2 its DNGs carry, as LibRaw's colordata.cpp ("Z 50") and
-// RawTherapee's camconst.json both list it, /10000. Until 2026-10-01 this was
-// 1.1853, -0.4189, -0.1024, -0.4292, 1.2041, 0.2569, -0.1336, 0.2599, 0.5824
-// under a label calling it Adobe's, which it is not; no source for those
-// numbers was ever recorded, and no Z 50 DNG among the owner's files carries
-// them. The practice DNGs in public/examples were written with the old numbers
-// and keep them in their own tags.
-const Z50_COLOR_MATRIX = [
-  1.164, -0.4829, -0.1079, -0.5107, 1.3006, 0.2325, -0.0972, 0.1711, 0.738,
-];
+// The Nikon Z 50 fallback matrix is color.ts's NIKON_Z50_COLOR_MATRIX, reached
+// through nikonColorMatrix exactly as the decode reaches it — this file kept its
+// own copy until 2026-10-02, which is one rule in two places.
 
-const HUE_DIVS = 36;
+// 360 hue divisions, one a degree (2026-10-02; 36 before). A swap shifts hue by
+// 240 - 2h, which wraps past +-180 twice round the circle, and every reader
+// interpolates the stored shifts STRAIGHT THROUGH a wrap (RawTherapee's
+// hsdApply, ported from Adobe's reference: hue_shift0 = h_fract0 * a + h_fract1
+// * b) — so the cell holding a wrap renders hues near +180 and -180 as their
+// average, about 0. With 36 divisions two 10-degree bands of the swap were
+// wrong (hue 35 rendered near 25 instead of 205); with 360 the two unavoidable
+// cells are one degree each. Within one hue node the wrap is made to fall on
+// the same side at every saturation and value (unwrapHueColumn), so no cell
+// interpolates across it in those two directions at all.
+const HUE_DIVS = 360;
 const SAT_DIVS = 8;
-const VAL_DIVS = 1;
+// VALUE DIVISIONS, sRGB-encoded, so the app's shadow fade survives: a
+// saturation boost fades out below luma 0.20 (smoothstep 0.02-0.20) in both the
+// CPU and GPU paths, and a table with one value division is constant in value
+// (DNG: "If the division count in a dimension is 1, then the table is constant
+// for that dimension"), which gave dark saturated colours the full boost the
+// app withholds. sRGB encoding (ProfileHueSatMapEncoding = 1) puts most of the
+// nodes where the fade is, which is what the spec offers it for: "additional
+// table precision to dark (shadow) image values".
+const VAL_DIVS = 8;
 
 const TYPE = { ASCII: 2, SHORT: 3, LONG: 4, SRATIONAL: 10, FLOAT: 11 } as const;
 
@@ -37,25 +69,128 @@ interface Entry {
   bytes: Uint8Array; // raw value bytes (little-endian)
 }
 
-export function generateDcp(params: EditParams, sourceBytes: Uint8Array | undefined, name = "IPS IR Look"): ArrayBuffer {
-  const colorMatrix = readColorMatrix(sourceBytes) ?? Z50_COLOR_MATRIX;
+/**
+ * Build a DNG camera profile carrying this edit's look.
+ * @param params       the edit: its swap, mixer, hue, saturation (with the
+ *   app's shadow fade) go into the hue/sat/value table, its contrast into the
+ *   tone curve, and its white balance `wb` into the matrix's white point.
+ * @param sourceBytes  the original file, for the matrix the render used, its
+ *   illuminant and the camera's name; undefined falls back to the Z 50.
+ * @param name         ProfileName, as Lightroom lists it.
+ * @param raw          true when the app rendered this photograph through a
+ *   camera matrix with `params.wb` as raw gains — only then are those gains a
+ *   camera neutral the matrix can be recentred on. False (a camera JPEG, a
+ *   lossy-linear DNG) writes the matrix unshifted.
+ * @returns the .dcp file (TIFF structure, magic 0x4352).
+ * What the result must satisfy (DNG 1.7.1.0): ColorMatrix1 is the matrix the
+ *   decode rendered with (readCameraMatrixTagged, else nikonColorMatrix) and
+ *   CalibrationIlluminant1 is the one its file names — absent when it names
+ *   none, never a guessed D65; UniqueCameraModel names the camera that matrix
+ *   belongs to; every zero-saturation table entry is [0, 1, 1] ("All zero input
+ *   saturation entries are required to have a value scale factor of 1.0");
+ *   ProfileEmbedPolicy is 0, "allow copying" — a profile meant to be shared,
+ *   where 1 ("embed if used") forbids copying it out of a DNG for any other
+ *   image. Consumer: the Export .dcp button in main.ts.
+ */
+export function generateDcp(params: EditParams, sourceBytes: Uint8Array | undefined, name = "IPS IR Look", raw = true): ArrayBuffer {
+  const src = profileSource(sourceBytes);
+  const colorMatrix = raw ? recentreOnNeutral(src.matrix, params.wb) : src.matrix;
   const hsm = buildHueSatMap(params);
   const tone = buildToneCurve(params.contrast);
 
   const entries: Entry[] = [
-    asciiEntry(50708, "NIKON Z 50"), // UniqueCameraModel
+    asciiEntry(50708, src.model), // UniqueCameraModel
     srationalEntry(50721, colorMatrix), // ColorMatrix1
-    shortEntry(50778, [21]), // CalibrationIlluminant1 = D65
     asciiEntry(50936, name), // ProfileName
     longEntry(50937, [HUE_DIVS, SAT_DIVS, VAL_DIVS]), // ProfileHueSatMapDims
     floatEntry(50938, hsm), // ProfileHueSatMapData1
     floatEntry(50940, tone), // ProfileToneCurve
-    longEntry(50941, [1]), // ProfileEmbedPolicy = embed allowed
+    longEntry(50941, [0]), // ProfileEmbedPolicy = 0, "allow copying"
     asciiEntry(50942, "Generated by Infrared Photography Studio"), // ProfileCopyright
+    longEntry(51107, [1]), // ProfileHueSatMapEncoding = 1, sRGB (see VAL_DIVS)
   ];
+  // CalibrationIlluminant1 ONLY WHEN THE FILE NAMED ONE. Until 2026-10-02 this
+  // wrote 21 (D65) beside whatever matrix it found — in an Adobe two-matrix DNG
+  // the first one it found was the tungsten (A) calibration. The spec default,
+  // 0, is "unknown", which is the truth for a file that names nothing.
+  if (src.illuminant !== undefined) entries.push(shortEntry(50778, [src.illuminant]));
   entries.sort((a, b) => a.tag - b.tag);
 
   return assembleTiff(entries);
+}
+
+// --- the matrix, its illuminant, and the camera's name ---
+
+/** D65's XYZ as the app's own sRGB matrix implies it (the rows of dcraw's
+ *  xyz_rgb summed) — the white camToSrgbLinear normalises the camera to, so the
+ *  neutral this file's matrix is recentred from is the one the app used. */
+const D65_XYZ = [0.950456, 1.0, 1.088754];
+/** D50, the PCS white, as ProPhoto's own primaries sum to it. */
+const D50_XYZ = [0.96422, 1.0, 0.82521];
+
+/** The matrix the decode rendered with, the illuminant its file names for it,
+ *  and the UniqueCameraModel a reader indexes profiles by. Mirrors decode.ts:
+ *  readCameraMatrixTagged first, then nikonColorMatrix by the Model string,
+ *  whose two constants are both Adobe-converter ColorMatrix2 values (D65). */
+function profileSource(sourceBytes: Uint8Array | undefined): { matrix: number[]; illuminant: number | undefined; model: string } {
+  let ifds: Ifd[] = [];
+  try {
+    if (sourceBytes && (sourceBytes[0] === 0x49 || sourceBytes[0] === 0x4d)) ifds = new Tiff(sourceBytes).allIfds();
+  } catch {
+    ifds = [];
+  }
+  const tagged = ifds.length ? readCameraMatrixTagged(ifds) : undefined;
+  const body = cameraModel(ifds);
+  const matrix = tagged?.matrix ?? nikonColorMatrix(body);
+  const illuminant = tagged ? tagged.illuminant : 21;
+  return { matrix, illuminant, model: uniqueCameraModel(ifds) ?? "Nikon Z 50" };
+}
+
+/** UniqueCameraModel for the profile: a DNG's own (tag 50708) when it carries
+ *  one — that is the string its reader will look a profile up by — else the
+ *  EXIF Make's first word in title case and the Model without the maker
+ *  repeated ("NIKON CORPORATION" + "NIKON Z 50" -> "Nikon Z 50"). Not verified
+ *  against a Lightroom install here: the form is the one Adobe's own profile
+ *  names use, and no Adobe-converted DNG among the owner's files carries 50708
+ *  to check it against. Until 2026-10-02 every profile said "NIKON Z 50",
+ *  including one carrying a D5300's matrix. */
+function uniqueCameraModel(ifds: Ifd[]): string | undefined {
+  let make: string | undefined;
+  let model: string | undefined;
+  for (const d of ifds) {
+    const u = d.str(50708);
+    if (u && u.trim()) return u.trim();
+    make ??= d.str(271);
+    model ??= d.str(272);
+  }
+  if (!model || !model.trim()) return undefined;
+  const brand = (make ?? "").trim().split(/\s+/)[0] ?? "";
+  let m = model.trim();
+  if (brand && m.toUpperCase().startsWith(brand.toUpperCase() + " ")) m = m.slice(brand.length + 1).trim();
+  const title = brand ? brand[0].toUpperCase() + brand.slice(1).toLowerCase() : "";
+  return title ? `${title} ${m}` : m;
+}
+
+/** The matrix with its white point moved to the app's infrared neutral.
+ *
+ *  The app renders camera RGB c as camToSrgbLinear(CM) . diag(wb) . c, and
+ *  camToSrgbLinear normalises the camera to n65 = CM . D65 — so the app's
+ *  rendering is sRGB-from-XYZ . inverse(CM) . diag(n65 / nIR) . c, with
+ *  nIR = 1 / wb the camera neutral it balanced to. Scaling the CAMERA side,
+ *  CM' = diag(nIR / n65) . CM, makes CM' . D65 = nIR: Lightroom then reads the
+ *  infrared neutral as D65, and at that white balance its camera -> XYZ (D50)
+ *  is the Bradford D65 -> D50 of exactly the app's XYZ. Normalised so the
+ *  largest component of the neutral is 1, the scale Adobe's profiles use. */
+function recentreOnNeutral(cm: number[], wb: readonly number[]): number[] {
+  const n65 = [0, 1, 2].map((r) => cm[r * 3] * D65_XYZ[0] + cm[r * 3 + 1] * D65_XYZ[1] + cm[r * 3 + 2] * D65_XYZ[2]);
+  const nIR = [0, 1, 2].map((r) => 1 / Math.max(1e-6, wb[r] ?? 1));
+  const top = Math.max(nIR[0], nIR[1], nIR[2]);
+  const out: number[] = [];
+  for (let r = 0; r < 3; r++) {
+    const k = nIR[r] / top / (Math.abs(n65[r]) > 1e-9 ? n65[r] : 1);
+    out.push(cm[r * 3] * k, cm[r * 3 + 1] * k, cm[r * 3 + 2] * k);
+  }
+  return out;
 }
 
 // --- look table ---
@@ -89,22 +224,150 @@ function creativeLinear(r: number, g: number, b: number, p: EditParams): [number
   return [nr, ng, nb];
 }
 
-/** ProfileHueSatMapData1: per (hue, sat) -> [hueShiftDeg, satScale, valScale]. */
+/** The app's colour steps WITH its shadow fade: creativeLinear's swap, mixer
+ *  and hue at saturation 1, then the saturation the way compileEdit and the
+ *  shader apply it — a boost (sat > 1) fading out below luma 0.20,
+ *  smoothstep(0.02, 0.20, luma), so it does not amplify chroma noise. */
+function creativeWithFade(r: number, g: number, b: number, p: EditParams): [number, number, number] {
+  const [nr, ng, nb] = creativeLinear(r, g, b, p.sat === 1 ? p : { ...p, sat: 1 });
+  const luma = nr * 0.2126 + ng * 0.7152 + nb * 0.0722;
+  let satEff = p.sat;
+  if (p.sat > 1) {
+    const t = Math.min(1, Math.max(0, (luma - 0.02) / 0.18));
+    satEff = 1 + (p.sat - 1) * t * t * (3 - 2 * t);
+  }
+  return [luma + (nr - luma) * satEff, luma + (ng - luma) * satEff, luma + (nb - luma) * satEff];
+}
+
+// --- ProPhoto, where a DNG reader applies the table ---
+
+function mul3(a: number[], b: number[]): number[] {
+  const o = new Array(9).fill(0);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) for (let k = 0; k < 3; k++) o[r * 3 + c] += a[r * 3 + k] * b[k * 3 + c];
+  return o;
+}
+function inv3(m: number[]): number[] {
+  const [a, b, c, d, e, f, g, h, i] = m;
+  const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
+  const D = -(b * i - c * h), E = a * i - c * g, F = -(a * h - b * g);
+  const G = b * f - c * e, H = -(a * f - c * d), I = a * e - b * d;
+  const det = a * A + b * B + c * C || 1;
+  return [A / det, D / det, G / det, B / det, E / det, H / det, C / det, F / det, I / det];
+}
+function apply3(m: number[], r: number, g: number, b: number): [number, number, number] {
+  return [m[0] * r + m[1] * g + m[2] * b, m[3] * r + m[4] * g + m[5] * b, m[6] * r + m[7] * g + m[8] * b];
+}
+
+/** Linear ProPhoto (ROMM) RGB -> XYZ D50 (Lindbloom). */
+const PROPHOTO_TO_XYZ = [0.7976749, 0.1351917, 0.0313534, 0.2880402, 0.7118741, 0.0000857, 0, 0, 0.82521];
+/** Linear sRGB -> XYZ D65: dcraw's xyz_rgb, the matrix color.ts builds the
+ *  camera's sRGB transform from, so "the app's space" is exactly that one. */
+const SRGB_TO_XYZ = [0.412453, 0.35758, 0.180423, 0.212671, 0.71516, 0.072169, 0.019334, 0.119193, 0.950227];
+
+/** Linear Bradford adaptation between two XYZ whites — the method the DNG
+ *  spec recommends for the camera -> XYZ (D50) step. */
+function bradford(from: number[], to: number[]): number[] {
+  const M = [0.8951, 0.2664, -0.1614, -0.7502, 1.7135, 0.0367, 0.0389, -0.0685, 1.0296];
+  const s = apply3(M, from[0], from[1], from[2]);
+  const d = apply3(M, to[0], to[1], to[2]);
+  return mul3(inv3(M), mul3([d[0] / s[0], 0, 0, 0, d[1] / s[1], 0, 0, 0, d[2] / s[2]], M));
+}
+
+/** ProPhoto linear -> the app's linear working space (sRGB primaries, D65),
+ *  through XYZ D50 and Bradford to D65 — the inverse of what Lightroom does to
+ *  the app's colours at a D65 white (see recentreOnNeutral). Each row is
+ *  renormalised to sum to 1 so a ProPhoto neutral is EXACTLY an app neutral;
+ *  the published constants round, and a profile must not tint grey. */
+const PROPHOTO_TO_APP = (() => {
+  const m = mul3(inv3(SRGB_TO_XYZ), mul3(bradford(D50_XYZ, D65_XYZ), PROPHOTO_TO_XYZ));
+  for (let r = 0; r < 3; r++) {
+    const k = m[r * 3] + m[r * 3 + 1] + m[r * 3 + 2];
+    m[r * 3] /= k; m[r * 3 + 1] /= k; m[r * 3 + 2] /= k;
+  }
+  return m;
+})();
+const APP_TO_PROPHOTO = inv3(PROPHOTO_TO_APP);
+
+/** One table node: the app's look at a ProPhoto HSV point, as the DNG reader
+ *  will apply it — [hueShiftDeg, satScale, valScale], valScale on the
+ *  sRGB-ENCODED value (ProfileHueSatMapEncoding 1: "Apply color table result
+ *  to the encoded values"). `vLin` is the node's linear value. */
+function nodeShift(p: EditParams, hue: number, sat: number, vLin: number): [number, number, number] {
+  const [r, g, b] = hsv2rgb(hue, sat, vLin);
+  const [ar, ag, ab] = apply3(PROPHOTO_TO_APP, r, g, b);
+  const [cr, cg, cb] = creativeWithFade(ar, ag, ab, p);
+  const [pr, pg, pb] = apply3(APP_TO_PROPHOTO, cr, cg, cb);
+  const [oh, os, ov] = rgb2hsv(pr, pg, pb);
+  let dh = oh - hue;
+  while (dh > 180) dh -= 360;
+  while (dh < -180) dh += 360;
+  const vScale = ov > 0 ? srgbFromLinearUnclamped(ov) / srgbFromLinearUnclamped(vLin) : 0;
+  return [dh, Math.min(8, Math.max(0, os / sat)), clampScale(vScale)];
+}
+
+/** The sRGB encoding curve without the clamp at 1 (a node's output value can
+ *  exceed it), linear below the knee as the curve is. */
+function srgbFromLinearUnclamped(v: number): number {
+  if (v <= 1) return srgbFromLinear(v);
+  return 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+}
+
+/** Put a hue node's wrap on ONE side. Shifts close to +180 and -180 are the
+ *  same rotation, but a reader interpolating between a +179.9 and a -179.9
+ *  renders about 0; flipping the minority by 360 keeps every saturation and
+ *  value of the node on the majority's side (at most a hair past 180, which
+ *  every reader wraps once after adding). Zero-saturation entries are not
+ *  rotations and are left alone. */
+function unwrapHueColumn(shifts: number[]): void {
+  let pos = 0, neg = 0;
+  for (const d of shifts) { if (d > 90) pos++; else if (d < -90) neg++; }
+  if (!pos || !neg) return;
+  for (let i = 0; i < shifts.length; i++) {
+    if (pos >= neg && shifts[i] < -90) shifts[i] += 360;
+    else if (pos < neg && shifts[i] > 90) shifts[i] -= 360;
+  }
+}
+
+/** ProfileHueSatMapData1: per (value, hue, sat) -> [hueShiftDeg, satScale,
+ *  valScale], in the spec's nested order — "value divisions in the outer
+ *  loop, the hue divisions in the middle loop, and the saturation divisions
+ *  in the inner loop". Nodes sit at hue h * 360 / HUE_DIVS, saturation
+ *  s / (SAT_DIVS - 1) and sRGB-encoded value v / (VAL_DIVS - 1). */
 function buildHueSatMap(p: EditParams): number[] {
-  const data: number[] = [];
-  for (let h = 0; h < HUE_DIVS; h++) {
-    for (let s = 0; s < SAT_DIVS; s++) {
+  const n = HUE_DIVS * SAT_DIVS * VAL_DIVS;
+  const data = new Array<number>(n * 3);
+  const at = (v: number, h: number, s: number) => ((v * HUE_DIVS + h) * SAT_DIVS + s) * 3;
+  for (let v = 0; v < VAL_DIVS; v++) {
+    // The black node has no colour to measure: it is evaluated just above
+    // black, where the app's fade has already turned any boost off, so the
+    // cell between it and the next node interpolates the look a near-black
+    // colour actually gets.
+    const enc = VAL_DIVS > 1 ? v / (VAL_DIVS - 1) : 0.5;
+    const vLin = Math.max(1e-4, srgbToLinear(enc));
+    for (let h = 0; h < HUE_DIVS; h++) {
       const hue = (h * 360) / HUE_DIVS;
-      const sat = SAT_DIVS > 1 ? s / (SAT_DIVS - 1) : 0;
-      const val = 0.5;
-      const [r, g, b] = hsv2rgb(hue, sat, val);
-      const [nr, ng, nb] = creativeLinear(r, g, b, p);
-      const [oh, os, ov] = rgb2hsv(nr, ng, nb);
-      let dh = oh - hue;
-      while (dh > 180) dh -= 360;
-      while (dh < -180) dh += 360;
-      data.push(sat < 1e-4 ? 0 : dh, sat < 1e-4 ? 1 : clampScale(os / sat), clampScale(ov / val));
+      for (let s = 0; s < SAT_DIVS; s++) {
+        const sat = SAT_DIVS > 1 ? s / (SAT_DIVS - 1) : 0;
+        const i = at(v, h, s);
+        if (sat < 1e-4) {
+          // REQUIRED by the spec, not a choice: "All zero input saturation
+          // entries are required to have a value scale factor of 1.0". A grey
+          // has no hue to shift and no saturation to scale either.
+          data[i] = 0; data[i + 1] = 1; data[i + 2] = 1;
+          continue;
+        }
+        const [dh, ss, vs] = nodeShift(p, hue, sat, vLin);
+        data[i] = dh; data[i + 1] = ss; data[i + 2] = vs;
+      }
     }
+  }
+  // One hue node at a time, across every saturation and value it holds.
+  for (let h = 0; h < HUE_DIVS; h++) {
+    const idx: number[] = [];
+    for (let v = 0; v < VAL_DIVS; v++) for (let s = 1; s < SAT_DIVS; s++) idx.push(at(v, h, s));
+    const col = idx.map((i) => data[i]);
+    unwrapHueColumn(col);
+    idx.forEach((i, k) => { data[i] = col[k]; });
   }
   return data;
 }
@@ -237,18 +500,4 @@ function srationalEntry(tag: number, vals: number[]): Entry {
     dv.setInt32(i * 8 + 4, 10000, true);
   });
   return { tag, type: TYPE.SRATIONAL, count: vals.length, bytes };
-}
-
-function readColorMatrix(sourceBytes: Uint8Array | undefined): number[] | undefined {
-  if (!sourceBytes) return undefined;
-  try {
-    if (sourceBytes[0] !== 0x49 && sourceBytes[0] !== 0x4d) return undefined;
-    for (const ifd of new Tiff(sourceBytes).allIfds()) {
-      const cm = ifd.num(50721);
-      if (cm.length === 9) return cm;
-    }
-  } catch {
-    /* fall through to default */
-  }
-  return undefined;
 }

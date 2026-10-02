@@ -1602,13 +1602,15 @@ function compareOne(label: string, drawn: DrawnFrame, computed: { data?: Uint8Cl
  *  with a texture attachment, and a render target that size being accepted says
  *  nothing about a CANVAS that size being accepted. They are different limits.
  *
- *  And the canvas one fails SILENTLY: iOS Safari clamps a drawing buffer it
- *  will not give you, keeps rendering, and hands back a black picture with no
- *  error anywhere. That is exactly why the app downscales anything over 2800px
- *  for display today. So the honest test is to ask for one, read back what was
- *  actually allocated, and then DRAW A KNOWN COLOUR AND READ IT — because a
- *  clamp that reports the size you asked for and paints black is the failure
- *  mode that costs a release. */
+ *  And the canvas one can fail QUIETLY: the WebGL spec answers an
+ *  unsatisfiable size with a smaller drawing buffer and reports its true size
+ *  in drawingBufferWidth/Height, with no error thrown. The editor now asks for
+ *  the whole frame and compares (Renderer.bufferShort), falling back to its
+ *  2800 px proxy only on a mismatch — until 2026-10-02 it proxied every 8-bit
+ *  source over 2800 px on an assumed 16.7 MP cap. This probe asks for one, reads
+ *  back what was actually allocated, and then DRAWS A KNOWN COLOUR AND READS
+ *  IT — because a buffer that reports the size you asked for and paints black
+ *  under memory pressure is the failure the size comparison cannot see. */
 async function aCanvasTheSizeOfTheFrame(): Promise<void> {
   const FW = 5600, FH = 3728;
   // THE FIRST VERSION OF THIS ASKED ON AN EMPTY PAGE, AND THAT ANSWER COST A
@@ -1764,20 +1766,25 @@ async function aCanvasTheSizeOfTheFrame(): Promise<void> {
  *  TWO SEPARATE CAPS, both documented with reproductions, neither respected by
  *  the export path today.
  *
- *  The first is AREA. Safari refuses a canvas above a fixed number of pixels
- *  regardless of how much memory is free — 16,777,216 on the version this was
- *  written against, which is 4096x4096, and the refusal does not depend on the
- *  shape: 4097x4096 is over it and 5120x3072 is under. A frame out of the camera
- *  this app is built around is 5568x3712, which is 20,668,416 pixels, ABOVE that
- *  number. Exports do come out on the reporter's iPad, so the cap is evidently
- *  not biting there — but that is one device, the published figure is several
- *  years old, and the app has never asked.
+ *  The first is AREA, and it is VERSION-DEPENDENT. Safari refuses a canvas
+ *  above a fixed number of pixels regardless of how much memory is free. The
+ *  published reproductions (2022) put it at 16,777,216 — 4096x4096, and the
+ *  refusal does not depend on the shape: 4097x4096 over, 5120x3072 under — and
+ *  a frame out of the camera this app is built around, 5568x3712 or 20,668,416
+ *  pixels, is above that. Current WebKit (CanvasBase.cpp maxCanvasArea) allows
+ *  8192 x 8192 = 67,108,864 on iOS and 16384 x 16384 elsewhere, which that
+ *  frame is well under. Which one a reader's iPad has depends on its Safari, so
+ *  the ladder below tries both sides of BOTH figures rather than trusting
+ *  either.
  *
- *  The second is TOTAL canvas memory across every canvas the page is holding,
- *  and it is worse, because Safari keeps canvases alive after the last reference
- *  to them is gone. Past the total, `getContext("2d")` starts returning null and
- *  canvases draw transparent. The documented remedy is to resize to 1x1 and
- *  clear before dropping one, which is what the export path does not do.
+ *  The second is TOTAL canvas memory across every canvas the page is holding.
+ *  The 2022 reproductions found one (384 MB on Safari 15), past which
+ *  `getContext("2d")` returned null and canvases drew transparent, and found
+ *  that Safari kept canvases alive after the last reference was gone; current
+ *  WebKit's canvas code has no such total check. Older devices may still have
+ *  it, so the second half of this probe measures it rather than assuming
+ *  either answer. The documented remedy is to resize to 1x1 and clear before
+ *  dropping one, which the export path now does (releaseCanvas).
  *
  *  AND THE FAILURE MODE IS THE REASON THIS IS WORTH A PROBE RATHER THAN A NOTE:
  *  it is not a crash. It is a photograph that comes out blank, from an export
@@ -1820,16 +1827,21 @@ async function theCanvasTheExportUses(): Promise<void> {
   };
 
   // --- part one: how big a single 2D surface can be -------------------------
-  // Ordered by area, and chosen so the two sides of the published cap are both
-  // tested rather than inferred: 4096x4096 is exactly it, 4097x4096 is one row
-  // of pixels over, and the two frame sizes are what this app actually asks for.
+  // Ordered by area, and chosen so both sides of BOTH caps are tested rather
+  // than inferred: 4096x4096 is the old published cap exactly and 4097x4096 one
+  // row over it; 8192x8192 is current iOS WebKit's cap exactly and 8193x8192
+  // one row over. The two frame sizes are what this app actually asks for. The
+  // last two rungs are 268 MB surfaces each, released before the next, and come
+  // last so the cheap answers are already recorded if they go badly.
   const SIZES: Array<[number, number, string]> = [
-    [4096, 4096, "the published cap exactly"],
-    [4097, 4096, "one pixel row over it"],
-    [5120, 3072, "under the cap, but wider than 4096"],
+    [4096, 4096, "the old published cap exactly"],
+    [4097, 4096, "one pixel row over the old cap"],
+    [5120, 3072, "under the old cap, but wider than 4096"],
     [5568, 3712, "a frame from the camera this app is built around"],
     [5600, 3728, "the frame size the rest of this page uses"],
-    [8192, 4096, "twice the published cap"],
+    [8192, 4096, "twice the old cap"],
+    [8192, 8192, "current iOS WebKit's cap exactly"],
+    [8193, 8192, "one pixel row over the current cap"],
   ];
   let biggest = 0, biggestLabel = "", firstRefusal = "", frameOk: boolean | null = null;
   for (const [w, h, what] of SIZES) {

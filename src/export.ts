@@ -425,6 +425,10 @@ export async function exportImage(
   // million of them for one photograph — and `cropToDisplayUv` allocated a
   // second. The arithmetic is unchanged; only where the numbers are put.
   const srcXY = new Float64Array(2);
+  // AND WHERE BETWEEN PIXELS IT FELL, for straighten: the same position in
+  // pixel units with pixel CENTRES on the integers (u * W - 0.5), which is
+  // where a LINEAR texture lookup puts its four taps.
+  const srcFrac = new Float64Array(2);
   const uv = new Float64Array(2);
   const toSrcF = (tx: number, ty: number): Float64Array => {
     cropToDisplayUvInto(tx, ty, crop, straighten, dispAspect, uv);
@@ -438,6 +442,8 @@ export async function exportImage(
     if (flip & 2) iv = 1 - iv;
     srcXY[0] = Math.min(srcW - 1, Math.max(0, Math.floor(iu * srcW)));
     srcXY[1] = Math.min(srcH - 1, Math.max(0, Math.floor(iv * srcH)));
+    srcFrac[0] = iu * srcW - 0.5;
+    srcFrac[1] = iv * srcH - 0.5;
     return srcXY;
   };
   const toSrc = (x: number, y: number): Float64Array => toSrcF((x + 0.5) / w, (y + 0.5) / h);
@@ -646,16 +652,26 @@ export async function exportImage(
   const ss = opts.scale < 1 ? Math.max(2, Math.min(4, Math.round(1 / opts.scale))) : 1;
   const boxN = ss * ss;
   const boxOut: [number, number, number] = [0, 0, 0];
+  // STRAIGHTEN RESAMPLES BILINEARLY, as the preview does (gl.ts bindPipeline
+  // turns the source texture LINEAR whenever straighten is on). A rotated
+  // output grid never lands on source pixel centres, and until 2026-10-02 this
+  // took the nearest one (the Math.floor in toSrcF) — a nearest-neighbour
+  // rotation, jagged on every straight edge, in both the preview and the file.
+  // darktable's rotation (clipping/ashift) interpolates the same way. Without
+  // straighten the grid IS the source's, and the one-tap path stays exact.
+  const lerpOut: [number, number, number] = [0, 0, 0];
+  const tap = (p: Float64Array): ArrayLike<number> =>
+    straighten !== 0 ? bilinearTap(sampleLinear, srcFrac[0], srcFrac[1], srcW, srcH, lerpOut) : sampleLinear(p[0], p[1]);
   const sampleBox = (x: number, y: number): ArrayLike<number> => {
     if (ss === 1) {
       const p = toSrc(x, y);
-      return sampleLinear(p[0], p[1]);
+      return tap(p);
     }
     let r = 0, g = 0, b = 0;
     for (let j = 0; j < ss; j++) {
       for (let i = 0; i < ss; i++) {
         const p = toSrcF((x + (i + 0.5) / ss) / w, (y + (j + 0.5) / ss) / h);
-        const s = sampleLinear(p[0], p[1]);
+        const s = tap(p);
         r += s[0]; g += s[1]; b += s[2];
       }
     }
@@ -828,14 +844,16 @@ export async function exportImage(
     // THE DRAWING SURFACE, AND THE TWO WAYS A BROWSER REFUSES ONE WITHOUT
     // SAYING SO.
     //
-    // Safari caps a surface by AREA — 16,777,216 pixels on the version this was
-    // written against, which a 5568x3712 frame is already over — and caps the
-    // TOTAL across every surface the page is holding, past which
-    // `getContext("2d")` starts returning null and surfaces draw transparent.
-    // It also keeps a surface alive after the last reference to it is gone, so
-    // exporting several photographs in one sitting walks towards that total;
-    // the documented remedy is to resize to 1x1 and clear before letting go,
-    // which this never did.
+    // Safari caps a surface by AREA, and the cap is VERSION-DEPENDENT: the 2022
+    // reproductions put it at 16,777,216 pixels (4096 x 4096), current WebKit
+    // allows 8192 x 8192 = 67,108,864 on iOS and 16384 x 16384 elsewhere
+    // (CanvasBase.cpp maxCanvasArea). Older versions also capped the TOTAL
+    // across every surface the page held (384 MB on Safari 15), past which
+    // `getContext("2d")` returned null and surfaces drew transparent, and kept
+    // a surface alive after the last reference to it was gone; current WebKit's
+    // canvas code has no total check. Nothing here budgets against either
+    // figure: this asks for the surface, checks what came back, and releases
+    // it with the documented 1x1 clear, whichever Safari it is running on.
     //
     // BOTH FAILURES LOOK LIKE SUCCESS. The old code asserted the context
     // non-null with a `!`, so a refusal became a TypeError with no bearing on
@@ -1006,13 +1024,53 @@ export async function exportImage(
   }
 }
 
+/**
+ * The bilinear blend of a sampler at a fractional pixel position — the same
+ * four taps and weights a LINEAR, CLAMP_TO_EDGE texture lookup takes.
+ * @param sample  the source, read at integer pixels; the array it returns may
+ *   be REUSED by its next call (LinearSampler's contract), so each corner is
+ *   read out before the next is asked for.
+ * @param fx      x in pixel units with pixel centres on the integers
+ *   (u * width - 0.5).
+ * @param fy      y, likewise.
+ * @param w       the source's width; corners are clamped into [0, w - 1].
+ * @param h       the source's height; corners are clamped into [0, h - 1].
+ * @param out     where the result is written.
+ * @returns `out`, holding the blend of the four pixels around (fx, fy).
+ * What the result must satisfy: at an integer (fx, fy) it is exactly that
+ *   pixel, and anywhere it equals the shader's `textureLod` of a LINEAR source
+ *   texture at the same uv to within the GPU's filter precision — the export's
+ *   straighten is the preview's (exportImage's `tap`).
+ */
+export function bilinearTap(sample: LinearSampler, fx: number, fy: number, w: number, h: number, out: [number, number, number]): [number, number, number] {
+  const x0f = Math.floor(fx), y0f = Math.floor(fy);
+  const tx = fx - x0f, ty = fy - y0f;
+  const cx = (v: number) => (v < 0 ? 0 : v > w - 1 ? w - 1 : v);
+  const cy = (v: number) => (v < 0 ? 0 : v > h - 1 ? h - 1 : v);
+  const x0 = cx(x0f), x1 = cx(x0f + 1), y0 = cy(y0f), y1 = cy(y0f + 1);
+  const w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+  let s = sample(x0, y0);
+  let r = s[0] * w00, g = s[1] * w00, b = s[2] * w00;
+  s = sample(x1, y0);
+  r += s[0] * w10; g += s[1] * w10; b += s[2] * w10;
+  s = sample(x0, y1);
+  r += s[0] * w01; g += s[1] * w01; b += s[2] * w01;
+  s = sample(x1, y1);
+  r += s[0] * w11; g += s[1] * w11; b += s[2] * w11;
+  out[0] = r; out[1] = g; out[2] = b;
+  return out;
+}
+
 /** Exported so the drawn-export path reads its source through THE SAME
  *  function — the one place that decides what a file's pixels actually are. */
 /** HOW MANY NATIVE PIXELS ONE PREVIEW TEXEL SPANS — the one place that answers
  *  it, because three paths need the same answer: the computed export spaces its
  *  neighbourhood taps this far apart, a drawn export scales the shader's taps by
  *  it, and a batch export has to agree with a single one. Kept in sync with
- *  main.ts MAX_PREVIEW (8-bit proxy) and demosaic.ts binning (RAW = half-res). */
+ *  main.ts MAX_PREVIEW (8-bit proxy) and demosaic.ts binning (RAW = half-res).
+ *  An 8-bit source is now shown at full size wherever the browser gives the
+ *  drawing buffer (main.ts toPreview), with its taps scaled by this same
+ *  factor, so the footprint a reader tuned is unchanged by that. */
 export function proxyFactorFor(src: Source, srcW: number, srcH: number): number {
   const PREVIEW_MAX = 2800;
   return "cfa" in src ? 2 : Math.max(1, Math.max(srcW, srcH) / PREVIEW_MAX);
@@ -1058,13 +1116,42 @@ export function getSource(file: ImportedFile, current: DecodedImage): Source {
   return { pixels: current.pixels, width: current.width, height: current.height };
 }
 
-/** Minimal baseline TIFF: RGB, 16-bit/channel, uncompressed, single strip, with
- *  an embedded ICC profile (tag 34675) so the output is never untagged — plus
- *  the honest EXIF subset (capture date, camera, lens, exposure) when the
- *  source carried one. Freshly built tags, never a copied block: GPS and
- *  Orientation structurally cannot ride along. */
+/**
+ * A 16-bit RGB TIFF: 16 bits a channel, uncompressed, single strip, with an
+ * embedded ICC profile (tag 34675) so the output is never untagged — plus the
+ * honest EXIF subset (capture date, camera, lens, exposure) when the source
+ * carried one. Freshly built tags, never a copied block: GPS and Orientation
+ * structurally cannot ride along.
+ *
+ * NOT "baseline". This was called a minimal baseline TIFF until 2026-10-02,
+ * and it is neither: TIFF 6.0's Baseline RGB image is BitsPerSample 8,8,8, so
+ * sixteen bits a channel is an extension every serious reader supports; and
+ * section 6 lists XResolution (282), YResolution (283) and ResolutionUnit
+ * (296) as REQUIRED for an RGB image, which this never wrote. They are written
+ * now, as 72 pixels per inch — the conventional value for a file with no print
+ * size, which a reader can change without touching a pixel.
+ *
+ * @param rgb  the pixels, w*h*3 unsigned 16-bit samples, row-major RGB.
+ * @param w    width in pixels.
+ * @param h    height in pixels.
+ * @param icc  the ICC profile describing those samples (default SRGB_ICC,
+ *   the gamma-2.2 sRGB-primaries profile the TIFF export's encode matches).
+ * @param exif the subset read from the original, or undefined to write none.
+ * @returns the whole file. What it must satisfy: IFD0's tags ascend by ID
+ *   (TIFF requires it; the EXIF extras interleave with the image tags), every
+ *   field TIFF 6.0 section 6 requires for an RGB image is present, and the
+ *   pixel data starts at an even offset (the Uint16Array view needs it).
+ */
 export function writeTiff16(rgb: Uint16Array, w: number, h: number, icc: Uint8Array = SRGB_ICC, exif?: ExifSubset): ArrayBuffer {
-  const ifd0Extra: TiffEntry[] = exif ? ifd0ExtraEntries(exif) : [];
+  // Resolution rides the same out-of-line path as the EXIF strings, so the
+  // offsets and the entry count below cannot forget it.
+  const res = (tag: number): TiffEntry => ({ tag, typ: 5, cnt: 1, data: [72, 0, 0, 0, 1, 0, 0, 0] }); // 72/1
+  const ifd0Extra: TiffEntry[] = [
+    res(282), // XResolution
+    res(283), // YResolution
+    { tag: 296, typ: 3, cnt: 1, inline: 2 }, // ResolutionUnit: inch
+    ...(exif ? ifd0ExtraEntries(exif) : []),
+  ].sort((a, b) => a.tag - b.tag);
   const exifIfd: TiffEntry[] = exif ? exifIfdEntries(exif) : [];
   const entries = 12 + ifd0Extra.length + (exifIfd.length ? 1 : 0);
   const ifdOffset = 8;
@@ -1126,8 +1213,9 @@ export function writeTiff16(rgb: Uint16Array, w: number, h: number, icc: Uint8Ar
   tag(277, SHORT, 1, 3); // SamplesPerPixel
   tag(278, LONG, 1, h); // RowsPerStrip
   tag(279, LONG, 1, dataBytes); // StripByteCounts
+  flush(284); // XResolution (282) / YResolution (283)
   tag(284, SHORT, 1, 1); // PlanarConfig: chunky
-  flush(339); // Software (305) / DateTime (306)
+  flush(339); // ResolutionUnit (296) / Software (305) / DateTime (306)
   tag(339, SHORT, 3, sampleFmtOffset); // SampleFormat -> [1,1,1] unsigned
   if (exifIfd.length) tag(34665, LONG, 1, exifIfdOffset); // Exif IFD pointer
   tag(34675, UNDEFINED, icc.length, iccOffset); // ICC profile (InterColorProfile)

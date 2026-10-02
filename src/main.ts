@@ -9443,7 +9443,8 @@ updateHealModeUI();
 const healStatus = $("healStatus") as HTMLElement;
 
 /** The exact buffer the GPU texture was uploaded from (current's own pixel/
- *  linear buffer, or the transient downscale for >MAX_PREVIEW 8-bit sources).
+ *  linear buffer, or — only where the browser gave a smaller drawing buffer
+ *  than a full-size 8-bit source asked for — the transient downscale).
  *  Heal bakes read it — it stays PRISTINE; healed pixels live only in the
  *  texture — so keep the reference in sync with every setImage call. */
 let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array } | null = null;
@@ -9482,7 +9483,7 @@ let healPreviewTimer = 0;
 function uploadPreview() {
   if (!current) return;
   nativeGen++;                       // anything still building belongs to the old photograph
-  previewSrc = toPreview(current);
+  previewSrc = toPreview(current, proxyRefusedFor === current);
   // THE TAP SCALE IS PART OF THE UPLOAD, NOT A SEPARATE STEP. The noise
   // reduction and the sharpening measure their footprint in texels of whatever
   // texture is bound; a working copy at native resolution has texels half the
@@ -9497,6 +9498,16 @@ function uploadPreview() {
   decodePitch = currentFile && sourceIsMosaiced(currentFile) ? 2 : 1;
   renderer.setNativePitch(decodePitch * (current.width / Math.max(1, previewSrc.width)));
   renderer.setImage(previewSrc);
+  // ASKED FOR THE WHOLE FRAME; IF THE BROWSER GAVE LESS, THE PROXY. Checked
+  // here, synchronously, so the first frame drawn is already the right one;
+  // `renderer.onBufferShort` catches a later crop or rotation that asks for
+  // more than this one did.
+  if (renderer.bufferShort && previewSrc === current && current.pixels && Math.max(current.width, current.height) > MAX_PREVIEW) {
+    proxyRefusedFor = current;
+    previewSrc = toPreview(current, true);
+    renderer.setTapScale(previewTapScale);
+    renderer.setImage(previewSrc);
+  }
   // AND WHICH LENS FLAT THOSE PIXELS CARRY, beside the upload for the same
   // reason as the tap scale: highlight recovery divides it back out to test the
   // clip as the sensor recorded it, so the two must never be out of step. This
@@ -18905,7 +18916,10 @@ ui.cubeBtn.addEventListener("click", () => {
 });
 
 ui.dcpBtn.addEventListener("click", () => {
-  const buf = generateDcp(params, currentFile?.bytes, `${baseName()} (IPS)`);
+  // `raw`: only a photograph rendered through a camera matrix has white-balance
+  // gains that are a camera neutral, which is what the profile's matrix is
+  // recentred on (dcp.ts recentreOnNeutral).
+  const buf = generateDcp(params, currentFile?.bytes, `${baseName()} (IPS)`, !!current?.camMatrix);
   void saveBlob(new Blob([new Uint8Array(buf)], { type: "application/octet-stream" }), `${baseName()}.dcp`);
 });
 
@@ -19732,11 +19746,31 @@ function estimateDenoise(img: DecodedImage): number {
 // autoExposure and autoRecover live in decode.ts, beside the balance they are
 // measured with, where a check can reach them without the page.
 
-// iOS Safari silently clamps large WebGL drawing buffers (symptom: black
-// canvas). The raw paths already produce a <=2800px half-res proxy, but the
-// full-res 8-bit path (lossy DNG / big JPEG) can reach 20MP+ — downscale that
-// for display only. `current` keeps full resolution for sampling and export.
+// THE 8-BIT PROXY IS A FALLBACK NOW, NOT A RULE (2026-10-02). Every 8-bit
+// source over 2800 px (lossy DNG, big JPEG, HEIC) used to be shown from a
+// 2800 px copy on the premise that iOS Safari clamps WebGL drawing buffers over
+// about 16.7 MP to a black canvas. The WebGL spec says an unsatisfiable size
+// produces a SMALLER drawing buffer and reports its true size in
+// drawingBufferWidth/Height; WebKit clamps each side to the texture,
+// renderbuffer and viewport maxima with no area cap; and 16,777,216 was an old
+// iOS 2D-CANVAS area cap — which the downscale below itself used. So the full
+// frame is asked for, `Renderer.bufferShort` compares what came back, and only
+// a mismatch drops to this size. The tap scale stays pinned to the proxy's
+// footprint either way (decision 009's chosen option), so denoise and sharpen
+// mean what they meant. `current` keeps full resolution for export regardless.
 const MAX_PREVIEW = 2800;
+/** The photograph whose full-size upload this browser refused (a smaller
+ *  drawing buffer than asked for). Its later uploads go straight to the proxy
+ *  rather than asking again and drawing one wrong frame each time. */
+let proxyRefusedFor: DecodedImage | null = null;
+renderer.onBufferShort = () => {
+  // A crop or rotation asked for more than the upload did. Only a full-size
+  // 8-bit upload has a proxy to fall back to; a raw's working copy is already
+  // bounded by NATIVE_MAX_MP, and the half-size raw proxy is small.
+  if (!current || previewSrc !== current || !current.pixels || Math.max(current.width, current.height) <= MAX_PREVIEW) return;
+  proxyRefusedFor = current;
+  uploadPreview();
+};
 let previewW = 0;
 let previewH = 0;
 
@@ -19760,29 +19794,75 @@ let decodePitch = 1;
  *  the least of it reports no memory figure at all, so the app cannot ask. */
 const NATIVE_MAX_MP = 24;
 
-function toPreview(img: DecodedImage): { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] } {
+/** What the live view draws from for this decode.
+ *  @param img    the decoded photograph.
+ *  @param proxy  true only after the browser refused the full-size drawing
+ *    buffer for this photograph (uploadPreview, renderer.onBufferShort).
+ *  @returns `img` itself — always for a raw's half-size copy, and for an
+ *    8-bit source unless `proxy` — or a <= MAX_PREVIEW downscale of an 8-bit
+ *    source when `proxy` is set. Sets previewW/H to what it returns and
+ *    previewTapScale to how many of its texels one proxy texel spans, which is
+ *    max(w, h) / MAX_PREVIEW for a full-size 8-bit source — the same number
+ *    export.ts proxyFactorFor gives, so the export's taps match the preview's. */
+function toPreview(img: DecodedImage, proxy = false): { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] } {
   previewW = img.width;
   previewH = img.height;
   previewTapScale = 1;
-  if (!img.pixels || Math.max(img.width, img.height) <= MAX_PREVIEW) return img;
-  const s = MAX_PREVIEW / Math.max(img.width, img.height);
+  const long = Math.max(img.width, img.height);
+  if (!img.pixels || long <= MAX_PREVIEW) return img;
+  if (!proxy) {
+    previewTapScale = long / MAX_PREVIEW;
+    return img;
+  }
+  const s = MAX_PREVIEW / long;
   const w = Math.max(1, Math.round(img.width * s));
   const h = Math.max(1, Math.round(img.height * s));
-  const src = document.createElement("canvas");
-  src.width = img.width;
-  src.height = img.height;
-  const copy = new Uint8ClampedArray(img.pixels.length);
-  copy.set(img.pixels);
-  src.getContext("2d")!.putImageData(new ImageData(copy, img.width, img.height), 0, 0);
-  const dst = document.createElement("canvas");
-  dst.width = w;
-  dst.height = h;
-  const ctx = dst.getContext("2d")!;
-  ctx.drawImage(src, 0, 0, w, h);
-  const { data } = ctx.getImageData(0, 0, w, h);
+  // AREA AVERAGE IN SCRIPT, not through a full-size 2D canvas: this path runs
+  // exactly when the browser has refused a surface the size of the frame, and
+  // the 2D canvas it used to draw through is the surface an older iOS capped
+  // by area (16,777,216 pixels; current WebKit allows 8192 x 8192 on iOS, and
+  // the limit has moved between versions). A downscale that depends on the
+  // limit it is working around is not a fallback.
+  const data = boxDownscale(img.pixels, img.width, img.height, w, h);
   previewW = w;
   previewH = h;
   return { width: w, height: h, pixels: data, camMatrix: img.camMatrix };
+}
+
+/** Area-average an RGBA8 frame down to w x h: each output pixel is the mean of
+ *  the source pixels its footprint covers, partial edge pixels weighted by
+ *  overlap. Separable — rows first into a float buffer, then columns. */
+function boxDownscale(src: Uint8ClampedArray, W: number, H: number, w: number, h: number): Uint8ClampedArray<ArrayBuffer> {
+  const sx = W / w, sy = H / h;
+  const mid = new Float32Array(w * H * 4);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = x * sx, b = a + sx;
+      let r = 0, g = 0, bl = 0, al = 0;
+      for (let i = Math.floor(a); i < Math.ceil(b) && i < W; i++) {
+        const wt = Math.min(b, i + 1) - Math.max(a, i);
+        const o = (y * W + i) * 4;
+        r += src[o] * wt; g += src[o + 1] * wt; bl += src[o + 2] * wt; al += src[o + 3] * wt;
+      }
+      const o = (y * w + x) * 4;
+      mid[o] = r / sx; mid[o + 1] = g / sx; mid[o + 2] = bl / sx; mid[o + 3] = al / sx;
+    }
+  }
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    const a = y * sy, b = a + sy;
+    for (let x = 0; x < w; x++) {
+      let r = 0, g = 0, bl = 0, al = 0;
+      for (let j = Math.floor(a); j < Math.ceil(b) && j < H; j++) {
+        const wt = Math.min(b, j + 1) - Math.max(a, j);
+        const o = (j * w + x) * 4;
+        r += mid[o] * wt; g += mid[o + 1] * wt; bl += mid[o + 2] * wt; al += mid[o + 3] * wt;
+      }
+      const o = (y * w + x) * 4;
+      out[o] = r / sy; out[o + 1] = g / sy; out[o + 2] = bl / sy; out[o + 3] = al / sy;
+    }
+  }
+  return out;
 }
 
 function clamp(v: number, lo: number, hi: number) {

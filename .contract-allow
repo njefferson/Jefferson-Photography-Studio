@@ -11,18 +11,14 @@ src/batchstore.ts:eachFrame
 src/batchstore.ts:frameStore
 src/color.ts:nikonColorMatrix
 src/color.ts:camToSrgbLinear
-src/dcp.ts:generateDcp
 src/decode.ts:linearAt
 src/decode.ts:decode
 src/decode.ts:cameraModel
-src/decode.ts:readCameraMatrix
 src/decode.ts:pickLargestPreview
 src/decodeClient.ts:decodeOffThread
 src/decodeClient.ts:decodeLanes
 src/decodeClient.ts:decodeLaneTarget
 src/diagnostic.ts:buildDiagnostic
-src/exif.ts:ifd0ExtraEntries
-src/exif.ts:exifIfdEntries
 src/exif.ts:externSize
 src/exif.ts:buildExifTiff
 src/exif.ts:buildExifApp1
@@ -35,7 +31,6 @@ src/export.ts:exportImage
 src/export.ts:proxyFactorFor
 src/export.ts:sourceIsMosaiced
 src/export.ts:getSource
-src/export.ts:writeTiff16
 src/exportparallel.ts:canRunParallel
 src/exportparallel.ts:workerCount
 src/exportparallel.ts:stitchBands
@@ -51,7 +46,6 @@ src/gps.ts:stripLocation
 src/gpuexport.ts:canDrawFrame
 src/gpuexport.ts:buildLinearSourceInBands
 src/gpuexport.ts:buildLinearSource
-src/half.ts:toHalf
 src/half.ts:fromHalf
 src/half.ts:toHalfBuffer
 src/heal.ts:spotRect

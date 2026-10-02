@@ -12,8 +12,17 @@
 export interface ExifSubset {
   make?: string;
   model?: string;
-  /** "YYYY:MM:DD HH:MM:SS" — DateTimeOriginal (capture time). */
+  /** "YYYY:MM:DD HH:MM:SS" — DateTimeOriginal (0x9003, capture time), and
+   *  ONLY from the source's own 0x9003. A source's IFD0 DateTime (0x0132) is
+   *  when that FILE was last changed — a Lightroom export's is the export — so
+   *  it is never promoted into this field (Exif: DateTime "is the date and time
+   *  the file was changed"; DateTimeOriginal "when the original image data was
+   *  generated", Exiv2 tags_int.cpp, copied from the standard). */
   dateTime?: string;
+  /** "YYYY:MM:DD HH:MM:SS" — when the EXPORT was written, for IFD0 DateTime
+   *  (0x0132). Never read from a source; the writers fill in the time they
+   *  build the block when it is absent, so a test can pin it. */
+  changed?: string;
   /** Rationals kept as raw [numerator, denominator] so 1/320 s round-trips
    *  exactly instead of decaying through a float. */
   exposureTime?: [number, number];
@@ -91,7 +100,6 @@ function readTiffSubset(v: DataView, bytes: Uint8Array, base: number, end: numbe
     return v.getUint32(o, le);
   };
   const out: ExifSubset = {};
-  let fallbackDate: string | undefined;
 
   const readEntry = (e: number) => {
     const tag = u16(e);
@@ -114,7 +122,6 @@ function readTiffSubset(v: DataView, bytes: Uint8Array, base: number, end: numbe
     };
     if (tag === 0x010f) out.make ??= ascii();
     else if (tag === 0x0110) out.model ??= ascii();
-    else if (tag === 0x0132) fallbackDate ??= ascii();
     else if (tag === 0x9003) out.dateTime ??= ascii();
     else if (tag === 0x829a) out.exposureTime ??= rational();
     else if (tag === 0x829d) out.fNumber ??= rational();
@@ -153,7 +160,6 @@ function readTiffSubset(v: DataView, bytes: Uint8Array, base: number, end: numbe
   };
   walkIfd(u32(base + 4), 0);
 
-  out.dateTime ??= fallbackDate;
   const any = out.dateTime || out.make || out.model || out.lens || out.exposureTime || out.fNumber || out.iso || out.focalLength;
   return any ? out : null;
 }
@@ -180,25 +186,60 @@ function rationalEntry(tag: number, [n, d]: [number, number]): TiffEntry {
   return { tag, typ: 5, cnt: 1, data };
 }
 
-/** The IFD0-level tags (camera identity + dates), sorted by tag. Shared by
- *  the JPEG APP1 builder and the TIFF export writer. */
+/**
+ * An Exif date string for a moment, in the camera's convention: local time,
+ * no zone, "YYYY:MM:DD HH:MM:SS".
+ * @param d  the moment — the writers pass the time the export is built.
+ * @returns the 19-character string Exif's DateTime fields hold.
+ * Consumer: ifd0ExtraEntries, for DateTime (0x0132) when `changed` is absent.
+ */
+export function exifDateTime(d: Date): string {
+  const p = (n: number, w = 2) => String(n).padStart(w, "0");
+  return `${p(d.getFullYear(), 4)}:${p(d.getMonth() + 1)}:${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/**
+ * The IFD0-level tags (camera identity, Software, and the file's own date),
+ * sorted by tag. Shared by the JPEG APP1 builder and the TIFF export writer.
+ * @param s  the subset read from the original.
+ * @returns entries for Make, Model, Software and DateTime, ascending by tag.
+ * What the result must satisfy: DateTime (0x0132) is ALWAYS the export's own
+ *   time (`s.changed`, else now) — never the capture time, which goes only into
+ *   DateTimeOriginal in the Exif IFD — because Exif defines 0x0132 as when the
+ *   file was changed, and this file was changed when it was exported.
+ */
 export function ifd0ExtraEntries(s: ExifSubset): TiffEntry[] {
   const out: TiffEntry[] = [];
   if (s.make) out.push(asciiEntry(0x010f, s.make));
   if (s.model) out.push(asciiEntry(0x0110, s.model));
   out.push(asciiEntry(0x0131, "Photography Studio")); // Software — honest provenance
-  if (s.dateTime) out.push(asciiEntry(0x0132, s.dateTime));
+  out.push(asciiEntry(0x0132, s.changed ?? exifDateTime(new Date()))); // DateTime: when THIS file was written
   return out.sort((a, b) => a.tag - b.tag);
 }
 
-/** The Exif-IFD tags (capture settings + lens), sorted by tag. */
+/**
+ * The Exif-IFD tags (version, capture settings, colour space, lens), sorted by
+ * tag.
+ * @param s  the subset read from the original.
+ * @returns entries ascending by tag; never empty, because ExifVersion and
+ *   ColorSpace are written whatever the source carried.
+ * What the result must satisfy: ExifVersion (0x9000) is "0232" — Exif says its
+ *   absence means non-conformance — and ColorSpace (0xA001) is 0xFFFF,
+ *   Uncalibrated, because neither export is sRGB: the JPEG is Display P3 and
+ *   the TIFF is gamma 2.2 on sRGB primaries, and Exif reserves 1 for sRGB and
+ *   says "if a color space other than sRGB is used, Uncalibrated is set". The
+ *   embedded ICC profile is what names the space. DateTimeOriginal (0x9003)
+ *   appears only when the source had its own.
+ */
 export function exifIfdEntries(s: ExifSubset): TiffEntry[] {
   const out: TiffEntry[] = [];
   if (s.exposureTime) out.push(rationalEntry(0x829a, s.exposureTime));
   if (s.fNumber) out.push(rationalEntry(0x829d, s.fNumber));
   if (s.iso) out.push({ tag: 0x8827, typ: 3, cnt: 1, inline: Math.min(0xffff, s.iso) });
+  out.push({ tag: 0x9000, typ: 7, cnt: 4, data: [0x30, 0x32, 0x33, 0x32] }); // ExifVersion "0232", UNDEFINED
   if (s.dateTime) out.push(asciiEntry(0x9003, s.dateTime));
   if (s.focalLength) out.push(rationalEntry(0x920a, s.focalLength));
+  out.push({ tag: 0xa001, typ: 3, cnt: 1, inline: 0xffff }); // ColorSpace: Uncalibrated
   if (s.lens) out.push(asciiEntry(0xa434, s.lens));
   return out.sort((a, b) => a.tag - b.tag);
 }
