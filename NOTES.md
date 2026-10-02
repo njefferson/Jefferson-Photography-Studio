@@ -54,6 +54,35 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**v2.64.56 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-10-02 (fab0ec7).** Production's code (v2.64.46) plus eight fixes from
+the audit of 2026-10-01 that leave every look as it was at open. Three more
+from the same audit change how photographs look, the camera matrix built as
+dcraw builds it, Contrast about mid grey with a shoulder into white, and
+Adobe's Z 50 matrix, and stay on the session branch until the built-in looks
+are re-fitted to them.
+- **Hue turns colour instead of tinting grey**, on the whole photo, inside a
+  mask, and in a .dcp export.
+- **12-bit Nikon NEFs keep their shadows**; the black level is scaled for the
+  bit depth instead of read as if the file were 14-bit.
+- **A Nikon High Efficiency NEF says it is one** instead of calling the file
+  damaged.
+- **An exported JPEG carries one colour profile**, so every viewer reads it as
+  Display P3.
+- **The editor no longer reserves graphics memory it never used.**
+- **Z 50 raws keep their brightest highlights**: the white level is 16383, the
+  value photosites on these raws actually pin at, so recovery starts where the
+  sensor clips.
+- **Shadows look and export the way they were computed**, and a TIFF opens in
+  another editor as it looked here: the sRGB curve replaces a plain 2.2.
+- **Z 50 raws lose the faint stripe every 12 rows** from the autofocus pixels;
+  each photo's own offset is measured and taken out at decode.
+- Checked headless: every commit gate on each commit, and a smoke test opening
+  NIR_1376.NEF and NIR_1597.JPG from the start screen, both settling with no
+  page error; both renders opened.
+- **The device pass it needs:** on the iPad, open a Z 50 raw with a bright sky
+  and a camera JPEG, move Hue on a grey area, and export one JPEG.
+
 v2.64.39 went to production on 2026-10-02, by a fast-forward push to `main`:
 fcbf876's fix to the test page and its staging note, rebased onto the docs
 commit 9fb9eb5 as 0341624 and 7ce7f56, then this note. Staging and this commit
