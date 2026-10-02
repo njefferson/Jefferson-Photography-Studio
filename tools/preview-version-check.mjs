@@ -53,6 +53,8 @@ const WHOLE = [
   // the old one. Found reading 015's call chain on 2026-09-29.
   "src/lensflat.ts",       // the flat laid on a raw at decode
   "src/stamp.ts",          // the hash two parts of the key are built with
+  "src/color.ts",          // the camera matrix a raw is rendered through
+  "src/icc.ts",            // the sRGB curve the picture is encoded with
 ];
 const DIRS = ["src/raw"];  // the raw decoders, every file
 const REGIONS = [
