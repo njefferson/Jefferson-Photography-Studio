@@ -63,14 +63,27 @@ direction opposite to option 2.
 
 ## Built already
 
-- `estimateDenoise` (`src/main.ts`): median of |la − lb| / (m + 0.01) over the
-  darkest 40% of the half-size frame, before white balance and exposure; target
-  sigma 0.75 × median; slider s = √(sigma / 0.1), capped at 0.6. Calibrated on
-  2026-07-12 so the default "barely clears the grain", against the 5x5 filter
-  of the time; the filter has been 13x13 since 2026-09-17 and the mapping was not
-  re-checked.
-- `rangeSigma` and the range term (`src/raw/denoise.ts`, `src/gl.ts`): relative
-  luma with a 0.02 floor, sigma 0.1 × s².
+- `estimateDenoise` (`src/main.ts`, through `measuredStrength` in
+  `src/raw/denoise.ts` since 2026-10-01): the median absolute difference of
+  neighbouring stabilised guide values (the equal-weight channel mean through
+  2√(y + 5e-4)) over the darkest 40% of the half-size frame, before white
+  balance and exposure, divided by 0.954, is the frame's noise; the range sigma
+  is set to 1.06 times it, slider s = √(sigma / 0.0335), capped at 0.6. Until
+  2026-10-01 it was the median of |la − lb| / (m + 0.01), target 0.75 × median,
+  s = √(sigma / 0.1), calibrated on 2026-07-12 against the 5x5 of the time. The
+  2026-10-01 constants were re-fitted against the 13x13 on six of the owner's
+  raws so the opening render leaves the mid-tone grain the old one left
+  (IR-SCIENCE 4c-xxv has the per-frame numbers).
+- `rangeSigma` and the range term (`src/raw/denoise.ts`, `src/gl.ts`): since
+  2026-10-01 the distance between stabilised guide values, which is the same
+  multiple of the local noise at every brightness, sigma 0.0335 × s². Until
+  then relative luma with a 0.02 floor, sigma 0.1 × s². That is NOT option 3
+  below: the floor went because raw noise is Poisson-Gaussian and a relative
+  range was a growing multiple of it as brightness rose (1.3x the noise at
+  y = 0.03, 3.3x at 0.5), on every photograph, not to smooth a pushed frame
+  harder. What it did to the opening strength, measured on six raws: within
+  0.02 on five, and NIR_3716, a bright frame whose darkest 40% sits high, from
+  0.41 to 0.54 — the old relative estimate read its noise low.
 - The Aerochrome look's denoise floor of 0.45, applied as the larger of the two.
 
 ## Weighed against
@@ -129,3 +142,4 @@ record cannot make.
 - NIR_3472, 2026-09-26: the same sheet.
 - NIR_3473, 2026-09-26: neutral-balance renders beside NIR_3474, colour at 1x and 4x, whole frame.
 - NIR_3474, 2026-09-26: the same sheets.
+- NIR_3716.NEF, 2026-10-01: the opening render with no noise reduction, the old range at 0.41 and the new at 0.54, side by side at 2x — a sky crop and the fence with the field behind it. The sky is smooth in both reduced panels and the field's grass texture reads the same; the higher number does not show as a softer picture.

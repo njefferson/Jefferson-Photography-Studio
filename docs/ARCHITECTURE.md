@@ -29,7 +29,10 @@ raw itself and applies arbitrary gains, which is the entire reason it exists.
 
 ```
 decode -> LINEAR camera-native RGB
-  -> DENOISE          (bilateral, BEFORE any gains amplify noise)
+  -> DENOISE          (bilateral, BEFORE white balance: there all three channels
+                       share one Poisson-Gaussian noise curve, so the range is
+                       measured in noise units on an equal-weight guide — what
+                       darktable's 1/wb-weighted guide is after the gains)
   -> CLARITY/DEHAZE   (before exposure/WB, on linear source data, vs per-image
                        LOW-RES MAPS (localmap.ts, RG8: blurred luma + blurred
                        dark-channel, sqrt-encoded, shared scale). Clarity =
@@ -196,8 +199,11 @@ decoder, re-verify against LibRaw before pushing.
   CHANNEL values, all three pooled as RawTherapee pools them, unclipped samples
   only -> 0.85, clamp 0.05..16. Was luma until 2026-10-01; on the owner's six
   raws the two agree within 0.02 stops where nothing clips.
-- Auto denoise: median relative neighbor luma diff in darkest 40% ->
-  strength = clamp(0.2 + (med-0.013)*25, 0, 0.8).
+- Auto denoise (`measuredStrength`, raw/denoise.ts): the median absolute
+  difference of neighbouring STABILISED guide values over the darkest 40%,
+  divided by 0.954, is the frame's noise; the strength puts the range sigma at
+  1.06 times it, capped at 0.6. (This line gave a 2026-07 formula until
+  2026-10-01; see IR-SCIENCE 4c-xxv for the calibration.)
 
 ## Looks (`LOOKS` in main.ts) — tuned on the owner's real files
 
@@ -213,10 +219,17 @@ without better evidence.
 
 ## Spatial features
 
-- Denoise (`raw/denoise.ts`): 13x13 brightness-adaptive bilateral on linear
-  data (`R = 6`), with colour averaged on a 7x7 grid at stride 2 (`CR = 3`,
-  `CHROMA_STRIDE = 2`); row-cached for exports. Same constants in shader. (It
-  read 5x5 until 2026-10-01; the window widened in IR-SCIENCE 4c-xxii.)
+- Denoise (`raw/denoise.ts`): 13x13 bilateral on linear data (`R = 6`) whose
+  range is measured in NOISE units — an equal-weight guide through the
+  generalized Anscombe transform, sigma 0.0335·s² — with colour averaged on a 7x7
+  grid at stride 2 (`CR = 3`), each tap prefiltered by a dense [1 2 1], computed
+  as the one separable 15-tap kernel that is — and on an export, where taps
+  spread `step` native pixels apart, each tap also a tent of half-width `step`
+  over the native pixels, so the spread lattice does not pass the native pixel
+  Nyquist; row-cached for exports. Same
+  constants in the shader, which reads every tap at a whole texel by integer
+  address. (It read 5x5 until 2026-10-01; the window widened in IR-SCIENCE
+  4c-xxii; the range was relative to brightness until 4c-xxv.)
 - Glow (`glow.ts`): 192px-wide highlight map, p99-normalized, soft threshold,
   wide gaussian; uploaded as R8 texture (UNPACK_ALIGNMENT 1); CPU export
   samples it bilinearly. GLOW_GAIN=0.7 shared.
@@ -645,11 +658,11 @@ cannot describe something the code does not say about itself.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (258 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1130 lines) — Full-resolution export.
+- **`src/export.ts`** (1133 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (2719 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (2816 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
@@ -678,15 +691,15 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (19597 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (19566 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (2719 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (2721 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
 - **`src/raw/demosaic.ts`** (126 lines) — Bayer demosaic + black/white-level normalization -> linear RGB.
-- **`src/raw/denoise.ts`** (444 lines) — Edge-preserving denoise (13x13 bilateral, colour on a 7x7 grid at stride 2) on LINEAR sensor data.
+- **`src/raw/denoise.ts`** (699 lines) — Edge-preserving denoise (13x13 bilateral, colour on a 7x7 grid at stride 2) on LINEAR sensor data.
 - **`src/raw/detail.ts`** (239 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
 - **`src/raw/dngRaw.ts`** (124 lines) — Decode a mosaiced (Bayer) DNG whose raw image is lossless-JPEG compressed (Compression 7, PhotometricInterpretation 32803 = CFA).
 - **`src/raw/lj92.ts`** (240 lines) — Lossless JPEG (ITU-T T.81, process 14 / SOF3) decoder — pure TypeScript.

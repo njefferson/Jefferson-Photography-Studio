@@ -161,8 +161,6 @@ src/qr.ts:drawQr
 src/raw/demosaic.ts:demosaicBinned
 src/raw/demosaic.ts:demosaicPixelLinear
 src/raw/demosaic.ts:demosaicPixelLinearInto
-src/raw/denoise.ts:rangeSigma
-src/raw/denoise.ts:makeRowDenoiser
 src/raw/detail.ts:makeRowDetail
 src/raw/dngRaw.ts:decodeMosaicedDng
 src/raw/dngRaw.ts:readMosaicedCfa

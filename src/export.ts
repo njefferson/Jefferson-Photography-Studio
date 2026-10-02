@@ -447,7 +447,10 @@ export async function exportImage(
   const baseName = file.name.replace(/\.[^.]+$/, "");
 
   // Camera-native linear RGB at a source pixel; denoise wraps the sampler so it
-  // acts on linear data BEFORE white balance/exposure amplify the noise.
+  // acts on linear data BEFORE white balance and exposure — where all three
+  // channels share one noise curve, which its range is measured in (see the
+  // header of raw/denoise.ts; "before the gains amplify the noise" was the old
+  // reason, corrected 2026-10-01).
   // Once per SOURCE pixel, through the row caches — so the same arithmetic
   // writing into one array rather than making twenty million of them.
   const rawOut: [number, number, number] = [0, 0, 0];

@@ -2417,6 +2417,9 @@ the artefact at all.
 gaps, at forty-nine taps. The cross-hatch is faint rather than absent; a dense
 13x13 would remove it entirely at 169 taps per output pixel, which is not
 affordable in a stage that runs once per pixel of a 21-megapixel export.
+(2026-10-01: the faint residue was the pixel Nyquist, which a kernel on even
+offsets passes at exactly 1; every tap is now prefiltered by a dense [1 2 1],
+computed as one separable kernel, 4c-xxv.)
 
 What it delivers on the reported sky: at 0.25 and 0.50 the pale pepper is
 substantially gone and the sky reads as a soft gradient; at 1.00 it is smoother
@@ -3012,6 +3015,134 @@ the owner's seven raws, opened with their lens fix and nothing moved (decision
   averages them to one number, and here that loses nothing.
 - **Still unmeasured on the owner's files:** the white point taken from the
   cloud, because it moves a setting.
+
+### 4c-xxv. THE DENOISER'S RANGE IN NOISE UNITS, ON AN EQUAL GUIDE — MEASURED ON SIX RAWS (2026-10-01)
+
+**What was wrong, from an audit against the references.** The bilateral's range
+weight was relative to brightness, `rel = dLuma / (lc + 0.02)`, which models
+noise whose spread is proportional to the signal. Raw noise is Poisson-Gaussian:
+variance `a*y + b`, linear in the irradiance (Liu, Freeman, Szeliski and Kang,
+*Noise Estimation from a Single Image*, CVPR 2006, section 3.1; Colom and Buades,
+IPOL 2013, section 2.1, which builds the same curve from brightness bins). So one
+slider value was a growing multiple of the noise as brightness rose — 1.3x the
+noise at y = 0.03 and 3.3x at y = 0.5 at 0.45 — and the guide was Rec.709 luma of
+UNBALANCED channels, weights that belong to sRGB primaries. darktable's
+`denoiseprofile.c` does both differently: it stabilises the variance first with
+the generalized Anscombe transform (`precondition()`: 2*sqrt(in/a + (b/a)^2 +
+3/8)), and its luminance guide after white balance weighs each channel by 1/wb,
+which its own comment says equals equal thirds on the data before the gains. The
+audit read darktable's source and the two papers; Foi et al. 2008, the model's
+usual citation, was unreachable from this environment and is cited through them.
+
+**THE CURVE, MEASURED HERE before choosing anything.** On the binned proxy the
+editor opens, for NIR_1376, NIR_3716, NIR_1651, NIR_1667, NIR_1688 and NIR_2920:
+16 px blocks, a Laplacian residual's variance, the tenth percentile per
+log-spaced brightness bin (the flattest blocks; texture only adds), fitted to
+`a*y + b`.
+
+- Where a bin held flat blocks, from y = 0.008 to 0.2, the variance followed
+  the level within the fit's scatter (measured over model 0.74 to 1.30). Bins
+  two to nine times above the line, on NIR_1376, NIR_1651, NIR_2920 and the
+  lowest of NIR_3716's, were bins whose flattest tenth was still textured,
+  which can only add.
+- b/a, the read-noise knee, came out between -2e-3 and +2e-3: below what these
+  frames resolve. The app uses 5e-4 (`NOISE_KNEE`).
+- a ran from 6.6e-6 (NIR_3716) to 5.1e-5 (NIR_2920) — the frames' ISO, which the
+  opening strength is there to measure.
+
+**WHAT SHIPPED.** The guide is the equal-weight channel mean; every tap's
+distance is taken between `2*sqrt(y + 5e-4)` values, where the noise is the same
+at every brightness; the slider's range is `0.0335 * s^2` in those units,
+quadratic and floorless as the 2026-07-12 tuning left it. Only the distance is
+stabilised — the average stays linear, so no inverse transform is needed. The
+opening strength (`measuredStrength`) measures the noise in the same units — the
+median absolute difference of neighbouring stabilised values over the darkest
+40%, over 0.954, which is that median for two independent normal samples (the
+old comment's 1.35 was wrong) — and sets the range to 1.06 times it.
+
+**THE CALIBRATION.** Grain left is the plane-fit residual of the guide in the
+flattest quarter of a tone band's 16 px blocks, after over before, median over
+blocks; bands are fractions of the frame's 97th percentile (shadow 0.03-0.10,
+mid 0.13-0.33, high 0.45-1). Swept against the old opening render:
+
+- the ratio of range to noise that leaves the old mid-tone grain: NIR_1376 1.06,
+  NIR_1651 1.11, NIR_1667 1.09, NIR_1688 1.06, NIR_2920 1.06, and NIR_3716 0.75
+  — whose mid band holds 210 blocks and no flat one, so it reads texture. 1.06,
+  the median, is `AT_OPEN_RATIO`.
+- the slider scale that keeps each frame's opening position: 0.0350, 0.0408,
+  0.0334, 0.0335, 0.0312, 0.0319. 0.0335, the median, is `RANGE_SCALE` — so a
+  look's fixed value (Aerochrome's floor of 0.45) smooths mid-tones as hard as
+  it did.
+
+**BEFORE AND AFTER, at open** — strength, then grain left per band:
+
+- NIR_1376 — 0.313 to 0.319; mid 0.427 to 0.427; high 0.970 to 0.987
+- NIR_1651 — 0.394 to 0.385; shadow 0.938 to 0.931; mid 0.271 to 0.285; high
+  0.409 to 0.456
+- NIR_1667 — 0.317 to 0.313; shadow 0.974 to 0.971; mid 0.397 to 0.410; high
+  0.856 to 0.895
+- NIR_1688 — 0.452 to 0.436; shadow 0.749 to 0.746; mid 0.606 to 0.609; high
+  0.894 to 0.924
+- NIR_2920 — 0.579 to 0.564; shadow 0.683 to 0.662; mid 0.473 to 0.473; high
+  0.925 to 0.954
+- NIR_3716 — **0.408 to 0.536**; mid 0.977 to 0.954; high (its sky) 0.172 to
+  0.146. The one frame that moves: bright, with its darkest 40% high in the
+  range, where the old relative estimate read its noise low.
+- NIR_1597.JPG, not in the calibration (a camera JPEG's noise is the camera's
+  tone curve and its own noise reduction, not Poisson-Gaussian) — 0.437 to
+  0.425; shadow 0.384 to 0.384; mid 0.793 to 0.858; high 0.826 to 0.916.
+
+Mid-tones hold by construction; bright areas keep a little more grain and,
+which is the point, the texture the old range was flattening there. On
+synthetic Poisson-Gaussian data with texture at twice the local noise, at 0.45:
+**77% kept at y = 0.03 and 36% at y = 0.5 before; 77% and 77% after.**
+
+**LOOKED AT**, at 2x, no reduction against old against new, through the CPU
+pipeline at the opening balance and exposure: NIR_3716's sky and its fence and
+field, NIR_2920's ground and its canopy, NIR_1651's dark sky and its bright
+foliage (and again at Aerochrome's 0.45), NIR_1688's pine needles, and
+NIR_1597.JPG's sky and a tree edge. In every pair old and new read as the same
+picture; the bright needles and foliage are a shade crisper after. The
+NIR_3716 strength change does not show as a softer sky or field.
+
+**THE SAME DAY, THE ONES THAT TRAVEL WITH IT.**
+
+- **The colour mean's stride.** A kernel on even offsets has a response of
+  exactly 1 at (0.5, 0), (0, 0.5) and (0.5, 0.5) cycles per pixel; every tap is
+  now prefiltered by a dense [1 2 1], the previous a-trous scale that darktable's
+  `eaw_dn_decompose` always has under a dilated kernel. Response at those three
+  frequencies 1.000 to 0.000; white chroma noise left 1.85x a dense Gaussian of
+  the same 13 px span before, 1.02x after.
+- **The same stride, on the export.** The export spreads every tap `step`
+  native pixels apart to reproduce the proxy's footprint (2 for every raw), so
+  a [1 2 1] at proxy spacing still sits on even native offsets only and passes
+  the NATIVE pixel Nyquist at exactly 1 — the preview never shows that band,
+  because its proxy was binned first. Each tap is now also a tent of half-width
+  `step` over the native pixels around it ([1 2 1] / 4 at 2, the identity at
+  1). Synthetic response at the native Nyquist, step 2: 1.000 to 0.000; step
+  2.14: 0.33 to 0.01. On NIR_1651's sky at native resolution through the
+  export's own sampler (bilinear demosaic, step 2, the opening luminance 0.385,
+  Colour noise 1), the colour residual at pixel scale, relative to the mean
+  luma: 2.1e-2 with no reduction, 3.3e-3 with the proxy-spaced prefilter alone,
+  9.2e-5 with the tent. **Looked at**, at 8x through the opening balance and
+  exposure at saturation 3: the proxy-spaced panel carries a faint one-pixel
+  lattice that the tent panel does not; at 3x the two read as the same sky.
+- **The preview's taps.** They fetched a LINEAR-filtered texture off texel
+  centres under a crop or straighten; they are now whole texels by integer
+  address. A +12 sigma speck on a flat 8-bit field under a 0.45-texel crop
+  offset, Despeckle at 1: 6.6 to 7.7 sigma above the on-screen noise before,
+  2.0 at most after.
+- **The CPU's range table.** Read by truncation, 1.74e-2 off next to t = 0;
+  interpolated, 9.6e-6. Preview and export now agree to 1e-5 relative on every
+  case of a headless parity harness — raw and 8-bit, cropped, straightened,
+  tap scale 2 and 2.14 — where they differed by 1e-3 to 1.8 before.
+
+**WHAT THIS DOES NOT SETTLE.** IR-SCIENCE 9i's canopy figure (30.76 under the
+13x13) was not re-measured through the full look; the texture result above is
+synthetic, and the per-band "texture kept" read on the owner's busiest blocks
+did not discriminate (0.99 to 1.00 both ways). Decision 072's question — how a
+frame shot well under should open — is untouched: the opening still removes a
+fixed share of the noise, now the same share at every brightness.
 
 ### 4c-vii. THE OVERTURNED NUMBERS, KEPT ON PURPOSE
 

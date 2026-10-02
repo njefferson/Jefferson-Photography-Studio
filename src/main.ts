@@ -48,7 +48,7 @@ import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
 import { buildSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI } from "./skymap";
 import { prepareSkySource, buildSkySelectionFrom, buildSkyGuide, refineSkyMask, growSkyByColour, type SkyGuide } from "./skyfine";
-import { makeRowDenoiser } from "./raw/denoise";
+import { makeRowDenoiser, measuredStrength } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { buildSkyMask, skyPrepare, skyTurn, SKY_MIN_COVERAGE, type SkyPrep } from "./sky";
 import { measureShadowCast, type ShadowCast } from "./shadowcast";
@@ -19103,44 +19103,13 @@ function autoAdjust(img: DecodedImage) {
 }
 
 /**
- * Auto denoise strength from measured shadow noise: median relative
- * neighbor-difference of luma over the darkest 40% of pixels (flat shadow
- * areas ≈ pure noise; the median ignores the minority of real edges).
- * Mapping calibrated on real Z50 NEFs; capped so detail always survives.
+ * Auto denoise strength from the frame's own measured noise — the units the
+ * filter's range is in, through `measuredStrength` (src/raw/denoise.ts), which
+ * carries the method and the calibration. Takes the working copy; returns a
+ * strength 0..0.6 for the Noise reduction slider.
  */
 function estimateDenoise(img: DecodedImage): number {
-  const { width, height } = img;
-  const step = Math.max(1, Math.floor(Math.min(width, height) / 200));
-  const lumaAt = (x: number, y: number) => {
-    const [r, g, b] = linearAt(img, x, y);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
-  const all: number[] = [];
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) all.push(lumaAt(x, y));
-  }
-  all.sort((a, b) => a - b);
-  const thr = all[Math.floor(all.length * 0.4)];
-  const diffs: number[] = [];
-  for (let y = 0; y < height - 1; y += step) {
-    for (let x = 0; x < width - 1; x += step) {
-      const la = lumaAt(x, y);
-      const lb = lumaAt(x + 1, y);
-      const m = (la + lb) / 2;
-      if (m > thr) continue;
-      diffs.push(Math.abs(la - lb) / (m + 0.01));
-    }
-  }
-  if (!diffs.length) return 0;
-  diffs.sort((a, b) => a - b);
-  const med = diffs[Math.floor(diffs.length / 2)];
-  // Work in sigma, then invert the slider's curve (sigma = 0.10·s², see
-  // rangeSigma). Owner-tuned (2026-07-12): the DEFAULT should barely just
-  // clear the banding in flat areas and nothing more — so target the measured
-  // noise amplitude itself (med ≈ 1.35× the relative noise sigma; 0.75·med
-  // lands right on it), leaving all the headroom above for taste.
-  const targetSigma = 0.75 * med;
-  return clamp(Math.sqrt(targetSigma / 0.1), 0, 0.6);
+  return measuredStrength((x, y) => linearAt(img, x, y), img.width, img.height);
 }
 
 // autoExposure and autoRecover live in decode.ts, beside the balance they are

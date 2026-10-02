@@ -18,8 +18,10 @@ export interface EditParams {
   /** 0..1 bilateral strength, applied to LINEAR data BEFORE everything else
    *  (see raw/denoise.ts) — not part of compileEdit's per-pixel math. */
   denoise: number;
-  /** 0..1 how far COLOUR is mixed toward a plain blur over the same 13 px span
-   *  `denoise` bilaterally filters — the LUMINANCE half keeps the bilateral's
+  /** 0..1 how far COLOUR is mixed toward a plain blur over about the span
+   *  `denoise` bilaterally filters (a 7x7 Gaussian at stride two, each tap
+   *  prefiltered by a dense [1 2 1], so 15 px at its widest; raw/denoise.ts)
+   *  — the LUMINANCE half keeps the bilateral's
    *  edge-preserving mean either way. Its own strength because the two are not
    *  the same problem: colour blotches carry almost no real information and can
    *  be smoothed hard, while luminance speckle overlaps genuine texture in

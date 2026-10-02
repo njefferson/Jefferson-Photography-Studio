@@ -2108,7 +2108,8 @@ user-scalable=no.
   darker, opened with automatic noise reduction 0.41 against 0.51 and its sky
   carried 3.6 times the grain. The lower number is not a weaker filter: both
   the estimate and the denoiser read noise relative to brightness with a floor,
-  so on a dark frame it smooths relatively harder. What stays is that the
+  so on a dark frame it smooths relatively harder (until 2026-10-01; both now
+  read it in noise units, IR-SCIENCE 4c-xxv). What stays is that the
   automatic setting removes a fixed share of the noise, and a frame shot under
   starts with more. Changing that means choosing the exposure the 2026-07-12
   calibration should hold at, which is not on record; the one design tried was
@@ -7861,6 +7862,11 @@ read as authoritative, and an invented one is worse than a missing one.
   s = clamp(sqrt(0.75·med / 0.10), 0, 0.6) — targets the noise amplitude
   itself, all headroom above is left for taste. The slider feel was
   confirmed on device; don't reshape without fresh feedback.
+  (2026-10-01: the SHAPE is unchanged and the units are not — the range is now
+  measured in noise units on an equal-weight guide, sigma = 0.0335·s², and the
+  opening strength aims it at 1.06 times the frame's measured noise; both
+  constants were fitted so the opening render keeps its old mid-tone grain on
+  six of the owner's raws. IR-SCIENCE.md 4c-xxv.)
 - [x] **Drag on photo to adjust** — Lightroom-style targeted adjustment (shipped
   2026-07-05): arm the tool, then drag on the photo — UP/DOWN scales that
   colour's luminance, LEFT/RIGHT shifts its hue. The colour under your finger

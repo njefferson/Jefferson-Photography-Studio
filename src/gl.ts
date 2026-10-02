@@ -200,11 +200,11 @@ uniform float u_vigMid;      // vignette midpoint 0..1
 uniform float u_outAspect;   // output (cropped) frame aspect, for the vignette
 uniform vec2 u_outPx;        // output frame size in pixels, for grain coords
 uniform float u_denoise; // 0..1 bilateral strength (see raw/denoise.ts)
-uniform float u_chroma;  // 0..1 how far COLOUR is mixed to the plain 13 px blur, 7x7 taps at stride 2 (raw/denoise.ts)
+uniform float u_chroma;  // 0..1 how far COLOUR is mixed to the plain 13 px blur: 7x7 at stride 2, each tap [1 2 1]-prefiltered (raw/denoise.ts)
 uniform float u_despeckle; // 0..1 decision-based median on the centre pixel (raw/denoise.ts)
 uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/detail.ts
 uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
-uniform vec2 u_texel;    // 1/textureSize
+uniform vec2 u_texel;    // one PROXY texel: tapScale / textureSize (see setTapScale)
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
 uniform int u_spotVis;   // 1 = "Visualize spots": amplified high-pass luma view
 uniform int u_maskViz;   // >=0 = show that mask's coverage as a preview overlay
@@ -313,6 +313,52 @@ float median9(float a0, float a1, float a2, float a3, float a4, float a5, float 
   t = min(a6, a4); a4 = max(a6, a4); a6 = t;
   t = min(a4, a2); a2 = max(a4, a2); a4 = t;
   return a4;
+}
+
+// THE DENOISER'S NOISE MODEL, mirrored from raw/denoise.ts noiseGuide() and
+// stabilise(): the equal-weight mean of the camera-native channels (the guide
+// darktable's 1/wb weights make after white balance) through the generalized
+// Anscombe transform 2*sqrt(y + b/a), whose noise is the same at every
+// brightness. 0.0005 is NOISE_KNEE; keep the literal in sync.
+float dnStab(vec3 s){ return 2.0 * sqrt(max(dot(s, vec3(1.0 / 3.0)), 0.0) + 0.0005); }
+// THE DENOISE TAP, READ AT A WHOLE TEXEL BY ITS INTEGER ADDRESS. texelFetch
+// returns the texel itself; a LINEAR fetch even at a computed texel centre can
+// carry a sliver of a neighbour, because (m + 0.5) / size is not exact in
+// float32, and that sliver was enough to flip the despeckle's tie tests on an
+// 8-bit source. The address is clamped to the frame first, which is what
+// CLAMP_TO_EDGE did and what the CPU's integer clamp does. Under a painted warp
+// the tap is the warped LINEAR sample at that texel's centre instead, because
+// the CPU warps its integer pixels with a bilinear read too (warp.ts).
+vec3 dnFetch(ivec2 p, ivec2 size){
+  ivec2 q = clamp(p, ivec2(0), size - ivec2(1));
+  if (u_warpOn) return fetchLin((vec2(q) + 0.5) / vec2(size));
+  vec3 s = texelFetch(u_tex, q, 0).rgb;
+  return u_linear ? s : toLinear(s);
+}
+// A tap's offset in whole texels for an offset of k PROXY texels: rounded the
+// way raw/denoise.ts rounds Math.round(k * step), so a native-resolution copy
+// (u_texel spanning several texels) reads the same texels the CPU reads.
+ivec2 dnOff(vec2 k, vec2 tapScale){ return ivec2(floor(k * tapScale + 0.5)); }
+// The colour mean's coarse Gaussian, sigma two in coarse-tap units, zero past
+// three taps: w(d) in raw/denoise.ts.
+float dnW1(float d){ return abs(d) <= 3.0 ? exp(-d * d / 8.0) : 0.0; }
+// Its dense kernel at proxy tap n (-7..7), the stride-2 Gaussian under a
+// [1 2 1]: an even n weighs half of w(n/2), an odd one a quarter of each
+// neighbour. ckAt in raw/denoise.ts.
+float dnCk(float n){ return mod(n, 2.0) == 0.0 ? 0.5 * dnW1(n * 0.5) : 0.25 * (dnW1((n - 1.0) * 0.5) + dnW1((n + 1.0) * 0.5)); }
+// The colour kernel's weight at NATIVE offset o for a tap scale s > 1, before
+// the tent's normalisation: the sum over the proxy taps n near o / s of
+// dnCk(n) times the tent 1 - |o - round(n s)| / s. Only n within one of
+// round(o / s) can reach o, so five candidates cover it. kAcc in raw/denoise.ts.
+float dnColW(int o, float s){
+  float w = 0.0;
+  int n0 = int(floor(float(o) / s + 0.5));
+  for (int n = n0 - 2; n <= n0 + 2; n++) {
+    if (n < -7 || n > 7) continue;
+    float j = float(o - int(floor(float(n) * s + 0.5)));
+    w += dnCk(float(n)) * max(0.0, 1.0 - abs(j) / s);
+  }
+  return w;
 }
 
 vec3 rgb2hsv(vec3 c){
@@ -601,11 +647,36 @@ void main() {
     srcSev = smoothstep(vec3(0.985), vec3(0.995), c / srcFlat);
   }
 
-  // Denoise FIRST, on linear sensor data, before the big IR gains amplify the
-  // noise. Same 13x13 brightness-adaptive bilateral as raw/denoise.ts, whose
-  // header says what the position really changes (corrected 2026-10-01).
+  // Denoise FIRST, on linear sensor data, before white balance — the 13x13
+  // bilateral of raw/denoise.ts, whose header says what the position buys: one
+  // noise curve for all three channels, which the range below is measured in.
+  //
+  // ON WHOLE TEXELS (2026-10-01). The centre is the texel this fragment falls
+  // in, and every tap is a whole texel at an offset rounded the way the CPU
+  // rounds Math.round(k * step) — read by integer address (dnFetch), the
+  // centre-snapping the detail block below does, made exact. Off a texel centre
+  // — a crop that starts between texels, a straighten — a LINEAR fetch is a
+  // blend of up to four texels, which halves white noise at a half-texel phase:
+  // the range weights and the despeckle's extreme-of-window test then ran on a
+  // pre-blurred field that changed with phase across the screen, and a +12 sigma
+  // speck still showed at about 6 sigma where the export, which reads whole
+  // pixels, removed it. The address uses the texture's true size, not u_texel,
+  // which may span several texels on a native-resolution copy.
+  vec3 preNoise = c;
+  ivec2 dnSize = textureSize(u_tex, 0);
+  vec2 dnScale = u_texel * vec2(dnSize); // the tap scale, in texels per proxy texel
+  ivec2 dnP = ivec2(floor(v_uv * vec2(dnSize)));
+  if ((u_despeckle > 0.0 || u_denoise > 0.0 || u_chroma > 0.0) && v_uv.x >= u_split) {
+    c = dnFetch(dnP, dnSize);
+    // THE PIXEL AS IT ARRIVED, kept for AIM_NOISE. Captured HERE, before the
+    // despeckle median as well as the bilateral, because both sit inside that one
+    // bit and export.ts mixes back toward its own pre-despeckle warped sampler.
+    // Taken after despeckle instead, the two paths would differ exactly where a
+    // speckle sat — see AIM_NOISE in pipeline.ts.
+    preNoise = c;
+  }
   // DESPECKLE FIRST, AND THE ORDER IS THE POINT. lc below is the centre's
-  // luma and every neighbour's weight is measured against it, so a centre that
+  // guide and every neighbour's weight is measured against it, so a centre that
   // is an impulse makes every neighbour look wrong and collapses the bilateral
   // onto the very pixel that should have gone. A bilateral preserves outliers by
   // construction — see raw/denoise.ts and IR-SCIENCE.md 4c-ix — which is why
@@ -615,20 +686,13 @@ void main() {
   // raw/denoise.ts: the centre must be the extreme of its own 3x3 AND sit
   // further from that window's median than k times the window's spread.
   vec3 ctr = c;
-  // THE PIXEL AS IT ARRIVED, kept for AIM_NOISE. Captured HERE, before the
-  // despeckle median as well as the bilateral, because both sit inside that one
-  // bit and export.ts mixes back toward its own pre-despeckle warped sampler.
-  // Taken
-  // after despeckle instead, the two paths would differ exactly where a speckle
-  // sat — see AIM_NOISE in pipeline.ts.
-  vec3 preNoise = c;
   if (u_despeckle > 0.0 && v_uv.x >= u_split) {
     float k = 0.45 * (1.0 - u_despeckle) + 0.02; // keep in sync with raw/denoise.ts
     vec3 n[9];
     int q = 0;
     for (int dy = -1; dy <= 1; dy++) {
       for (int dx = -1; dx <= 1; dx++) {
-        n[q] = fetchLin(v_uv + vec2(float(dx), float(dy)) * u_texel);
+        n[q] = dnFetch(dnP + dnOff(vec2(float(dx), float(dy)), dnScale), dnSize);
         q++;
       }
     }
@@ -644,49 +708,82 @@ void main() {
     c = ctr;
   }
   if ((u_denoise > 0.0 || u_chroma > 0.0) && v_uv.x >= u_split) {
-    // A FLOOR RATHER THAN A BRANCH when the luminance half is off — same reason
-    // as raw/denoise.ts: sigma 0 makes the centre tap 0 * Infinity.
-    float sigma = u_denoise > 0.0 ? 0.1 * u_denoise * u_denoise : 1e-6; // keep in sync with raw/denoise.ts rangeSigma()
+    // Sigma in NOISE units (dnStab): RANGE_SCALE * s^2, keep the literal in sync
+    // with raw/denoise.ts rangeSigma(). With the luminance half off the loop is
+    // SKIPPED, as on the CPU: the sigma 1e-6 floor it used to run at still let a
+    // neighbour whose guide landed within a few millionths of the centre's blend
+    // in, by an amount float32 and the CPU's doubles did not agree on.
+    float sigma = u_denoise > 0.0 ? 0.0335 * u_denoise * u_denoise : 1.0;
     float inv2s2 = 1.0 / (2.0 * sigma * sigma);
-    float lc = dot(c, LUMA_W);
-    vec3 sum = vec3(0.0);
-    float wsum = 0.0;
+    float lc = dnStab(c);
+    vec3 sum = ctr;
+    float wsum = 1.0;
     vec3 gsum = vec3(0.0);
     float gw = 0.0;
+    if (u_denoise > 0.0) { sum = vec3(0.0); wsum = 0.0; }
     // THIRTEEN PIXELS ACROSS, DENSE — identical to raw/denoise.ts, and the
     // width is the fix rather than an optimisation. A 5x5 cannot flatten the
     // three-to-five-pixel luminance mottle in a deep infrared sky; the colour
     // half was widened to this span for that reason and the luminance half was
     // left behind (IR-SCIENCE.md 4c-xxii). Dense, not strided: a sparse lattice
     // samples a noise field periodically and that is itself a pattern.
-    for (int dy = -6; dy <= 6; dy++) {
+    for (int dy = -6; dy <= 6 && u_denoise > 0.0; dy++) {
       for (int dx = -6; dx <= 6; dx++) {
         // The centre tap is the corrected pixel, for the same reason lc is.
-        vec3 s = (dx == 0 && dy == 0) ? ctr : fetchLin(v_uv + vec2(float(dx), float(dy)) * u_texel);
-        float rel = (dot(s, LUMA_W) - lc) / (lc + 0.02);
+        vec3 s = (dx == 0 && dy == 0) ? ctr : dnFetch(dnP + dnOff(vec2(float(dx), float(dy)), dnScale), dnSize);
+        // The distance in the stabilised guide, where the noise is the same at
+        // every brightness — so this sigma is one multiple of the local noise
+        // in a shadow and a highlight alike (raw/denoise.ts stabilise()).
+        float rel = dnStab(s) - lc;
         float sp = exp(-float(dx*dx + dy*dy) / 18.0);
         float w = sp * exp(-rel * rel * inv2s2);
         sum += s * w;
         wsum += w;
-        // The same taps weighted spatially only — the plain blur the colour
-        // half is mixed toward. Identical math to raw/denoise.ts.
-        // (the colour mean has its own wider grid below)
       }
     }
     vec3 m = sum / wsum;
     if (u_chroma > 0.0) {
-      // THE COLOUR MEAN, ON ITS OWN WIDER GRID — identical to raw/denoise.ts.
-      // 7x7 at stride two, spanning thirteen pixels, because the mottle it has
-      // to reach is three to five across and the bilateral's five-pixel window
-      // cannot flatten it. Stride THREE was tried first and left a fine regular
-      // cross-hatch: sampling a noise field periodically is itself a pattern.
-      // Forty-nine fetches, only when the colour half is on.
-      for (int dy = -3; dy <= 3; dy++) {
-        for (int dx = -3; dx <= 3; dx++) {
-          vec3 s2 = fetchLin(v_uv + vec2(float(dx * 2), float(dy * 2)) * u_texel);
-          float sp2 = exp(-float(dx*dx + dy*dy) / 8.0);
-          gsum += s2 * sp2;
-          gw += sp2;
+      // THE COLOUR MEAN, ON ITS OWN WIDER GRID — identical to raw/denoise.ts:
+      // a 7x7 Gaussian at stride two over a thirteen-pixel span (the mottle it
+      // has to reach is three to five across; stride THREE left a fine regular
+      // cross-hatch), each tap prefiltered by a dense [1 2 1] so the stride no
+      // longer passes period-2 colour noise untouched. Run as the one dense
+      // 15x15 kernel that cascade is: an even offset 2d weighs half of w(d), an
+      // odd one a quarter of each neighbour. 225 fetches, only when the colour
+      // half is on — the live view, whose tap scale is 1.
+      if (abs(dnScale.x - 1.0) < 1e-4) {
+        float ck[15];
+        for (int i = 0; i < 15; i++) ck[i] = dnCk(float(i - 7));
+        for (int dy = -7; dy <= 7; dy++) {
+          for (int dx = -7; dx <= 7; dx++) {
+            vec3 s2 = dnFetch(dnP + ivec2(dx, dy), dnSize);
+            float sp2 = ck[dx + 7] * ck[dy + 7];
+            gsum += s2 * sp2;
+            gw += sp2;
+          }
+        }
+      } else {
+        // A NATIVE-RESOLUTION COPY (tap scale s > 1, a drawn export): the taps
+        // spread s texels apart, each a tent of half-width s over the texels
+        // around it, so the lattice does not pass the native pixel Nyquist —
+        // raw/denoise.ts says why, and builds the same kernel. Every native
+        // offset the kernel reaches, with its weight from dnColW; (2M+1)^2
+        // fetches, 961 at s = 2, only on this path.
+        float s = dnScale.x;
+        int tj = int(ceil(s)) - 1;
+        float tsum = 0.0;
+        for (int j = -tj; j <= tj; j++) tsum += max(0.0, 1.0 - abs(float(j)) / s);
+        int km = int(floor(7.0 * s + 0.5)) + tj;
+        for (int dy = -km; dy <= km; dy++) {
+          float ky = dnColW(dy, s) / tsum;
+          if (ky <= 0.0) continue;
+          for (int dx = -km; dx <= km; dx++) {
+            float kx = dnColW(dx, s) / tsum;
+            if (kx <= 0.0) continue;
+            vec3 s2 = dnFetch(dnP + ivec2(dx, dy), dnSize);
+            gsum += s2 * (kx * ky);
+            gw += kx * ky;
+          }
         }
       }
       // Luminance from the edge-preserving mean, colour from the plain one.
@@ -701,8 +798,6 @@ void main() {
     }
   }
 
-  // Detail: sharpen (high-freq) + texture (mid-freq) on LINEAR data, after
-  // denoise and before WB — a hue-preserving luminance gain from two Gaussian
   // HELD BACK WHERE NO MASK AIMS AT NOISE (decision 030). The ternary is
   // load-bearing for the same reason it is on the lens weight below:
   // aimWeightOf walks every mask, and a frame with neither slider on must not
@@ -711,6 +806,8 @@ void main() {
     c = mix(preNoise, c, aimWeightOf(16));
   }
 
+  // Detail: sharpen (high-freq) + texture (mid-freq) on LINEAR data, after
+  // denoise and before WB — a hue-preserving luminance gain from two Gaussian
   // blurs of the neighbourhood luma. Same math + constants as raw/detail.ts
   // (R=3, sigma 1.0/2.0 -> 2*sigma^2 = 2.0/8.0; KS=2.2, KT=2.4, EPS=0.05).
   if (u_sharpen > 0.0 || u_texture != 0.0) {
