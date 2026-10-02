@@ -561,7 +561,8 @@ function masksToBlocks(src: string): { src: string; ok: boolean; sites: number }
 }
 
 /** OPTION 8, SECOND FORM: the same parameters in one float texture read with
- *  texelFetch, as the measured lens curve already is (`u_lensTex`): 18 texels
+ *  texelFetch, as the measured lens curve was until it began filtering between
+ *  bins (`u_lensTex`, 2026-10-02): 18 texels
  *  per mask (7 fields, 8 mixer bands, 3 grade rows), one row per mask. Takes a
  *  fragment source; gives back `rewriteMaskArrays`' answer. */
 function masksToTexture(src: string): { src: string; ok: boolean; sites: number } {

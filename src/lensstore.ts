@@ -34,7 +34,7 @@
 
 import type { ExifSubset } from "./exif";
 import { fnv1a } from "./stamp";
-import { shapeProblem, NBINS } from "./lensprofile";
+import { shapeProblem, NBINS, SPOT_CENTRE_MAX } from "./lensprofile";
 
 const KEY = "ips-lens-profiles-v1";
 
@@ -69,17 +69,29 @@ export interface StoredProfile {
   bump?: number[];
   /** True for a profile that came with the app rather than from this device. */
   builtIn?: boolean;
-  /** The camera this profile's COLOUR was measured on, when that is not the
-   *  camera of the photograph it is being applied to. Set by the matcher, never
-   *  stored: its presence means the colour half was withheld, and the panel has
-   *  something to say about why. */
-  otherCamera?: string;
+  /** Where the hot spot's centre sat in the flats, as an offset `[x, y]` from
+   *  the frame's geometric centre (x right, y down, the SENSOR's axes) in units
+   *  of the half-diagonal. Estimated by the rig (`spotCentre`, lensprofile.ts)
+   *  and absent on every profile measured before it did — absent IS the
+   *  geometric centre, which is what those were measured about, so an old
+   *  profile applies exactly as it always did. DNG FixVignetteRadial and lensfun
+   *  both carry an optical centre for the same reason. */
+  centre?: [number, number];
+  /** The focus distance the flats were shot at, in metres, when their files
+   *  recorded one (EXIF SubjectDistance). The match weighs it as lensfun does,
+   *  in reciprocal distance. Absent on every profile from a Nikon Z 50, which
+   *  does not write it. */
+  dist?: number;
   /** Present when this is a blend of two measurements rather than one of them,
    *  so the panel can say so and a test can tell the two apart. */
   blend?: { loFl: number; hiFl: number; t: number };
-  /** HOW FAR THE MATCHER HAD TO REACH to answer for this frame, as a log
-   *  distance: aperture ratio plus however far outside the set's focal range the
-   *  frame falls, zero when the set brackets it. One stop is 0.347.
+  /** Present when two APERTURES were blended for this frame — the two that
+   *  bracket it, mixed linearly in 1/N (lensfun's aperture axis). */
+  apBlend?: { loAp: number; hiAp: number; t: number };
+  /** HOW FAR THE MATCHER HAD TO REACH to answer for this frame, in RawTherapee's
+   *  units (`ffInfo::distance`): two per doubling of the f-number — one per
+   *  STOP — against one per doubling of focal length, combined as a Euclidean
+   *  distance, and zero on an axis the measurements bracket.
    *
    *  Set by the matcher, never stored, and undefined when the frame carries no
    *  focal length — there is no reach to report without something to measure
@@ -150,6 +162,22 @@ export function bumpProblem(a: unknown, n: number): string | null {
   return bandProblem("brightness", a, n, 0, 4);
 }
 
+/** Whether a stored hot-spot CENTRE is one this version can apply.
+ *  Takes `c`, the candidate as read from storage or a payload (absent is
+ *  allowed: it is the geometric centre).
+ *  Returns null when it is usable or absent, or a sentence naming what is
+ *  wrong. A centre more than a quarter of the half-diagonal off the middle is
+ *  not a lens's optical centre, it is a cloud or a ramp the estimate followed —
+ *  the rig refuses to write one (`spotCentre`), and this refuses to read one.
+ *  DEPENDS BOTH WAYS like the curve checks: `saveFromPayload` and `read` apply
+ *  it to the same field, held by tools/lens-store-check.mjs. */
+export function centreProblem(c: unknown): string | null {
+  if (c === undefined) return null;
+  if (!Array.isArray(c) || c.length !== 2) return "its hot-spot centre is not a pair of numbers";
+  for (const v of c) if (typeof v !== "number" || !Number.isFinite(v) || Math.abs(v) > SPOT_CENTRE_MAX) return `its hot-spot centre reads ${JSON.stringify(c)}, further from the middle than any lens puts one`;
+  return null;
+}
+
 /** What the last read had to set aside, for the diagnostic report. A profile
  *  that vanishes without a word is the defect this pair of counters exists to
  *  make visible — the reader has no other way to know their measurement is not
@@ -191,12 +219,16 @@ function read(): StoredProfile[] {
         droppedProfiles++;
         continue;
       }
-      if (p.bump !== undefined && bumpProblem(p.bump, NBINS)) {
+      // A CENTRE THAT IS NOT ONE IS DROPPED, NOT THE PROFILE: absent is the
+      // geometric centre, which is a correction that exists. Same rule as a
+      // bad brightness curve above.
+      const q = centreProblem(p.centre) ? { ...p, centre: undefined } : p;
+      if (q.bump !== undefined && bumpProblem(q.bump, NBINS)) {
         droppedBumps++;
-        out.push({ ...p, bump: undefined });
+        out.push({ ...q, bump: undefined });
         continue;
       }
-      out.push(p);
+      out.push(q);
     }
     return out;
   } catch {
@@ -272,8 +304,8 @@ export interface SaveChange {
  *  Takes `p`, anything with `kr` and `kb` curves.
  *  Returns true when any band differs from 1 — a flat 1 means the measurement
  *  found no colour rather than measuring none.
- *  Used to rank profiles (colour beats frame count) and by `forCamera` to
- *  decide whether there is colour worth withholding from a different body. */
+ *  Used to rank profiles (colour beats frame count) when one replaces another
+ *  under the same key. */
 export function saysAnythingAboutColour(p: { kr: ArrayLike<number>; kb: ArrayLike<number> }): boolean {
   for (const a of [p.kr, p.kb]) for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - 1) > 1e-9) return true;
   return false;
@@ -329,7 +361,7 @@ export function saveFromPayload(payload: {
   measured?: string;
   profiles?: Record<string, {
     kr: number[]; kb: number[]; frames: number; source: string;
-    falloff?: number[]; bump_range?: number[];
+    falloff?: number[]; bump_range?: number[]; centre?: number[]; dist?: number;
   }>;
   lens_map?: Record<string, string>;
 }): { saved: number; skipped: string[]; ok: boolean; changes: SaveChange[] } {
@@ -372,6 +404,10 @@ export function saveFromPayload(payload: {
       source: p.source ?? "",
       camera: payload.camera ?? "",
       measured: payload.measured ?? "",
+      // The rig's estimate of where the spot sat; a centre the reader would
+      // refuse is not stored, and the profile goes in about the middle.
+      ...(p.centre !== undefined && !centreProblem(p.centre) ? { centre: [p.centre[0], p.centre[1]] as [number, number] } : {}),
+      ...(typeof p.dist === "number" && p.dist > 0 && Number.isFinite(p.dist) ? { dist: p.dist } : {}),
     };
     const change = place(list, entry, p.falloff);
     changes.push(change);
@@ -425,36 +461,29 @@ export function clearProfiles(): void {
 
 /** A number that is 0 at `a`, 1 at `b`, in proportion rather than in units.
  *  50mm to 55mm is a small move and 200mm to 205mm a smaller one; 24mm to 29mm
- *  is not. Apertures are the same shape of quantity — f/4 to f/5.6 is one stop
- *  wherever it sits. */
+ *  is not. */
 const logMix = (v: number, a: number, b: number) =>
   a === b ? 0 : Math.min(1, Math.max(0, Math.log(v / a) / Math.log(b / a)));
 /** The stored profile that fits a photograph.
  *  Takes `ex`, the frame's EXIF subset (lens, focal length, aperture, make and
  *  model), or null when it carries none.
- *  Returns the best matching profile, blended across focal lengths where two
- *  bracket the frame, with colour withheld if it was measured on a different
- *  body — or null when nothing matches.
+ *  Returns the best matching profile, blended across focal lengths and
+ *  apertures where two bracket the frame — or null when nothing matches, which
+ *  includes every profile measured on another body (`matchIn`).
  *  Reads through `read`, so a profile whose brightness curve is unusable can
  *  still be returned here for its colour. */
 export function findProfile(ex: ExifSubset | null): StoredProfile | null {
   return matchIn(read(), ex);
 }
 
-/** Pick the profile for a photograph out of a list of candidates.
- *
- *  ONE MATCHER, TWO CALLERS. The profiles that ship with the app and the ones
- *  the reader measured are the same shape from the same rig, and "which of
- *  these fits this frame" is one question. It was two implementations — this
- *  one, and a nearest-focal-length snap in hotspot.ts — which is how the
- *  shipped table ended up ignoring aperture entirely while this one had
- *  handled it for weeks. */
-/** The camera a frame was taken on, in the same spelling the rig records. */
+/** The camera a frame was taken on, in the same spelling the rig records:
+ *  make and model joined by a space, runs of space collapsed. */
 function cameraOf(ex: ExifSubset | null): string {
-  return [ex?.make, ex?.model].filter(Boolean).join(" ").trim();
+  return [ex?.make, ex?.model].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
 }
+const bodyOf = (p: StoredProfile) => (p.camera ?? "").replace(/\s+/g, " ").trim();
 
-/** THE COLOUR HALF BELONGS TO THE BODY, NOT ONLY TO THE LENS.
+/** THE BODY HAS TO MATCH, AND SO DOES THE LENS — BOTH HALVES, OR NEITHER.
  *
  *  `kr`/`kb` are how much red and blue the centre has against green across the
  *  frame. In infrared that is two things multiplied together: how the lens's
@@ -463,105 +492,74 @@ function cameraOf(ex: ExifSubset | null): string {
  *  the CONVERTED BODY. A 720nm conversion has almost no blue to measure; a
  *  full-spectrum one has a great deal.
  *
- *  So a colour curve measured on one converted body is not a fact about that
- *  lens on anybody else's. The brightness half is different: a hot-spot is
- *  internal reflection inside the lens barrel, which is geometry, and it
- *  transfers. (Corrected 2026-10-01: it does not, reliably. Kolari shows the
- *  sensor stack and the conversion filter making or removing the spot on the
- *  same lens, and RawTherapee's ffInfo::distance refuses a flat from any other
- *  make, model or lens. EXIF records no conversion, so a second body of the
- *  same model cannot be told apart from the file. IR-SCIENCE 9c.)
+ *  This used to withhold the COLOUR alone, and only when both cameras were
+ *  known and differed, calling the brightness half "internal reflection inside
+ *  the lens barrel, which is geometry, and it transfers". It does not, reliably:
+ *  Kolari shows the sensor stack and the conversion filter making or removing
+ *  the spot on the same lens — an AR coating reduced it and a removed
+ *  hot-mirror stack took it away. And the reference refuses outright:
+ *  RawTherapee's `ffInfo::distance` (rtengine/ffmanager.cc) returns INFINITY
+ *  when maker, model or lens differ, and its `find()` returns nothing when every
+ *  distance is infinite. So a profile from another body, or from a frame whose
+ *  make and model are not recorded, matches nothing here, both halves at once,
+ *  and `withheldFor` says why.
  *
- *  This mattered little while the profiles that shipped carried colour measured
- *  from camera JPEGs, which was wrong for everyone including the photographer
- *  who measured it. It matters now: the shipped table is 72 profiles of real,
- *  conversion-specific colour, and applying those to a stranger's differently
- *  converted body would make the app worse for them than no correction at all.
+ *  WHAT THIS CANNOT SEE. EXIF records no conversion, so a second NIKON Z 50
+ *  converted differently is the same body to this test; only the reader can
+ *  tell, and the card says so (IR-SCIENCE.md 9c).
  *
- *  WITHHELD ONLY WHEN BOTH CAMERAS ARE KNOWN AND THEY DIFFER. A frame with no
- *  make or model in it — a stripped JPEG, an export of an export — cannot be
- *  told apart from a match, and refusing colour there would break the ordinary
- *  case to guard the rare one. */
-function forCamera(p: StoredProfile, ex: ExifSubset | null): StoredProfile {
-  const mine = cameraOf(ex), theirs = (p.camera ?? "").trim();
-  if (!mine || !theirs || mine === theirs) return p;
-  if (!saysAnythingAboutColour(p)) return p;
-  const flat: number[] = new Array(p.kr.length).fill(1);
-  return { ...p, kr: flat, kb: [...flat], otherCamera: theirs };
-}
+ *  The manual pick is the exception, as RawTherapee's is: a reader who chooses
+ *  a profile by hand has said which one they want, and `anyBody` lets it
+ *  through. */
 /** The profile that fits a photograph, out of a list the caller supplies.
- *  Takes `list`, the candidates, and `ex`, the frame's EXIF subset.
- *  Returns the best match with `forCamera` already applied, or null.
+ *  Takes `list`, the candidates; `ex`, the frame's EXIF subset; and `opts`,
+ *  where `anyBody` skips the body test for a lens the reader picked by hand.
+ *  Returns the best match — blended across the focal lengths and the
+ *  apertures that bracket the frame, its `reach` set — or null when no
+ *  profile of this lens on this body exists.
  *  ONE MATCHER, TWO CALLERS — the shipped table and the reader's own profiles
  *  are the same shape and must be matched by the same rules; a second
- *  implementation is how the shipped table came to ignore aperture. */
-export function matchIn(list: StoredProfile[], ex: ExifSubset | null): StoredProfile | null {
-  const picked = matchAny(list, ex);
-  return picked ? forCamera(picked, ex) : null;
+ *  implementation is how the shipped table came to ignore aperture.
+ *  What the result must satisfy: never a profile whose `camera` differs from
+ *  the frame's make and model unless `anyBody`; `tools/lens-store-check.mjs`
+ *  holds that, the bracketing and the reach units. */
+export function matchIn(list: StoredProfile[], ex: ExifSubset | null, opts?: { anyBody?: boolean }): StoredProfile | null {
+  return matchAny(list, ex, !!opts?.anyBody);
 }
 
-function matchAny(list: StoredProfile[], ex: ExifSubset | null): StoredProfile | null {
+/** WHY NOTHING MATCHED, when a profile of this lens exists for another body.
+ *  Takes `list` and `ex`, as `matchIn`.
+ *  Returns the body the profiles were measured on and the one the frame names
+ *  ("" when it names none), or null when there is no such profile or one
+ *  matched. Consumer: the lens cards and the diagnostic, which must say why a
+ *  lens the app knows is not being corrected rather than offer to identify it. */
+export function withheldFor(list: StoredProfile[], ex: ExifSubset | null): { measuredOn: string; frame: string } | null {
   if (!ex?.lens) return null;
   const model = ex.lens.trim();
-  const fl = ex.focalLength && ex.focalLength[1] ? ex.focalLength[0] / ex.focalLength[1] : NaN;
-  const ap = ex.fNumber && ex.fNumber[1] ? ex.fNumber[0] / ex.fNumber[1] : NaN;
-  const mine = list.filter((p) => p.model === model);
-  if (!mine.length) return null;
-  if (!Number.isFinite(fl)) return mine[0];
+  const lens = list.filter((p) => p.model === model);
+  if (!lens.length) return null;
+  const body = cameraOf(ex);
+  if (lens.some((p) => bodyOf(p) === body)) return null;
+  return { measuredOn: bodyOf(lens[0]) || "a camera that was not recorded", frame: body };
+}
 
-  // 1. the aperture set nearest this frame's, keeping unrecorded apertures
-  //    together as their own set rather than pretending they are any value.
-  const sets = new Map<string, StoredProfile[]>();
-  for (const p of mine) {
-    const k = Number.isFinite(p.ap) ? p.ap.toFixed(2) : "?";
-    (sets.get(k) ?? sets.set(k, []).get(k)!).push(p);
-  }
-  // Scored on BOTH axes, not aperture first. Aperture-first was fine while every
-  // set spanned the focal range; the profiles that ship with the app do not —
-  // seven apertures at one focal length and one aperture at another — and a
-  // 50mm f/8 frame chose the f/5.3 set, whose only member was measured at
-  // 130mm. Nearer in aperture, and the wrong lens position entirely.
-  //
-  // The focal cost is how far OUTSIDE a set's measured range the frame falls:
-  // zero when the set brackets it, because interpolating inside a range is not
-  // a reach. Both terms are log ratios, so they are the same kind of distance
-  // and add without a fudge factor.
-  let best: StoredProfile[] = [];
-  let bestCost = Infinity;
-  // Declared here so every return below carries it. The returns ABOVE this
-  // point are the ones with nothing to measure — no lens, no profiles, no focal
-  // length — and they deliberately carry no reach at all.
-  for (const [k, list2] of sets) {
-    const apCost = k === "?" || !Number.isFinite(ap) ? 0.4 : Math.abs(Math.log(Number(k) / ap));
-    const fls = list2.map((q) => q.fl);
-    const lo = Math.min(...fls), hi = Math.max(...fls);
-    const flCost = fl >= lo && fl <= hi ? 0 : Math.abs(Math.log(fl / (fl < lo ? lo : hi)));
-    const cost = apCost + flCost;
-    if (cost < bestCost) { bestCost = cost; best = list2; }
-  }
+/** One stop of aperture, in reach units: RawTherapee's `2 * log2(a1 / a2)` at a
+ *  ratio of root two. Exported so the precedence rule in hotspot.ts measures
+ *  "a stop" in the matcher's own units. */
+export const REACH_STOP = 1;
+/** What an unrecorded aperture costs: a little over a stop, as it did when
+ *  reach was measured in natural logs (0.4 there). */
+const UNKNOWN_AP = 1.15;
 
-  // 2. within it, bracket the frame's focal length and blend.
-  const reached = (p: StoredProfile): StoredProfile => ({ ...p, reach: bestCost });
-  const by = [...best].sort((a, z) => a.fl - z.fl);
-  if (by.length === 1) return reached(by[0]);
-  if (fl <= by[0].fl) return reached(by[0]);
-  if (fl >= by[by.length - 1].fl) return reached(by[by.length - 1]);
-  let lo = by[0], hi = by[by.length - 1];
-  for (let i = 0; i < by.length - 1; i++) {
-    if (fl >= by[i].fl && fl <= by[i + 1].fl) { lo = by[i]; hi = by[i + 1]; break; }
-  }
-  if (lo === hi || lo.fl === hi.fl) return reached(lo);
-  const t = logMix(fl, lo.fl, hi.fl);
-  // Landing exactly on an anchor is not a blend of anything. Returning a
-  // synthetic "blended 0% / 100%" is arithmetically identical and reads to the
-  // reader as if the app could not tell where the frame was.
-  if (t <= 0) return reached(lo);
-  if (t >= 1) return reached(hi);
-  const n = Math.min(lo.kr.length, hi.kr.length, lo.kb.length, hi.kb.length);
+/** Two profiles mixed at `t` (0 is `a`): colour linearly; the brightness curve
+ *  with a missing end read as a measured zero (see below); the centre with a
+ *  missing end read as the geometric centre, and absent when both are. */
+function mixProfiles(a: StoredProfile, b: StoredProfile, t: number): Pick<StoredProfile, "kr" | "kb" | "bump" | "centre" | "dist"> {
+  const n = Math.min(a.kr.length, b.kr.length, a.kb.length, b.kb.length);
   const kr: number[] = [], kb: number[] = [];
   for (let i = 0; i < n; i++) {
-    kr.push(lo.kr[i] + (hi.kr[i] - lo.kr[i]) * t);
-    kb.push(lo.kb[i] + (hi.kb[i] - lo.kb[i]) * t);
+    kr.push(a.kr[i] + (b.kr[i] - a.kr[i]) * t);
+    kb.push(a.kb[i] + (b.kb[i] - a.kb[i]) * t);
   }
   // THE BUMP BLENDS ON THE SAME MIX, AND A MISSING END IS A MEASURED ZERO.
   //
@@ -578,7 +576,8 @@ function matchAny(list: StoredProfile[], ex: ExifSubset | null): StoredProfile |
   // zero curve. The shipped table agrees with the physics on this: across the
   // 44 profiles of the 50-250mm the curve APPEARS as the lens stops down and is
   // absent wide open, which is how a hot-spot behaves (IR-SCIENCE.md §1), so the
-  // absences sit exactly where no hot-spot is expected.
+  // absences sit exactly where no hot-spot is expected. The same holds across
+  // apertures, which is the axis the curve comes and goes along.
   //
   // The one case where missing means unreadable rather than zero is a reader's
   // own profile whose curve `read()` set aside. Blending that toward zero
@@ -586,40 +585,151 @@ function matchAny(list: StoredProfile[], ex: ExifSubset | null): StoredProfile |
   // leaves a disc the Hot-spot slider can finish, which is the trade the
   // generator's own header already names.
   let bump: number[] | undefined;
-  if (lo.bump || hi.bump) {
-    const bn = lo.bump && hi.bump
-      ? Math.min(lo.bump.length, hi.bump.length)
-      : (lo.bump ?? hi.bump)!.length;
+  if (a.bump || b.bump) {
+    const bn = a.bump && b.bump ? Math.min(a.bump.length, b.bump.length) : (a.bump ?? b.bump)!.length;
     const at = (p: StoredProfile, i: number) => (p.bump ? p.bump[i] : 0);
     const out: number[] = [];
-    for (let i = 0; i < bn; i++) out.push(at(lo, i) + (at(hi, i) - at(lo, i)) * t);
+    for (let i = 0; i < bn; i++) out.push(at(a, i) + (at(b, i) - at(a, i)) * t);
     // A blend that lands on nothing stays nothing: a flat zero curve would make
     // the report name a brightness source that does not move a pixel, which is
     // the contradiction this whole thread started as.
     bump = out.some((v) => v > 1e-6) ? out : undefined;
   }
+  let centre: [number, number] | undefined;
+  if (a.centre || b.centre) {
+    const ca = a.centre ?? [0, 0], cb = b.centre ?? [0, 0];
+    centre = [ca[0] + (cb[0] - ca[0]) * t, ca[1] + (cb[1] - ca[1]) * t];
+  }
+  const dist = a.dist !== undefined && b.dist !== undefined ? 1 / ((1 - t) / a.dist + t / b.dist) : undefined;
+  return { kr, kb, bump, centre, dist };
+}
+
+function matchAny(list: StoredProfile[], ex: ExifSubset | null, anyBody: boolean): StoredProfile | null {
+  if (!ex?.lens) return null;
+  const model = ex.lens.trim();
+  const fl = ex.focalLength && ex.focalLength[1] ? ex.focalLength[0] / ex.focalLength[1] : NaN;
+  const ap = ex.fNumber && ex.fNumber[1] ? ex.fNumber[0] / ex.fNumber[1] : NaN;
+  const dist = typeof ex.subjectDistance === "number" && ex.subjectDistance > 0 ? ex.subjectDistance : NaN;
+  const body = cameraOf(ex);
+  const mine = list.filter((p) => p.model === model && (anyBody || bodyOf(p) === body));
+  if (!mine.length) return null;
+  if (!Number.isFinite(fl)) return mine[0];
+
+  // 1. Each aperture set, brought to this frame's focal length — bracketed and
+  //    blended where two anchors straddle it, the nearer end where none do —
+  //    with how far OUTSIDE its measured range the frame falls. Unrecorded
+  //    apertures stay together as their own set rather than pretending they are
+  //    any value.
+  const sets = new Map<string, StoredProfile[]>();
+  for (const p of mine) {
+    const k = Number.isFinite(p.ap) ? p.ap.toFixed(2) : "?";
+    (sets.get(k) ?? sets.set(k, []).get(k)!).push(p);
+  }
+  type Cand = { p: StoredProfile; ap: number; flCost: number; cost: number };
+  const cands: Cand[] = [];
+  for (const [k, set] of sets) {
+    const by = [...set].sort((a, z) => a.fl - z.fl);
+    const lo0 = by[0].fl, hi0 = by[by.length - 1].fl;
+    // Focal distance in RawTherapee's unit: one per doubling.
+    const flCost = fl >= lo0 && fl <= hi0 ? 0 : Math.abs(Math.log2(fl / (fl < lo0 ? lo0 : hi0)));
+    let p: StoredProfile;
+    if (by.length === 1 || fl <= lo0) p = by[0];
+    else if (fl >= hi0) p = by[by.length - 1];
+    else {
+      let lo = by[0], hi = by[by.length - 1];
+      for (let i = 0; i < by.length - 1; i++) {
+        if (fl >= by[i].fl && fl <= by[i + 1].fl) { lo = by[i]; hi = by[i + 1]; break; }
+      }
+      const t = lo === hi || lo.fl === hi.fl ? 0 : logMix(fl, lo.fl, hi.fl);
+      // Landing exactly on an anchor is not a blend of anything. Returning a
+      // synthetic "blended 0% / 100%" is arithmetically identical and reads to
+      // the reader as if the app could not tell where the frame was.
+      if (t <= 0) p = lo;
+      else if (t >= 1) p = hi;
+      else {
+        p = {
+          ...mixProfiles(lo, hi, t),
+          key: `${lo.key}+${hi.key}`,
+          model,
+          fl: Math.round(fl),
+          ap: lo.ap,
+          builtIn: lo.builtIn && hi.builtIn,
+          frames: lo.frames + hi.frames,
+          source: lo.source === hi.source ? lo.source : `${lo.source}+${hi.source}`,
+          camera: lo.camera || hi.camera,
+          measured: lo.measured || hi.measured,
+          blend: { loFl: lo.fl, hiFl: hi.fl, t },
+        };
+      }
+    }
+    // Aperture in RawTherapee's unit, `2 * log2(a1 / a2)`, "more important for
+    // vignette": one per STOP, so a stop weighs what a doubling of focal length
+    // does. It was |ln| on both axes until 2026-10-02, which made a stop half
+    // of a doubling.
+    const apAt = k === "?" ? NaN : Number(k);
+    const apCost = !Number.isFinite(apAt) || !Number.isFinite(ap) ? UNKNOWN_AP : Math.abs(2 * Math.log2(apAt / ap));
+    // Focus distance as lensfun weighs it, in RECIPROCAL distance — dioptres
+    // here, one per dioptre — and only when both ends recorded one.
+    const dCost = Number.isFinite(dist) && p.dist !== undefined ? Math.abs(1 / p.dist - 1 / dist) : 0;
+    cands.push({ p, ap: apAt, flCost, cost: Math.hypot(apCost, flCost, dCost) });
+  }
+
+  // 2. THE TWO APERTURES THAT BRACKET THE FRAME, mixed in 1/N, as lensfun's
+  //    vignetting interpolation places a calibration on an `a = 4 / aperture`
+  //    axis (lens.cpp `__vignetting_dist`). It took the single nearest set
+  //    until 2026-10-02 — while the shipped table's own numbers say brightness
+  //    is the aperture-dependent half (the 50-250 at 50mm: centre bump 0.0241
+  //    at f/8, 0.0502 at f/13), so a frame between two measured stops got the
+  //    nearer stop's spot, whole. Each side is the nearest set ON that side by
+  //    the same distance, so a set measured at another focal length entirely
+  //    only wins a side that has nothing nearer.
+  const reached = (p: StoredProfile, reach: number): StoredProfile => ({ ...p, reach });
+  let best = cands[0];
+  for (const c of cands) if (c.cost < best.cost) best = c;
+  if (!Number.isFinite(ap)) return reached(best.p, best.cost);
+  let below: Cand | null = null, above: Cand | null = null;
+  for (const c of cands) {
+    if (!Number.isFinite(c.ap)) continue;
+    if (c.ap <= ap && (!below || c.cost < below.cost)) below = c;
+    if (c.ap >= ap && (!above || c.cost < above.cost)) above = c;
+  }
+  // Bracketed in aperture, the aperture is not a reach; what is left is how far
+  // outside its focal range either end had to go. A bracket whose ends had to
+  // go further in focal length than the single nearest set is from the frame
+  // altogether is not an interpolation of THIS frame — measured on the owner's
+  // NIR_1688, 91mm f/5: f/4.5 exists only at 50mm and f/5.3 only at 130mm —
+  // and the nearest set stands alone, as lensfun's inverse-distance weights
+  // would all but give it.
+  const reach = below && above ? Math.max(below.flCost, above.flCost) : Infinity;
+  if (!below || !above || below === above || below.ap === above.ap || reach > best.cost) {
+    const one = !below || !above || reach > best.cost ? best : below;
+    return reached(one.p, one.cost);
+  }
+  const t = (1 / below.ap - 1 / ap) / (1 / below.ap - 1 / above.ap);
+  if (t <= 0) return reached(below.p, reach);
+  if (t >= 1) return reached(above.p, reach);
+  const lo = below.p, hi = above.p;
   return {
-    key: `${lo.key}+${hi.key}`,
+    ...mixProfiles(lo, hi, t),
+    key: `${lo.key}~${hi.key}`,
     model,
     fl: Math.round(fl),
-    ap: lo.ap,
-    kr,
-    kb,
-    bump,
+    ap,
     builtIn: lo.builtIn && hi.builtIn,
     frames: lo.frames + hi.frames,
     source: lo.source === hi.source ? lo.source : `${lo.source}+${hi.source}`,
     camera: lo.camera || hi.camera,
     measured: lo.measured || hi.measured,
-    blend: { loFl: lo.fl, hiFl: hi.fl, t },
-    reach: bestCost,
+    ...(lo.blend ? { blend: lo.blend } : hi.blend ? { blend: hi.blend } : {}),
+    apBlend: { loAp: below.ap, hiAp: above.ap, t },
+    reach,
   };
 }
 /** How to describe a match to the reader.
  *  Takes `p`, the profile that matched, and `ex`, the frame's EXIF subset.
  *  Returns a sentence naming where the numbers came from and how exactly they
- *  fit — the blend between focal lengths, whether the aperture was recorded,
- *  and whether colour was withheld because the body differs.
+ *  fit — the blend between focal lengths and between apertures, whether the
+ *  aperture was recorded, and where the hot spot's centre was found.
  *  It must stay honest about a blend: a profile applied at a focal length
  *  nobody measured, described as a measurement, is the failure it guards. */
 export function matchNote(p: StoredProfile, ex: ExifSubset | null): string {
@@ -638,15 +748,22 @@ export function matchNote(p: StoredProfile, ex: ExifSubset | null): string {
   } else if (Number.isFinite(fl) && Math.round(fl) !== Math.round(p.fl)) {
     bits.push(`measured at ${p.fl}mm, this frame is ${Math.round(fl)}mm`);
   }
-  if (p.otherCamera) {
-    bits.push(`its colour was measured on a ${p.otherCamera} and this photograph is not from one, so only the brightness applies — an infrared conversion decides what colour the sensor sees, and that is not a property of the lens`);
-  }
-  if (Number.isFinite(ap) && Number.isFinite(p.ap) && Math.abs(ap - p.ap) > 0.15) {
+  if (p.apBlend) {
+    const pc = Math.round(p.apBlend.t * 100);
+    bits.push(`between f/${p.apBlend.loAp} and f/${p.apBlend.hiAp} (${100 - pc}% / ${pc}%)`);
+  } else if (Number.isFinite(ap) && Number.isFinite(p.ap) && Math.abs(ap - p.ap) > 0.15) {
     bits.push(`measured at f/${p.ap}, this frame is f/${ap.toFixed(1)}`);
   } else if (!Number.isFinite(p.ap) && !mine) {
     // The 2026-07 pair recorded no aperture, and the hot-spot moves a long way
     // with one: 0.00 wide open against 0.19 stopped right down, on one lens.
     bits.push("measured at an aperture that was not recorded");
+  }
+  // WHERE THE SPOT WAS FOUND, when it was not the middle: a reader comparing
+  // the card with the picture can then see why the correction is off-centre.
+  if (p.centre && Math.hypot(p.centre[0], p.centre[1]) >= 0.005) {
+    const pct = (v: number) => `${Math.abs(Math.round(v * 100))}%`;
+    const side = [p.centre[0] ? `${pct(p.centre[0])} ${p.centre[0] > 0 ? "right" : "left"}` : "", p.centre[1] ? `${pct(p.centre[1])} ${p.centre[1] > 0 ? "down" : "up"}` : ""].filter(Boolean).join(" and ");
+    bits.push(`its hot spot sits ${side} of the middle, measured from the flats`);
   }
   return bits.join("; ");
 }

@@ -12,7 +12,7 @@
 // that is genuinely about the SHIPPED table — the manual picker's lists, and
 // turning a manual pick into a match.
 
-import { matchIn, type StoredProfile } from "./lensstore";
+import { matchIn, withheldFor, REACH_STOP, type StoredProfile } from "./lensstore";
 import { SHIPPED_PROFILES, SHIPPED_LENSES, SHIPPED_ANCHORS } from "./hotspotProfiles";
 import type { ExifSubset } from "./exif";
 
@@ -34,18 +34,45 @@ function modelFor(lensShort: string): string | null {
   return null;
 }
 
-/** The shipped profile for a photograph, from its own EXIF. */
+/** The shipped profile for a photograph, from its own EXIF — none for a frame
+ *  from another body, whose reason `shippedWithheld` gives.
+ *  @param ex  the frame's EXIF subset, or null.
+ *  @returns `matchIn` over the shipped table: blended across the focal lengths
+ *    and apertures that bracket the frame, or null.
+ *  What the result must satisfy: the profile `lensStrengthAtOpen`,
+ *    `initHotspot`, `lensCurveFor` and `batchHasLens` all agree on, since each
+ *    asks this rather than matching for itself. */
 export function findShipped(ex: ExifSubset | null): StoredProfile | null {
   return matchIn(SHIPPED_PROFILES, ex);
 }
 
+/** Why the shipped table has a profile for this frame's lens and is not
+ *  applying it: the body it was measured on, and the one the frame names.
+ *  @param ex  the frame's EXIF, or null.
+ *  @returns `withheldFor` over the shipped table — null when the table has no
+ *    such lens or a profile matched. Consumer: the shipped card and the
+ *    diagnostic, which must say this rather than offer to identify the lens. */
+export function shippedWithheld(ex: ExifSubset | null): { measuredOn: string; frame: string } | null {
+  return withheldFor(SHIPPED_PROFILES, ex);
+}
+
 /** The shipped profile for a lens the reader picked by hand, at a focal length
  *  and — when the file recorded one — the frame's own aperture. Built as a
- *  synthetic EXIF so the manual route cannot drift from the automatic one. */
+ *  synthetic EXIF so the manual route cannot drift from the automatic one.
+ *  The body test is skipped (`anyBody`): a pick is the reader choosing a
+ *  profile, which RawTherapee also allows by hand while its automatic search
+ *  refuses another body.
+ *  @param lensShort  the picker's short name ("16-50").
+ *  @param fl  the picked focal length in mm.
+ *  @param ex  the frame's EXIF, for its aperture; may be null.
+ *  @returns the matched profile, or null for an unknown lens or no focal length.
+ *  What the result must satisfy: the same profile `matchIn` gives an automatic
+ *    match with that lens, focal length and aperture on the table's own body —
+ *    `hotspotFromPick` and `lensCurveFor` rely on it for a tile to match. */
 export function findShippedManual(lensShort: string, fl: number, ex: ExifSubset | null): StoredProfile | null {
   const lens = modelFor(lensShort);
   if (!lens || !(fl > 0)) return null;
-  return matchIn(SHIPPED_PROFILES, { lens, focalLength: [fl, 1], fNumber: ex?.fNumber });
+  return matchIn(SHIPPED_PROFILES, { lens, focalLength: [fl, 1], fNumber: ex?.fNumber }, { anyBody: true });
 }
 
 /** The short name for a lens EXIF names, or null when it is not one of ours. */
@@ -98,9 +125,10 @@ export function hasColour(p: StoredProfile | null): boolean {
  *  every frame at any aperture at full strength (`matchAny`: a set of one is
  *  returned whatever the distance), so a measurement at 50mm f/13 landed on a
  *  57mm f/8 frame while a table with 44 anchors for that lens sat beside it able
- *  to interpolate exactly. `reach` is the matcher's own log distance — aperture
- *  ratio plus however far outside the measured focal range the frame falls — so
- *  the two are compared in the same units the matcher already chose the set in.
+ *  to interpolate exactly. `reach` is the matcher's own distance in
+ *  RawTherapee's units — one per stop outside the measured apertures, one per
+ *  doubling outside the measured focal range — so the two are compared in the
+ *  same units the matcher already chose the profile in.
  *
  *  BOTH halves stand down here, where provenance stands down colour alone, and
  *  the shipped table says why: on the 50-250 at 50mm the centre bump is 0.0241
@@ -148,10 +176,10 @@ export function lensHalves(
 } {
   const rough = measured ?? null;
   const theirs = shipped ?? null;
-  // ONE STOP is a ratio of root two in aperture, which is what `reach` measures
-  // in. Half a stop of margin keeps a near-tie with the reader rather than
-  // flipping to the table for a hundredth of a log unit.
-  const ONE_STOP = Math.log(Math.SQRT2);
+  // ONE STOP is 1 in the matcher's units (RawTherapee's `2 * log2` of the
+  // aperture ratio). Half a stop of margin keeps a near-tie with the reader
+  // rather than flipping to the table for a hundredth of a unit.
+  const ONE_STOP = REACH_STOP;
   const outreached =
     !!rough && !!theirs &&
     typeof rough.reach === "number" && typeof theirs.reach === "number" &&

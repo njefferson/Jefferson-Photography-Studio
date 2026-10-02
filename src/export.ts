@@ -2,8 +2,8 @@
 // uses a half-res proxy), applies the exact edit pipeline on the CPU, and saves
 // a JPEG or 16-bit TIFF to the device.
 
-import { lensGains } from "./lensflat";
-import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, aimedSampler, maskGroupsForRender, AIM_NOISE, AIM_TEXTURE, type BrushMask, type EditParams, type LensCurve, lensBin } from "./pipeline";
+import { lensGains, lensCurveForSource, turnOfOrientation } from "./lensflat";
+import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, aimedSampler, maskGroupsForRender, AIM_NOISE, AIM_TEXTURE, type BrushMask, type EditParams, type LensCurve, lensGeom, lensLerp, lensRadius } from "./pipeline";
 import { demosaicPixelLinearInto, type RawCfa } from "./raw/demosaic";
 import { readMosaicedCfa } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
@@ -460,14 +460,16 @@ export async function exportImage(
   // detail pass — so the export's order is the preview's. An 8-bit source has
   // no linear copy and keeps the correction inside the grade (lens passed on).
   const flat = "cfa" in src ? lensGains(lens ?? null, params.lensBypass ? 0 : (params.lensFix ?? 0)) : null;
-  const flatAspect = srcW / Math.max(1, srcH);
+  const flatGeom = flat ? lensGeom(srcW / Math.max(1, srcH), flat.c) : null;
   const rawSample: LinearSampler =
     "cfa" in src
       ? flat
         ? (x: number, y: number) => {
             demosaicPixelLinearInto(src.cfa, x, y, rawOut);
-            const i = lensBin((x + 0.5) / srcW, (y + 0.5) / srcH, flatAspect, flat.n);
-            rawOut[0] *= flat.gr[i]; rawOut[1] *= flat.gg[i]; rawOut[2] *= flat.gb[i];
+            // Between bins, on the flat's radius, about the profile's centre —
+            // the decode-time flat's own three reads (lensflat.ts).
+            const rr = lensRadius((x + 0.5) / srcW, (y + 0.5) / srcH, flatGeom!);
+            rawOut[0] *= lensLerp(flat.gr, rr, flat.n); rawOut[1] *= lensLerp(flat.gg, rr, flat.n); rawOut[2] *= lensLerp(flat.gb, rr, flat.n);
             return rawOut;
           }
         : (x: number, y: number) => { demosaicPixelLinearInto(src.cfa, x, y, rawOut); return rawOut; }
@@ -478,6 +480,17 @@ export async function exportImage(
           rawOut[2] = toLinear8(src.pixels[i + 2]);
           return rawOut;
         };
+  // THE CURVE THE GRADE CARRIES for a source with no linear copy: none for a
+  // mosaiced raw (the sampler above already laid the flat), the whole curve for
+  // a lossy-linear DNG, and the brightness half alone for a camera-rendered
+  // picture, turned upright with it when the browser turned a JPEG by its
+  // Orientation (lensCurveForSource, LN1).
+  const gradeLens = "cfa" in src
+    ? null
+    : lensCurveForSource(lens ?? null, {
+        isRaw: current.isRaw,
+        turn: file.kind === "jpeg" ? turnOfOrientation(readExifSubset(file.bytes)?.orientation) : 0,
+      });
   // Aspect = SOURCE dims (the uv we pass below are source-space), so the lens
   // fix stays circular in pixels regardless of display rotation. The clarity/
   // dehaze maps are rebuilt from the full-res source (cheap: coarse grid).
@@ -616,13 +629,13 @@ export async function exportImage(
   // amount is off or no sky was found, which is what makes it cost nothing on
   // the frames that do not need it.
   const skyMap = ((params.skySmooth ?? 0) > 0 || ((params.skyDepth ?? 0) > 0 && skyFine)) && sky
-    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, sky, flat, params.warp)
+    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, gradeLens, sky, flat, params.warp)
     : null;
   // A raw's pixels already carry the flat (above), so the grade gets no curve
   // for it; an 8-bit source still takes it here. The flat itself goes in as
   // `srcFlat`, so highlight recovery reads each pixel's clip as the sensor
   // recorded it — the same division the preview's shader makes.
-  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, skyMap, skyFine ?? null, flat);
+  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, gradeLens, skyMap, skyFine ?? null, flat);
   // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
   // pixel averages an ss×ss grid of source taps placed in OUTPUT space and
   // mapped through toSrcF — so the filter stays correct under crop, rotation,

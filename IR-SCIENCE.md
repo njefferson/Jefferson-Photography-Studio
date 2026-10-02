@@ -685,7 +685,29 @@ for all three is not neutral: a guide channel earns a coefficient only where
 its variance in the window is comparable to eps (He, Sun and Tang, TPAMI 2013,
 section 3), and the two colour shares vary 16–50× less than 0.005, so the
 filter follows luma alone. Scaling the channels to comparable spread, or an
-eps near 1e-4, is what lets colour separate. Built once per photograph beside the bitmap, cached per decoded
+eps near 1e-4, is what lets colour separate.
+
+**SHIPPED 2026-10-02: the shares are scaled to luma's spread inside the filter.**
+`refineSkyMask` multiplies each colour share by luma's frame spread over its own
+(1.4826 × MAD, over the whole guide), so the three channels share one range as
+the paper's RGB guide does (TPAMI eq. 19 puts one ε on every channel). The
+guide itself keeps its units, because the colour grow reads it as shares. ε
+stays 0.005 in luma's units, which puts it at 0.005/k² on the shares: k² is
+178/109 on NIR_1651, 68/39 on NIR_1667 and 146/70 on NIR_1376 (red/blue), so
+3e-5 to 1.3e-4 in their own units — the "near 1e-4" the measurement asked for,
+reached by scaling rather than by a second constant. Measured on those three
+owner raws through the app's own decode, lens flat, seed and guide, in the band
+within 24 guide pixels of the seed's edge, against a key from the confident
+sky's own shares (per-axis median and MAD: sky inside 3 spreads, not-sky past 6):
+NIR_1651 edge coverage of keyed sky 67.6% to 68.8%, spill onto keyed not-sky
+19.0% to 15.9%; NIR_1667 69.2% to 70.6%, spill 31.3% to 28.9%; NIR_1376 81.7%
+to 84.7%, spill 11.2% to 7.7%. Pushing ε down to 1e-4 in luma's units gains at
+most 1.3 more points of coverage and 0.8 of spill and raises the selection's
+grain in that band (mean distance of a sky pixel's weight from its 3×3 mean)
+from 16.2/11.7/18.4 to 20.3/17.2/19.9 thousandths, against 7.9/5.2/5.7 shipped
+before — so the constant stayed where it was and only the scale moved. Opened at
+3× on the crowns of all three: the crown's own pale tips leave the selection,
+the sky up to them joins it, and no grain shows in the selected sky. Built once per photograph beside the bitmap, cached per decoded
 image (a WeakMap, so a set of forty tiles never grows one twice), uploaded as
 one R8 texture and sampled by the brush sampler on the CPU — the same texel-
 centre bilinear the shader does.
@@ -3517,7 +3539,8 @@ Failure modes the references name, rather than ones found here:
   is added to the flat frame layer. A single stored strength is not enough.
 - **What the flat actually depends on.** RawPedia lists camera, lens, **focal
   distance**, aperture, and lens tilt/shift. This app matches focal *length* and
-  aperture; focal distance is unmatched.
+  aperture; focal distance is unmatched. (From 2026-10-02 it is weighed when the
+  file records one, below; the Nikon Z 50 does not.)
 - **The flat is deliberately smoothed before use.** RawPedia's default Blur
   Radius is 32, "usually sufficient to get rid of localized variations of raw
   data due to noise"; radius 0 is reserved for dust removal and carries the
@@ -3542,14 +3565,59 @@ stack and the conversion filter making or removing the spot on the same lens.
 EXIF records no conversion, so a second body of the same model cannot be told
 apart from the file at all.
 
+**SHIPPED 2026-10-02: the match is RawTherapee's, and the colour half is for raw
+data only.** Four changes, each to the reference's own behaviour.
+
+- **Body and lens both, or nothing.** `matchIn` (`src/lensstore.ts`) considers
+  only profiles whose camera string equals the frame's make and model, as
+  `ffInfo::distance` does; a profile from another body, or a frame that names
+  no camera, matches nothing, both halves at once. The card says which body the
+  profiles were measured on and which the photograph names (`withheldFor`), so
+  a lens the app knows is never reported as one it could not identify. A lens
+  the reader PICKS by hand crosses bodies, as RawTherapee's manual flat-field
+  choice does. What this still cannot see is a second Z 50 converted
+  differently: EXIF carries no conversion.
+- **A stop weighs what a doubling of focal length does.** Reach is
+  `2·log2` of the aperture ratio against `log2` of the focal ratio, combined as
+  a distance — RawTherapee's units, one per stop. It was |ln| on both, which
+  made a stop half a doubling.
+- **The two apertures that bracket the frame are mixed**, in 1/N, as lensfun
+  places a calibration on its `a = 4 / aperture` axis (`lens.cpp`,
+  `__vignetting_dist`); each side is first brought to the frame's focal length
+  the way a single set always was. It took the single nearest aperture set
+  whole — while the table's own numbers say the brightness half is the one that
+  moves with aperture (the 50-250 at 50mm: centre bump 0.0241 at f/8, 0.0502 at
+  f/13). A bracket whose ends had to reach further in focal length than the
+  nearest single set stands down to that set (the owner's NIR_1688, 91mm f/5:
+  f/4.5 is measured only at 50mm and f/5.3 only at 130mm).
+- **Focus distance enters the match when the file records it** (EXIF
+  SubjectDistance), weighed in reciprocal distance as lensfun weighs it — one
+  unit per dioptre, so 1 m against infinity costs about what a stop does — and
+  stored on a profile only when every one of its flats recorded one. The rig
+  does not split a profile by distance, so it chooses between profiles rather
+  than interpolating within one; on every file this camera writes the term is
+  absent and changes nothing.
+- **A camera-rendered source takes no colour half** (`lensCurveForSource`,
+  `src/lensflat.ts`). The colour curves are ratios between camera-native
+  channels measured on raw linear data; a camera JPEG has been through the
+  camera's matrix and tone curve, where the same ratios read 3.5x the raw answer
+  in red and 2.3x in blue (§ above on `source`). RawTherapee applies a flat
+  field to raw files only, and darktable applies gain maps in `rawprepare`, to
+  raw data. A JPEG keeps the brightness half, which is what moved least between
+  the two (at most 4.3 points at the centre), and the card says why the colour
+  does not move.
+
 ### 9d. What this app does, measured on its own shipped table
 
 - The colour curve is applied at **full strength automatically** from an EXIF
   match, on every raw file, with no per-image scale.
 - It is indexed with `floor(r * n)` over **80 hard radial bins and no
-  interpolation** — the opposite of the deliberate smoothing above.
+  interpolation** — the opposite of the deliberate smoothing above. (Shipped
+  2026-10-02: read between bin centres on every path, 9g.)
 - Its radius is measured from the **frame's geometric centre on uncropped uv**,
   against Kolari on centring and rotation and LifePixel on aperture-shaped spots.
+  (Shipped 2026-10-02: from the hot spot's own centre where the rig placed one,
+  and to the FLAT's corner rather than the frame's, 9g.)
 - **It is not area-neutral.** Divided by its own area-weighted mean the residual
   cast would be zero; as shipped it moves the whole frame's red-against-blue by
   **+1.49%** on the blend matched to the lone-oak frame (50-250 at 57mm f/8,
@@ -3613,7 +3681,9 @@ profile-driven hot-spot correction. This app does.
 The normalising term went in on 2026-09-17, in both renderers, from one exported
 helper (`lensAreaMean` in `src/pipeline.ts`) that states in its contract that
 `compileEdit` and `gl.ts`'s `setLensCurve` are the only two callers allowed and
-must agree. The curve is multiplied by its own area-weighted mean before it is
+must agree. (From 2026-10-02 it has one caller, `lensGainsFor`, whose tables
+the shader uploads rather than rebuilding, and its mean is of the gain as it
+lands — read between bins, about the profile's centre.) The curve is multiplied by its own area-weighted mean before it is
 applied; the shipped profile arrays are untouched.
 
 **The weights are the SENSOR's, not the frame's**, which is a decision rather
@@ -3664,6 +3734,48 @@ ways it changed this frame's numbers by nothing at four significant figures,
 because it only acts at ring boundaries and this frame shows no banding. Eighty
 hard steps still have no support in any reference and it stays owed, but it
 buys no picture today and it costs a texture-filtering change in the shader.
+
+**SHIPPED 2026-10-02, and both reasons above turned out not to hold.** That
+frame's matched profile is nearly flat, which is why twenty resamplings moved
+nothing; across the shipped table the gain steps by up to **5.8%** between
+neighbouring bins (16-50 at 25mm f/16, bins 1-2) and by over 1% in **39 places
+across 8 profiles** — terraces about 42 px apart at full size. And the cost was
+of a 32-bit float texture, which WebGL 2 cannot filter without an extension;
+half-float formats are texture-filterable in core (ES 3.0, Table 3.13), and
+since 021 a raw takes the flat on the CPU anyway. What shipped, with three more
+changes beside it:
+
+- **Between bin centres, everywhere.** `lensLerp` (`src/pipeline.ts`) reads a
+  table linearly between bin centres, clamped to the end bins, which is what
+  the DNG GainMap opcode states ("values are interpolated using bi-linear
+  interpolation") and what darktable's `rawprepare` does. The decode-time flat,
+  the raw export's sampler and `compileEdit` call it; the shader samples the
+  same table from an RGB16F texture with LINEAR filtering and CLAMP_TO_EDGE,
+  which is the same arithmetic, and `compileEdit` reads the half-rounded copy
+  the texture holds so the two read one set of numbers. The gains are built
+  once, by `lensGainsFor`, for every path, the shader's included.
+- **The radius is the FLAT's.** Every flat is shot full-frame and its r = 1 is
+  the 3:2 sensor's corner; a frame of another shape (the camera's 1:1 or 16:9
+  image area, or a portrait JPEG) used to put r = 1 at its own corner, so a
+  square crop read the ring at 0.78 of the half-diagonal as the last bin.
+  `lensGeom` maps a frame onto the sensor as the camera crops it — the largest
+  centred window of that aspect — as lensfun rescales a calibration made at
+  another aspect. A 3:2 frame with no centre reads exactly the old radius.
+- **The hot spot's centre is measured and stored.** The rig estimates it in
+  each flat (`spotCentre`, `src/lensprofile.ts`): a plane fitted outside the
+  reference ring's inner edge removes the sky's ramp, and the excess over the
+  ring is weighted above half its peak, its centroid the centre; refused past a
+  quarter of the half-diagonal or under a 1% excess. Each frame is measured
+  about its own estimate, a profile stores the per-axis median when most of its
+  frames placed one, and every applier lays the correction about it. An old
+  profile carries none and is applied about the middle, as it was measured. The
+  DNG `FixVignetteRadial` opcode and lensfun both carry an optical centre for
+  this; Kolari (9a) is why.
+- **The diagnostic and the card report what lands**, a camera JPEG's missing
+  colour half included.
+
+Seen on a photograph at full size is still owed: this step was made without
+renders, and the release that carries it verifies it as a whole.
 
 ### 9f. What is still NOT read
 
@@ -4250,10 +4362,17 @@ toward that map by the sky bitmap's own weight, luma exactly preserved. The
 bitmap is `buildSkyMask`'s, built once per photograph from the gray-world render
 so the selection cannot drift as the photo is graded. The GPU samples the same
 bytes as an RGB8 texture and the export samples them bilinearly — the local-map
-pattern, so the two agree to filtering error. Dense, not strided: the 22 px
-texel footprint IS the smoothing radius, and the lattice trap 4c-xii and 4c-xxii
-record never enters it. Aerochrome carries it at 1; Pink IR, which has no
-mixer, does not need it.
+pattern, so the two agree to filtering error. The 22 px texel spacing is the
+smoothing radius. (Corrected 2026-10-02: this said each texel averages its
+footprint, "dense, not strided". It does not. A texel is the mask-weighted mean
+of a 2×2 grid of samples at a quarter and three quarters of the texel, about
+11 px apart on a 2800 px frame, each a pixel of the denoiser's output — so with
+Denoise on each tap carries the bilateral's own 13 px average, and with it off
+a tap is one pixel. That is a strided four-tap estimate on a pre-filtered
+source, and mottle finer than the tap spacing that survives the pre-pass can
+alias into the map; `src/skymap.ts` says the same. The numbers below were
+measured through the stage as it is.) Aerochrome carries it at 1; Pink IR,
+which has no mixer, does not need it.
 
 **MEASURED ACROSS TEN FRAMES, dark third of the sky, chroma residual p95 at the
 artefact's 12 px scale, both controls in front of every row.** Three frames have
@@ -4269,8 +4388,8 @@ measured further here.
 
 **THOSE ARE THE PROTOTYPE'S NUMBERS, AND THE SHIPPED STAGE READS LOWER.** The
 ten-frame sweep smoothed the rendered planes with a dense 17 px box (R8) to
-choose the radius; the shipped map is a 22 px texel box bilinearly upsampled,
-a wider kernel. Measured on the same population of NIR_3406 through the export
+choose the radius; the shipped map is four pre-passed taps per 22 px texel,
+bilinearly upsampled — a wider kernel, though not a box (above). Measured on the same population of NIR_3406 through the export
 path itself, the shipped stage reads **15.9 → 2.2** at the 12 px lag with the
 mean held 36.9 → 37.0 — a quarter of Pink IR's bare sky, not half. The 2.50
 patch note carries the prototype's 4.7, which understates what shipped. A
@@ -4690,8 +4809,14 @@ Navigation", International Journal of Advanced Robotic Systems 10(10), 2013
 - `t` is chosen by **optimising an energy function** over a one-dimensional
   search, `Jn(t) = 1 / (γ|Σs| + |Σg| + γ|λ1ˢ| + |λ1ᵍ|)`, where Σ is the 3×3
   covariance of the pixels in each region, λ1 its largest eigenvalue, and γ = 2
-  the emphasis on the sky's homogeneity. A border that leaves a uniform region
-  above it and a varied one below scores high. Its ancestor is Ettinger,
+  the emphasis on the sky's homogeneity. It penalises the spread of BOTH
+  regions — covariance volume plus principal variance — with the sky's
+  weighted twice, so it favours a border that leaves both compact and, among
+  candidates, prefers leaving heterogeneity below rather than above. It never
+  rewards a varied ground: a more varied ground always lowers Jn. (This line
+  said "a uniform region above it and a varied one below scores high" until
+  2026-10-02; the paper's own words are "maximizing equation (1) can minimize
+  the intra-class variance of the ground and sky distributions".) Its ancestor is Ettinger,
   Nechyba, Ifju and Waszak's horizon energy for micro air vehicles (2002).
 - Two post-processing tests. **§2.3.1**, a photograph with no sky in it: the
   border averages less than H/30, or less than H/10 with an average absolute
@@ -4701,7 +4826,15 @@ Navigation", International Journal of Advanced Robotic Systems 10(10), 2013
   eq. 15 and codes `image.shape[0]/4`, and it is what `SKY_NO_SKY_AVE_JAGGED`
   in `src/skyhorizon.ts` still carries. **§2.3.2**, columns with no sky in them: where the border
   steps by more than H/3 somewhere, split the region above it into two clusters
-  and clear the columns whose contents belong to the cluster nearer the ground.
+  by k-means and take the one less like the ground as the TRUE SKY. Algorithm 3
+  then takes as its inputs the true sky's mean and covariance and the GROUND
+  region's (μs_true, Σs_true, μg, Σg — the other cluster is not an input): for
+  every pixel above b(x) it compares its Mahalanobis distance to the true sky
+  under Σs_true with its distance to the ground under Σg, counts the pixels
+  nearer the sky, and clears the column when that count falls below a bound of
+  b(x) (the notebook codes b/2). (This line said the columns are cleared whose
+  contents "belong to the cluster nearer the ground" until 2026-10-02, which is
+  the app's substitution, listed below, not the paper's test.)
 
 **Why it is the right instrument for infrared specifically.** Gradient is the
 one cue this repository has measured as reliable on these frames and it is the
@@ -4715,8 +4848,9 @@ strongly and a canopy is all structure. The separation the method needs is
 wider in infrared than in the visible, not narrower.
 
 **FOUR THINGS HAD TO CHANGE, and each one is a measurement rather than a
-preference.** (Two further departures were made and not listed here until
-2026-10-01; they follow the four, marked as unmeasured.)
+preference.** (Three further departures were made and not listed here until
+2026-10-01 and 2026-10-02; they follow the four, the first two marked as
+unmeasured and the third with the measurement that forced it.)
 
 - **The thresholds are quantiles of the frame's own gradients, not numbers.**
   The paper searches t over 5..600 in 120 steps, stating 1443 as the
@@ -4778,6 +4912,20 @@ preference.** (Two further departures were made and not listed here until
   the darkest region and the separation measured in `sky.ts` (sky 0.004–0.03
   against foliage 0.1–0.4) was taken in linear. Owed: both versions measured
   on the corpus before either is called right.
+- **Unlisted until 2026-10-02: the column test compares two CENTROIDS under
+  EUCLIDEAN distance, not true sky against ground under Mahalanobis.**
+  `refineColumns` in `src/skyhorizon.ts` decides which k-means cluster is the
+  ground-like FAKE one by each centroid's Mahalanobis distance under the
+  ground's covariance (`SKY_GROUND_CHI2`), and then clears a column when most
+  of the pixels above its border are nearer, in plain Euclidean distance in the
+  luma/chroma ×255 space, to the fake cluster's centroid than to the real one's.
+  The paper's Algorithm 3 measures each pixel against the true sky under
+  Σs_true and against the ground under Σg. The reason is the code's own, and it
+  was a measurement: a sky cluster's own covariance is tiny, so a Mahalanobis
+  distance under it is enormous for anything a little off it, and "is this
+  pixel more like the sky or the ground" came back "the ground" for real sky on
+  every frame with a gradient in it — the reference test, wired as written,
+  cleared real sky.
 
 **AND THE METHOD HAS A DOMAIN, WHICH IT ANNOUNCES.** The paper assumes the
 optimum is interior — its own words are that Jn(t) is nearly constant once t

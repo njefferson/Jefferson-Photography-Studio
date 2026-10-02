@@ -21,7 +21,6 @@ src/decodeClient.ts:decodeOffThread
 src/decodeClient.ts:decodeLanes
 src/decodeClient.ts:decodeLaneTarget
 src/diagnostic.ts:buildDiagnostic
-src/exif.ts:readExifSubset
 src/exif.ts:ifd0ExtraEntries
 src/exif.ts:exifIfdEntries
 src/exif.ts:externSize
@@ -63,8 +62,6 @@ src/heal.ts:detectSpots
 src/histogram.ts:drawHistogram
 src/hotspot.ts:lensNames
 src/hotspot.ts:flAnchors
-src/hotspot.ts:findShipped
-src/hotspot.ts:findShippedManual
 src/hotspot.ts:shortFor
 src/hotspot.ts:hasColour
 src/hotspot.ts:bumpToLinear
@@ -79,9 +76,6 @@ src/import.ts:refineKind
 src/lensbackup.ts:backupState
 src/lensbackup.ts:backupSentence
 src/lensprofile.ts:shapeProblem
-src/lensprofile.ts:radialMeans
-src/lensprofile.ts:profileFrame
-src/lensprofile.ts:averageProfiles
 src/lensrig.ts:wireLensRig
 src/look.ts:coerceLook
 src/look.ts:cleanName
@@ -129,7 +123,6 @@ src/pipeline.ts:applyGrain
 src/pipeline.ts:creativeVignette
 src/pipeline.ts:applyCreativeVignette
 src/pipeline.ts:lensGain
-src/pipeline.ts:lensBin
 src/pipeline.ts:toLinear8
 src/platform.ts:device
 src/platform.ts:deviceNoun

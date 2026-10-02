@@ -26,6 +26,7 @@ import { markBackedUp, backupState, backupSentence } from "./lensbackup";
 import { requestPersistence } from "./session";
 import { keepAwake, granted as wakeGranted, supported as wakeSupported } from "./wakelock";
 import { loadMeasured, putMeasured, frameKey } from "./framecache";
+import { turnOfOrientation } from "./lensflat";
 
 declare const __APP_VERSION__: string;
 
@@ -475,7 +476,7 @@ export function wireLensRig(root: ParentNode): void {
       // --- PASS ONE: which lens is each frame, read from its head only ---------
       // 256 KB out of a 25 MB raw, so a big zip is sorted in seconds rather than
       // decoded for minutes to learn what it already says in its EXIF.
-      const seen: { f: Candidate; key: string; model: string; short: string; fl: number; ap: number }[] = [];
+      const seen: { f: Candidate; key: string; model: string; short: string; fl: number; ap: number; orientation?: number; dist?: number }[] = [];
       /** Every lens the picked set CONTAINS, whether or not it produces a profile. */
       const sawLens = new Map<string, { model: string; frames: number; fls: Set<number>; aps: Set<string> }>();
       let camera = "";
@@ -497,7 +498,7 @@ export function wireLensRig(root: ParentNode): void {
           // frames averaged into one 50mm profile spanning f/4.5 to f/22, which
           // is a survey of seven different behaviours reported as one number.
           const apKey = Number.isFinite(ap) ? `f${ap.toFixed(1)}` : "f?";
-          seen.push({ f: files[i], key: `${short}@${Math.round(fl)}@${apKey}`, model, short, fl: Math.round(fl), ap });
+          seen.push({ f: files[i], key: `${short}@${Math.round(fl)}@${apKey}`, model, short, fl: Math.round(fl), ap, orientation: ex?.orientation, dist: ex?.subjectDistance });
           // Every lens the SET contains, whether or not it ends up producing a
           // profile. Reporting only what came out is how a lens can be shot,
           // picked, refused frame by frame and never mentioned again.
@@ -540,7 +541,7 @@ export function wireLensRig(root: ParentNode): void {
       }
 
       // --- PASS TWO: decode and measure only those ----------------------------
-      const groups = new Map<string, { frames: FrameProfile[]; model: string; short: string; fl: number; aps: number[] }>();
+      const groups = new Map<string, { frames: FrameProfile[]; model: string; short: string; fl: number; aps: number[]; dists: number[] }>();
       let unusable = 0;
       // WHAT A PREVIOUS RUN ALREADY MEASURED. Read once, not per frame. A frame
       // that is in here costs nothing this time: the decode is the expensive
@@ -583,7 +584,10 @@ export function wireLensRig(root: ParentNode): void {
             // better". Four of those sixteen were refused for clipping that is a
             // property of the preview's tone curve, not of the sensor data.
             const img = await decodeOffThread({ name: c.f.name, kind: refineKind(sniff(bytes), c.f.name), bytes, looksTranscoded: false });
-            prof = profileFrame(img);
+            // A camera JPEG arrives turned upright by the browser, so the spot's
+            // centre is found in turned pixels and turned back to the sensor's
+            // axes before it is stored (profileFrame); raw data is never turned.
+            prof = profileFrame(img, img.isRaw ? 0 : turnOfOrientation(c.orientation));
             // AWAITED, deliberately. The row has to be on disk before the next
             // decode starts, because the moment being survived is the one right
             // after this frame — a sleep, a reload, a tab the system took back.
@@ -592,9 +596,10 @@ export function wireLensRig(root: ParentNode): void {
           const where = `${c.model} at ${c.fl}mm`;
           if (!prof.usable) { unusable++; drop(c.short, prof.why); profRow(c.f.name, "not used", `${prof.why}. ${where}.`); continue; }
           let g = groups.get(c.key);
-          if (!g) { g = { frames: [], model: c.model, short: c.short, fl: c.fl, aps: [] }; groups.set(c.key, g); }
+          if (!g) { g = { frames: [], model: c.model, short: c.short, fl: c.fl, aps: [], dists: [] }; groups.set(c.key, g); }
           g.frames.push(prof);
           if (Number.isFinite(c.ap)) g.aps.push(c.ap);
+          if (typeof c.dist === "number" && c.dist > 0) g.dists.push(c.dist);
           const cr = prof.kr[0], cb = prof.kb[0];
           profRow(c.f.name, c.key,
             `The centre's colour is off by ${pct(Math.abs(cr - 1))} in red and ${pct(Math.abs(cb - 1))} in blue against the same frame's edges. ` +
@@ -651,7 +656,7 @@ export function wireLensRig(root: ParentNode): void {
         return;
       }
 
-      const profiles: Record<string, { falloff: number[]; kr: number[]; kb: number[]; bump_range: number[]; frames: number; source: string; apertures: string }> = {};
+      const profiles: Record<string, { falloff: number[]; kr: number[]; kb: number[]; bump_range: number[]; frames: number; source: string; apertures: string; centre?: number[]; dist?: number }> = {};
       const lensMap: Record<string, string> = {};
       const anchors: Record<string, number[]> = {};
       for (const [key, g] of [...groups].sort((a, b) => a[0].localeCompare(b[0]))) {
@@ -673,6 +678,12 @@ export function wireLensRig(root: ParentNode): void {
           // the profile came from frames half of which had been set aside.
           source: a.space,
           apertures: g.aps.length ? [...new Set(g.aps.map((x) => "f/" + x.toFixed(1)))].sort().join(" ") : "unrecorded",
+          // Where the spot sat, when most frames could place it (averageProfiles),
+          // and the focus distance when every frame recorded one — both what the
+          // matcher reads, lensstore.ts.
+          ...(a.centre ? { centre: round5(a.centre) } : {}),
+          // Averaged in reciprocal distance, the axis the matcher weighs it on.
+          ...(g.dists.length && g.dists.length === g.frames.length ? { dist: Number((g.dists.length / g.dists.reduce((x, y) => x + 1 / y, 0)).toFixed(3)) } : {}),
         };
         lensMap[g.model] = g.short;
         (anchors[g.short] ??= []).push(g.fl);

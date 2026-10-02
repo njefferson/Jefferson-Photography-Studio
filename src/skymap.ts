@@ -25,10 +25,20 @@
 // blend toward the SAME bytes and stay within filtering error of each other.
 // Two differences, both deliberate. It is rebuilt PER EDIT rather than per
 // image, because it is a map of the output — which is why it stays small. And
-// the downsample IS the smooth: at 128 texels across, one texel averages a
-// 20–25 px footprint of a 2800 px frame, which is the measured radius, so no
-// further pass is needed and a strided kernel — the lattice trap 4c-xii and
-// 4c-xxii both record — never enters it.
+// the downsample is most of the smooth: at 128 texels across, one texel spans
+// a 20–25 px footprint of a 2800 px frame, which is the measured radius.
+//
+// A TEXEL IS NOT AN AVERAGE OF THAT FOOTPRINT, and this header said it was
+// until 2026-10-02. It is the mask-weighted mean of FOUR samples, a 2x2 grid
+// at a quarter and three quarters of the texel (SUB below) — about 11 px apart
+// on that frame. Each sample is a pixel of the PRE-PASSED source (the sampler
+// the caller hands in is the denoiser's, so with Denoise on each tap already
+// carries the bilateral's own average over its 13 px window, and with it off a
+// tap is one pixel), and bilinear upsampling then blends between texels. So it
+// is a four-tap estimate on a pre-filtered source, a strided decimation rather
+// than a box: mottle finer than the tap spacing that the pre-pass leaves can
+// alias into the map (decimation without a low-pass, the standard result). The
+// measurements below were taken through it as it is.
 import { sampleWarp, warpIsEmpty, type WarpField } from "./warp";
 import { compileEdit, SKY_CHROMA_RANGE, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, smooth01, rgb2hsv, type EditParams, type BrushMask, type LensCurve, type LocalMap, type SkyMap, type SourceFlat } from "./pipeline";
 export { sampleSkyMap, decSkyChroma, type SkyMap } from "./pipeline";

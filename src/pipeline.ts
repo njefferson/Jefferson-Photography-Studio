@@ -6,7 +6,7 @@ import type { HealSpot } from "./heal";
 import type { WarpField } from "./warp";
 import { sampleLut3d } from "./lut3d";
 import { srgbFromLinear, srgbToLinear } from "./icc";
-import { fromHalf } from "./half";
+import { toHalf, fromHalf } from "./half";
 export type { HealSpot };
 
 export interface EditParams {
@@ -2035,6 +2035,110 @@ export interface LensCurve {
    *  applied. This line used to give the bump its own strength, `p.hsFix`,
    *  after the two had become one (corrected 2026-09-29). */
   bump?: ArrayLike<number>;
+  /** Where the hot spot's centre sits, as an offset `[x, y]` from the frame's
+   *  geometric centre (x right, y down) in units of the flat's half-diagonal,
+   *  in the axes of the PIXELS this curve is applied to. Absent is the
+   *  geometric centre, which is what every profile measured before the rig
+   *  estimated one was taken about. The rig stores it in the sensor's own axes;
+   *  `lensCurveForSource` (lensflat.ts) turns it into a browser-rotated
+   *  camera JPEG's axes. The DNG FixVignetteRadial opcode and lensfun both
+   *  carry an optical centre for the same reason (IR-SCIENCE.md 9a: Kolari,
+   *  "the hotspot is not always perfectly centered"). */
+  centre?: ArrayLike<number>;
+}
+
+/** THE SHAPE OF THE FRAME A PROFILE WAS MEASURED ON: the sensor's 3:2. Every
+ *  flat is shot full-frame on this camera and its radius is 1 at THAT frame's
+ *  corner (lensprofile.ts, NBINS). A photograph cropped to another aspect in
+ *  the camera — the Z 50's 1:1 or 16:9 image area — is a centred window on the
+ *  same sensor, so its own corner is NOT the flat's corner. */
+export const LENS_FLAT_ASPECT = 3 / 2;
+
+/** How a frame maps onto the flat it is corrected with: the frame's aspect,
+ *  the hot spot's centre in frame-height units, and one over the flat's
+ *  half-diagonal in the same units. Built once per frame by `lensGeom`. */
+export interface LensGeom {
+  ax: number;
+  cx: number;
+  cy: number;
+  invD: number;
+}
+
+/**
+ * WHERE THE FLAT'S CORNER IS, FOR A FRAME OF THIS SHAPE.
+ *
+ * The radius used to be measured to the corner of the frame being corrected,
+ * so a square crop of the 3:2 sensor put r = 1 at 0.78 of the half-diagonal
+ * the profile was measured against and laid every ring at the wrong distance.
+ * lensfun rescales a calibration made at another crop or aspect ratio for the
+ * same reason (modifier.cpp, "a calibration is used that was made with another
+ * sensor size, i.e. different crop factor and/or aspect ratio"). The crop is
+ * taken as the camera takes it: the largest centred window of that aspect on
+ * the 3:2 sensor, so a frame narrower than 3:2 keeps the sensor's short side
+ * and one wider keeps its long side. The long side follows the frame's own
+ * long side, so a portrait camera JPEG (rotated by the browser) maps too.
+ *
+ * @param aspect  the frame's width over height.
+ * @param centre  `LensCurve.centre` in the frame's own axes, or absent for the
+ *   geometric centre.
+ * @returns the geometry `lensRadius` reads. For a 3:2 frame with no centre the
+ *   radius is exactly the old one, `2·|d| / sqrt(a² + 1)`, so every photograph
+ *   this camera shoots at its native aspect keeps its rings where they were.
+ * Consumers: `lensRadius` on the CPU (compileEdit, lensflat.ts, the export's
+ *   raw sampler, lensAreaMean) and the shader's u_lensC / u_lensInvD, which
+ *   gl.ts fills from this same function so the two cannot disagree.
+ */
+export function lensGeom(aspect: number, centre?: ArrayLike<number> | null): LensGeom {
+  const a = aspect > 0 && Number.isFinite(aspect) ? aspect : 1;
+  const L = Math.max(a, 1), S = Math.min(a, 1);
+  const Q = LENS_FLAT_ASPECT;
+  const long = L / S <= Q ? Q * S : L;
+  const short = L / S <= Q ? S : L / Q;
+  const D = 0.5 * Math.sqrt(long * long + short * short);
+  const ox = centre && Number.isFinite(Number(centre[0])) ? Number(centre[0]) : 0;
+  const oy = centre && Number.isFinite(Number(centre[1])) ? Number(centre[1]) : 0;
+  return { ax: a, cx: ox * D, cy: oy * D, invD: 1 / D };
+}
+
+/** The normalised radius of image-uv (u, v) on the flat: 0 at the hot spot's
+ *  centre, 1 at the flat's corner distance from it.
+ *  @param u, v  image-uv, 0..1 across the frame's width and height.
+ *  @param g  from `lensGeom` for this frame.
+ *  @returns r ≥ 0; may pass 1 at a far corner when the centre is offset, which
+ *    `lensLerp` reads as the last bin, as the shader's CLAMP_TO_EDGE does.
+ *  Mirrored by the shader line that builds `r` from u_lensC and u_lensInvD. */
+export function lensRadius(u: number, v: number, g: LensGeom): number {
+  const dx = (u - 0.5) * g.ax - g.cx, dy = v - 0.5 - g.cy;
+  return Math.sqrt(dx * dx + dy * dy) * g.invD;
+}
+
+/**
+ * A per-bin table read at radius r, LINEARLY BETWEEN BIN CENTRES.
+ *
+ * It was `floor(r · n)` — eighty hard rings. Across the shipped table the gain
+ * steps by up to 5.8% between neighbouring bins (16-50 at 25mm f/16, bins 1-2)
+ * and by over 1% in 39 places across 8 profiles: terraces about 42 px apart at
+ * full size. The DNG GainMap opcode says "values are interpolated using
+ * bi-linear interpolation", and darktable's rawprepare interpolates its gain
+ * maps the same way; IR-SCIENCE.md 9g.
+ *
+ * @param t  the table, one value per bin; bin i's centre is at r = (i + 0.5)/n.
+ * @param r  the radius from `lensRadius`.
+ * @param n  how many bins `t` holds (its length).
+ * @returns the value at r: the first bin inside the first half-bin, the last
+ *   past the last bin's centre, a straight line between centres elsewhere.
+ * What the result must satisfy: it is EXACTLY what the shader's linear sample
+ *   of the same table returns with CLAMP_TO_EDGE at s = r (texel i0 = floor(r·n
+ *   − 0.5), weight its fraction, both indices clamped) — compileEdit hands it
+ *   the half-rounded table the GPU holds, and the parity walk holds the two.
+ */
+export function lensLerp(t: ArrayLike<number>, r: number, n: number): number {
+  const f = r * n - 0.5;
+  const i = Math.floor(f);
+  const w = f - i;
+  const i0 = i < 0 ? 0 : i > n - 1 ? n - 1 : i;
+  const i1 = i + 1 < 0 ? 0 : i + 1 > n - 1 ? n - 1 : i + 1;
+  return t[i0] * (1 - w) + t[i1] * w;
 }
 
 /** HOW FAR A MEASURED PROFILE MAY MOVE ONE CHANNEL, either way.
@@ -2070,16 +2174,6 @@ export function lensGain(k: number, strength: number): number {
   return g > LENS_GAIN_HI ? LENS_GAIN_HI : g < LENS_GAIN_LO ? LENS_GAIN_LO : g;
 }
 
-/** The bin a pixel falls in. `r` is the same normalised radius the hot-spot
- *  uses — 1 at the frame corner. */
-export function lensBin(u: number, v: number, aspect: number, n: number): number {
-  const a = aspect > 0 ? aspect : 1;
-  const dx = (u - 0.5) * a, dy = v - 0.5;
-  const r = (2 * Math.sqrt(dx * dx + dy * dy)) / Math.sqrt(a * a + 1);
-  const i = Math.floor(r * n);
-  return i < 0 ? 0 : i > n - 1 ? n - 1 : i;
-}
-
 /** THE TERM THIS APP WAS MISSING, AND IT IS NOT A NEW IDEA.
  *
  *  Takes `k`, one colour curve (red or blue against green, per radial bin).
@@ -2087,9 +2181,10 @@ export function lensBin(u: number, v: number, aspect: number, n: number): number
  *  strength — 1 for a curve that only redistributes colour across the frame,
  *  and anything else for one that also shifts the whole frame.
  *
- *  THE CALLER MUST MULTIPLY `k` BY THIS before applying it, and both renderers
- *  have to do it or they render different pictures: `compileEdit` below and
- *  `setLensCurve` in gl.ts are the two, and there must never be a third.
+ *  THE CALLER MUST MULTIPLY `k` BY THIS before applying it, and there is one
+ *  caller: `lensGainsFor` below, whose tables every applier reads — the shader
+ *  included, since gl.ts uploads those tables rather than building its own
+ *  (it carried a second copy of this multiply until 2026-10-02).
  *  Multiplying k rather than dividing the gain is deliberate — it stays correct
  *  at every strength, because lensGain interpolates in k and not in the gain.
  *
@@ -2117,32 +2212,54 @@ export function lensBin(u: number, v: number, aspect: number, n: number): number
  *  cropped frame against its own crop would be normalising against a flat
  *  nobody shot. 3:2 is the sensor, and it is why this takes no aspect.
  *
+ *  AND THE MEAN IS OF WHAT LANDS: the gain read between bin centres
+ *  (`lensLerp`) about the profile's own centre, over the 3:2 sensor — the
+ *  correction every applier lays since bins are interpolated and the hot spot
+ *  is placed where the rig found it. A mean of the eighty bin values would be
+ *  the mean of a correction nothing applies.
+ *
+ *  @param centre  the profile's `LensCurve.centre` in the SENSOR's axes, or
+ *    absent for the geometric centre.
+ *
  *  The shipped profile arrays are never touched — this is applied at render
  *  time, so `hotspotProfiles.ts` keeps exactly what was measured. */
-export function lensAreaMean(k: ArrayLike<number> | undefined | null): number {
+export function lensAreaMean(k: ArrayLike<number> | undefined | null, centre?: ArrayLike<number> | null): number {
   const n = k ? k.length : 0;
   if (!n || n < 2) return 1;
-  const w = new Float64Array(n), G = 240, a = 3 / 2;
-  for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) w[lensBin((x + 0.5) / G, (y + 0.5) / G, a, n)]++;
-  let sw = 0, m = 0;
-  for (let i = 0; i < n; i++) sw += w[i];
-  if (!(sw > 0)) return 1;
-  for (let i = 0; i < n; i++) m += (w[i] / sw) * lensGain(k![i], 1);
-  return Number.isFinite(m) && m > 1e-3 ? m : 1;
+  const key = centre ? `${Number(centre[0])},${Number(centre[1])}` : "0,0";
+  const seen = AREA_MEANS.get(k as object);
+  const hit = seen?.get(key);
+  if (hit !== undefined) return hit;
+  const gain = new Float64Array(n);
+  for (let i = 0; i < n; i++) gain[i] = lensGain(k![i], 1);
+  const G = 240, geom = lensGeom(LENS_FLAT_ASPECT, centre);
+  let m = 0;
+  for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) m += lensLerp(gain, lensRadius((x + 0.5) / G, (y + 0.5) / G, geom), n);
+  m /= G * G;
+  const out = Number.isFinite(m) && m > 1e-3 ? m : 1;
+  // Remembered per curve, because the renderer asks again on every Strength
+  // step and each answer is 57,600 interpolated reads.
+  (seen ?? AREA_MEANS.set(k as object, new Map()).get(k as object)!).set(key, out);
+  return out;
 }
+const AREA_MEANS = new WeakMap<object, Map<string, number>>();
 
 /** The per-bin gain tables one strength lays over a curve — THE ONE SOURCE for
- *  both the in-grade stage below and the decode-time flat (lensflat.ts, which
- *  re-exports this rather than carrying a copy).
+ *  every applier: the decode-time flat (lensflat.ts, which re-exports this
+ *  rather than carrying a copy), the export's raw sampler, the in-grade stage
+ *  below and the shader's texture (gl.ts uploads these very tables).
  *  @param lens  the matched curve or null.
  *  @param strength  0 returns null: nothing lands.
- *  @returns `{n, gr, gb, gg}` — red and blue carry the colour half times the
- *    brightness half, green the brightness half alone — or null when no half is
- *    usable. A colour and a brightness half of different lengths keep the
- *    colour and drop the brightness (a bin count is a radius mapping, above).
- *  What the result must satisfy: identical to what `measuredOn` in compileEdit
- *    applied before this existed; the agreement walk holds the four paths. */
-export function lensGainsFor(lens: LensCurve | null | undefined, strength: number): { n: number; gr: Float32Array; gb: Float32Array; gg: Float32Array } | null {
+ *  @returns `{n, gr, gb, gg, c}` — red and blue carry the colour half times the
+ *    brightness half, green the brightness half alone, one value per bin read
+ *    BETWEEN bins by `lensLerp`; `c` is the curve's centre, `[0, 0]` when it
+ *    has none — or null when no half is usable. A colour and a brightness half
+ *    of different lengths keep the colour and drop the brightness (a bin count
+ *    is a radius mapping, above).
+ *  What the result must satisfy: every applier reads it through `lensLerp` at
+ *    `lensRadius(u, v, lensGeom(aspect, c))` and nowhere else, so a ring is the
+ *    same ring on every path; the agreement walk holds the four paths. */
+export function lensGainsFor(lens: LensCurve | null | undefined, strength: number): { n: number; gr: Float32Array; gb: Float32Array; gg: Float32Array; c: [number, number] } | null {
   if (!lens || !(strength !== 0) || !Number.isFinite(strength)) return null;
   const kr = lens.kr, kb = lens.kb, bump = lens.bump;
   const colourN = kr && kb ? Math.min(kr.length, kb.length) : 0;
@@ -2153,8 +2270,11 @@ export function lensGainsFor(lens: LensCurve | null | undefined, strength: numbe
   const lengthsAgree = !(colourOn && bumpOn) || colourN === bumpN;
   const useBump = bumpOn && lengthsAgree;
   const n = colourOn ? colourN : bumpN;
-  const areaR = colourOn ? lensAreaMean(kr) : 1;
-  const areaB = colourOn ? lensAreaMean(kb) : 1;
+  const cx = lens.centre && Number.isFinite(Number(lens.centre[0])) ? Number(lens.centre[0]) : 0;
+  const cy = lens.centre && Number.isFinite(Number(lens.centre[1])) ? Number(lens.centre[1]) : 0;
+  const c: [number, number] = [cx, cy];
+  const areaR = colourOn ? lensAreaMean(kr, lens.centre) : 1;
+  const areaB = colourOn ? lensAreaMean(kb, lens.centre) : 1;
   const gr = new Float32Array(n), gb = new Float32Array(n), gg = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const gc = useBump ? lensGain(1 + bump![i], strength) : 1;
@@ -2162,7 +2282,7 @@ export function lensGainsFor(lens: LensCurve | null | undefined, strength: numbe
     gb[i] = (colourOn ? lensGain(kb![i] * areaB, strength) : 1) * gc;
     gg[i] = gc;
   }
-  return { n, gr, gb, gg };
+  return { n, gr, gb, gg, c };
 }
 
 /** THE SENSOR PIN, ONE PLACE. A source value at or above `SENSOR_PIN` in any
@@ -2183,6 +2303,9 @@ export interface SourceFlat {
   gr: ArrayLike<number>;
   gg: ArrayLike<number>;
   gb: ArrayLike<number>;
+  /** The hot spot's centre the tables are laid about (`lensGeom`); absent is
+   *  the frame's centre. */
+  c?: ArrayLike<number> | null;
 }
 
 /**
@@ -2380,14 +2503,21 @@ export function compileEdit(
   // pass uses on a raw's linear copy (decision 021). This in-grade stage stays
   // for the sources that have no linear copy to correct at decode (8-bit:
   // JPEG, preview, lossy-linear DNG); a raw caller passes `lens` as null
-  // because its pixels already carry the flat. One function builds the gains
-  // for both, so a ring is the same ring in both places.
+  // because its pixels already carry the flat, and a camera-rendered one
+  // passes the brightness half alone (`lensCurveForSource`). One function
+  // builds the gains for every path, so a ring is the same ring everywhere.
+  //
+  // ROUNDED TO HALF FLOAT HERE because the shader reads these very tables out
+  // of an RGB16F texture (gl.ts), which is what lets it filter between bins;
+  // reading the float32 table here would put the two a half-float step apart.
   const lensT = lensGainsFor(lens, lensFix);
   const measuredOn = !!lensT;
   const lensN = lensT ? lensT.n : 0;
-  const lensGr = lensT ? lensT.gr : null;
-  const lensGb = lensT ? lensT.gb : null;
-  const lensGg = lensT ? lensT.gg : null;
+  const asHalf = (t: Float32Array) => { const o = new Float32Array(t.length); for (let i = 0; i < t.length; i++) o[i] = fromHalf(toHalf(t[i])); return o; };
+  const lensGr = lensT ? asHalf(lensT.gr) : null;
+  const lensGb = lensT ? asHalf(lensT.gb) : null;
+  const lensGg = lensT ? asHalf(lensT.gg) : null;
+  const lensG = lensT ? lensGeom(aspect, lensT.c) : null;
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
@@ -2428,6 +2558,9 @@ export function compileEdit(
   // unwarped source and the decode-time lens flat sits in the source pixels, so
   // both are read there. Absent, they are (u, v): no warp, or a caller with no
   // field.
+  // The source flat is read exactly as the decode laid it (lensflat.ts
+  // applyLensFlat): about its own centre, linearly between bin centres.
+  const flatGeo = srcFlat ? lensGeom(aspect, srcFlat.c) : null;
   return (r, g, b, out, glow = 0, u, v, mu = u, mv = v) => {
     // Clip severity PER CHANNEL from the SOURCE values, before anything
     // modifies them — the sensor pin lives in native space (matches the
@@ -2442,8 +2575,8 @@ export function compileEdit(
     let s0 = 0, s1 = 0, s2 = 0, fr = 1, fg = 1, fb = 1;
     if (cam && recover > 0) {
       if (srcFlat && mu !== undefined && mv !== undefined) {
-        const i = lensBin(mu, mv, aspect, srcFlat.n);
-        fr = srcFlat.gr[i]; fg = srcFlat.gg[i]; fb = srcFlat.gb[i];
+        const fRad = lensRadius(mu, mv, flatGeo!);
+        fr = lensLerp(srcFlat.gr, fRad, srcFlat.n); fg = lensLerp(srcFlat.gg, fRad, srcFlat.n); fb = lensLerp(srcFlat.gb, fRad, srcFlat.n);
       }
       s0 = smooth01(SENSOR_PIN, SENSOR_PIN_FULL, r / fr);
       s1 = smooth01(SENSOR_PIN, SENSOR_PIN_FULL, g / fg);
@@ -2527,7 +2660,9 @@ export function compileEdit(
     // Spatial, so skipped in the LUT bake where u/v are absent — the same
     // guard the radial gain above carries, for the same reason.
     if (measuredOn && u !== undefined && v !== undefined) {
-      const i = lensBin(u, v, aspect, lensN);
+      // Between bin centres, about the profile's own centre, on the flat's
+      // radius — lensLerp, lensRadius and lensGeom, the shader's three lines.
+      const rr = lensRadius(u, v, lensG!);
       // AIMED with the same bit as the manual hot-spot above: one correction,
       // two routes to it. The table is built once at full strength, so the aim
       // BLENDS each gain toward 1 rather than re-deriving it per pixel at a
@@ -2535,9 +2670,9 @@ export function compileEdit(
       // so scaling the strength here and blending in the shader would be two
       // different renderings of the same edit. The shader blends too.
       const lw = aimWeight(aimGroups, AIM_LENS, u, v, aspect);
-      r *= 1 + (lensGr![i] - 1) * lw;
-      b *= 1 + (lensGb![i] - 1) * lw;
-      if (lensGg) g *= 1 + (lensGg[i] - 1) * lw;
+      r *= 1 + (lensLerp(lensGr!, rr, lensN) - 1) * lw;
+      b *= 1 + (lensLerp(lensGb!, rr, lensN) - 1) * lw;
+      g *= 1 + (lensLerp(lensGg!, rr, lensN) - 1) * lw;
     }
     // Camera-native -> linear sRGB (after WB, before swap), matching the shader.
     if (cam) {

@@ -111,12 +111,20 @@ What exists that the remaining work on this record will use, so a second one
 does not get written (LESSONS 330):
 
 - **The gains, once.** `lensGainsFor` in `src/pipeline.ts` builds the per-bin
-  gain tables every CPU applier uses; `lensAreaMean` beside it normalises the
-  colour halves (shipped 2026-09-17, Options); `lensBin` picks a pixel's bin, a
-  floor over 80 bins. `src/gl.ts` repeats the normalisation in `setLensCurve`.
+  gain tables every applier uses, the shader's included since 2026-10-02 (it
+  uploads them rather than repeating the normalisation); `lensAreaMean` beside
+  it normalises the colour halves (shipped 2026-09-17, Options). A pixel reads a
+  table through `lensLerp`, between bin centres, at `lensRadius` on the flat's
+  geometry (`lensGeom`: the 3:2 sensor's corner, about the profile's stored
+  centre). Until 2026-10-02 it was `lensBin`, a floor over 80 bins measured to
+  the frame's own corner about its middle.
+- **What a source may take.** `lensCurveForSource` in `src/lensflat.ts`: the
+  whole curve on raw data, the brightness half alone on a camera-rendered
+  picture (2026-10-02).
 - **The appliers.** The decode-time flat for raws (`src/lensflat.ts`), the raw
   export's sampler (`src/export.ts`), the in-grade stage for 8-bit sources
-  (`compileEdit`), and the shader for an 8-bit screen (one `texelFetch`).
+  (`compileEdit`), and the shader for an 8-bit screen (one linear sample of an
+  RGB16F table; one `texelFetch` until 2026-10-02).
   `tools/agreement-walk.mjs` does NOT exercise the decode-time flat, which this
   entry used to claim: its raws are practice DNGs with no EXIF, so no curve
   matches, and its camera-JPEG pair sits in a folder that no longer exists
@@ -312,6 +320,14 @@ change, the shader's included, where a 32-bit float texture is not linearly
 filterable in WebGL 2 without an extension the iPad may lack, so it would be two
 reads and a mix. What would reopen it: a frame where ring edges are seen at full
 size.
+**Reopened and shipped 2026-10-02, on an audit of both grounds, before that
+frame was seen.** The lone-oak frame's matched profile is nearly flat, which is
+why it moved nothing; across the shipped table the gain steps by up to 5.8%
+between neighbouring bins and by over 1% in 39 places across 8 profiles, about
+42 px apart at full size. And half-float textures are filterable in WebGL 2
+core, so the shader reads the table once, linearly (IR-SCIENCE §9g). The
+reopening condition this entry names, ring edges SEEN at full size, was not
+met by a picture; it is owed to the release that carries the change.
 
 **Doing the whole re-architecture in one go** — clip control, a per-image
 strength, and moving the stage out of the creative chain. All three are supported

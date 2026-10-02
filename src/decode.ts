@@ -17,7 +17,7 @@ import { decodeMosaicedDng } from "./raw/dngRaw";
 import { decodeNef } from "./raw/nef";
 import { camToSrgbLinear, nikonColorMatrix } from "./color";
 import { srgbToLinear } from "./icc";
-import { lensBin, SENSOR_PIN, type BrushMask } from "./pipeline";
+import { lensGeom, lensRadius, lensLerp, SENSOR_PIN, type BrushMask } from "./pipeline";
 
 /** The photograph's sky selection, built once from the undegraded decode —
  *  gray-world balance only, no exposure, correction or look — so it never
@@ -129,8 +129,9 @@ export function unitMinGains(g: ArrayLike<number>): [number, number, number] {
  *   the flat at that pixel, is at or above `SENSOR_PIN`. An 8-bit source has no
  *   flat in its pixels and is tested as decoded (255 reads 1).
  * What the result must satisfy: it agrees with the clip test `compileEdit` and
- *   the shader make for highlight recovery, ring for ring (`lensBin` at the
- *   pixel centre, the same bin `applyLensFlat` used). Consumers: grayWorldMeans,
+ *   the shader make for highlight recovery (`lensRadius` from the flat's own
+ *   `lensGeom` at the pixel centre, read by `lensLerp`, exactly as
+ *   `applyLensFlat` laid it). Consumers: grayWorldMeans,
  *   autoExposure, autoRecover, tap-to-balance in main.ts, prepareSkySource.
  */
 export function pinTest(img: DecodedImage): (x: number, y: number) => boolean {
@@ -150,15 +151,15 @@ export function pinTest(img: DecodedImage): (x: number, y: number) => boolean {
       return lin[o] >= floor || lin[o + 1] >= floor || lin[o + 2] >= floor;
     };
   }
-  const aspect = width / Math.max(1, height);
+  const geo = lensGeom(width / Math.max(1, height), flat.c);
   return (x, y) => {
     const o = (y * width + x) * 4;
     const r = lin[o], g = lin[o + 1], b = lin[o + 2];
     // Below the floor no channel can be at the pin before the flat, whatever
     // ring it sits in, so the bin is only looked up for the few bright samples.
     if (!(r >= floor || g >= floor || b >= floor)) return false;
-    const i = lensBin((x + 0.5) / width, (y + 0.5) / height, aspect, flat.n);
-    return r / flat.gr[i] >= SENSOR_PIN || g / flat.gg[i] >= SENSOR_PIN || b / flat.gb[i] >= SENSOR_PIN;
+    const rad = lensRadius((x + 0.5) / width, (y + 0.5) / height, geo);
+    return r / lensLerp(flat.gr, rad, flat.n) >= SENSOR_PIN || g / lensLerp(flat.gg, rad, flat.n) >= SENSOR_PIN || b / lensLerp(flat.gb, rad, flat.n) >= SENSOR_PIN;
   };
 }
 

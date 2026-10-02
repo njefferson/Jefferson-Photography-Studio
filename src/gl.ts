@@ -5,8 +5,8 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, aimsAt, AIM_NOISE, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
-import { toHalfBuffer } from "./half";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toHalfBuffer, toHalf } from "./half";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -84,15 +84,14 @@ precision highp float;
 // meant only to prove the walk could fail. tsc is green either way: a shader
 // is a string to it.
 precision highp sampler2DArray;
-// Bounds for the measured lens gain — see pipeline.ts LENS_GAIN_LO/HI.
-// toFixed, NOT the bare number: GLSL will not convert an int literal to a float,
-// so an interpolated 2 gives "cannot convert from const int to const highp
-// float" and the whole shader fails to compile. The app then reports itself
-// unsupported and every browser harness fails on a click being intercepted,
-// which looks like a UI change and is a missing decimal point. tsc is green
-// either way — a shader is a string to it.
-const float LENS_GAIN_LO = ${LENS_GAIN_LO.toFixed(6)};
-const float LENS_GAIN_HI = ${LENS_GAIN_HI.toFixed(6)};
+// Bounds injected from pipeline.ts. toFixed, NOT the bare number: GLSL will
+// not convert an int literal to a float, so an interpolated 2 gives "cannot
+// convert from const int to const highp float" and the whole shader fails to
+// compile. The app then reports itself unsupported and every browser harness
+// fails on a click being intercepted, which looks like a UI change and is a
+// missing decimal point. tsc is green either way — a shader is a string to it.
+// (The measured lens gain's own bounds, LENS_GAIN_LO/HI, are applied where its
+// table is built — pipeline.ts lensGainsFor — since the shader reads gains.)
 const float SAT_GUARD_LO = ${SAT_GUARD_LO.toFixed(6)};
 const float SAT_GUARD_HI = ${SAT_GUARD_HI.toFixed(6)};
 const float SKY_SAT_GATE_LO = ${SKY_SAT_GATE_LO.toFixed(6)};
@@ -153,15 +152,18 @@ uniform int u_readMode;      // 1 = output the mask-stage DISPLAY colour and sto
 uniform float u_hotspot;     // IR hot-spot correction (darken centre) 0..0.8
 uniform float u_hotspotSize; // hot-spot radial extent
 uniform float u_hotspotColor; // -0.5..0.5 the hot-spot's COLOUR (+red / -blue at centre)
-// The reader's MEASURED lens colour curve: an Nx1 RG float texture, R = the red
-// gain and G = the blue gain, one texel per radial bin. texelFetch rather
-// than texture() on purpose — no filtering, so the bin the shader reads is
-// exactly the bin the CPU mirror indexes, and GPU/CPU parity is by construction
-// rather than by tolerance.
+// The MEASURED lens correction: an Nx1 RGB16F texture of the GAINS that land
+// at the photograph's strength — R the red gain, G the brightness gain alone,
+// B the blue gain, one texel per radial bin — built by pipeline.ts
+// lensGainsFor, the table every CPU applier reads. SAMPLED LINEARLY between
+// texel centres, as the DNG GainMap reads its gains: the eighty hard rings a
+// texelFetch gave stepped by up to 5.8% between neighbours. Half float because
+// a 32-bit float texture is not filterable in WebGL 2 without an extension;
+// compileEdit rounds its copy to half so the two read the same numbers.
 uniform sampler2D u_lensTex;
-uniform int u_lensN;      // 0 when no measured profile matched this photograph
-uniform float u_lensFix;  // measured colour strength; 0 is off
-uniform float u_lensBump;  // shipped brightness strength; 0 is off
+uniform int u_lensN;      // bins in u_lensTex; 0 when nothing lands on this draw
+uniform vec2 u_lensC;     // the hot spot's centre, in frame-height units (pipeline.ts lensGeom)
+uniform float u_lensInvD; // one over the FLAT's half-diagonal, frame-height units
 uniform float u_vignette;    // -1..1 (+ brighten corners, - darken)
 uniform float u_aspect;      // image width/height — keeps the lens fix circular in pixels, and turns a radial mask as a shape
 uniform float u_recover;     // 0..1 highlight recovery strength (pipeline.ts recoverHighlight)
@@ -169,10 +171,14 @@ uniform float u_recover;     // 0..1 highlight recovery strength (pipeline.ts re
 // correction (decision 021) — one texel per radial bin, RGB = the gain on red,
 // green and blue. Read back out at the pixel so the clip test behind highlight
 // recovery sees the value the sensor recorded. u_flatN is 0 when the pixels
-// carry none (an 8-bit source, or no lens matched). texelFetch, as for the lens
-// curve above: the bin read is exactly the bin pipeline.ts lensBin indexes.
+// carry none (an 8-bit source, or no lens matched). Read as the decode laid it
+// (lensflat.ts applyLensFlat): about its own centre u_flatC at radius scale
+// u_flatInvD (pipeline.ts lensGeom), linearly between bin centres with two
+// exact texelFetches, which is pipeline.ts lensLerp to the bit.
 uniform sampler2D u_flatTex;
 uniform int u_flatN;
+uniform vec2 u_flatC;
+uniform float u_flatInvD;
 uniform float u_clarity;     // -1..1 local contrast vs the blurred-luma map
 uniform float u_dehaze;      // -1..1 veil subtraction vs the dark-channel map
 uniform sampler2D u_localTex; // RGBA16F (localmap.ts): R sqrt-encoded blurred luma, G/B dehaze guided-filter a/b
@@ -518,23 +524,11 @@ float radialGain(vec2 uv, float hot){
 /** The hot-spot's radial weight alone: 1 at the centre, 0 past u_hotspotSize.
  *  Shared with radialGain above so both describe the same circle, and mirrored
  *  by hotspotWeight() in pipeline.ts. */
-// THE MEASURED GAIN, BOUNDED, and the same arithmetic as pipeline.ts lensGain.
-// The two limits are injected from that one constant rather than typed here, so
-// the shader and the CPU mirror cannot be given two different bounds. The old
-// form guarded the divisor instead of the gain, which admits a factor of a
-// thousand and then snaps back to 1 — see pipeline.ts lensGain for what that
-// cost and why a bin of zero reached 100x at strength 0.99.
-//
 // NOTE FOR ANYONE EDITING THE COMMENTS IN THIS FILE: the shader is a JavaScript
 // template literal, so a backtick in a comment ends it and the rest of the
-// shader is parsed as TypeScript. This paragraph replaces one that quoted the
-// old expression in backticks and did exactly that.
-float lensGain(float k, float s) {
-  float v = 1.0 + (k - 1.0) * s;
-  if (!(v > 1e-6)) return LENS_GAIN_HI;
-  return clamp(1.0 / v, LENS_GAIN_LO, LENS_GAIN_HI);
-}
-
+// shader is parsed as TypeScript. A paragraph here once quoted an expression in
+// backticks and did exactly that. (The measured gain's own function lived here
+// until its table moved to the CPU, pipeline.ts lensGainsFor, 2026-10-02.)
 float hotspotWeight(vec2 uv){
   vec2 d = vec2((uv.x - 0.5) * u_aspect, uv.y - 0.5);
   float r = 2.0 * length(d) / sqrt(u_aspect * u_aspect + 1.0);
@@ -750,10 +744,13 @@ void main() {
   vec3 srcFlat = vec3(1.0);
   if (u_useCam && u_recover > 0.0) {
     if (u_flatN > 0) {
-      vec2 fd = vec2((v_uv.x - 0.5) * u_aspect, v_uv.y - 0.5);
-      float fr = 2.0 * length(fd) / sqrt(u_aspect * u_aspect + 1.0);
-      int fi = clamp(int(floor(fr * float(u_flatN))), 0, u_flatN - 1);
-      srcFlat = texelFetch(u_flatTex, ivec2(fi, 0), 0).rgb;
+      vec2 fuv = warpUv(v_uv);
+      vec2 fd = vec2((fuv.x - 0.5) * u_aspect, fuv.y - 0.5) - u_flatC;
+      float ff = length(fd) * u_flatInvD * float(u_flatN) - 0.5;
+      float fi = floor(ff);
+      int f0 = clamp(int(fi), 0, u_flatN - 1);
+      int f1 = clamp(int(fi) + 1, 0, u_flatN - 1);
+      srcFlat = mix(texelFetch(u_flatTex, ivec2(f0, 0), 0).rgb, texelFetch(u_flatTex, ivec2(f1, 0), 0).rgb, ff - fi);
     }
     srcSev = smoothstep(vec3(0.985), vec3(0.995), c / srcFlat);
   }
@@ -1059,7 +1056,7 @@ void main() {
   // it is not aimed, and if it is the only thing on then u_hotspot is 0 and
   // the weight cannot matter. (No backticks in here: the shader is a template
   // literal and one would end it, which is what this comment just did once.)
-  float lw = (u_hotspot != 0.0 || u_hotspotColor != 0.0 || (u_lensN > 0 && (u_lensFix != 0.0 || u_lensBump != 0.0))) ? aimWeightOf(8) : 1.0;
+  float lw = (u_hotspot != 0.0 || u_hotspotColor != 0.0 || u_lensN > 0) ? aimWeightOf(8) : 1.0;
   if (u_hotspot != 0.0 || u_vignette != 0.0) c *= radialGain(v_uv, u_hotspot * lw);
   // And the hot-spot's COLOUR, on the same circle — before the swap and the
   // matrix below, so it corrects the LENS rather than the false-colour result.
@@ -1070,21 +1067,25 @@ void main() {
   }
   // The MEASURED curve, on the same side of the matrix and the swap. Its own
   // branch: it does not depend on any manual slider being set.
-  if (u_lensN > 0 && (u_lensFix != 0.0 || u_lensBump != 0.0)) {
-    vec2 d = vec2((v_uv.x - 0.5) * u_aspect, v_uv.y - 0.5);
-    float r = 2.0 * length(d) / sqrt(u_aspect * u_aspect + 1.0);
-    int i = clamp(int(floor(r * float(u_lensN))), 0, u_lensN - 1);
-    vec3 k = texelFetch(u_lensTex, ivec2(i, 0), 0).rgb;
+  if (u_lensN > 0) {
+    // The radius on the FLAT, about the profile's own centre: pipeline.ts
+    // lensRadius, with u_lensC and u_lensInvD from its lensGeom. Then the
+    // table read between bin centres — the texture's LINEAR filter with
+    // CLAMP_TO_EDGE is pipeline.ts lensLerp exactly.
+    vec2 d = vec2((v_uv.x - 0.5) * u_aspect, v_uv.y - 0.5) - u_lensC;
+    float r = length(d) * u_lensInvD;
+    // textureLod at level 0, not texture(): this sits in a branch, where
+    // Direct3D cannot take gradients (071); with no mipmaps the two agree.
+    vec3 g = textureLod(u_lensTex, vec2(r, 0.5), 0.0).rgb;
     // The brightness half rides all three channels; the colour half is a ratio
-    // against green, so green takes the bump and nothing else.
-    // The aim BLENDS each gain toward 1 rather than scaling the strength:
-    // lensGain is 1/(1+(k-1)s) and is not linear in s, and pipeline.ts builds
-    // its table once at full strength. Blending is the one thing both paths
-    // can do identically.
-    float ic = lensGain(1.0 + k.b, u_lensBump);
-    c.r *= 1.0 + (lensGain(k.r, u_lensFix) * ic - 1.0) * lw;
-    c.g *= 1.0 + (ic - 1.0) * lw;
-    c.b *= 1.0 + (lensGain(k.g, u_lensFix) * ic - 1.0) * lw;
+    // against green, so green takes the bump and nothing else — both already
+    // multiplied into the table. The aim BLENDS each gain toward 1 rather than
+    // scaling the strength: lensGain is 1/(1+(k-1)s) and is not linear in s,
+    // and the table is built at the photograph's strength. Blending is the one
+    // thing both paths can do identically.
+    c.r *= 1.0 + (g.r - 1.0) * lw;
+    c.g *= 1.0 + (g.g - 1.0) * lw;
+    c.b *= 1.0 + (g.b - 1.0) * lw;
   }
 
   // Camera colour matrix: separates infrared chroma into distinct hues so the
@@ -1455,7 +1456,7 @@ export interface BuildOptions {
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -1510,58 +1511,61 @@ export class Renderer {
   private camMatrix: Float32Array | null = null;
   private patchHalf = new Uint16Array(0); // reused scratch for half-float patches
   private glowTex: WebGLTexture;
-  /** Upload a measured lens colour curve for the photograph now open, or clear
-   *  it with null. Per-PHOTOGRAPH, never per-draw: the curve is chosen by the
-   *  file's EXIF and does not change as the reader edits. */
-  /** Upload the radial lens curve: red-against-green, blue-against-green and
-   *  the shipped brightness bump, one texel per bin. One texture rather than
-   *  two because both halves are read at the same bin on the same draw, and a
-   *  second lookup would be a second chance for them to disagree about which
-   *  ring a pixel is in. A half that is absent uploads as neutral, so the two
-   *  are independently on or off without a second code path. */
-  setLensCurve(kr: ArrayLike<number> | null, kb?: ArrayLike<number> | null, bump?: ArrayLike<number> | null): void {
+  /** THE MEASURED LENS CURVE FOR THE PHOTOGRAPH NOW OPEN, or null to clear it.
+   *  Per-PHOTOGRAPH: the curve is chosen by the file's EXIF and does not change
+   *  as the reader edits. What reaches the texture is the GAIN TABLE at the
+   *  draw's strength (`lensGainsFor`, the table every CPU applier reads), so
+   *  it is uploaded on the first draw after the curve or the strength moves —
+   *  80 texels, against a whole frame re-baked before this stage was in the
+   *  pipeline. One texture for both halves, because both are read at the same
+   *  radius on the same draw and a second lookup would be a second chance for
+   *  them to disagree about which ring a pixel is in.
+   *  @param curve  the curve, already passed through `lensCurveForSource` for
+   *    this source (null for a raw, whose pixels carry the flat).
+   *  @returns nothing; the next `render` uploads what lands. */
+  setLensCurve(curve: LensCurve | null): void {
+    this.lensCurve = curve;
+    this.lensSig = "";
+  }
+
+  /** Bring the lens texture to the gains that land at strength `s`, and return
+   *  how many bins it holds (0 when nothing lands). Uploads only when the curve
+   *  or the strength changed since the last upload. */
+  private syncLensGains(s: number): number {
     const gl = this.gl;
-    const cN = kr && kb ? Math.min(kr.length, kb.length) : 0;
-    const bN = bump ? bump.length : 0;
-    // A BIN COUNT IS A RADIUS MAPPING, NOT A RESOLUTION — see pipeline.ts. The
-    // shorter of the two used to win, which stretches the longer curve outward
-    // rather than trimming it. When they disagree the colour half keeps its own
-    // length and the brightness half stands down, matching the CPU mirror.
-    const useB = bN > 1 && (cN <= 1 || cN === bN);
-    const n = cN > 1 ? cN : useB ? bN : 0;
+    const sig = this.lensCurve ? `${s}` : "none";
+    if (sig === this.lensSig) return this.lensN;
+    this.lensSig = sig;
+    const g = lensGainsFor(this.lensCurve, s);
     gl.activeTexture(gl.TEXTURE10);
     gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    if (n < 2) {
+    if (!g || g.n < 2) {
       this.lensN = 0;
-      this.lensHasColour = false;
-      this.lensHasBump = false;
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array([1, 1, 0]));
-      return;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, 1, 1, 0, gl.RGB, gl.HALF_FLOAT, new Uint16Array([0x3c00, 0x3c00, 0x3c00]));
+      return 0;
     }
-    // Normalised to its own area-weighted mean on the way into the texture, so
-    // the curve redistributes colour without tinting the frame. compileEdit
-    // does the same thing when it assembles its gains — lensAreaMean's contract
-    // says these are the only two places allowed to, and they must agree.
-    const areaR = cN > 1 ? lensAreaMean(kr) : 1;
-    const areaB = cN > 1 ? lensAreaMean(kb) : 1;
-    const data = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) {
-      data[i * 3] = cN > 1 ? kr![i] * areaR : 1;
-      data[i * 3 + 1] = cN > 1 ? kb![i] * areaB : 1;
-      data[i * 3 + 2] = useB ? bump![i] : 0;
+    // R red, G brightness, B blue — the channel each multiplies, so the shader
+    // reads .rgb straight on. Encoded by half.ts's round-to-nearest-even, the
+    // conversion compileEdit applies to its own copy, rather than left to the
+    // driver's float-to-half conversion, whose rounding the GL spec does not fix.
+    const data = new Uint16Array(g.n * 3);
+    for (let i = 0; i < g.n; i++) {
+      data[i * 3] = toHalf(g.gr[i]);
+      data[i * 3 + 1] = toHalf(g.gg[i]);
+      data[i * 3 + 2] = toHalf(g.gb[i]);
     }
-    this.lensN = n;
-    this.lensHasColour = cN > 1;
-    this.lensHasBump = useB;
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, n, 1, 0, gl.RGB, gl.FLOAT, data);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, g.n, 1, 0, gl.RGB, gl.HALF_FLOAT, data);
+    this.lensN = g.n;
+    this.lensC = g.c;
+    return g.n;
   }
 
   /**
    * Tell the renderer which lens flat the source texture's pixels already carry.
    * @param gains  the decode-time gains (`DecodedImage.lensApplied.gains`,
    *   lensflat.ts), or null when the pixels carry none.
-   * @returns nothing; the table is uploaded to unit 14 and read by the
+   * @returns nothing; the table is uploaded to unit 15 and read by the
    *   highlight-recovery clip test only.
    * What the result must satisfy: it names exactly the gains in the texture
    *   last given to `setImage`, so the shader divides out what is there — the
@@ -1569,9 +1573,9 @@ export class Renderer {
    *   flat on the working copy is re-applied (main.ts uploadPreview), as
    *   compileEdit takes the same table as `srcFlat`.
    */
-  setSourceFlat(gains: { n: number; gr: ArrayLike<number>; gg: ArrayLike<number>; gb: ArrayLike<number> } | null): void {
+  setSourceFlat(gains: { n: number; gr: ArrayLike<number>; gg: ArrayLike<number>; gb: ArrayLike<number>; c?: ArrayLike<number> | null } | null): void {
     const gl = this.gl;
-    gl.activeTexture(gl.TEXTURE14);
+    gl.activeTexture(gl.TEXTURE15);
     gl.bindTexture(gl.TEXTURE_2D, this.flatTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (!gains || gains.n < 1) {
@@ -1588,6 +1592,7 @@ export class Renderer {
       data[i * 3 + 2] = gains.gb[i];
     }
     this.flatN = n;
+    this.flatC = gains.c ? [Number(gains.c[0]) || 0, Number(gains.c[1]) || 0] : [0, 0];
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, n, 1, 0, gl.RGB, gl.FLOAT, data);
     gl.activeTexture(gl.TEXTURE0);
   }
@@ -1595,12 +1600,15 @@ export class Renderer {
   private toneTex: WebGLTexture;
   private lensTex: WebGLTexture;
   private lensN = 0;
-  /** The lens flat in the source texture (unit 14) and its bin count; 0 bins
+  /** The lens flat in the source texture (unit 15) and its bin count; 0 bins
    *  when the source carries none. */
   private flatTex: WebGLTexture;
   private flatN = 0;
-  private lensHasColour = false;
-  private lensHasBump = false;
+  /** The source flat's hot-spot centre (`LensGains.c`), for u_flatC. */
+  private flatC: [number, number] = [0, 0];
+  private lensCurve: LensCurve | null = null;
+  private lensSig = "";
+  private lensC: [number, number] = [0, 0];
   private toneRgbTex: WebGLTexture;
   private brushTex: WebGLTexture;
   private brushFineTex: WebGLTexture;
@@ -1741,10 +1749,7 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
 
     // Tone-curve LUT (unit 2); a 256-entry identity ramp until a curve is set.
-    // The measured lens curve (unit 10). RG32F so a 5% correction is not
-    // quantised into 8-bit steps, and NEAREST because the shader fetches an
-    // exact texel rather than sampling between them.
-    // The flat the source pixels carry (unit 14), for the recovery clip test.
+    // The flat the source pixels carry (unit 15), for the recovery clip test.
     // RGB32F, NEAREST, one texel per bin, the same reasons as the lens curve.
     this.flatTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.flatTex);
@@ -1755,13 +1760,21 @@ export class Renderer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array([1, 1, 1]));
 
+    // The measured lens gains (unit 10). RGB16F so a 5% correction is not
+    // quantised into 8-bit steps AND so it can be filtered: half-float formats
+    // are texture-filterable in WebGL 2 core (ES 3.0 Table 3.13), 32-bit float
+    // ones are not without OES_texture_float_linear. LINEAR because the shader
+    // reads between bin centres, as the DNG GainMap reads its gains;
+    // CLAMP_TO_EDGE so past the last centre it reads the last bin, which is
+    // what pipeline.ts lensLerp does.
     this.lensTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, 1, 1, 0, gl.RG, gl.FLOAT, new Float32Array([1, 1]));
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, 1, 1, 0, gl.RGB, gl.HALF_FLOAT, new Uint16Array([0x3c00, 0x3c00, 0x3c00]));
 
     this.toneTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
@@ -2470,6 +2483,11 @@ export class Renderer {
     gl.uniform1f(this.loc.u_aspect, this.imgH ? this.imgW / this.imgH : 1);
     gl.uniform1f(this.loc.u_recover, p.recover ?? 0);
     gl.uniform1i(this.loc.u_flatN, this.flatN);
+    {
+      const fg = lensGeom(this.imgH ? this.imgW / this.imgH : 1, this.flatC);
+      gl.uniform2f(this.loc.u_flatC, fg.cx, fg.cy);
+      gl.uniform1f(this.loc.u_flatInvD, fg.invD);
+    }
     gl.uniform1f(this.loc.u_clarity, p.clarity ?? 0);
     gl.uniform1f(this.loc.u_dehaze, p.dehaze ?? 0);
     // A head's own colour mixer switches the mixer on too (042, stage 2b), even
@@ -2684,20 +2702,24 @@ export class Renderer {
     gl.uniform1i(this.loc.u_toneRgbTex, 6);
     gl.activeTexture(gl.TEXTURE6);
     gl.bindTexture(gl.TEXTURE_2D, this.toneRgbTex);
-    // The reader's measured lens curve (unit 10). The TEXTURE is per-photograph
-    // and uploaded by setLensCurve; only the strength changes per draw, so
-    // moving the Strength slider costs one uniform and no upload — which is the
-    // whole reason this stage moved into the pipeline.
-    gl.uniform1i(this.loc.u_lensTex, 10);
-    gl.uniform1i(this.loc.u_lensN, this.lensN);
-    gl.uniform1f(this.loc.u_lensFix, this.lensHasColour && !p.lensBypass ? (p.lensFix ?? 0) : 0);
-    // Same strength as the colour half: one profile, one correction, one slider.
-    gl.uniform1f(this.loc.u_lensBump, this.lensHasBump && !p.lensBypass ? (p.lensFix ?? 0) : 0);
-    gl.activeTexture(gl.TEXTURE10);
-    gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
-    // The source's own lens flat (unit 14), uploaded by setSourceFlat.
-    gl.uniform1i(this.loc.u_flatTex, 14);
-    gl.activeTexture(gl.TEXTURE14);
+    // The reader's measured lens correction (unit 10). The CURVE is
+    // per-photograph (setLensCurve); the texture holds the gains at this
+    // draw's strength and is re-uploaded only when the strength or the curve
+    // moved — 80 texels, never the frame. One strength for both halves: one
+    // profile, one correction, one slider. Bypass is a strength of 0.
+    {
+      const n = this.syncLensGains(p.lensBypass ? 0 : (p.lensFix ?? 0));
+      const geo = lensGeom(this.imgH ? this.imgW / this.imgH : 1, this.lensC);
+      gl.uniform1i(this.loc.u_lensTex, 10);
+      gl.uniform1i(this.loc.u_lensN, n);
+      gl.uniform2f(this.loc.u_lensC, geo.cx, geo.cy);
+      gl.uniform1f(this.loc.u_lensInvD, geo.invD);
+      gl.activeTexture(gl.TEXTURE10);
+      gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
+    }
+    // The source's own lens flat (unit 15), uploaded by setSourceFlat.
+    gl.uniform1i(this.loc.u_flatTex, 15);
+    gl.activeTexture(gl.TEXTURE15);
     gl.bindTexture(gl.TEXTURE_2D, this.flatTex);
     // Imported .cube LUT (unit 5). The sig check IS the uploader: the lattice
     // re-uploads only when the LUT identity changes; strength-only changes are

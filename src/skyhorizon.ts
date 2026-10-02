@@ -8,8 +8,12 @@
 // The idea in one sentence: a sky border position function b(a) says, for each
 // column, the depth at which the first edge stronger than t appears; sweeping t
 // over the gradient image's own quantiles and keeping whichever b maximises an
-// energy function that rewards a HOMOGENEOUS sky against a VARIED ground gives
-// the horizon without ever asking what colour a sky is.
+// energy function that penalises the spread of BOTH regions — covariance volume
+// plus principal variance, the sky's weighted twice (γ = 2, "our emphasis on
+// the homogeneity in the sky region") — gives the horizon without ever asking
+// what colour a sky is. It never rewards a varied ground: a more varied ground
+// always lowers the energy; the doubled sky weight only makes it prefer leaving
+// heterogeneity below the border to leaving it above.
 //
 // Why that is the right instrument here and a colour model is not. `sky.ts`
 // learned the sky's colour from a strip at the top of the frame and grew down
@@ -571,6 +575,10 @@ function refineColumns(
 
   // A column goes when most of what sits above its border is nearer the ground
   // cluster than the sky one, in the plain geometry the split was made in.
+  // THIS IS A SUBSTITUTION FOR THE PAPER'S TEST, listed in IR-SCIENCE.md 9o:
+  // Algorithm 3 compares each pixel with the TRUE SKY under Σs_true and with
+  // the GROUND REGION under Σg (Mahalanobis both), not two centroids under
+  // Euclidean distance; the covariance reason is the paragraph above.
   let cleared = false;
   for (let a = 0; a < cols; a++) {
     const top = b[a];

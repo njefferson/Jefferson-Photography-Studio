@@ -709,35 +709,35 @@ cannot describe something the code does not say about itself.
 - **`src/color.ts`** (110 lines) — Camera color science.
 - **`src/cubeimport.ts`** (181 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (255 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
-- **`src/debug.ts`** (2115 lines) — The test page behind the version number.
-- **`src/decode.ts`** (730 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
+- **`src/debug.ts`** (2116 lines) — The test page behind the version number.
+- **`src/decode.ts`** (731 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (60 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
-- **`src/exif.ts`** (258 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1161 lines) — Full-resolution export.
+- **`src/exif.ts`** (292 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
+- **`src/export.ts`** (1174 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (3127 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (3149 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
-- **`src/gpuexport.ts`** (287 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
+- **`src/gpuexport.ts`** (292 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
 - **`src/half.ts`** (69 lines) — IEEE half-precision, both directions, in one place.
 - **`src/heal.ts`** (1100 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
 - **`src/histogram.ts`** (114 lines) — Lightroom-style floating histogram.
-- **`src/hotspot.ts`** (197 lines) — The per-lens IR hot-spot correction that comes WITH the app, as opposed to one the reader measured for themselves (lensstore.ts).
+- **`src/hotspot.ts`** (225 lines) — The per-lens IR hot-spot correction that comes WITH the app, as opposed to one the reader measured for themselves (lensstore.ts).
 - **`src/hotspotProfiles.ts`** (32 lines) — GENERATED — do not hand-edit.
 - **`src/icc.ts`** (273 lines) — Embed a colour profile in every export so files are never emitted untagged (untagged JPEG/TIFF is a real-world failure: viewers guess the colour space).
 - **`src/iconpicker.ts`** (202 lines) — Home-Screen icon picker for the installed Studio launcher.
 - **`src/import.ts`** (162 lines) — Hardened image import.
 - **`src/keepfile.ts`** (258 lines) — THE KEEP FILE: a photograph the reader owns, as one file they hold.
 - **`src/lensbackup.ts`** (84 lines) — HAS ANY OF THIS EVER LEFT THE DEVICE — its own file, deliberately.
-- **`src/lensflat.ts`** (168 lines) — The measured lens correction as a flat-field pass on the LINEAR working copy, applied at decode before anything is measured or graded (decision 021; IR-SCIENCE.md §9c — RawPedia, the DNG GainMap, Ligh
-- **`src/lensprofile.ts`** (924 lines) — Measuring an IR lens's hot-spot ON THE DEVICE, from flat frames, per channel.
-- **`src/lensrig.ts`** (929 lines) — Measuring a lens, as a destination in the app.
-- **`src/lensstore.ts`** (802 lines) — Keeping a lens profile the reader measured, and putting it back to work.
+- **`src/lensflat.ts`** (237 lines) — The measured lens correction as a flat-field pass on the LINEAR working copy, applied at decode before anything is measured or graded (decision 021; IR-SCIENCE.md §9c — RawPedia, the DNG GainMap, Ligh
+- **`src/lensprofile.ts`** (1103 lines) — Measuring an IR lens's hot-spot ON THE DEVICE, from flat frames, per channel.
+- **`src/lensrig.ts`** (940 lines) — Measuring a lens, as a destination in the app.
+- **`src/lensstore.ts`** (919 lines) — Keeping a lens profile the reader measured, and putting it back to work.
 - **`src/localmap.ts`** (309 lines) — Per-image reference maps for Clarity and Dehaze (glow-map pattern: built once per image from LINEAR source data, sampled as a texture by the GPU and bilinearly by the CPU export).
 - **`src/look.ts`** (314 lines) — Shareable looks. A look is the CREATIVE grade only (see SavedLook) — small enough (~0.5 KB of JSON) to travel as a link fragment, a paste-able code, or a tiny .ipslook.json file, with no server and no
 - **`src/lookmark.ts`** (75 lines) — The traveling recipe: every exported JPEG can carry the look that made it, as an APP11 segment ("IPSLOOK\0" + the look.ts wire-format JSON, ~600 bytes).
@@ -748,10 +748,10 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (20116 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (20189 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (2931 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (3066 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
@@ -766,12 +766,12 @@ cannot describe something the code does not say about itself.
 - **`src/session.ts`** (599 lines) — Crash-safe store for a photo SESSION — the set you opened and are moving between, each photo keeping its own edit.
 - **`src/shadowcast.ts`** (252 lines) — THE SHADOW'S OWN ILLUMINANT, MEASURED FROM THIS PHOTOGRAPH (decision 034).
 - **`src/share.ts`** (156 lines) — Share / copy-link for the INSTALLED (standalone) app.
-- **`src/sky.ts`** (663 lines) — Classical sky detection (mask type 4).
+- **`src/sky.ts`** (722 lines) — Classical sky detection (mask type 4).
 - **`src/sky.worker.ts`** (31 lines) — The sky selection, built off the main thread on a lane of its own.
 - **`src/skyClient.ts`** (62 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
-- **`src/skyfine.ts`** (631 lines) — The sky selection refined to the picture's own edges.
-- **`src/skyhorizon.ts`** (600 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
-- **`src/skymap.ts`** (271 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
+- **`src/skyfine.ts`** (676 lines) — The sky selection refined to the picture's own edges.
+- **`src/skyhorizon.ts`** (608 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
+- **`src/skymap.ts`** (281 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
 - **`src/stamp.ts`** (27 lines) — ONE HASH, BECAUSE THE SECOND COPY IS WHERE THE TWO ANSWERS COME FROM.
 - **`src/startup.ts`** (154 lines) — WHAT THE FIRST SECONDS OF THIS LAUNCH COST, AND WHERE (decision 071).
 - **`src/sticker.ts`** (577 lines) — Sticker compositing — rhymes with heal.ts (src/heal.ts): stickers are baked INTO the linear source (pre-pipeline), so each one inherits the channel swap / WB / looks / grade / grain and lands in the I

@@ -21,8 +21,11 @@
 // TWO STAGES, and the order is the whole design (2026-09-20).
 //   1. WHERE THE SKY ENDS — `skyhorizon.ts`, the published border-position
 //      method (Shen and Wang 2013; IR-SCIENCE.md §9o). One border depth per
-//      display column, chosen by an energy function that rewards a homogeneous
-//      sky against a varied ground, plus that paper's two post-processing
+//      display column, chosen by an energy function that favours a border
+//      leaving BOTH regions compact — small covariance volume plus small
+//      principal variance — with the sky's spread weighted twice (it never
+//      rewards a varied ground: more variety below always lowers it), plus
+//      that paper's two post-processing
 //      tests: this photograph has no sky at all, and these columns hold no sky.
 //      It never asks what colour a sky is, which is why it can answer both.
 //   2. WHICH PIXELS ARE IT — this file. The region above the border is the
@@ -58,6 +61,53 @@ export const SKY_MIN_COVERAGE = 0.005;
  *  centre of the cluster that earns the extra room and the edge earns none.
  *  Calibrated over the 44 practice frames — see NOTES. */
 const SKY_LUMA_STRETCH = 6;
+
+/** The model fit's outlier cut, in chroma SPREADS: `skyChromaSpread`, the
+ *  root sum of squares of each axis's normal-consistent MAD — √2·σ for an
+ *  isotropic cluster, so three spreads is a 4.2σ radius.
+ *
+ *  THE MULTIPLIERS STAYED AND THE STATISTIC UNDER THEM WAS CORRECTED
+ *  (2026-10-02). The spread was 1.4826 × the median of the 2-D distance, the
+ *  1-D constant on a Rayleigh-distributed radius, which reads 1.75σ, so these
+ *  same 3 and 4 were 5.2σ and 7σ radii. Measured over the 44 practice DNGs and
+ *  NIR_1651, NIR_1667 and NIR_1376 through the app's own decode and seed: the
+ *  coarse selection moved by at most 0.06% of its pixels (NIR_1688, NIR_1701)
+ *  with the multipliers kept, and by at most 0.05% with the old 1.75σ folded
+ *  back into them — the floor (0.03 here, 0.06 on the fill) and the 0.15 cap
+ *  decide almost every frame, so the honest statistic costs nothing and the
+ *  constants now say what spread they count in. */
+const SKY_CHROMA_CUT = 3;
+/** The fill's chroma tolerance, in the same spreads (a 5.7σ radius), before
+ *  its floor and cap. */
+const SKY_CHROMA_TOL = 4;
+
+/**
+ * THE SKY MODEL'S CHROMA SPREAD, per axis and then combined — as skyfine.ts's
+ * grow key takes it (`skyGrowKey`).
+ * @param cx  each pixel's first chroma coordinate (the caller's CX).
+ * @param cy  each pixel's second (CY), the same length.
+ * @param mx  the cluster's centre on the first axis (its median); `my` on the
+ *   second.
+ * @returns √(sx² + sy²), each s being 1.4826 × the median absolute deviation of
+ *   that axis from its centre — the normal-consistent MAD (Wikipedia, Median
+ *   absolute deviation: k = 1/Φ⁻¹(3/4)) — so an isotropic normal cluster of
+ *   per-axis σ reads √2·σ; 0 for an empty set.
+ * What the result must satisfy: it is the unit `SKY_CHROMA_CUT` and
+ *   `SKY_CHROMA_TOL` count in, compared against each pixel's Euclidean distance
+ *   from (mx, my) in `buildSkyMask`. It must not be a 1-D constant applied to a
+ *   2-D radius: that median is Rayleigh's, σ·√(2 ln 2), and read 1.75σ.
+ */
+export function skyChromaSpread(cx: ArrayLike<number>, cy: ArrayLike<number>, mx: number, my: number): number {
+  const n = Math.min(cx.length, cy.length);
+  if (!n) return 0;
+  const mad = (a: ArrayLike<number>, m: number) => {
+    const d = new Float64Array(n);
+    for (let i = 0; i < n; i++) d[i] = Math.abs(a[i] - m);
+    d.sort();
+    return 1.4826 * d[Math.floor(n / 2)];
+  };
+  return Math.hypot(mad(cx, mx), mad(cy, my));
+}
 
 /** Most pixels the robust model fit sorts. The seed set is now the whole region
  *  above the horizon rather than a strip at the top of the frame, so it can be
@@ -321,6 +371,16 @@ export function buildSkyMask(
   };
   const margin = SKY_MARGIN;
   const median = (a: number[]) => { const t = [...a].sort((x, y) => x - y); return t[Math.floor(t.length / 2)]; };
+  // THE CHROMA SPREAD PER AXIS, then combined — as skyfine.ts's grow key takes
+  // it. This used to scale the median of the 2-D DISTANCE by 1.4826, which is
+  // the consistency constant for a 1-D normal (Wikipedia, Median absolute
+  // deviation: 1/Φ⁻¹(3/4)). For an isotropic 2-D normal that distance is
+  // Rayleigh-distributed with median σ·√(2 ln 2) = 1.177σ, so the "spread" came
+  // out at 1.75σ per axis and its "3 spreads" cut sat at 5.2σ. Here each axis
+  // gets its own normal-consistent MAD and the spread is their root sum of
+  // squares, the RMS radius — √2·σ for an isotropic cluster.
+  const chromaSpread = (pts: number[], cx: number, cy: number): number =>
+    skyChromaSpread(pts.map((p) => CX[p]), pts.map((p) => CY[p]), cx, cy);
   const empty = (hz: SkyHorizon | null = null): SkyResult =>
     ({ mask: { w: W, h: H, data: new Uint8Array(N) }, found: false, coverage: 0, horizon: hz });
 
@@ -422,15 +482,15 @@ export function buildSkyMask(
     const dl = fit.map((p) => Math.abs(Ln[p] - mL));
     const dc = fit.map((p) => Math.hypot(CX[p] - mcx, CY[p] - mcy));
     sdL = 1.4826 * median(dl);
-    sdC = 1.4826 * median(dc);
-    const kept = fit.filter((_, i) => dl[i] < Math.max(0.03, 3 * sdL) && dc[i] < Math.max(0.03, 3 * sdC));
+    sdC = chromaSpread(fit, mcx, mcy);
+    const kept = fit.filter((_, i) => dl[i] < Math.max(0.03, SKY_CHROMA_CUT * sdL) && dc[i] < Math.max(0.03, SKY_CHROMA_CUT * sdC));
     if (kept.length < fit.length * 0.4) break; // cluster too weak — keep all
     fit = kept;
   }
 
   // tolerances: proportional to the seed spread, floored AND capped, then scaled
   // by Reach so the user can loosen/tighten the grow.
-  let tolC = Math.min(0.15, Math.max(0.06, 4 * sdC)) * reach;
+  let tolC = Math.min(0.15, Math.max(0.06, SKY_CHROMA_TOL * sdC)) * reach;
   let tolL = Math.min(0.25, Math.max(0.08, 4 * sdL)) * reach;
   const tolEdge = 0.10 * reach;   // gradient a fill may cross
   const tolAdj = 0.06 * reach;    // adjacent-luma continuity (lets gradients pass)
@@ -503,10 +563,9 @@ export function buildSkyMask(
       mcx = median(sample.map((p) => CX[p]));
       mcy = median(sample.map((p) => CY[p]));
       const dl = sample.map((p) => Math.abs(Ln[p] - mL));
-      const dc = sample.map((p) => Math.hypot(CX[p] - mcx, CY[p] - mcy));
       sdL = 1.4826 * median(dl);
-      sdC = 1.4826 * median(dc);
-      tolC = Math.min(0.15, Math.max(0.06, 4 * sdC)) * reach;
+      sdC = chromaSpread(sample, mcx, mcy);
+      tolC = Math.min(0.15, Math.max(0.06, SKY_CHROMA_TOL * sdC)) * reach;
       tolL = Math.min(0.25, Math.max(0.08, 4 * sdL)) * reach;
       fillFrom(found);
     }

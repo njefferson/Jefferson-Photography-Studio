@@ -37,8 +37,8 @@ import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
 import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
-import { lensGains, lensCentreLine, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
-import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, spotMode, SPOT_R_MIN, SPOT_R_MAX, type HealSpot, type HealCache } from "./heal";
+import { lensGains, lensCentreLine, applyLensFlat, lensPlanStamp, lensCurveForSource, turnOfOrientation, type LensPlan } from "./lensflat";
+import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
 import type { Sticker, BrushMask, LensCurve, SourceFlat } from "./pipeline";
@@ -596,10 +596,9 @@ function activeProfile(): LensStore.StoredProfile | null {
 function syncLensTexture(img: DecodedImage | null = current) {
   // A RAW CARRIES THE FLAT IN ITS PIXELS (decision 021), so the shader's stage
   // gets no curve for it and stays inert; an 8-bit source has no linear copy
-  // and still takes the correction here.
-  if (img?.linear) { renderer.setLensCurve(null, null, null); return; }
-  const { colour, bump } = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
-  renderer.setLensCurve(colour ? colour.kr : null, colour ? colour.kb : null, bump);
+  // and still takes the correction here — the halves that source may take,
+  // which for a camera JPEG is the brightness alone (`lensForEdit`).
+  renderer.setLensCurve(lensForEdit(img, currentLensCurve(), currentExif));
 }
 
 /** The shipped card's Strength governs everything the SHIPPED profile
@@ -641,7 +640,7 @@ function syncHotspot() {
  *  @returns a leading " · …" clause, or "" when nothing is landing.
  *  Consumer: the shipped card's status line and the reader's own card's. */
 function centreEffect(): string {
-  const curve = currentLensCurve();
+  const curve = landingLensCurve();
   const st = params.lensBypass ? 0 : (params.lensFix ?? 0);
   const g = lensGains(curve, st);
   if (!g || !g.n) return "";
@@ -668,7 +667,12 @@ function updateHotspotUI() {
   hsUi.bypassBtn.setAttribute("aria-pressed", String(params.hsBypass));
   hsUi.prompt.hidden = !!hotspotState;
   if (!hotspotState) {
-    hsUi.status.textContent = "Couldn't identify the lens — pick it below.";
+    // A LENS THE APP KNOWS, ON ANOTHER BODY, IS NOT AN UNIDENTIFIED LENS.
+    // Both halves are withheld there (lensstore.ts matchIn, as RawTherapee's
+    // flat-field match refuses another make or model), and the card has to say
+    // so rather than ask the reader to identify a lens it just named.
+    const why = Hotspot.shippedWithheld(currentExif) ?? LensStore.withheldFor(LensStore.listProfiles(), currentExif);
+    hsUi.status.textContent = why ? lensWithheldSentence(why) + " You can still pick it below." : "Couldn't identify the lens — pick it below.";
     return;
   }
   const { p, short, source } = hotspotState;
@@ -687,9 +691,17 @@ function updateHotspotUI() {
   // zero corrects nothing.
   const colour = Hotspot.hasColour(p);
   const bright = !!p.bump?.some((v) => v > 0);
-  const knows = colour && bright ? "brightness and colour" : colour ? "colour only" : bright ? "brightness only" : "nothing on this frame";
+  // A CAMERA JPEG TAKES NO COLOUR (LN1): the profile's colour was measured on
+  // raw sensor data and a JPEG has been through the camera's own colour and
+  // tone first. Said, because "brightness and colour" over a picture getting
+  // brightness only is the card claiming a correction it is not making.
+  const rendered = renderedSource();
+  const knows = colour && rendered
+    ? (bright ? "brightness only — its colour is for raw files" : "nothing on this frame — its colour is for raw files")
+    : colour && bright ? "brightness and colour" : colour ? "colour only" : bright ? "brightness only" : "nothing on this frame";
   hsUi.status.textContent =
-    `${short} · ${src} · ${knows}${note ? ` — ${note}` : ""}${params.hsBypass ? " · bypassed" : ""}${centreEffect()}`;
+    `${short} · ${src} · ${knows}${note ? ` — ${note}` : ""}${params.hsBypass ? " · bypassed" : ""}${centreEffect()}` +
+    (colour && rendered ? renderedColourNote() : "");
 }
 
 hsUi.strength.addEventListener("input", () => {
@@ -752,12 +764,13 @@ hsUi.applyManualBtn.addEventListener("click", () => {
 // by the open photograph's EXIF and its COLOUR term applied, at a strength they
 // can see and move, with the untouched decode a press away.
 //
-// It corrects colour only. `falloff` would flatten the corners, which is what
-// the Vignette slider is for, and the hot-spot's own share of the brightness
-// comes back from a measurement as a RANGE rather than a number — see
-// lensstore.ts. The shipped scalar profile keeps the brightness half, and the
-// two ride the same radial curve now (see setLensCurve): one texture, one bin,
-// two strengths.
+// `falloff` would flatten the corners, which is what the Vignette slider is
+// for, so it is not applied; the hot-spot's own share of the brightness comes
+// back from a measurement as a RANGE and is applied at its low end when the
+// rig could derive a curve (`bumpFrom`, lensstore.ts), otherwise the shipped
+// profile keeps the brightness half (`lensHalves`). The two ride the same
+// radial table (see setLensCurve): one texture, read between bins, one
+// strength. Its colour half lands on raw files only (lensflat.ts).
 const myLensUi = {
   card: $("myLensCard") as HTMLElement,
   status: $("myLensStatus") as HTMLElement,
@@ -809,9 +822,10 @@ function updateMyLensUI() {
   // while the picture shows the first is the shape this panel has been wrong in
   // before. `lensHalves` is asked; nothing is re-derived here.
   const halves = Hotspot.lensHalves(p, hotspotState?.p ?? null);
+  const rendered = renderedSource();
   const gives = [
     halves.brightness === p && p.bump?.some((v) => v > 0) ? "brightness" : null,
-    halves.colour === p ? "colour" : null,
+    halves.colour === p && !rendered ? "colour" : null,
   ].filter(Boolean);
   const knows = gives.length ? gives.join(" and ") : "nothing on this frame";
   myLensUi.status.textContent =
@@ -827,7 +841,37 @@ function updateMyLensUI() {
         ` settings you shoot and yours takes over again.`
       : "") +
     (myLens.note ? ` — ${myLens.note}` : "") +
+    (halves.colour === p && rendered ? renderedColourNote() : "") +
     (params.lensBypass ? " · bypassed" : "");
+}
+
+/** Whether the open photograph is camera-rendered (a JPEG, a PNG or a raw's
+ *  embedded preview) rather than raw data — the sources that take no colour
+ *  half (lensflat.ts `lensCurveForSource`). */
+function renderedSource(): boolean {
+  return !!current && !current.isRaw;
+}
+
+/** The card's sentence for a camera-rendered photograph whose profile carries
+ *  colour, so the reader learns why only the brightness moves. A function
+ *  rather than a constant so the cards can call it whenever they first run.
+ *  @returns the clause, opening " · ". */
+function renderedColourNote(): string {
+  return " · Colour is not corrected on a camera JPEG: the profile's colour was measured on raw sensor data," +
+    " and the camera's own colour and tone have already changed a JPEG's channels, by several times as much" +
+    " (RawTherapee and darktable also correct raw files only). Open the raw file for the colour half.";
+}
+
+/** WHY A LENS THE APP KNOWS IS NOT BEING CORRECTED, in the reader's words.
+ *  @param w  from `withheldFor` / `Hotspot.shippedWithheld`: the body the
+ *    profiles were measured on and the one this photograph names.
+ *  @returns one sentence for the card, naming both bodies and the reason —
+ *    a hot spot depends on the body's infrared conversion as well as the lens,
+ *    and the file cannot say which conversion a body has. */
+function lensWithheldSentence(w: { measuredOn: string; frame: string }): string {
+  return `This lens has a profile, but it was measured on a ${w.measuredOn} and this photograph ` +
+    (w.frame ? `is from a ${w.frame}` : "does not say which camera took it") +
+    ", so neither its brightness nor its colour is applied: a hot spot depends on the camera's infrared conversion as well as the lens, and a file cannot say which conversion its camera has.";
 }
 
 /** The measured curve for a photograph, from its own EXIF. Used by every path
@@ -880,9 +924,9 @@ function lensCurveFor(imported: ImportedFile, pick?: EditParams["lensPick"]): Le
   const measured = ex ? LensStore.findProfile(ex) : null;
   // Same rule as the open photograph: the reader's own measurement is the
   // colour when they have one, and the shipped profile is the brightness.
-  const { colour, bump } = Hotspot.lensHalves(measured, shipped);
+  const { colour, bump, brightness } = Hotspot.lensHalves(measured, shipped);
   if (!colour && !bump) return null;
-  return { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined };
+  return { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined, centre: lensCentreOf(colour, brightness) };
 }
 
 /** WHAT EACH HEAL ACTUALLY CLONED, measured on the buffer the heal reads.
@@ -1076,7 +1120,12 @@ function lensDiagnostic(): string {
   if (!current) return "nothing open";
   const mine = myLens?.p ?? null;
   const shipped = hotspotState?.p ?? null;
-  if (!mine && !shipped) return "no profile matched this photograph";
+  if (!mine && !shipped) {
+    const why = Hotspot.shippedWithheld(currentExif) ?? LensStore.withheldFor(LensStore.listProfiles(), currentExif);
+    return why
+      ? `no profile matched this photograph · WITHHELD: profiles for this lens were measured on ${why.measuredOn}, this frame is from ${why.frame || "a camera it does not name"}`
+      : "no profile matched this photograph";
+  }
   const halves = Hotspot.lensHalves(mine, shipped);
   const colour = halves.colour;
   const where = (p: LensStore.StoredProfile | null) =>
@@ -1096,7 +1145,7 @@ function lensDiagnostic(): string {
   const lost = LensStore.droppedBumps + LensStore.droppedProfiles;
   return (
     `strength ${params.lensFix}${params.lensBypass ? " · BYPASSED" : ""}` +
-    ` · colour from ${where(colour)}` +
+    ` · colour from ${renderedSource() && colour ? `${where(colour)} — NOT APPLIED, a camera-rendered source takes brightness only` : where(colour)}` +
     (!brightness
       ? " · NO BRIGHTNESS CURVE — nothing is correcting the hot-spot"
       : same
@@ -1119,7 +1168,7 @@ function lensDiagnostic(): string {
     (halves.outreached && mine
       ? ` · YOUR PROFILE STANDS DOWN ON FIT: measured at ${mine.fl}mm` +
         `${Number.isFinite(mine.ap) ? ` f/${mine.ap}` : ""}, reaching ${mine.reach?.toFixed(2)}` +
-        ` where the shipped table reaches ${shipped?.reach?.toFixed(2)} (one stop is 0.35)`
+        ` where the shipped table reaches ${shipped?.reach?.toFixed(2)} (one stop is ${LensStore.REACH_STOP})`
       : "") +
     // A measurement set aside on read is invisible to the reader by
     // construction: the app falls back and keeps working. Say it here.
@@ -1137,7 +1186,7 @@ function lensDiagnostic(): string {
  *  correction without the anchor, which nothing applies. */
 function lensCentreDiagnostic(): string {
   if (!current) return "nothing open";
-  return lensCentreLine(currentLensCurve(), params.lensBypass ? 0 : params.lensFix);
+  return lensCentreLine(landingLensCurve(), params.lensBypass ? 0 : params.lensFix);
 }
 
 /** The curve for the frame the reader has open — both halves, from the two
@@ -1147,8 +1196,22 @@ function lensCentreDiagnostic(): string {
 /** The curve the GRADE should carry for a photograph: none for a raw, whose
  *  pixels already hold the flat (decision 021); the matched curve for an 8-bit
  *  source. Every compileEdit and buildSkyMap call for a picture asks this. */
-function lensForEdit(img: { linear?: Float32Array } | null | undefined, curve: LensCurve | null = currentLensCurve()): LensCurve | null {
-  return img?.linear ? null : curve;
+function lensForEdit(img: { linear?: Float32Array; isRaw?: boolean } | null | undefined, curve: LensCurve | null = currentLensCurve(), ex: ExifSubset | null = currentExif): LensCurve | null {
+  if (img?.linear) return null;
+  // A camera-rendered source takes the brightness half alone (LN1), and a
+  // camera JPEG arrives turned upright by the browser, so the hot spot's
+  // centre turns with it. Raw data is never turned at decode.
+  return lensCurveForSource(curve, { isRaw: !!img?.isRaw, turn: img?.isRaw ? 0 : turnOfOrientation(ex?.orientation) });
+}
+
+/** THE CURVE THAT LANDS ON THE OPEN PHOTOGRAPH, wherever it lands: the whole
+ *  matched curve for a raw, whose linear copy takes it at decode, and what
+ *  `lensForEdit` hands the grade otherwise.
+ *  @returns the curve, or null when nothing lands. Consumers: the card's
+ *    numbers (`centreEffect`), the report's centre line and `lensFixLive`, so
+ *    nothing reports a half the photograph is not getting. */
+function landingLensCurve(): LensCurve | null {
+  return current?.linear ? currentLensCurve() : lensForEdit(current, currentLensCurve(), currentExif);
 }
 
 /** The other half of the same fact: the flat a raw's pixels DO carry, which
@@ -1161,9 +1224,18 @@ function srcFlatOf(img: DecodedImage | null | undefined): SourceFlat | null {
 }
 
 function currentLensCurve(): LensCurve | null {
-  const { colour, bump } = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
+  const { colour, bump, brightness } = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
   if (!colour && !bump) return null;
-  return { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined };
+  return { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined, centre: lensCentreOf(colour, brightness) };
+}
+
+/** Where the curve's hot spot sits: the profile supplying the brightness when
+ *  there is one — the spot IS the brightness half — otherwise the colour's.
+ *  The two are one profile whole unless the reader's own carries no
+ *  brightness curve (`lensHalves`), and then the shipped one sets the place.
+ *  @returns the stored centre, or undefined for the geometric centre. */
+function lensCentreOf(colour: LensStore.StoredProfile | null, brightness: LensStore.StoredProfile | null): [number, number] | undefined {
+  return (brightness ?? colour)?.centre;
 }
 
 /** Called at open, beside initHotspot. */
@@ -8567,9 +8639,10 @@ wireHold(lensCmpBtn, showNoLensFix);
  *  when nothing is. */
 function lensFixLive(): { colour: boolean; bump: boolean } | null {
   if (!activeProfile() || params.lensBypass || (params.lensFix ?? 0) === 0) return null;
-  const h = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
-  const colour = Hotspot.hasColour(h.colour);
-  const bump = !!h.bump && Array.prototype.some.call(h.bump, (v: number) => v > 0);
+  // What LANDS, not what the profile carries: a camera JPEG takes no colour.
+  const c = landingLensCurve();
+  const colour = !!c?.kr && Array.prototype.some.call(c.kr, (v: number) => Math.abs(v - 1) > 1e-4);
+  const bump = !!c?.bump && Array.prototype.some.call(c.bump, (v: number) => v > 0);
   return colour || bump ? { colour, bump } : null;
 }
 
@@ -12971,8 +13044,8 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, o
   // (applySnapshot merges over it), so the tile does the same.
   if (own) bringLensTo(img, lens, { lensFix: own.params.lensFix ?? lensStrengthAtOpen(ex), lensBypass: own.params.lensBypass });
   const tileSample = (x: number, y: number) => linearAt(img, Math.min(img.width - 1, Math.floor(x / s)), Math.min(img.height - 1, Math.floor(y / s)));
-  const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileSky, srcFlatOf(img)) : null;
-  const edit = compileEdit(p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileMap, tileSky, srcFlatOf(img));
+  const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null, ex), tileSky, srcFlatOf(img)) : null;
+  const edit = compileEdit(p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null, ex), tileMap, tileSky, srcFlatOf(img));
   const px = new Float32Array(3);
   const out = new Uint8ClampedArray(ow * oh * 4);
   for (let oy = 0; oy < oh; oy++) {

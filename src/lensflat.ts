@@ -2,13 +2,23 @@
 // applied at decode before anything is measured or graded (decision 021;
 // IR-SCIENCE.md §9c — RawPedia, the DNG GainMap, Lightroom and darktable all
 // finish the correction before the grade). One radial gain table from the
-// matched curve and the photograph's strength; one in-place multiply per pixel;
-// and a RE-APPLY BY RATIO, so a strength change, Bypass, Undo and the bare-decode
-// hold reach the uncorrected picture without a second 80 MB buffer — exact in
-// float because nothing here clips. The gain arithmetic is the one source
+// matched curve and the photograph's strength, read between bin centres as the
+// DNG GainMap reads its gains; one in-place multiply per pixel; and a RE-APPLY
+// BY RATIO, so a strength change, Bypass, Undo and the bare-decode hold reach
+// the uncorrected picture without a second 80 MB buffer — exact in float
+// because nothing here clips. The gain arithmetic is the one source
 // compileEdit's in-grade stage (kept for 8-bit sources, which have no linear
-// copy) also uses, so the two cannot disagree about a ring.
-import { lensBin, lensGainsFor, LENS_GAIN_HI, LENS_GAIN_LO, type LensCurve } from "./pipeline";
+// copy) and the shader also use, so no two of them can disagree about a ring.
+//
+// AND THIS FILE DECIDES WHICH HALF A SOURCE MAY TAKE (`lensCurveForSource`).
+// The colour half is a ratio between camera-native channels measured on raw
+// linear data; a camera JPEG has been through the camera's matrix and tone
+// curve, where the same ratios read 3.5x the raw answer in red and 2.3x in blue
+// (lensprofile.ts). RawTherapee applies a flat field to raw files only and its
+// JPEG/TIFF source carries no flat-field code at all; darktable applies gain
+// maps in rawprepare, to raw data. So a camera-rendered source takes the
+// brightness half and no colour.
+import { lensGainsFor, lensGeom, lensLerp, lensRadius, LENS_GAIN_HI, LENS_GAIN_LO, type LensCurve } from "./pipeline";
 import type { DecodedImage } from "./decode";
 
 /** The per-bin gains one strength applies: red, blue and the brightness half on
@@ -18,6 +28,8 @@ export interface LensGains {
   gr: Float32Array;
   gb: Float32Array;
   gg: Float32Array;
+  /** The hot spot's centre the tables are laid about (`LensCurve.centre`). */
+  c: [number, number];
 }
 
 /** What a decoded photograph was corrected with, carried on the image so a
@@ -40,6 +52,56 @@ export interface LensPlan {
 /** The gain tables — pipeline.ts's `lensGainsFor`, re-exported so every caller
  *  of this module reaches the one source rather than a second copy. */
 export const lensGains = lensGainsFor;
+
+/**
+ * THE HALVES A SOURCE MAY TAKE, in the axes of its pixels.
+ * @param curve  the curve matched to the photograph (`currentLensCurve` /
+ *   `lensCurveFor` in main.ts, the export's `lens`), or null.
+ * @param src  what was decoded: `isRaw` (false for a camera JPEG, PNG, HEIC or
+ *   a raw's embedded preview), and `turn`, the quarter-turns clockwise the
+ *   decoder already rotated the pixels from the sensor — non-zero only for a
+ *   camera JPEG the browser turned upright by its EXIF Orientation.
+ * @returns the curve unchanged for raw data; for a camera-rendered source the
+ *   brightness half alone with the colour half dropped, or null when that
+ *   leaves nothing. `centre` is turned by `turn` so it lands on the hot spot
+ *   in the rotated pixels.
+ * What the result must satisfy: every path that applies a curve to a decoded
+ *   picture passes it through here first — the open photograph's texture
+ *   (`syncLensTexture`), `lensForEdit` (the grade, tiles, sky map), the export
+ *   and the drawn export — and the diagnostic and the cards read it too, so
+ *   what they report is what lands (LN1, 2026-10-02).
+ */
+export function lensCurveForSource(curve: LensCurve | null | undefined, src: { isRaw?: boolean; turn?: number }): LensCurve | null {
+  if (!curve) return null;
+  let centre = curve.centre;
+  const k = (((src.turn ?? 0) % 4) + 4) % 4;
+  if (centre && k) {
+    let x = Number(centre[0]) || 0, y = Number(centre[1]) || 0;
+    // A quarter-turn clockwise carries (x, y) to (-y, x): the top edge's
+    // middle, (0, -1), lands on the right edge's, (1, 0).
+    for (let i = 0; i < k; i++) { const t = x; x = -y; y = t; }
+    centre = [x, y];
+  }
+  if (src.isRaw) return centre === curve.centre ? curve : { ...curve, centre };
+  if (!curve.bump || curve.bump.length < 2) return null;
+  return { bump: curve.bump, centre };
+}
+
+/** The quarter-turns clockwise a browser applies to a camera JPEG from its EXIF
+ *  Orientation (1 none, 3 half, 6 a quarter clockwise, 8 three quarters).
+ *  @param orientation  a JPEG's IFD0 tag (`ExifSubset.orientation`, which is
+ *    absent for a raw file and for a file with none).
+ *  @returns 0..3; the mirrored values (2, 4, 5, 7), which no camera writes for
+ *    a photograph, read as their unmirrored turn.
+ *  Consumer: `lensCurveForSource`'s `turn` for a source the browser decoded. */
+export function turnOfOrientation(orientation: number | undefined): number {
+  switch (orientation) {
+    case 3: case 4: return 2;
+    case 6: case 5: return 1;
+    case 8: case 7: return 3;
+    default: return 0;
+  }
+}
 
 /**
  * WHAT THE CORRECTION DOES TO THE MIDDLE OF THE FRAME, as the diagnostic
@@ -91,13 +153,15 @@ export function lensCentreLine(curve: LensCurve | null | undefined, strength: nu
 /**
  * Apply (or re-apply) the flat to a linear RGBA buffer in place.
  * @param linear  Float32 RGBA, `w * h * 4`, the decode's working copy.
- * @param w  width in pixels; `h` height. The radius mapping uses `w / h`, the
- *   source aspect, as every other caller of `lensBin` does.
+ * @param w  width in pixels; `h` height. The radius is measured on the flat
+ *   (`lensGeom` of `w / h`, about the gains' own centre), as every other
+ *   applier measures it.
  * @param next  the gains to land, or null for none.
- * @param prev  the gains already in the buffer, or null for none; the buffer
- *   is multiplied by `next / prev` per bin, so the pass is its own inverse.
+ * @param prev  the gains already in the buffer, or null for none; each pixel
+ *   is multiplied by `next / prev`, each read between bins at that pixel's
+ *   radius, so the pass is its own inverse.
  * @returns nothing; the buffer is changed in place. A pixel keeps its value
- *   where `next` and `prev` agree, and a `prev` bin of 0 is left alone rather
+ *   where `next` and `prev` agree, and a `prev` gain of 0 is left alone rather
  *   than divided by.
  * What the result must satisfy: applying `next` then re-applying with
  *   `prev = next` and `next = null` returns the buffer to within float
@@ -106,32 +170,37 @@ export function lensCentreLine(curve: LensCurve | null | undefined, strength: nu
  */
 export function applyLensFlat(linear: Float32Array, w: number, h: number, next: LensGains | null, prev: LensGains | null): void {
   if (!next && !prev) return;
-  if (next && prev && next.n !== prev.n) {
-    // Different bin counts cannot be divided ring for ring: undo the old table
-    // first, then lay the new one — two passes, still exact.
-    applyLensFlat(linear, w, h, null, prev);
-    applyLensFlat(linear, w, h, next, null);
-    return;
-  }
-  const n = (next ?? prev)!.n;
   const aspect = w / Math.max(1, h);
-  const rr = new Float32Array(n), rg = new Float32Array(n), rb = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const pr = prev ? prev.gr[i] : 1, pg = prev ? prev.gg[i] : 1, pb = prev ? prev.gb[i] : 1;
-    rr[i] = pr > 0 ? (next ? next.gr[i] : 1) / pr : 1;
-    rg[i] = pg > 0 ? (next ? next.gg[i] : 1) / pg : 1;
-    rb[i] = pb > 0 ? (next ? next.gb[i] : 1) / pb : 1;
-  }
-  // One bin per pixel through the same lensBin the grade used, so a ring is the
-  // same ring in both places.
+  const gN = next ? lensGeom(aspect, next.c) : null;
+  const gP = prev ? lensGeom(aspect, prev.c) : null;
+  const sameCentre = !!(gN && gP && gN.cx === gP.cx && gN.cy === gP.cy);
+  // Each table read between bins at the pixel's own radius, through the same
+  // lensLerp and lensRadius the grade and the shader use, so a ring is the same
+  // ring in every place. The RATIO is taken after the reads, never between two
+  // tables, because a straight line through ratios is not the ratio of two
+  // straight lines and the round trip would stop being exact.
   for (let y = 0; y < h; y++) {
     const v = (y + 0.5) / h;
     let o = y * w * 4;
     for (let x = 0; x < w; x++, o += 4) {
-      const i = lensBin((x + 0.5) / w, v, aspect, n);
-      linear[o] *= rr[i];
-      linear[o + 1] *= rg[i];
-      linear[o + 2] *= rb[i];
+      const u = (x + 0.5) / w;
+      let fr = 1, fg = 1, fb = 1;
+      const rN = gN ? lensRadius(u, v, gN) : 0;
+      if (next) {
+        fr = lensLerp(next.gr, rN, next.n);
+        fg = lensLerp(next.gg, rN, next.n);
+        fb = lensLerp(next.gb, rN, next.n);
+      }
+      if (prev) {
+        const rP = sameCentre ? rN : lensRadius(u, v, gP!);
+        const pr = lensLerp(prev.gr, rP, prev.n), pg = lensLerp(prev.gg, rP, prev.n), pb = lensLerp(prev.gb, rP, prev.n);
+        fr = pr > 0 ? fr / pr : 1;
+        fg = pg > 0 ? fg / pg : 1;
+        fb = pb > 0 ? fb / pb : 1;
+      }
+      linear[o] *= fr;
+      linear[o + 1] *= fg;
+      linear[o + 2] *= fb;
     }
   }
 }
@@ -146,7 +215,7 @@ export function applyLensFlat(linear: Float32Array, w: number, h: number, next: 
 export function lensPlanStamp(curve: LensCurve | null | undefined): string {
   if (!curve) return "";
   const sig = (a?: ArrayLike<number>) => (a && a.length ? `${a.length}:${Number(a[0]).toFixed(4)}:${Number(a[a.length >> 1]).toFixed(4)}:${Number(a[a.length - 1]).toFixed(4)}` : "-");
-  return `${sig(curve.kr)}|${sig(curve.kb)}|${sig(curve.bump)}`;
+  return `${sig(curve.kr)}|${sig(curve.kb)}|${sig(curve.bump)}|${sig(curve.centre)}`;
 }
 
 /**

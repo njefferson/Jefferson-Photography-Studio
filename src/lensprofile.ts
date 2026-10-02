@@ -270,6 +270,137 @@ const SRGB_LIN = (() => {
   return t;
 })();
 
+/** How far from the frame's middle a hot spot's estimated centre may sit, as
+ *  a fraction of the half-diagonal, before the estimate is called a cloud or a
+ *  ramp rather than a lens. Lensfun's database carries centre offsets of a few
+ *  percent; a quarter of the half-diagonal is well past any of them and well
+ *  short of the reference ring the curves are normalised in. */
+export const SPOT_CENTRE_MAX = 0.25;
+
+/** Below this excess over the fitted ramp and vignette, a flat's middle holds
+ *  no spot to place: one percent, a few times the 8-bit step a rendered flat
+ *  quantises to. A lens with no hot spot reads well under it (0.2% on a
+ *  synthetic cos⁴ flat with a 10% ramp), so it stores no centre and is
+ *  measured about the middle as before. */
+const SPOT_MIN_EXCESS = 0.01;
+
+/**
+ * WHERE THE HOT SPOT ACTUALLY SITS IN ONE FLAT.
+ *
+ * Every profile used to be measured and applied about the frame's geometric
+ * centre, and nothing stored any other. Kolari: "the hotspot is not always
+ * perfectly centered" (IR-SCIENCE.md 9a); the DNG FixVignetteRadial opcode
+ * carries an optical centre `(cx, cy)` for exactly this, and lensfun shifts its
+ * vignetting model by the lens's own `CenterX`/`CenterY`. A spot a few percent
+ * off-centre measured about the middle is smeared into its rings and then laid
+ * back as a centred disc — an over-correction on one side and an under one on
+ * the other.
+ *
+ * THE ESTIMATE IS THE CENTROID OF THE BRIGHT CORE, after the sky's ramp AND
+ * the lens's vignette are divided out. Both are fitted together OUTSIDE
+ * r = REF_LO, where the spot is absent, as one least-squares surface in log
+ * brightness: `1, x, y` for the ramp (a gradient is a factor, so it is linear
+ * in the log) and `r², r⁴` about the frame's middle for the vignette, the
+ * even polynomial a vignette is modelled with (the falloff fits in this file
+ * use the same terms). Fitted over the whole frame, the surface would absorb
+ * the first moment of an off-centre spot; fitted without the vignette — a
+ * plane, as this was first written — the centred vignette stays in the excess
+ * and drags the centroid back to the middle: a spot planted 0.094 out on a
+ * cos⁴ flat read 0.035 that way and 0.094 this way (a design check of the
+ * two, 2026-10-02). The excess over the reference ring's level is then
+ * thresholded at half its peak, and the excess above that half is the
+ * weight. Half maximum is the usual way to place a peak.
+ *
+ * @param img  the decoded flat: linear sensor data or 8-bit sRGB, in the
+ *   orientation it was decoded in.
+ * @returns `[x, y]` from the frame's geometric centre, x right and y down, in
+ *   units of the half-diagonal, in the DECODED frame's axes — or null when the
+ *   flat's middle is not bright enough to place (under SPOT_MIN_EXCESS) or the
+ *   centroid lands further than SPOT_CENTRE_MAX out.
+ * What the result must satisfy: a value `centreProblem` (lensstore.ts)
+ *   accepts, since it is what the profile stores; and on a flat whose spot is
+ *   centred it is within a fraction of a bin of [0, 0] — the rig test plants
+ *   a known offset and reads it back.
+ */
+export function spotCentre(img: DecodedImage): [number, number] | null {
+  const w = img.width, h = img.height;
+  const lin = img.linear, px = img.pixels;
+  if (!lin && !px) return null;
+  const gx = (w - 1) / 2, gy = (h - 1) / 2, Rd = Math.hypot(gx, gy);
+  const step = Math.max(1, Math.round(Math.sqrt((w * h) / 2e5)));
+  const xs: number[] = [], ys: number[] = [], rs: number[] = [], ls: number[] = [];
+  for (let y = 0; y < h; y += step) for (let x = 0; x < w; x += step) {
+    const o = (y * w + x) * 4;
+    const L = lin ? (lin[o] + lin[o + 1] + lin[o + 2]) / 3
+                  : (SRGB_LIN[px![o]] + SRGB_LIN[px![o + 1]] + SRGB_LIN[px![o + 2]]) / 3;
+    if (!Number.isFinite(L)) continue;
+    xs.push((x - gx) / Rd); ys.push((y - gy) / Rd); rs.push(Math.hypot(x - gx, y - gy) / Rd); ls.push(L);
+  }
+  // The ramp and the vignette, from the ring and beyond only, in log
+  // brightness (see above).
+  const terms = (i: number) => { const r2 = rs[i] * rs[i]; return [1, xs[i], ys[i], r2, r2 * r2]; };
+  const K = 5;
+  const A = Array.from({ length: K }, () => new Array<number>(K).fill(0)), b = new Array<number>(K).fill(0);
+  for (let i = 0; i < ls.length; i++) {
+    if (rs[i] < REF_LO || !(ls[i] > 0)) continue;
+    const f = terms(i), t = Math.log(ls[i]);
+    for (let r = 0; r < K; r++) { b[r] += f[r] * t; for (let c = 0; c < K; c++) A[r][c] += f[r] * f[c]; }
+  }
+  const co = solveN(A, b);
+  if (!co) return null;
+  const flat = (i: number) => { const f = terms(i); let t = 0; for (let k = 0; k < K; k++) t += co[k] * f[k]; return ls[i] / Math.exp(t); };
+  let ref = 0, nRef = 0;
+  for (let i = 0; i < ls.length; i++) if (rs[i] >= REF_LO && rs[i] <= REF_HI) { ref += flat(i); nRef++; }
+  if (!nRef || !(ref > 0)) return null;
+  ref /= nRef;
+  // The excess inside the middle half of the radius, and its peak taken as a
+  // high quantile rather than the maximum so one hot pixel cannot set it.
+  const inner: number[] = [];
+  const ex: number[] = [];
+  for (let i = 0; i < ls.length; i++) {
+    if (rs[i] >= 0.5) continue;
+    inner.push(i); ex.push(flat(i) / ref - 1);
+  }
+  if (!ex.length) return null;
+  const sorted = Float64Array.from(ex).sort();
+  const peak = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.995))];
+  if (!(peak >= SPOT_MIN_EXCESS)) return null;
+  const half = peak / 2;
+  let sw = 0, sx = 0, sy = 0;
+  for (let j = 0; j < inner.length; j++) {
+    const wgt = ex[j] - half;
+    if (wgt <= 0) continue;
+    sw += wgt; sx += wgt * xs[inner[j]]; sy += wgt * ys[inner[j]];
+  }
+  if (!(sw > 0)) return null;
+  const c: [number, number] = [sx / sw, sy / sw];
+  return Math.hypot(c[0], c[1]) <= SPOT_CENTRE_MAX ? c : null;
+}
+
+/** An n×n solve by elimination with partial pivoting, or null when singular. */
+function solveN(A0: number[][], b0: number[]): number[] | null {
+  const n = b0.length;
+  const A = A0.map((r) => [...r]), b = [...b0];
+  for (let i = 0; i < n; i++) {
+    let piv = i;
+    for (let k = i + 1; k < n; k++) if (Math.abs(A[k][i]) > Math.abs(A[piv][i])) piv = k;
+    if (Math.abs(A[piv][i]) < 1e-12) return null;
+    [A[i], A[piv]] = [A[piv], A[i]]; [b[i], b[piv]] = [b[piv], b[i]];
+    for (let k = i + 1; k < n; k++) {
+      const f = A[k][i] / A[i][i];
+      for (let j = i; j < n; j++) A[k][j] -= f * A[i][j];
+      b[k] -= f * b[i];
+    }
+  }
+  const x = new Array<number>(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    let acc = b[i];
+    for (let j = i + 1; j < n; j++) acc -= A[i][j] * x[j];
+    x[i] = acc / A[i][i];
+  }
+  return x.every(Number.isFinite) ? x : null;
+}
+
 export interface RadialMeans {
   /** Per-channel linear mean per bin; NaN where a bin caught no pixels. */
   r: Float64Array;
@@ -294,6 +425,15 @@ export interface RadialMeans {
 
 /** Walk the decoded frame and accumulate per-channel linear means by radius.
  *
+ *  @param img  the decoded flat.
+ *  @param centre  where to measure the radius from, as `spotCentre` gives it
+ *    (decoded frame's axes, units of the half-diagonal), or absent/null for
+ *    the geometric centre.
+ *  @returns per-ring channel levels, counts and the frame's quality readings;
+ *    r = 1 is the frame's half-diagonal FROM ITS MIDDLE whichever centre is
+ *    used, so a bin means one distance on every profile — what
+ *    pipeline.ts `lensGeom` reads it as. Consumer: `profileFrame`.
+ *
  *  THIS IS THE COST OF MEASURING A FRAME, not the decode. Timed on a binned
  *  20 MP raw (2784x1856, which is what the raw path actually hands over):
  *  310 ms here against 95 ms to decode the file in the first place. Two things
@@ -308,10 +448,13 @@ export interface RadialMeans {
  *  A quarter of that is still thousands in the thinnest ring — bin 0 spans a
  *  21-pixel radius on that frame and keeps ~350 samples — and the profile does
  *  not move. One million is the target now. */
-export function radialMeans(img: DecodedImage): RadialMeans {
+export function radialMeans(img: DecodedImage, centre?: [number, number] | null): RadialMeans {
   const w = img.width, h = img.height;
-  const cx = (w - 1) / 2, cy = (h - 1) / 2;
-  const Rd = Math.hypot(cx, cy);
+  // About the spot's own centre when one was found (`spotCentre`), still in
+  // units of the frame's half-diagonal: r = 1 is the same distance either way,
+  // so the bins mean what the applier reads them as (pipeline.ts lensGeom).
+  const Rd = Math.hypot((w - 1) / 2, (h - 1) / 2);
+  const cx = (w - 1) / 2 + (centre ? centre[0] * Rd : 0), cy = (h - 1) / 2 + (centre ? centre[1] * Rd : 0);
   const sr = new Float64Array(NBINS), sg = new Float64Array(NBINS), sb = new Float64Array(NBINS);
   const cnt = new Float64Array(NBINS);
   // Sum and sum-of-squares of each pixel's brightness, per ring, for the
@@ -752,11 +895,30 @@ export interface FrameProfile {
   /** Rings where the estimate came from fewer sectors than were present — the
    *  frame was rescued at that radius rather than believed. */
   rescuedRings: number;
+  /** Where the hot spot sat (`spotCentre`), turned back into the SENSOR's axes
+   *  — the frame was measured about it — or null when it could not be placed,
+   *  in which case the frame was measured about the geometric centre. */
+  centre: [number, number] | null;
 }
 
-/** One flat frame -> one profile. */
-export function profileFrame(img: DecodedImage): FrameProfile {
-  const m = radialMeans(img);
+/** One flat frame -> one profile.
+ *  @param img  the decoded flat.
+ *  @param turn  the quarter-turns clockwise the decoder rotated the pixels from
+ *    the sensor — a camera JPEG the browser turned upright by its Orientation;
+ *    0 for raw data, which decodes in the sensor's own axes.
+ *  @returns the profile, measured about the hot spot's own centre where
+ *    `spotCentre` could place one, with that centre turned back into the
+ *    sensor's axes so every profile stores one frame of reference. */
+export function profileFrame(img: DecodedImage, turn = 0): FrameProfile {
+  const seen = spotCentre(img);
+  const m = radialMeans(img, seen);
+  let centre: [number, number] | null = null;
+  if (seen) {
+    let x = seen[0], y = seen[1];
+    // Undo `turn` quarter-turns clockwise: each step carries (x, y) to (y, -x).
+    for (let i = 0; i < ((turn % 4) + 4) % 4; i++) { const t = x; x = y; y = -t; }
+    centre = [x, y];
+  }
   const falloff = new Float64Array(NBINS).fill(NaN);
   const kr = new Float64Array(NBINS).fill(NaN);
   const kb = new Float64Array(NBINS).fill(NaN);
@@ -767,7 +929,7 @@ export function profileFrame(img: DecodedImage): FrameProfile {
   // below. Named in one place so the two can never drift apart.
   const colour = refG >= (m.linear ? GREEN_FLOOR_RAW : GREEN_FLOOR);
   const bad = (why: string): FrameProfile =>
-    ({ falloff, kr, kb, colour, bumpRange: [NaN, NaN], falloffAtCorner: NaN, usable: false, why, clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear, goodTo: 0, rescuedRings: 0 });
+    ({ falloff, kr, kb, colour, bumpRange: [NaN, NaN], falloffAtCorner: NaN, usable: false, why, clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear, goodTo: 0, rescuedRings: 0, centre });
   if (!(refR > 0) || !(refG > 0) || !(refB > 0)) return bad("the reference ring caught nothing to measure");
   // AND THE REFERENCE RING ITSELF HAS TO HAVE SURVIVED. Every curve here is
   // divided by the level in r 0.55-0.72, so a frame whose estimate runs out
@@ -834,11 +996,11 @@ export function profileFrame(img: DecodedImage): FrameProfile {
 
   // Both baselines, only so the gap between them can be reported. Neither
   // result is written into the profile — see the header for why.
-  const centre = falloff[0];
+  const mid = falloff[0];
   const poly = fitVignette(falloff, m.counts, BASE_RMIN)(binR(0));
   const cos4 = fitCos4(falloff, m.counts, BASE_RMIN)(binR(0));
-  const lo = Math.max(0, centre / Math.max(poly, cos4) - 1);
-  const hi = Math.max(0, centre / Math.min(poly, cos4) - 1);
+  const lo = Math.max(0, mid / Math.max(poly, cos4) - 1);
+  const hi = Math.max(0, mid / Math.min(poly, cos4) - 1);
 
   // The corner value comes from the DATA, not from either fit: the outermost
   // bin that actually caught pixels. An earlier version reported a fitted
@@ -847,14 +1009,22 @@ export function profileFrame(img: DecodedImage): FrameProfile {
   let corner = NaN;
   for (let i = NBINS - 1; i >= 0; i--) if (Number.isFinite(falloff[i]) && m.counts[i] >= 32) { corner = falloff[i]; break; }
 
-  return { falloff, kr, kb, colour, bumpRange: [lo, hi], falloffAtCorner: corner, usable: true, why: "", clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear, goodTo, rescuedRings };
+  return { falloff, kr, kb, colour, bumpRange: [lo, hi], falloffAtCorner: corner, usable: true, why: "", clipFrac: m.clipFrac, meanLevel: m.meanLevel, structure: m.structure, linear: m.linear, goodTo, rescuedRings, centre };
 }
 
 /** Average several frames of the same lens and focal length. Bins where a
  *  frame had nothing are skipped rather than counted as zero — a NaN averaged
  *  in as 0 would pull a real bump down toward nothing and look like a
- *  measurement rather than a gap. */
-export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: number[]; kb: number[]; bumpRange: [number, number]; n: number; colourFrames: number; space: "raw" | "rendered"; setAside: number } {
+ *  measurement rather than a gap.
+ *  @param fs  the group's frame profiles, usable or not.
+ *  @returns the averaged curves, the bump range, how many frames went in and
+ *    which space they were measured in, and `centre` — the per-axis median of
+ *    the frames that placed the spot, or null unless most of them did.
+ *  What the result must satisfy: the curves and `centre` go into the rig's
+ *    payload, and `saveFromPayload` (lensstore.ts) must accept them —
+ *    `colourProblem`, `bumpProblem` and `centreProblem` — or the profile saves
+ *    and is refused on read. */
+export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: number[]; kb: number[]; bumpRange: [number, number]; n: number; colourFrames: number; space: "raw" | "rendered"; setAside: number; centre: [number, number] | null } {
   const usable = fs.filter((f) => f.usable);
   // ONE SPACE PER PROFILE, AND THE CHOICE IS MADE HERE RATHER THAN BY THE CALLER.
   //
@@ -910,6 +1080,14 @@ export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: nu
   const loEnds = use.map((f) => f.bumpRange[0]).filter(Number.isFinite);
   const hiEnds = use.map((f) => f.bumpRange[1]).filter(Number.isFinite);
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
+  // THE CENTRE IS THE MEDIAN OF THE FRAMES THAT PLACED ONE, per axis, and only
+  // when most of them did: each frame was measured about its own estimate, so
+  // their curves are the same spot's profile and average as they always have.
+  // A group where most frames could not place it keeps the geometric centre,
+  // which is what every one of those frames was measured about.
+  const cs = use.map((f) => f.centre).filter((c): c is [number, number] => !!c);
+  const med = (xs: number[]) => { const t = [...xs].sort((a, b) => a - b); const k = t.length >> 1; return t.length % 2 ? t[k] : (t[k - 1] + t[k]) / 2; };
+  const centre: [number, number] | null = cs.length && cs.length * 2 > use.length ? [med(cs.map((c) => c[0])), med(cs.map((c) => c[1]))] : null;
   return {
     falloff: avg((f) => f.falloff), kr: avgColour((f) => f.kr), kb: avgColour((f) => f.kb),
     bumpRange: [mean(loEnds), mean(hiEnds)],
@@ -917,6 +1095,7 @@ export function averageProfiles(fs: FrameProfile[]): { falloff: number[]; kr: nu
     colourFrames: colourFs.length,
     space,
     setAside,
+    centre,
   };
 }
 

@@ -21,16 +21,45 @@ export interface ExifSubset {
   iso?: number;
   focalLength?: [number, number];
   lens?: string;
+  /** A JPEG's IFD0 Orientation (1..8), READ ONLY: never written into an
+   *  export (the writers below build their tags from the other fields by
+   *  name). A browser turns a camera JPEG upright by it as it decodes, so the
+   *  lens correction needs it to find the hot spot's centre in the turned
+   *  pixels (lensflat.ts `turnOfOrientation`). ABSENT for a TIFF-family file
+   *  (NEF, DNG): its decoder keeps the sensor's axes and carries the tag as a
+   *  display rotation (decode.ts `orientationToRotate`), and a raw's embedded
+   *  preview is decoded from a bitstream that does not carry it — so the field
+   *  means "the turn already in the decoded pixels" and nothing else. */
+  orientation?: number;
+  /** SubjectDistance (0x9206) in metres, READ ONLY, when the camera wrote one:
+   *  absent for 0 (unknown) and for 0xFFFFFFFF (infinity, which the lens match
+   *  reads the same as no distance). The lens match uses it beside focal length
+   *  and aperture, as lensfun does (lensstore.ts `matchIn`). The Nikon Z 50
+   *  does not write it. */
+  subjectDistance?: number;
 }
 
 const TYPE_SIZE: Record<number, number> = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8 };
 
-/** Read the subset from a JPEG (EXIF APP1) or TIFF-family (DNG/NEF) file. */
+/** Read the subset from a JPEG (EXIF APP1) or TIFF-family (DNG/NEF) file.
+ *  @param bytes  the whole file, or its head (the lens rig reads 256 KB).
+ *  @returns the fields found — the first occurrence of each tag wins, so IFD0's
+ *    Orientation is read before a thumbnail IFD's — or null when the file
+ *    carries none of the exported fields. Throws only on bytes it cannot walk.
+ *  What the result must satisfy: `orientation` is present only for a JPEG,
+ *    being the turn the browser lays on its pixels; it and `subjectDistance`
+ *    are READ ONLY — `ifd0ExtraEntries` and `exifIfdEntries` never write them, so an
+ *    export's EXIF stays the honest subset; consumers are the lens match
+ *    (lensstore.ts), the lens correction's turn (lensflat.ts) and the exports'
+ *    EXIF writers. */
 export function readExifSubset(bytes: Uint8Array): ExifSubset | null {
   try {
     const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length > 8 && (v.getUint16(0) === 0x4949 || v.getUint16(0) === 0x4d4d)) {
-      return readTiffSubset(v, bytes, 0, bytes.length);
+      // A raw's Orientation turns no pixels at decode (see `orientation`).
+      const s = readTiffSubset(v, bytes, 0, bytes.length);
+      if (s) delete s.orientation;
+      return s;
     }
     if (bytes.length > 4 && v.getUint16(0) === 0xffd8) {
       let off = 2;
@@ -92,6 +121,11 @@ function readTiffSubset(v: DataView, bytes: Uint8Array, base: number, end: numbe
     else if (tag === 0x8827 && (typ === 3 || typ === 4)) out.iso ??= typ === 3 ? u16(vo) : u32(vo);
     else if (tag === 0x920a) out.focalLength ??= rational();
     else if (tag === 0xa434) out.lens ??= ascii();
+    else if (tag === 0x0112 && typ === 3) out.orientation ??= u16(vo);
+    else if (tag === 0x9206) {
+      const d = rational();
+      if (d && d[1] && d[0] && d[0] !== 0xffffffff) out.subjectDistance ??= d[0] / d[1];
+    }
     return { tag, typ };
   };
 

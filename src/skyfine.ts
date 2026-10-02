@@ -16,7 +16,10 @@
 // sky (luma alone read the bright sky round a crown as the crown's side and
 // left a halo), and pale horizon haze is as neutral as a dark roof (colour
 // alone read the haze band above a roofline as roof and left a pale rim).
-// With all three, the per-window fit uses whichever separates there. Built
+// With all three, the per-window fit uses whichever separates there — once the
+// two colour shares are brought to luma's spread inside `refineSkyMask`; before
+// 2026-10-02 one ε sat 16-50 times above their variance at an edge and the fit
+// ran on luma alone while this sentence said otherwise. Built
 // once per photograph beside the bitmap, sampled bilinearly by the shader
 // (u_skyFineTex) and by compileEdit (the brush sampler), never rebuilt per
 // edit.
@@ -36,8 +39,15 @@ export const SKY_FINE_EDGE = 1024;
  *  ramp to pull it to the photograph's edge, and a window wider still lets
  *  the sky's own gradient leak into the fit. */
 export const SKY_FINE_RADIUS = 12;
-/** Regularisation on the guide's covariance, in guide units squared (every
- *  channel runs 0..1). Smaller follows fainter edges and admits more noise. */
+/** Regularisation on the guide's covariance, in LUMA units squared: the colour
+ *  shares are scaled to luma's frame spread before the fit (`refineSkyMask`),
+ *  so this one ε lands on them at 0.005/k² in their own units, k being luma's
+ *  spread over theirs — 39 to 178 on NIR_1651, NIR_1667 and NIR_1376, so
+ *  3e-5 to 1.3e-4, under their 9e-5 to 3e-4 variance in a window that straddles
+ *  the selection's edge, where the colour has to act. Smaller follows fainter
+ *  edges and admits more noise: measured on those three frames, ε 1e-4 in these
+ *  units moved edge coverage by at most 1.3 points over 0.005 and raised the
+ *  selection's grain in the edge band by 8% to 47% (IR-SCIENCE.md 4b-v). */
 export const SKY_FINE_EPS = 0.005;
 const REC = [0.2126, 0.7152, 0.0722];
 
@@ -108,6 +118,21 @@ export function buildSkyGuide(
   return { w, h, r, b, l };
 }
 
+/** A channel's spread across the frame, robustly: 1.4826 × its median absolute
+ *  deviation from its median (the normal-consistent MAD), over at most 65,536
+ *  evenly strided pixels. Used by `refineSkyMask` to bring the guide's channels
+ *  to one range; 0 for a channel that does not vary. */
+function robustSpread(a: Float32Array): number {
+  const step = Math.max(1, Math.floor(a.length / 65536));
+  const t: number[] = [];
+  for (let i = 0; i < a.length; i += step) if (Number.isFinite(a[i])) t.push(a[i]);
+  if (!t.length) return 0;
+  t.sort((x, y) => x - y);
+  const m = t[t.length >> 1];
+  const d = t.map((v) => Math.abs(v - m)).sort((x, y) => x - y);
+  return 1.4826 * d[d.length >> 1];
+}
+
 /** Box mean of `src` over a (2r+1)² window clamped at the borders, into `out`,
  *  through a summed-area table held in `sat` (sized (w+1)·(h+1)). */
 function boxMean(src: Float32Array, w: number, h: number, r: number, out: Float32Array, sat: Float64Array): void {
@@ -169,8 +194,28 @@ function maskAt(m: BrushMask, u: number, v: number): number {
  * stays true.
  */
 export function refineSkyMask(mask: BrushMask, guide: SkyGuide, r = SKY_FINE_RADIUS, eps = SKY_FINE_EPS): BrushMask {
-  const { w, h, r: I1, b: I2, l: I3 } = guide;
+  const { w, h, l: I3 } = guide;
   const n = w * h;
+  // THE COLOUR SHARES BROUGHT TO LUMA'S SPREAD before anything is fitted. One ε
+  // goes on every channel's variance (He, Sun & Tang, TPAMI 2013 eq. 19:
+  // Σ_k + εU, U the identity), which assumes channels that share one range —
+  // their colour guide is RGB. These do not: a red or blue share varies 7 to
+  // 12 times less than gamma luma across a frame (std 0.019-0.031 against
+  // 0.17-0.23), so its variance in a window straddling the selection's edge,
+  // 9e-5 to 3e-4, sat 16 to 50 times under the old ε of 0.005, and a channel
+  // whose variance is far under ε gets a coefficient near zero ("patches with
+  // variance much smaller than ε are smoothed", §3.2). The filter ran on luma
+  // alone while this file said it used whichever channel separates. Scaled
+  // here, inside the filter, so the guide keeps its own units for the grow
+  // (skyGrowKey, skyGrowGradient), which reads them as shares.
+  const sl = Math.max(1e-3, robustSpread(I3));
+  const scaled = (a: Float32Array): Float32Array => {
+    const k = sl / Math.max(1e-6, robustSpread(a));
+    const o = new Float32Array(n);
+    for (let i = 0; i < n; i++) o[i] = a[i] * k;
+    return o;
+  };
+  const I1 = scaled(guide.r), I2 = scaled(guide.b);
   const p = new Float32Array(n);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) p[y * w + x] = maskAt(mask, (x + 0.5) / w, (y + 0.5) / h) >= 0.5 ? 1 : 0;
   const sat = new Float64Array((w + 1) * (h + 1));

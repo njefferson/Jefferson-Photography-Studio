@@ -28,6 +28,8 @@ import { srgbDisplayToP3Display } from "./icc";
 import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
 import type { EditParams, LensCurve } from "./pipeline";
+import { lensCurveForSource, turnOfOrientation } from "./lensflat";
+import { readExifSubset } from "./exif";
 
 export interface DrawnFrame {
   data: Uint8ClampedArray;
@@ -254,7 +256,10 @@ export async function drawFrame(
     // would give. Read from the same function the computed export uses, so the
     // two cannot disagree about it.
     r.setTapScale(proxyFactorFor(src, image.width, image.height));
-    r.setLensCurve(lens?.kr ?? null, lens?.kb ?? null, lens?.bump ?? null);
+    // The halves this source may take (lensflat.ts lensCurveForSource): a
+    // camera-rendered picture takes the brightness half alone. A raw here is a
+    // fresh demosaic without the decode's flat, so it takes the whole curve.
+    r.setLensCurve(lensCurveForSource(lens, { isRaw: current.isRaw, turn: file.kind === "jpeg" ? turnOfOrientation(readExifSubset(file.bytes)?.orientation) : 0 }));
     r.setToneCurve(params.tone, params.toneR, params.toneG, params.toneB);
     r.setRotation(rotate);
     r.setFlip(flip);

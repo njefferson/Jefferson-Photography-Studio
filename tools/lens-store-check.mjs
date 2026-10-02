@@ -28,12 +28,16 @@ import { pathToFileURL } from "node:url";
 const dir = mkdtempSync(join(tmpdir(), "lensstore-"));
 const entry = join(dir, "entry.ts");
 writeFileSync(entry, `export { bumpFrom, bumpProblem } from ${JSON.stringify(join(process.cwd(), "src/lensstore.ts"))};
-export { matchIn } from ${JSON.stringify(join(process.cwd(), "src/lensstore.ts"))};
+export { matchIn, withheldFor, centreProblem, saveFromPayload, listProfiles } from ${JSON.stringify(join(process.cwd(), "src/lensstore.ts"))};
 export { lensHalves } from ${JSON.stringify(join(process.cwd(), "src/hotspot.ts"))};
 export { NBINS } from ${JSON.stringify(join(process.cwd(), "src/lensprofile.ts"))};`);
 const out = join(dir, "bundle.mjs");
 await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
-const { bumpFrom, bumpProblem, NBINS, lensHalves, matchIn } = await import(pathToFileURL(out).href);
+// A localStorage for node, so the store's two doors can be exercised for real
+// rather than read about: the same getItem/setItem the browser gives it.
+const mem = new Map();
+globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); }, removeItem: (k) => { mem.delete(k); } };
+const { bumpFrom, bumpProblem, NBINS, lensHalves, matchIn, withheldFor, centreProblem, saveFromPayload, listProfiles } = await import(pathToFileURL(out).href);
 
 let bad = 0;
 const fail = (s) => { bad++; console.log(`FAIL  ${s}`); };
@@ -312,12 +316,14 @@ const shippedBumpOnly = prof({ bump: BUMP });
     bump: curve2(0.05), frames: 2, source: "raw", camera: "BODY", measured: "x", ...o,
   });
   const curve2 = (peak) => Array.from({ length: NBINS }, (_, i) => Math.max(0, peak * (1 - i / 20)));
-  // NO make/model ON THE FRAME. `forCamera` withholds colour when both cameras
-  // are known and differ, and a fixture whose camera string does not match the
-  // one `cameraOf` builds gets its colour blanked — which reads as "no colour
-  // matched" and fails this case for a reason that is not the one under test.
-  // It did exactly that on the first run.
-  const frame = (fl, ap) => ({ lens: LENS2, focalLength: [fl, 1], fNumber: [ap, 1] });
+  // THE FRAME NAMES THE BODY THE PROFILES WERE MEASURED ON. The matcher
+  // refuses a profile from any other make and model outright (both halves, as
+  // RawTherapee's ffInfo::distance does), so a fixture whose camera string does
+  // not match the one `cameraOf` builds matches nothing — which would fail
+  // this case for a reason that is not the one under test. Before 2026-10-02
+  // the same mismatch blanked only the colour, and it did that on this case's
+  // first run too.
+  const frame = (fl, ap) => ({ make: "BODY", lens: LENS2, focalLength: [fl, 1], fNumber: [ap, 1] });
 
   // BOTH SIDES ARE `raw` ON PURPOSE, so this is about reach and nothing else —
   // otherwise the provenance rule above would hold the colour back and the case
@@ -349,6 +355,148 @@ const shippedBumpOnly = prof({ bump: BUMP });
       ? ok("no table to fall back to: the far measurement is still better than nothing")
       : fail("standing down in favour of no correction at all is the worse answer");
   }
+}
+
+{
+  // THE BODY HAS TO MATCH, AND THEN NEITHER HALF CROSSES (2026-10-02).
+  //
+  // The matcher keyed on the lens string alone and withheld only the colour,
+  // only when both cameras were known and differed; the brightness half was
+  // applied to any body, as lens "geometry that transfers". Kolari shows the
+  // conversion making or removing the spot on the same lens, and RawTherapee's
+  // ffInfo::distance returns INFINITY for another maker, model or lens.
+  const LENS3 = "TEST BODY 16-50mm";
+  const p3 = (fl, ap, camera) => ({
+    key: `${fl}@${ap}`, model: LENS3, fl, ap, kr: KR_REAL, kb: KR_REAL,
+    bump: Array.from({ length: NBINS }, (_, i) => Math.max(0, 0.2 * (1 - i / 20))), frames: 3, source: "raw", camera, measured: "x",
+  });
+  const table = [p3(25, 8, "MAKER BODY ONE")];
+  const at = (make, model) => ({ make, model, lens: LENS3, focalLength: [25, 1], fNumber: [8, 1] });
+  matchIn(table, at("MAKER", "BODY ONE"))
+    ? ok("the body the profile was measured on: matched")
+    : fail("a frame from the profile's own body must match");
+  const other = matchIn(table, at("MAKER", "BODY TWO"));
+  other === null
+    ? ok("another body: nothing matched — neither the colour nor the brightness crosses")
+    : fail(`another body got a profile (${other.bump ? "WITH its brightness curve" : "colour"}) — the spot depends on the conversion, and RawTherapee refuses it`);
+  const unnamed = matchIn(table, { lens: LENS3, focalLength: [25, 1], fNumber: [8, 1] });
+  unnamed === null
+    ? ok("a frame that names no camera: nothing matched, as RawTherapee's string compare gives")
+    : fail("a frame with no make or model cannot be shown to be the profile's body");
+  const why = withheldFor(table, at("MAKER", "BODY TWO"));
+  why && why.measuredOn === "MAKER BODY ONE" && why.frame === "MAKER BODY TWO"
+    ? ok(`the withheld reason names both bodies (${why.measuredOn} / ${why.frame}), for the card`)
+    : fail(`withheldFor must name the profile's body and the frame's, got ${JSON.stringify(why)}`);
+  withheldFor(table, at("MAKER", "BODY ONE")) === null && withheldFor(table, { lens: "SOME OTHER LENS" }) === null
+    ? ok("no withheld reason when it matched, or when the lens has no profile at all")
+    : fail("withheldFor must be null for a match and for an unknown lens");
+  matchIn(table, at("MAKER", "BODY TWO"), { anyBody: true })
+    ? ok("a lens picked by hand crosses bodies, as RawTherapee's manual flat-field choice does")
+    : fail("the manual pick must not be refused for the body");
+}
+
+{
+  // THE TWO APERTURES THAT BRACKET THE FRAME ARE MIXED, IN 1/N (lensfun), AND A
+  // STOP WEIGHS WHAT A DOUBLING OF FOCAL LENGTH DOES (RawTherapee).
+  const LENS4 = "TEST AP 50-250mm";
+  const curve = (peak) => Array.from({ length: NBINS }, (_, i) => Math.max(0, peak * (1 - i / 20)));
+  const a = (fl, ap, peak, o = {}) => ({ key: `${fl}@${ap}`, model: LENS4, fl, ap, kr: KR_REAL, kb: KR_REAL, bump: curve(peak), frames: 2, source: "raw", camera: "B", measured: "x", ...o });
+  const fr = (fl, ap) => ({ make: "B", lens: LENS4, focalLength: [fl, 1], fNumber: [ap, 1] });
+  const m = matchIn([a(50, 8, 0.0241), a(50, 13, 0.0502)], fr(50, 10));
+  // 1/N mix: t = (1/8 - 1/10) / (1/8 - 1/13) = 0.52, so 0.0241 + 0.52 * 0.0261.
+  const t = (1 / 8 - 1 / 10) / (1 / 8 - 1 / 13);
+  const want = 0.0241 + (0.0502 - 0.0241) * t;
+  m && m.bump && Math.abs(m.bump[0] - want) < 1e-6 && m.apBlend && Math.abs(m.apBlend.t - t) < 1e-9
+    ? ok(`f/10 between an f/8 and an f/13 profile: mixed in 1/N to ${m.bump[0].toFixed(4)} (t ${t.toFixed(3)})`)
+    : fail(`f/10 between f/8 and f/13 should mix in 1/N to ${want.toFixed(4)}, got ${m && m.bump ? m.bump[0].toFixed(4) : "nothing"} — the nearer stop alone is what this replaced`);
+  m && m.reach === 0
+    ? ok("a frame bracketed in aperture and focal length reaches nothing")
+    : fail(`a bracketed frame must reach 0, got ${m && m.reach}`);
+  const exact = matchIn([a(50, 8, 0.0241), a(50, 13, 0.0502)], fr(50, 8));
+  exact && !exact.apBlend && exact.bump && Math.abs(exact.bump[0] - 0.0241) < 1e-9
+    ? ok("a frame on a measured aperture takes that profile, unblended")
+    : fail("a frame on an anchor aperture must take that anchor whole");
+  // A BRACKET WHOSE ENDS ARE FAR IN FOCAL LENGTH IS NOT AN INTERPOLATION OF
+  // THIS FRAME (the owner's NIR_1688, 91mm f/5: f/4.5 exists only at 50mm and
+  // f/5.3 only at 130mm). The nearest single set stands alone there.
+  const far = matchIn([a(50, 4.5, 0.01), a(130, 5.3, 0.02), a(50, 6.3, 0.03), a(130, 6.3, 0.04)], fr(91, 5));
+  far && !far.apBlend && far.key === "130@5.3"
+    ? ok(`a bracket that reaches further in focal length than the nearest set loses to it (${far.key}, reach ${far.reach.toFixed(2)})`)
+    : fail(`91mm f/5 should take the nearest single set, 130@5.3, got ${far && far.key}`);
+  // RawTherapee's weighting: two stops away in aperture (f/16 against f/8)
+  // must cost what two doublings of focal length (200mm against 50mm) do, so
+  // the two candidates below tie at 2, where |ln| on both axes made a stop
+  // half of a doubling.
+  const r1 = matchIn([a(50, 16, 0.03)], fr(50, 8)).reach;
+  const r2 = matchIn([a(200, 8, 0.03)], fr(50, 8)).reach;
+  Math.abs(r1 - 2) < 1e-9 && Math.abs(r2 - 2) < 1e-9
+    ? ok(`two stops and two focal doublings both reach 2 (${r1.toFixed(3)}, ${r2.toFixed(3)}), RawTherapee's units`)
+    : fail(`two stops and two focal doublings must both reach 2, got ${r1} and ${r2}`);
+}
+
+{
+  // THE HOT SPOT'S CENTRE: stored when the rig found one, refused when it is
+  // not one, absent on every older profile — and absent is the middle.
+  const LENS5 = "TEST CENTRE 16-50mm";
+  const pay = (centre) => ({
+    camera: "C", measured: "x", lens_map: { L5: LENS5 },
+    profiles: { "L5@25@f8.0": { kr: KR_REAL, kb: KR_REAL, frames: 3, source: "raw", ...(centre === undefined ? {} : { centre }) } },
+  });
+  mem.clear();
+  saveFromPayload(pay([0.04, -0.02]));
+  const kept = listProfiles()[0];
+  kept && kept.centre && kept.centre[0] === 0.04 && kept.centre[1] === -0.02
+    ? ok("a measured centre is stored at the save door and comes back at the read door")
+    : fail(`the centre did not survive the store: ${JSON.stringify(kept && kept.centre)}`);
+  mem.clear();
+  saveFromPayload(pay([0.6, 0]));
+  const far = listProfiles()[0];
+  far && far.centre === undefined && far.kr
+    ? ok("a centre no lens has is not stored — and the profile still is, about the middle")
+    : fail("an impossible centre must be dropped, not stored and not take the profile with it");
+  mem.clear();
+  saveFromPayload(pay(undefined));
+  const old = listProfiles()[0];
+  old && old.centre === undefined
+    ? ok("a payload with no centre (every rig before this one) stores none — the geometric centre")
+    : fail("a profile with no centre must not grow one");
+  // The READ door: a stored row carrying a corrupt centre loses the centre.
+  mem.set("ips-lens-profiles-v1", JSON.stringify([{ ...old, centre: ["x", 1] }]));
+  const back = listProfiles()[0];
+  back && back.centre === undefined && back.kr
+    ? ok("a corrupt stored centre is set aside on read, the profile kept")
+    : fail("read() must drop a bad centre and keep the profile");
+  for (const [c, good] of [[undefined, true], [[0, 0], true], [[0.25, 0], true], [[0.26, 0], false], [[NaN, 0], false], [[0.1], false]]) {
+    (centreProblem(c) === null) === good
+      ? ok(`centreProblem(${JSON.stringify(c)}) ${good ? "accepts" : "refuses"}`)
+      : fail(`centreProblem(${JSON.stringify(c)}) should ${good ? "accept" : "refuse"}: ${centreProblem(c)}`);
+  }
+  // Blended across anchors, a missing end is the middle.
+  const fl = (f, c) => ({ key: `${f}`, model: LENS5, fl: f, ap: 8, kr: KR_REAL, kb: KR_REAL, frames: 1, source: "raw", camera: "C", ...(c ? { centre: c } : {}) });
+  const mid = matchIn([fl(17, [0.1, 0]), fl(25, undefined)], { make: "C", lens: LENS5, focalLength: [Math.sqrt(17 * 25), 1], fNumber: [8, 1] });
+  mid && mid.centre && Math.abs(mid.centre[0] - 0.05) < 1e-9
+    ? ok(`a centre blends across focal lengths with a missing end read as the middle (${mid.centre[0].toFixed(3)})`)
+    : fail(`a blended centre should be halfway to the middle, got ${JSON.stringify(mid && mid.centre)}`);
+  mem.clear();
+}
+
+{
+  // FOCUS DISTANCE, WHEN THE FILE RECORDS ONE (lensfun weighs it in reciprocal
+  // distance). Two profiles of one lens and focal length, the aperture not
+  // recorded on the frame so both cost the same there: the one measured at the
+  // frame's distance must win, either way round, and with no distance on the
+  // frame the term must change nothing.
+  const LENS6 = "TEST DIST 16-50mm";
+  const d = (ap, dist, peak) => ({ key: `25@${ap}`, model: LENS6, fl: 25, ap, kr: KR_REAL, kb: KR_REAL, bump: Array.from({ length: NBINS }, (_, i) => Math.max(0, peak * (1 - i / 20))), frames: 2, source: "raw", camera: "D", measured: "x", dist });
+  const list = [d(8, 0.5, 0.02), d(11, 20, 0.04)];
+  const at = (dist) => ({ make: "D", lens: LENS6, focalLength: [25, 1], ...(dist ? { subjectDistance: dist } : {}) });
+  const near = matchIn(list, at(0.5)), far = matchIn(list, at(20)), none = matchIn(list, at(undefined));
+  near && near.key === "25@8" && far && far.key === "25@11"
+    ? ok(`the profile measured at the frame's focus distance wins (0.5 m -> ${near.key}, 20 m -> ${far.key})`)
+    : fail(`focus distance must pick the profile measured nearest it, got ${near && near.key} at 0.5 m and ${far && far.key} at 20 m`);
+  none && none.key === "25@8"
+    ? ok("no distance on the frame: the term is absent and the first profile stands, as before")
+    : fail(`a frame with no distance must match as it did, got ${none && none.key}`);
 }
 
 console.log(bad ? `\n${bad} failed\n` : "\nthe save door and the read door agree, and every render path takes the same halves\n");
