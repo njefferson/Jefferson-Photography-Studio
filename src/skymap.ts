@@ -121,11 +121,12 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  * @param srcFlat  the lens flat already in a raw's source pixels, passed through
  *   to compileEdit so highlight recovery here reads the clip the way the
  *   rendered pixels do; null for an 8-bit source.
- * @param warp the edit's warp field, when it has one: `local` is built from the
- *             unwarped source and `srcFlat` was laid on it, so each sample
- *             reads both where its pixel came from — compileEdit's one (mu, mv)
- *             pair — as the export and the shader do (2026-10-02). Omitted or
- *             empty, they are read in place.
+ * @param warp the warp field `sample` already reads through, when it does (the
+ *             export's sampler is warped; the preview's is not and passes
+ *             none). `local` is built from the unwarped source and `srcFlat`
+ *             lies on the unwarped pixels, so each sample reads BOTH where its
+ *             pixel came from — compileEdit's (mu, mv) — as the export and the
+ *             shader do (2026-10-02). Omitted or empty, both are read in place.
  * @returns the map, or null when the bitmap selects nothing. Four bytes per
  *   texel: encoded chroma a and b, the bitmap's mean weight, and the depth
  *   key — the PHOTOGRAPH's key (SKY_DEPTH_CHROMA_LO/HI on the sky's mean
@@ -160,10 +161,9 @@ export function buildSkyMap(
   srcFlat: SourceFlat | null = null,
   warp?: WarpField | null,
 ): SkyMap | null {
-  // WHENEVER THERE IS A WARP, not only when there is a clarity/dehaze map: the
-  // same (mu, mv) also tells highlight recovery where to read the source flat,
-  // and gating it on `local` read the flat in the wrong place under a warp —
-  // a pinned white sky reached the map with the balance's cast (2026-10-02).
+  // WHETHER OR NOT THERE IS A LOCAL MAP: (mu, mv) is also where the source flat
+  // is divided back out for highlight recovery, and a warped sample carries the
+  // flat of the place it came from.
   const warpF = warp && !warpIsEmpty(warp) ? warp : null;
   const wd = new Float32Array(2);
   const W = SKY_MAP_W;

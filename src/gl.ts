@@ -42,6 +42,15 @@ uniform int u_rot; // display rotation in 90-degree CW steps (0..3)
 uniform int u_flip; // SOURCE-space mirror: bit 1 = source-x, bit 2 = source-y
 uniform vec4 u_crop;       // (x,y,w,h) crop rect in the STRAIGHTENED frame [0,1]
 uniform float u_straighten; // radians, applied about the frame centre
+// cos and sin of -u_straighten, worked out ONCE on the CPU in double precision:
+// the numbers pipeline.ts cropToDisplayUvInto turns by. A GPU's own cos and sin
+// are approximations whose accuracy GLSL ES does not fix. SwiftShader's cos of
+// 7.5 degrees is 1.8e-4 off, which moves a straightened frame's edge by about a
+// quarter of a pixel at 2800 px, and the preview then resampled a different
+// place from the export's bilinear tap (export.ts bilinearTap): measured on an
+// owner photograph at 840 px and 4 degrees, 1660 channel values more than 2 of
+// 255 apart, worst 8, on every edge; from these uniforms, none over 2.
+uniform vec2 u_straightenCS;
 uniform float u_dispAspect; // display-rotated frame width/height (pre-crop)
 void main() {
   vec2 uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
@@ -57,7 +66,7 @@ void main() {
   vec2 local = u_crop.xy + uv * u_crop.zw;
   if (u_straighten != 0.0) {
     vec2 d = vec2((local.x - 0.5) * u_dispAspect, local.y - 0.5);
-    float cosA = cos(-u_straighten), sinA = sin(-u_straighten);
+    float cosA = u_straightenCS.x, sinA = u_straightenCS.y;
     vec2 r = vec2(d.x * cosA - d.y * sinA, d.x * sinA + d.y * cosA);
     local = vec2(r.x / u_dispAspect + 0.5, r.y + 0.5);
   }
@@ -858,7 +867,8 @@ void main() {
       // longer passes period-2 colour noise untouched. Run as the one dense
       // 15x15 kernel that cascade is: an even offset 2d weighs half of w(d), an
       // odd one a quarter of each neighbour. 225 fetches, only when the colour
-      // half is on — the live view, whose tap scale is 1.
+      // half is on, at tap scale 1 — the live view of a raw, and of an 8-bit
+      // picture up to 2800 px.
       if (abs(dnScale.x - 1.0) < 1e-4) {
         float ck[15];
         for (int i = 0; i < 15; i++) ck[i] = dnCk(float(i - 7));
@@ -871,22 +881,34 @@ void main() {
           }
         }
       } else {
-        // A NATIVE-RESOLUTION COPY (tap scale s > 1, a drawn export): the taps
+        // TAP SCALE s > 1: a drawn export, and — since 2026-10-02 — the LIVE
+        // VIEW of an 8-bit picture over 2800 px, which is now shown at full size
+        // with its taps scaled by long / 2800 (main.ts toPreview). The taps
         // spread s texels apart, each a tent of half-width s over the texels
         // around it, so the lattice does not pass the native pixel Nyquist —
         // raw/denoise.ts says why, and builds the same kernel. Every native
         // offset the kernel reaches, with its weight from dnColW; (2M+1)^2
-        // fetches, 961 at s = 2, only on this path.
+        // fetches, 961 at s = 2.
+        //
+        // THE WEIGHTS ONCE PER FRAGMENT, NOT ONCE PER TAP. The kernel is
+        // separable, so a column's weight depends on dx alone; dnColW costs
+        // about seven exponentials, and evaluating it inside the inner loop
+        // paid that 961 times a pixel where 31 do. The same function gives the
+        // same numbers, so the CPU twin is unchanged. 81 entries reach km 40
+        // (s about 5.4); past that it falls back to evaluating in the loop.
         float s = dnScale.x;
         int tj = int(ceil(s)) - 1;
         float tsum = 0.0;
         for (int j = -tj; j <= tj; j++) tsum += max(0.0, 1.0 - abs(float(j)) / s);
         int km = int(floor(7.0 * s + 0.5)) + tj;
+        float kw[81];
+        bool kTab = km <= 40;
+        if (kTab) for (int j = -km; j <= km; j++) kw[j + 40] = dnColW(j, s) / tsum;
         for (int dy = -km; dy <= km; dy++) {
-          float ky = dnColW(dy, s) / tsum;
+          float ky = kTab ? kw[dy + 40] : dnColW(dy, s) / tsum;
           if (ky <= 0.0) continue;
           for (int dx = -km; dx <= km; dx++) {
-            float kx = dnColW(dx, s) / tsum;
+            float kx = kTab ? kw[dx + 40] : dnColW(dx, s) / tsum;
             if (kx <= 0.0) continue;
             vec3 s2 = dnFetch(dnP + ivec2(dx, dy), dnSize);
             gsum += s2 * (kx * ky);
@@ -1456,7 +1478,7 @@ export interface BuildOptions {
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -1779,7 +1801,10 @@ export class Renderer {
 
     // Tone-curve LUT (unit 2); a 256-entry identity ramp until a curve is set.
     // The flat the source pixels carry (unit 15), for the recovery clip test.
-    // RGB32F, NEAREST, one texel per bin, the same reasons as the lens curve.
+    // RGB32F, NEAREST, one texel per bin: the shader reads it with two exact
+    // texelFetches and blends them itself (pipeline.ts lensLerp), so it needs
+    // no filtering and keeps the decode's float32 gains to the bit. (The lens
+    // curve beside it is RGB16F and LINEAR since 2026-10-02.)
     this.flatTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.flatTex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -2422,9 +2447,11 @@ export class Renderer {
       // there NEAREST is a nearest-neighbour resample of the photograph —
       // bindPipeline switches to LINEAR for them. This used to say float
       // textures are not reliably linear-filterable, which is true of RGBA32F
-      // (it needs OES_texture_float_linear) and false of RGBA16F, the working
-      // copy's format: GLES 3.0 table 3.13 marks it texture-filterable, so
-      // WebGL2 filters it on every device.
+      // (it needs OES_texture_float_linear) and false of RGBA16F: GLES 3.0
+      // table 3.13 marks it texture-filterable, so WebGL2 filters it on every
+      // device. RGBA16F is the native-resolution copy's format (`linear16`);
+      // a raw's half-size working copy arrives as `linear` and is RGBA32F, so
+      // ITS straighten and warp are filtered only where the extension is.
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       this.srcFilter = gl.NEAREST;
@@ -2477,6 +2504,7 @@ export class Renderer {
     const straighten = applyCrop ? p.straighten ?? 0 : 0;
     gl.uniform4f(this.loc.u_crop, crop.x, crop.y, crop.w, crop.h);
     gl.uniform1f(this.loc.u_straighten, (straighten * Math.PI) / 180);
+    gl.uniform2f(this.loc.u_straightenCS, Math.cos((-straighten * Math.PI) / 180), Math.sin((-straighten * Math.PI) / 180));
     const odd = (rot & 1) === 1;
     const dispAspect = this.imgH ? (odd ? this.imgH / this.imgW : this.imgW / this.imgH) : 1;
     gl.uniform1f(this.loc.u_dispAspect, dispAspect);
@@ -2813,7 +2841,10 @@ export class Renderer {
     // export interpolates bilinearly there too (export.ts bilinearTap; warp.ts
     // warpSampler), so preview and saved file are the same resample. An
     // RGBA32F source without OES_texture_float_linear cannot filter and stays
-    // NEAREST — the drawn-export probe on the test page is its only user.
+    // NEAREST. That is not only the drawn-export probe: a raw's working copy
+    // is RGBA32F (setImage), so on a device without the extension a raw's
+    // straightened or warped preview is a nearest resample while its export
+    // is bilinear. Whether the reader's tablet has it is not measured.
     if (this.isLinear) {
       const filt = (straighten !== 0 || this.warpOn) && (this.isHalf || this.floatLinear) ? gl.LINEAR : gl.NEAREST;
       if (filt !== this.srcFilter) {
