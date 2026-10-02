@@ -5,6 +5,8 @@
 // free, halves each dimension (keeping GPU memory sane on the iPad), and is
 // artifact-free. Full-resolution bilinear demosaic is for the export path.
 
+import { applyPost, type PostStage } from "./dngOpcodes";
+
 export interface LinearImage {
   width: number;
   height: number;
@@ -12,15 +14,31 @@ export interface LinearImage {
   linear: Float32Array;
 }
 
-/** A raw Bayer frame plus the metadata needed to interpret it. */
+/** A raw Bayer frame plus the metadata needed to interpret it.
+ *
+ *  The decoders deliver it already cropped to the picture (a DNG's ActiveArea
+ *  and DefaultCrop) and with every per-photosite black level already
+ *  subtracted, so `black` is a single number for every reader — 0 whenever the
+ *  file's black varied by site, row or column, with `white` then the white
+ *  level minus the largest black (DNG 1.7.1.0 chapter 5's scale). */
 export interface RawCfa {
   cfa: Uint16Array;
   width: number;
   height: number;
-  /** 2x2 color indices [tl,tr,bl,br], 0=R 1=G 2=B. */
+  /** 2x2 color indices [tl,tr,bl,br], 0=R 1=G 2=B, phased from this frame's
+   *  own top-left photosite. */
   pattern: number[];
   black: number;
   white: number;
+  /** Samples per pixel. Absent (or 1) for a mosaic. 3 for a LinearRaw DNG:
+   *  `cfa` then holds R,G,B interleaved per pixel and needs no demosaic, and
+   *  `pattern` is unused. */
+  samples?: number;
+  /** Work done after demosaic, per pixel (a DNG's OpcodeList3, and the
+   *  reference-camera matrix of a ForwardMatrix profile whose calibration is
+   *  not diagonal). Absent for nearly every file. Plain data: an export worker
+   *  receives it. */
+  post?: PostStage;
 }
 
 /**
@@ -86,10 +104,30 @@ export function demosaicPixelLinear(c: RawCfa, x: number, y: number): [number, n
  *  photograph. The arithmetic below is character for character what it was; the
  *  only change is where the numbers are put and that `at` and `colorAt` are
  *  written out rather than built per call. Proven by hashing the exported
- *  file: identical bytes, measurably less time. */
+ *  file: identical bytes, measurably less time.
+ *
+ *  @param c    the frame (a mosaic, or a 3-sample LinearRaw frame, read as is).
+ *  @param x    the pixel's column in the frame.
+ *  @param y    its row.
+ *  @param out  receives the camera-native linear R,G,B, 1.0 = the frame's white.
+ *  @returns nothing; `out` holds the pixel, after the frame's after-demosaic
+ *    stage (`c.post`) when it has one. Every full-resolution consumer — the
+ *    export, the native-resolution rebuild — reads pixels only through this,
+ *    so it must agree with the binned preview's colour and levels. */
 export function demosaicPixelLinearInto(c: RawCfa, x: number, y: number, out: [number, number, number] | Float32Array | number[]): void {
   const { cfa, width, height, pattern, black, white } = c;
   const scale = 1 / Math.max(1, white - black);
+  if (c.samples === 3) {
+    // A LinearRaw DNG is already demosaiced: the pixel is read, not built.
+    const cx0 = x < 0 ? 0 : x >= width ? width - 1 : x;
+    const cy0 = y < 0 ? 0 : y >= height ? height - 1 : y;
+    const i = (cy0 * width + cx0) * 3;
+    out[0] = Math.max(0, (cfa[i] - black) * scale);
+    out[1] = Math.max(0, (cfa[i + 1] - black) * scale);
+    out[2] = Math.max(0, (cfa[i + 2] - black) * scale);
+    if (c.post) applyPost(c.post, cx0, cy0, out);
+    return;
+  }
   for (let ch = 0; ch < 3; ch++) {
     if (pattern[(y & 1) * 2 + (x & 1)] === ch) {
       const cx0 = x < 0 ? 0 : x >= width ? width - 1 : x;
@@ -122,4 +160,5 @@ export function demosaicPixelLinearInto(c: RawCfa, x: number, y: number, out: [n
     }
     out[ch] = n ? sum / n : 0;
   }
+  if (c.post) applyPost(c.post, x, y, out);
 }

@@ -107,3 +107,109 @@ export function camToSrgbLinear(colorMatrix1: number[]): number[] {
   }
   return inv3(camRgb);
 }
+
+/** The D50 white the DNG spec's ForwardMatrix maps a unit camera vector to
+ *  (xy 0.3457, 0.3585, Y = 1). */
+const D50_XYZ = [0.3457 / 0.3585, 1, (1 - 0.3457 - 0.3585) / 0.3585];
+
+/** Bradford cone response (Lam 1985), the chromatic adaptation the DNG spec
+ *  recommends ("linear Bradford"). */
+const BRADFORD = [0.8951, 0.2664, -0.1614, -0.7502, 1.7135, 0.0367, 0.0389, -0.0685, 1.0296];
+
+/** XYZ (D50) -> linear sRGB: Bradford-adapted to the D65 white that
+ *  SRGB_TO_XYZ itself implies (its row sums), then inverted sRGB. Built here
+ *  rather than copied so D50 white lands on (1, 1, 1) to rounding. */
+const XYZ_D50_TO_SRGB = (() => {
+  const d65 = [0, 1, 2].map((r) => SRGB_TO_XYZ[r * 3] + SRGB_TO_XYZ[r * 3 + 1] + SRGB_TO_XYZ[r * 3 + 2]);
+  const src = [0, 1, 2].map((r) => BRADFORD[r * 3] * D50_XYZ[0] + BRADFORD[r * 3 + 1] * D50_XYZ[1] + BRADFORD[r * 3 + 2] * D50_XYZ[2]);
+  const dst = [0, 1, 2].map((r) => BRADFORD[r * 3] * d65[0] + BRADFORD[r * 3 + 1] * d65[1] + BRADFORD[r * 3 + 2] * d65[2]);
+  const scale = [dst[0] / src[0], 0, 0, 0, dst[1] / src[1], 0, 0, 0, dst[2] / src[2]];
+  const adapt = mul3(inv3(BRADFORD), mul3(scale, BRADFORD));
+  return mul3(inv3(SRGB_TO_XYZ), adapt);
+})();
+
+type Matrixish = { num(tag: number): number[]; str(tag: number): string | undefined };
+
+/**
+ * The camera -> linear sRGB matrix for a DNG, as DNG 1.7.1.0 chapter 6 builds
+ * it, for the calibration this app renders from (the daylight one: the ranking
+ * readCameraMatrix in decode.ts uses).
+ * @param ifds  every IFD of the file. The colour tags live in IFD 0.
+ * @returns undefined when the file carries no ColorMatrix (the caller falls
+ *   back to the per-model NEF default); otherwise `cam`, a row-major 3x3 the
+ *   pipeline applies AFTER its own camera-space white balance, and, rarely,
+ *   `pre`, a 3x3 that must be applied to the camera values BEFORE that balance
+ *   (RawCfa.post.matrix).
+ *
+ *   With ForwardMatrix tags the spec's transform is CameraToXYZ_D50 = FM * D *
+ *   Inverse(AB * CC), D the diagonal that takes the camera neutral to the unit
+ *   vector. The app's white-balance gains ARE that diagonal, applied in camera
+ *   space, so `cam` is XYZ(D50)->sRGB times FM alone. The ColorMatrix's only
+ *   job on this route is the spec's: turning a white-balance xy into a camera
+ *   neutral — and this app finds its neutral from the data (gray-world, tap-WB,
+ *   the sliders), never from an xy, so it takes no part. The NEF default for
+ *   the D5300 (NIKON_D5300_COLOR_MATRIX above) is unchanged: a NEF names no
+ *   profile and carries no ForwardMatrix, and that matrix still means what it
+ *   meant, the "-100" profile's ColorMatrix from the owner's Lightroom DNGs.
+ *   Inverse(AB * CC) is diagonal for every calibration
+ *   written as gains and then folds into the gains too; when it is not, it is
+ *   returned as `pre`, which puts the data in the reference camera's space so
+ *   the gains act there, exactly as the spec's D does. FM maps (1,1,1) to D50
+ *   white, which this matrix maps to (1,1,1), so a neutral stays neutral to
+ *   the file's own rounding without any row normalisation.
+ *
+ *   Without ForwardMatrix tags it is camToSrgbLinear of XYZtoCamera = AB * CC *
+ *   CM, LibRaw's construction.
+ *
+ *   This matters for infrared because a ColorMatrix in an IR profile is a
+ *   white-balance calibration: the two Rob Shea profiles in the owner's
+ *   Lightroom DNGs ("Infrared Temp -100" and "-50") carry the same
+ *   ForwardMatrix and different ColorMatrices, so through this they are the
+ *   same colour transform, as the spec intends. CameraCalibration is used only
+ *   when CameraCalibrationSignature equals ProfileCalibrationSignature (both
+ *   empty counts as equal, as in Adobe's SDK); otherwise identity.
+ *   Consumers: decode.ts (camMatrix at open) and export.ts getSource, so the
+ *   preview and the export render through the same matrix.
+ */
+export function dngCameraToSrgb(ifds: Matrixish[]): { cam: number[]; pre?: number[] } | undefined {
+  const rank = (ill: number | undefined) =>
+    ill === 21 ? 0 : ill === 20 ? 1 : ill === 22 ? 2 : ill === 23 ? 3 : ill === 1 || ill === 9 ? 4 : ill === undefined ? 5 : 6;
+  // [ColorMatrix, CalibrationIlluminant, CameraCalibration, ForwardMatrix] per set.
+  const sets = [
+    [50722, 50779, 50724, 50965],
+    [50721, 50778, 50723, 50964],
+    [52531, 52529, 52530, 52532],
+  ] as const;
+  let best: { d: Matrixish; set: (typeof sets)[number] } | undefined;
+  let bestRank = Infinity;
+  for (const d of ifds) {
+    for (const set of sets) {
+      if (d.num(set[0]).length !== 9) continue;
+      const r = rank(d.num(set[1])[0]);
+      if (r < bestRank) {
+        bestRank = r;
+        best = { d, set };
+      }
+    }
+  }
+  if (!best) return undefined;
+  const { d, set } = best;
+  const cm = d.num(set[0]);
+  const ab = d.num(50727);
+  const AB = [ab[0] ?? 1, 0, 0, 0, ab[1] ?? 1, 0, 0, 0, ab[2] ?? 1];
+  const ccTag = d.num(set[2]);
+  const sigOk = (d.str(50931) ?? "") === (d.str(50932) ?? "");
+  const CC = ccTag.length === 9 && sigOk ? ccTag : [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  const ABCC = mul3(AB, CC);
+  const fm = d.num(set[3]);
+  if (fm.length !== 9) return { cam: camToSrgbLinear(mul3(ABCC, cm)) };
+
+  const cam = mul3(XYZ_D50_TO_SRGB, fm);
+  const K = inv3(ABCC);
+  const offDiag = Math.max(...[1, 2, 3, 5, 6, 7].map((i) => Math.abs(K[i])));
+  if (offDiag < 1e-9) return { cam };
+  // A calibration that mixes channels cannot fold into diagonal gains: it is
+  // applied to the camera values first, so gray-world, tap-WB and the sliders
+  // all balance in the reference camera's space, which is where D acts.
+  return { cam, pre: K };
+}

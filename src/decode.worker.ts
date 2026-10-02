@@ -50,6 +50,7 @@ self.onmessage = async (e: MessageEvent<Job>) => {
     const transfer: Transferable[] = [];
     if (img.pixels) transfer.push(img.pixels.buffer);
     if (img.linear) transfer.push(img.linear.buffer);
+    if (img.lossyCodes) transfer.push(img.lossyCodes.buffer);
     if (skySrc) transfer.push(skySrc.rgb.buffer);
     if (skySrc?.clip) transfer.push(skySrc.clip.buffer);
     (self as unknown as Worker).postMessage({ id, ok: true, img, skySrc }, transfer);

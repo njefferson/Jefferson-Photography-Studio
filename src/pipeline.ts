@@ -2502,8 +2502,9 @@ export function compileEdit(
   // THE TABLES COME FROM lensflat.ts NOW — the same arithmetic the decode-time
   // pass uses on a raw's linear copy (decision 021). This in-grade stage stays
   // for the sources that have no linear copy to correct at decode (8-bit:
-  // JPEG, preview, lossy-linear DNG); a raw caller passes `lens` as null
-  // because its pixels already carry the flat, and a camera-rendered one
+  // JPEG, PNG, an embedded preview); a raw caller — every DNG raw image
+  // included, lossy LinearRaw too — passes `lens` as null because its pixels
+  // already carry the flat, and a camera-rendered one
   // passes the brightness half alone (`lensCurveForSource`). One function
   // builds the gains for every path, so a ring is the same ring everywhere.
   //

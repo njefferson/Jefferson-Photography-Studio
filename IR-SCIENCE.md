@@ -188,7 +188,17 @@ three are look design, which is the owner's, and none is proposed here.
 from a profile made against the IR raw's own custom white balance rather than
 fighting a visible-light pipeline channel by channel. Wider and more stable
 grading latitude at the cost of setup. The app does not implement this. Some of
-the owner's Lightroom-iOS DNGs embed such a profile.
+the owner's Lightroom-iOS DNGs embed such a profile, and since 2026-10-02 the
+app renders those DNGs through the profile's ForwardMatrix as the DNG spec
+directs (chapter 6: CameraToXYZ_D50 = FM * D * Inverse(AB * CC), D being the
+white balance) rather than through its ColorMatrix. The two Rob Shea profiles
+read ("Infrared Temp -100" and "-50") carry the same ForwardMatrix and differ
+only in ColorMatrix, which the spec uses only to turn a white-balance xy into a
+camera neutral — so they are white-balance calibrations, not two colour
+renderings, and with the app's white balance found from the data they now
+render alike. The profile's hue/saturation tables are still not applied. A NEF
+names no profile, so the D5300 NEF default stays the "-100" ColorMatrix
+(color.ts).
 
 **Route 3 — monochrome.** See section 2. Under-served here.
 

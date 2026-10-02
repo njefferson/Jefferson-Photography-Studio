@@ -29,8 +29,6 @@ src/export.ts:exportImage
 src/export.ts:exportImage
 src/export.ts:exportImage
 src/export.ts:proxyFactorFor
-src/export.ts:sourceIsMosaiced
-src/export.ts:getSource
 src/exportparallel.ts:canRunParallel
 src/exportparallel.ts:workerCount
 src/exportparallel.ts:stitchBands
@@ -134,12 +132,7 @@ src/qr.ts:encodeQr
 src/qr.ts:drawQr
 src/raw/demosaic.ts:demosaicBinned
 src/raw/demosaic.ts:demosaicPixelLinear
-src/raw/demosaic.ts:demosaicPixelLinearInto
-src/raw/dngRaw.ts:decodeMosaicedDng
-src/raw/dngRaw.ts:readMosaicedCfa
-src/raw/lj92.ts:decodeLJ92
 src/raw/nef.ts:decodeNef
-src/raw/nef.ts:readNefCfa
 src/savefile.ts:download
 src/savefile.ts:saveBlob
 src/session.ts:requestPersistence

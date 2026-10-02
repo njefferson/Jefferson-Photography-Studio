@@ -2,9 +2,10 @@
 //
 // This is what DNG uses to compress mosaiced (Bayer) raw, e.g. Lightroom's
 // "Convert to DNG". Verified bit-exact against LibRaw on the project's real
-// files. Handles N components (DNG packs Bayer columns as interleaved
-// components), 16-bit precision, predictors 1-7, byte-stuffing and restart
-// markers.
+// files. Handles N components, 16-bit precision, predictors 1-7,
+// byte-stuffing and restart markers. How the decoded samples map onto a DNG
+// tile is NOT this file's business: the DNG spec requires only that the total
+// sample count match, so dngRaw.ts walks the samples in raster order.
 
 export interface Lj92Image {
   width: number; // X (per-component width)
@@ -109,7 +110,21 @@ function extend(v: number, t: number): number {
   return v < 1 << (t - 1) ? v - (1 << t) + 1 : v;
 }
 
-export function decodeLJ92(j: Uint8Array): Lj92Image {
+/**
+ * Decode one lossless-JPEG (SOF3) stream.
+ * @param j  the stream, from its SOI marker.
+ * @param legacy16  true for a DNG older than 1.1.0.0 (DNGVersion below
+ *   1,1,0,0): such files store sixteen difference bits after an SSSS of 16, as
+ *   every other length does, where later files store none and mean -32768 (DNG
+ *   1.7.1.0, Compatibility Issue 2; LibRaw ljpeg_diff:
+ *   `if (len == 16 && (!dng_version || dng_version >= 0x1010000)) return -32768`).
+ *   Reading none from an old file desynchronises the rest of the stream.
+ * @returns the samples interleaved per JPEG pixel, `[y*width + x]*components
+ *   + c`, each in 0..65535. The total count is width*height*components, which
+ *   is the only figure a DNG tile is required to agree with. Throws, with a
+ *   reader-facing message, on a stream that is not SOF3 or ends early.
+ */
+export function decodeLJ92(j: Uint8Array, legacy16 = false): Lj92Image {
   const be16 = (o: number) => (j[o] << 8) | j[o + 1];
   let p = 2; // skip SOI (FFD8)
   let precision = 0;
@@ -139,6 +154,10 @@ export function decodeLJ92(j: Uint8Array): Lj92Image {
       Y = be16(p + 5);
       X = be16(p + 7);
       Nf = j[p + 9];
+    } else if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
+      // Any other start-of-frame (SOF1 is what three Blackmagic cameras write)
+      // is a DCT process, not lossless: decoding it as SOF3 is garbage.
+      throw new Error("This DNG's raw image is compressed with a JPEG variant this app doesn't read (only lossless JPEG is).");
     } else if (m === 0xc4) {
       // DHT (possibly several tables in one segment)
       let q = p + 4;
@@ -171,6 +190,7 @@ export function decodeLJ92(j: Uint8Array): Lj92Image {
     p += 2 + L;
   }
 
+  if (!precision || !X || !Y || !Nf) throw new Error("This DNG's raw image has no lossless-JPEG frame header — the file looks damaged.");
   const br = new BitReader(j, p);
   const planes: Int32Array[] = [];
   for (let c = 0; c < Nf; c++) planes.push(new Int32Array(X * Y));
@@ -195,7 +215,7 @@ export function decodeLJ92(j: Uint8Array): Lj92Image {
         const t = huffDecode(br, huff[compTable[c]]);
         let diff: number;
         if (t === 0) diff = 0;
-        else if (t === 16) diff = 32768;
+        else if (t === 16) diff = legacy16 ? extend(br.bits(16), 16) : 32768;
         else diff = extend(br.bits(t), t);
 
         const plane = planes[c];

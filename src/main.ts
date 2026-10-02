@@ -11727,6 +11727,9 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // Last, because it opens a dialog: the notice is the reader's, the six
   // numbers above are the instrument's, and nothing after this line is timed.
   if (img.previewNotice) noticeDialog("Preview only", img.previewNotice);
+  // The raw data opened, but a correction the DNG requires did not (an opcode
+  // this app does not implement): said once, at open, like the preview notice.
+  else if (img.decodeNotice) noticeDialog("Opened without a correction", img.decodeNotice);
 }
 
 /** Reset the live edit to this photo's opening baseline, clear masks and undo
@@ -19747,7 +19750,8 @@ function estimateDenoise(img: DecodedImage): number {
 // measured with, where a check can reach them without the page.
 
 // THE 8-BIT PROXY IS A FALLBACK NOW, NOT A RULE (2026-10-02). Every 8-bit
-// source over 2800 px (lossy DNG, big JPEG, HEIC) used to be shown from a
+// source over 2800 px (a big JPEG, PNG or HEIC, an embedded preview) used
+// to be shown from a
 // 2800 px copy on the premise that iOS Safari clamps WebGL drawing buffers over
 // about 16.7 MP to a black canvas. The WebGL spec says an unsatisfiable size
 // produces a SMALLER drawing buffer and reports its true size in

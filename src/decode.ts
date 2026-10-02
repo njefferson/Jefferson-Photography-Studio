@@ -1,11 +1,13 @@
-// Image decoding. Three real paths, no big WASM dependency:
+// Image decoding. Real paths, no big WASM dependency:
 //   - JPEG/PNG: native bitmap decode.
-//   - Lossy linear DNG (8-bit, baseline-JPEG tile, Photometric 34892): decode
-//     natively; gamma-2.2 -> linear happens in the shader.
-//   - Mosaiced DNG (14-bit, lossless-JPEG, Photometric 32803 = CFA): pure-JS
-//     LJ92 decode + demosaic -> linear float. (Verified bit-exact vs LibRaw.)
-// Anything else (e.g. Nikon NEF compression) falls back to the embedded preview
-// until its decoder lands.
+//   - Nikon NEF (compression 34713): raw/nef.ts.
+//   - DNG (raw/dngRaw.ts): a 2x2 Bayer mosaic or a LinearRaw image, stored
+//     uncompressed at any depth from 8 to 16 bits, as lossless JPEG, or — for
+//     LinearRaw — as lossy baseline JPEG, whose tiles the browser decodes here
+//     and dngRaw.ts linearises. All of them are camera-native and get the DNG's
+//     own colour matrix (color.ts dngCameraToSrgb).
+// Anything else falls back to the embedded preview, and the reader is told that
+// is what opened and why.
 // It also holds what everything that reads a decoded photograph shares: the
 // pixel reader (linearAt), the sensor-clip test read before the lens flat
 // (pinTest), and the at-open automatics measured from it — gray-world balance,
@@ -13,9 +15,9 @@
 
 import type { ImportedFile } from "./import";
 import { Tiff, type Ifd } from "./raw/tiff";
-import { decodeMosaicedDng } from "./raw/dngRaw";
+import { binRaw, findDngRaw, rawFromLossyCodes, readDngRaw, withPreMatrix, type DngRaw, type DngRawFind } from "./raw/dngRaw";
 import { decodeNef } from "./raw/nef";
-import { camToSrgbLinear, nikonColorMatrix } from "./color";
+import { camToSrgbLinear, dngCameraToSrgb, nikonColorMatrix } from "./color";
 import { srgbToLinear } from "./icc";
 import { lensGeom, lensRadius, lensLerp, SENSOR_PIN, type BrushMask } from "./pipeline";
 
@@ -46,17 +48,24 @@ export interface DecodedImage {
    *  lane died first — the caller then builds it on this thread. Absent when
    *  the decode was not asked for a selection. */
   skySelReady?: Promise<SkySelection | null>;
-  /** 8-bit gamma-encoded RGBA (JPEG/preview/lossy-linear path). */
+  /** 8-bit gamma-encoded RGBA (JPEG/PNG/preview path). */
   pixels?: Uint8ClampedArray;
-  /** Linear float RGBA (mosaiced-raw path). Present instead of `pixels`. */
+  /** Linear float RGBA (every raw path). Present instead of `pixels`. */
   linear?: Float32Array;
+  /** A lossy LinearRaw DNG's tiles exactly as the browser decoded them: RGBA,
+   *  the raw IFD's full stored size, CODES rather than a picture — they mean
+   *  nothing until dngRaw.ts `rawFromLossyCodes` linearises them. Kept because
+   *  the export needs them at full resolution and they cannot be re-read from
+   *  the file without the browser's (asynchronous) JPEG decoder. Never drawn. */
+  lossyCodes?: Uint8ClampedArray;
   /** What the linear copy was corrected with at decode (the lens flat,
    *  decision 021), so a later strength re-applies as a ratio against it.
    *  Absent on 8-bit sources, which take the correction inside the grade. */
   lensApplied?: import("./lensflat").LensApplied;
   /** Camera-native -> linear sRGB 3x3 (row-major), applied after white balance.
-   *  Present only for camera-native raw (NEF, mosaiced DNG); absent when the
-   *  source is already display/profiled (JPEG, preview, lossy-linear DNG). */
+   *  Present for every camera-native raw (NEF, and every DNG raw image, lossy
+   *  LinearRaw included — the DNG spec calls LinearRaw camera-native); absent
+   *  when the source is already display-rendered (JPEG, PNG, a preview). */
   camMatrix?: number[];
   /** True when these are true (un-white-balanced) sensor values. */
   isRaw: boolean;
@@ -66,6 +75,10 @@ export interface DecodedImage {
    *  a Canon CR2 opened via its embedded JPEG preview. The UI must surface
    *  this (hint/alert), or the user believes they're editing raw data. */
   previewNotice?: string;
+  /** Honesty note when the raw data DID open but a correction the file says
+   *  must be applied was not (a DNG opcode this app does not implement, such as
+   *  a lens distortion warp). Shown once at open, like previewNotice. */
+  decodeNotice?: string;
 }
 
 /** Clamp `v` into [lo, hi]. */
@@ -462,10 +475,8 @@ function orientationToRotate(ifds: Ifd[]): number {
   return 0;
 }
 
-const PHOTO_LINEAR_RAW = 34892;
 const PHOTO_CFA = 32803;
 const COMP_JPEG = 7;
-const COMP_LOSSY_DNG = 34892;
 
 export async function decode(file: ImportedFile): Promise<DecodedImage> {
   if (file.kind === "jpeg" || file.kind === "png") {
@@ -507,11 +518,21 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
       isHeic(file.bytes)
         ? "This is a HEIC photo, which this browser can't decode. Open this app in Safari to use it, or export the photo as JPEG from Photos first."
         : file.rawBrand
-          ? `This is a ${file.rawBrand} raw file, which this app can't decode. ` +
-            "Convert it to DNG with the free Adobe DNG Converter and it will open here."
-          : "This file type isn't supported. Use JPEG, PNG, DNG or Nikon NEF — any other camera's RAW converts with the free Adobe DNG Converter.",
+          ? `This is a ${file.rawBrand} raw file, which this app can't decode. ` + convertAdvice(file.rawBrand)
+          : "This file type isn't supported. Use JPEG, PNG, DNG or Nikon NEF — most other cameras' raw files convert with the free Adobe DNG Converter.",
     );
   }
+}
+
+/** What to tell the owner of a raw file this app cannot read. A DNG converted
+ *  from a Fujifilm RAF keeps the camera's colour filter pattern, and most
+ *  Fujifilm bodies use X-Trans, a 6x6 pattern this app cannot develop — so the
+ *  RAF promise that every other brand gets would be false for them. */
+function convertAdvice(brand: string): string {
+  if (/fujifilm/i.test(brand)) {
+    return "Converting it to DNG won't help either for most Fujifilm cameras: their X-Trans sensors use a 6x6 colour pattern, the DNG keeps it, and this app can only develop the 2x2 Bayer pattern most other cameras use.";
+  }
+  return "Convert it to DNG with the free Adobe DNG Converter and it will open here.";
 }
 
 /** True when a NEF's raw data is High Efficiency (TicoRAW / JPEG XS), which
@@ -579,56 +600,97 @@ function make2d(w: number, h: number): { canvas: { width: number; height: number
   return { canvas, ctx };
 }
 
+/**
+ * The full-resolution raw frame of a DNG and the matrix it renders through.
+ * @param bytes  the whole file.
+ * @param ifds  every IFD of the file.
+ * @param found  what `findDngRaw` said about it — must carry a `kind`.
+ * @param lossyCodes  for kind "lossy", the browser-decoded tiles (RGBA codes,
+ *   DecodedImage.lossyCodes); ignored otherwise.
+ * @returns `cfa`, the frame `readDngRaw` / `rawFromLossyCodes` gives with any
+ *   reference-camera matrix attached, and `cam`, the camera -> linear sRGB
+ *   matrix (`dngCameraToSrgb`, or the per-model NEF default when the file has
+ *   no ColorMatrix). Decode and export.ts `getSource` both build their source
+ *   here, so the two cannot drift. Throws when a lossy file's codes are absent.
+ */
+export function readDngSource(bytes: Uint8Array, ifds: Ifd[], found: DngRawFind, lossyCodes?: Uint8ClampedArray): { cfa: DngRaw; cam: number[] } {
+  if (!found.ifd || !found.kind) throw new Error("This DNG has no raw image this app can read.");
+  let cfa: DngRaw;
+  if (found.kind === "lossy") {
+    if (!lossyCodes) throw new Error("No full-resolution source available to export.");
+    cfa = rawFromLossyCodes(lossyCodes, found.ifd);
+  } else {
+    cfa = readDngRaw(bytes, found.ifd, ifds);
+  }
+  const colour = dngCameraToSrgb(ifds);
+  withPreMatrix(cfa, colour?.pre);
+  return { cfa, cam: colour?.cam ?? camToSrgbLinear(nikonColorMatrix(cameraModel(ifds))) };
+}
+
+/** True when the file says it is a DNG (DNGVersion in any IFD) rather than a
+ *  plain TIFF, whose JPEG strip IS the picture rather than a preview of one. */
+function isDngFile(ifds: Ifd[]): boolean {
+  return ifds.some((d) => d.has(50706));
+}
+
 async function decodeDng(bytes: Uint8Array, file?: ImportedFile): Promise<DecodedImage> {
   const ifds = new Tiff(bytes).allIfds();
+  const found = findDngRaw(ifds);
 
-  // Lossy linear DNG (8-bit) -> native baseline-JPEG decode.
-  const linearRaw = ifds.find(
-    (d) => d.num(254)[0] === 0 && d.num(262)[0] === PHOTO_LINEAR_RAW && isJpegComp(d.num(259)[0]),
-  );
-  if (linearRaw) {
-    return { ...(await decodeTiledJpeg(bytes, linearRaw)), isRaw: true, rotate: orientationToRotate(ifds) };
-  }
+  // A mosaic this app would develop wrongly (X-Trans, a non-RGB filter): no
+  // preview stands in for it — say why and stop.
+  if (found.refuse) throw new Error(`This DNG can't be opened: ${found.why}.`);
 
-  // Mosaiced DNG -> pure-JS decode + demosaic (Compression 7 = lossless JPEG,
-  // Compression 1 = uncompressed, used by the bundled example files).
-  const cfaRaw = ifds.find(
-    (d) => d.num(254)[0] === 0 && d.num(262)[0] === PHOTO_CFA && (d.num(259)[0] === COMP_JPEG || d.num(259)[0] === 1),
-  );
-  if (cfaRaw) {
-    const img = decodeMosaicedDng(bytes, cfaRaw);
-    const cm = readCameraMatrix(ifds) ?? nikonColorMatrix(cameraModel(ifds));
+  if (found.kind) {
+    // Lossy LinearRaw: the browser decodes the baseline-JPEG tiles to codes.
+    const lossyCodes = found.kind === "lossy" ? (await decodeTiledJpeg(bytes, found.ifd!)).pixels : undefined;
+    const { cfa, cam } = readDngSource(bytes, ifds, found, lossyCodes);
+    const img = binRaw(cfa);
     return {
       width: img.width,
       height: img.height,
       linear: img.linear,
-      camMatrix: camToSrgbLinear(cm),
+      lossyCodes,
+      camMatrix: cam,
       isRaw: true,
       rotate: orientationToRotate(ifds),
+      decodeNotice: cfa.skipped.length
+        ? `This DNG asks for ${listWords([...new Set(cfa.skipped)])}, which this app doesn't apply, so the photograph is shown without ${cfa.skipped.length > 1 ? "them" : "it"}. ` +
+          "Lightroom or Adobe Camera Raw will apply it; everything else about the raw data is here."
+        : undefined,
     };
   }
 
   // Fallback: embedded preview. A third-party raw (CR2/ARW/… — TIFF-based, so
-  // it sniffs as "dng") lands here: the open SUCCEEDS but the user must be
-  // told it's the baked-in JPEG preview, not their raw data.
+  // it sniffs as "dng") lands here, and so does a DNG whose raw image this app
+  // cannot read: the open SUCCEEDS, but the reader must be told it is the
+  // baked-in JPEG preview, not their raw data, every time.
   const preview = pickLargestPreview(bytes, ifds);
   if (preview) {
     const decoded = await decodeBitmap(preview);
     const notice = file?.rawBrand
-      ? `This is a ${file.rawBrand} raw file — the app opened its built-in JPEG preview, not the raw data. ` +
-        "For true raw editing, convert it to DNG with the free Adobe DNG Converter."
-      : undefined;
+      ? `This is a ${file.rawBrand} raw file — the app opened its built-in JPEG preview, not the raw data. ` + convertAdvice(file.rawBrand)
+      : isDngFile(ifds)
+        ? `This app opened the JPEG preview built into this DNG, not its raw data: ${found.why ?? "the file holds no raw image this app recognises"}. ` +
+          "Edits work on that 8-bit picture."
+        : undefined;
     return { ...decoded, isRaw: false, previewNotice: notice };
   }
   const isDngByName = /\.dng$/i.test(file?.name ?? "");
   throw new Error(
     file?.rawBrand
-      ? `This is a ${file.rawBrand} raw file, which this app can't decode. ` +
-        "Convert it to DNG with the free Adobe DNG Converter and it will open here."
-      : isDngByName
-        ? "No decodable image found in this DNG."
-        : "No decodable image found in this TIFF file.",
+      ? `This is a ${file.rawBrand} raw file, which this app can't decode. ` + convertAdvice(file.rawBrand)
+      : found.why
+        ? `This DNG can't be opened: ${found.why}, and it carries no preview to show instead.`
+        : isDngByName
+          ? "No decodable image found in this DNG."
+          : "No decodable image found in this TIFF file.",
   );
+}
+
+/** "a, b and c" — a list in words for a notice. */
+function listWords(items: string[]): string {
+  return items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
 /** Camera Model string (tag 272) from any IFD that carries it. */
@@ -641,20 +703,21 @@ export function cameraModel(ifds: Ifd[]): string | undefined {
 }
 
 /**
- * Camera ColorMatrix (XYZ -> camera), preferring the daylight calibration.
- * Adobe DNGs carry two: ColorMatrix1 for CalibrationIlluminant1 (often
- * Illuminant A / tungsten) and ColorMatrix2 for CalibrationIlluminant2
- * (usually D65). IR shooting is daylight-only and dcraw/LibRaw likewise
- * render from the D65 matrix — picking the tungsten one bends every color
- * (the D5300 twins mismatched exactly this way, 2026-07-25).
- * @param ifds  every IFD of the file (Tiff.allIfds()).
- * @returns the chosen nine numbers, row-major, or undefined when no IFD carries
- *   a nine-value ColorMatrix (a NEF, a camera JPEG).
- * What the result must satisfy: it is the SAME matrix `readCameraMatrixTagged`
- *   picks, because the decode renders from this one and the .dcp export writes
- *   that one — two choosers would be a profile describing a different
- *   rendering from the one on screen.
- */
+ * @param ifds  every IFD of the file.
+ * @returns the daylight ColorMatrix (XYZ -> camera) as stored, or undefined.
+ *   NOT the colour route by itself any more: color.ts `dngCameraToSrgb` uses
+ *   the same ranking and adds ForwardMatrix, CameraCalibration and
+ *   AnalogBalance. Kept for the measurement tools that read the matrix.
+ *
+ *  Camera ColorMatrix (XYZ -> camera), preferring the daylight calibration.
+ *  Adobe DNGs carry two: ColorMatrix1 for CalibrationIlluminant1 (often
+ *  Illuminant A / tungsten) and ColorMatrix2 for CalibrationIlluminant2
+ *  (usually D65). IR shooting is daylight-only and dcraw/LibRaw likewise
+ *  render from the D65 matrix — picking the tungsten one bends every color
+ *  (the D5300 twins mismatched exactly this way, 2026-07-25).
+ * What the result must satisfy: it ranks the matrices exactly as
+ *   `readCameraMatrixTagged` and `dngCameraToSrgb` do, so a measurement reads
+ *   the matrix the rendering starts from. */
 export function readCameraMatrix(ifds: Ifd[]): number[] | undefined {
   return readCameraMatrixTagged(ifds)?.matrix;
 }
@@ -695,11 +758,9 @@ export function readCameraMatrixTagged(ifds: Ifd[]): { matrix: number[]; illumin
   return best;
 }
 
-function isJpegComp(c: number | undefined) {
-  return c === COMP_JPEG || c === COMP_LOSSY_DNG;
-}
-
-/** Decode a tiled or single-strip baseline-JPEG image and composite it. */
+/** Decode a tiled or single-strip baseline-JPEG image and composite it. The
+ *  codes are kept as stored (`colorSpaceConversion: "none"`): a lossy DNG's
+ *  tiles are camera data, not a picture to colour-manage. */
 async function decodeTiledJpeg(bytes: Uint8Array, ifd: Ifd): Promise<{ width: number; height: number; pixels: Uint8ClampedArray }> {
   const width = ifd.num(256)[0];
   const height = ifd.num(257)[0];
@@ -712,7 +773,7 @@ async function decodeTiledJpeg(bytes: Uint8Array, ifd: Ifd): Promise<{ width: nu
     const counts = ifd.num(325);
     const across = Math.ceil(width / tileW);
     for (let i = 0; i < tileOffsets.length; i++) {
-      const bmp = await createImageBitmap(toBlob(slice(bytes, tileOffsets[i], counts[i])));
+      const bmp = await createImageBitmap(toBlob(slice(bytes, tileOffsets[i], counts[i])), { colorSpaceConversion: "none" });
       ctx.drawImage(bmp, (i % across) * tileW, Math.floor(i / across) * tileH);
       bmp.close();
     }
@@ -721,7 +782,7 @@ async function decodeTiledJpeg(bytes: Uint8Array, ifd: Ifd): Promise<{ width: nu
     const stripCounts = ifd.num(279);
     const rowsPerStrip = ifd.num(278)[0] || height;
     for (let i = 0; i < stripOffsets.length; i++) {
-      const bmp = await createImageBitmap(toBlob(slice(bytes, stripOffsets[i], stripCounts[i])));
+      const bmp = await createImageBitmap(toBlob(slice(bytes, stripOffsets[i], stripCounts[i])), { colorSpaceConversion: "none" });
       ctx.drawImage(bmp, 0, i * rowsPerStrip);
       bmp.close();
     }

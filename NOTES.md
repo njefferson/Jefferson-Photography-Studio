@@ -13561,6 +13561,18 @@ If a pair with a non-"-100" profile should match exactly: re-export that
 DNG with the -100 profile, or the owner names a different NEF default
 (one-line change). Profile-aware NEF defaults beyond one per model are
 impossible — the NEF simply doesn't say which profile the user assigned.
+CORRECTED 2026-10-02 (audit, DNG spec 1.7.1.0 chapter 6): a profile with
+ForwardMatrix tags renders through FM * D * Inverse(AB * CC), and its
+ColorMatrix only turns a white-balance xy into a camera neutral. Identical
+ForwardMatrices with different ColorMatrices are therefore two white-balance
+calibrations of ONE colour transform, not two renderings. The app now renders a
+DNG with ForwardMatrix tags that way (color.ts dngCameraToSrgb), so the -100
+and -50 DNGs render alike at the same gains, and "the app is RIGHT to honor"
+the ColorMatrix above no longer describes it. The D5300 NEF default is
+unchanged (still the -100 ColorMatrix, through the ColorMatrix route), so a
+D5300 NEF and its Lightroom DNG twin now take different matrices: the DNG its
+ForwardMatrix, the NEF that ColorMatrix. The FM numbers were never recorded
+here; reading them from DSC_4940's DNG would let the NEF default match again.
 
 FIXED 2026-07-25 (a daytime frame rendered dark — DSC_1709 NEF vs its DNG twin
 as ground truth): the NEF path's black pedestal was the Z-series

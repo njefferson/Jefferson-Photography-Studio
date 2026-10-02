@@ -71,7 +71,8 @@ decode -> LINEAR camera-native RGB
                        PIXELS — hot-spots are optically round — via an aspect
                        term (u_aspect / compileEdit's aspect arg); r = 1 at the
                        frame corner. Spatial (image-uv) -> NOT in the .cube LUT.)
-  -> CAMERA MATRIX    (cam->sRGB, row-normalized; SEPARATES IR hues — without
+  -> CAMERA MATRIX    (cam->sRGB: dcraw's row-normalised ColorMatrix inverse,
+                       or a DNG's ForwardMatrix route; SEPARATES IR hues — without
                        it all IR chroma sits on one magenta axis and swap/sat
                        cannot produce false color. Biggest single discovery.)
   -> CHANNEL SWAP     (r<->b)
@@ -170,26 +171,45 @@ pipeline.ts (gl.ts re-exports).
 
 **Nikon NEF, compression 34713** — `nef.ts`.
 dcraw's algorithm: fixed Huffman trees, the linearization curve in MakerNote tag
-0x96, and a 2-back predictor. Verified bit-exact. Z50 levels are black 1008 and
+0x96, and a 2-back predictor. Verified bit-exact. The black is MakerNote
+0x003D's four values, one per CFA site, subtracted site by site (all 1008 on the
+Z 50 at 14-bit). Z50 levels are black 1008 and
 white 15520 at 14-bit. Does NOT support Z8 or Z9 High-Efficiency NEF.
 
-**Mosaiced DNG, lossless JPEG, compression 7** — `lj92.ts` with `dngRaw.ts`.
-DNG packs Bayer columns as interleaved JPEG components, so a tile's CFA column
-is `x * Nf + c`. Verified bit-exact over 20.8M pixels.
-
-**Mosaiced DNG, uncompressed, compression 1** — `dngRaw.ts`.
-Used by the bundled example files.
-
-**Lossy linear DNG, compression 34892** — `decode.ts`.
-Baseline-JPEG tile decoded natively, gamma-2.2-encoded, verified at 0.015 error
-against linear. No camera matrix on this path: those files already carry baked
-colour.
+**DNG** — `dngRaw.ts`, with `lj92.ts` and `dngOpcodes.ts`. One reader for a
+2x2 Bayer mosaic (Photometric 32803) and for LinearRaw (34892, demosaiced,
+camera-native), whichever way it is stored: uncompressed at any BitsPerSample
+from 8 to 16 (packed big-endian, rows byte-aligned, as dcraw's
+packed_dng_load_raw reads them), lossless JPEG (compression 7), or — LinearRaw
+only — lossy baseline JPEG (34892), whose tiles the browser decodes to 8-bit
+codes in `decode.ts`. Strips or tiles. It runs the DNG spec's own order:
+OpcodeList1; crop to ActiveArea; LinearizationTable; per-pixel black (the
+BlackLevel repeat pattern from the ActiveArea's corner plus BlackLevelDeltaH/V)
+subtracted and scaled by white minus the MAXIMUM black; OpcodeList2;
+DefaultCrop; OpcodeList3 after demosaic. The CFA phase is taken from the
+ActiveArea origin and follows the crop. Lossless-JPEG samples are walked in
+raster order and wrapped at the tile width, as dcraw and LibRaw do — the spec
+requires only that the sample COUNT match a tile, and 11 of 70 lossless CFA DNGs
+on raw.pixls.us use one component and two CFA rows per JPEG row. A DNG older
+than 1.1.0.0 stores 16 difference bits after SSSS=16 and is read that way. A
+lossy file with no LinearizationTable and no MapPolynomial takes the sRGB curve,
+LibRaw's default. Opcodes applied: GainMap, MapPolynomial, FixVignetteRadial
+(and MapTable on stored values); any other one the file does not mark optional
+is named to the reader at open (`decodeNotice`). A mosaic that is not 2x2 RGB
+Bayer (X-Trans is 6x6) is refused with the reason. Floating-point, Deflate,
+JPEG XL and VC-5 raw images open the embedded preview, and the reader is told
+that is what opened and why. The bundled example files are uncompressed
+16-bit mosaics. The original lossless path was verified bit-exact over 20.8M
+pixels.
 
 **JPEG and PNG** — `decode.ts`.
 Native decode; the browser applies EXIF orientation itself.
 
-X-Trans (Fuji) is NOT supported anywhere. Preview = half-res 2x2-binned
-demosaic (`demosaic.ts`); export = full-res bilinear per pixel.
+X-Trans (Fuji) is NOT supported anywhere, and a DNG converted from an X-Trans
+RAF is refused rather than developed as RGGB. Preview = half-res 2x2-binned
+demosaic (`demosaic.ts`; a LinearRaw frame is averaged 2x2 by `binRaw`); export
+= full-res bilinear per pixel, through the same `RawCfa`, so crop, levels and
+the after-demosaic stage are the preview's.
 
 ## Verification methodology (the project's backbone)
 
@@ -201,11 +221,19 @@ decoder, re-verify against LibRaw before pushing.
 
 ## Color science constants
 
-- Nikon Z50 ColorMatrix1 (XYZ->cam, D65): in `src/color.ts`. DNGs carry their
-  own matrix (tag 50721, SRATIONAL — the shared TIFF reader in `raw/tiff.ts`
-  handles types 3/4/5/10/11).
-- camToSrgbLinear = XYZ2sRGB * inverse(CM1), then ROW-NORMALIZED so neutrals
-  survive (keeps tap-WB meaningful).
+- Nikon Z50 ColorMatrix (XYZ->cam, D65): in `src/color.ts`, the NEF default.
+  DNGs carry their own colour tags (SRATIONAL — the shared TIFF reader in
+  `raw/tiff.ts` handles every TIFF numeric type).
+- DNG colour is `dngCameraToSrgb` (DNG 1.7.1.0 chapter 6), from the daylight
+  calibration: with ForwardMatrix, XYZ(D50)->sRGB (Bradford) * FM, the app's
+  camera-space white balance standing for the spec's D and the ColorMatrix
+  taking no part (it only turns a WB xy into a neutral, and the app finds its
+  neutral from the data); a non-diagonal Inverse(AB * CC) is applied to the
+  camera values first (`RawCfa.post.matrix`). Without ForwardMatrix,
+  camToSrgbLinear(AB * CC * CM). So the two Rob Shea IR profiles, which share a
+  ForwardMatrix and differ only in ColorMatrix, render alike.
+- camToSrgbLinear = inverse of the ROW-NORMALIZED CM * sRGB->XYZ (dcraw/LibRaw
+  cam_xyz_coeff), so neutrals survive (keeps tap-WB meaningful).
 - Auto WB: gray-world over the samples the sensor did NOT clip (`pinTest`,
   read before the lens flat — LibRaw's auto-WB drops any block holding a
   photosite above maximum-25), gains scaled so the SMALLEST is 1
@@ -714,21 +742,21 @@ later, that decoder (or shooting Lossless NEF) is the prerequisite.
 
 <!-- MODULE MAP: generated by tools/architecture-check.mjs — do not hand-edit -->
 
-80 modules. Each line is that file's own opening comment, so this
+81 modules. Each line is that file's own opening comment, so this
 cannot describe something the code does not say about itself.
 
 - **`src/batchstore.ts`** (174 lines) — Crash-safe store for finished batch frames.
 - **`src/chooser.ts`** (65 lines) — Two-door landing page.
-- **`src/color.ts`** (110 lines) — Camera color science.
+- **`src/color.ts`** (216 lines) — Camera color science.
 - **`src/cubeimport.ts`** (181 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (504 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 - **`src/debug.ts`** (2128 lines) — The test page behind the version number.
-- **`src/decode.ts`** (756 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
-- **`src/decode.worker.ts`** (60 lines) — Decoding, off the main thread.
+- **`src/decode.ts`** (817 lines) — Image decoding. Real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
+- **`src/decode.worker.ts`** (61 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (333 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1262 lines) — Full-resolution export.
+- **`src/export.ts`** (1279 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
@@ -761,20 +789,21 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (20269 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (20273 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (3066 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (3067 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
-- **`src/raw/demosaic.ts`** (126 lines) — Bayer demosaic + black/white-level normalization -> linear RGB.
+- **`src/raw/demosaic.ts`** (165 lines) — Bayer demosaic + black/white-level normalization -> linear RGB.
 - **`src/raw/denoise.ts`** (699 lines) — Edge-preserving denoise (13x13 bilateral, colour on a 7x7 grid at stride 2) on LINEAR sensor data.
 - **`src/raw/detail.ts`** (302 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
-- **`src/raw/dngRaw.ts`** (124 lines) — Decode a mosaiced (Bayer) DNG whose raw image is lossless-JPEG compressed (Compression 7, PhotometricInterpretation 32803 = CFA).
-- **`src/raw/lj92.ts`** (240 lines) — Lossless JPEG (ITU-T T.81, process 14 / SOF3) decoder — pure TypeScript.
-- **`src/raw/nef.ts`** (394 lines) — Nikon NEF (Compression 34713) decoder — pure TypeScript.
-- **`src/raw/tiff.ts`** (92 lines) — Minimal TIFF/DNG reader shared by the JPEG and mosaiced-raw decode paths.
+- **`src/raw/dngOpcodes.ts`** (345 lines) — DNG opcode lists (DNG 1.7.1.0, chapter 7): the corrections a DNG says must be applied at three points of decoding.
+- **`src/raw/dngRaw.ts`** (494 lines) — Decode a DNG's raw image into linear camera values.
+- **`src/raw/lj92.ts`** (260 lines) — Lossless JPEG (ITU-T T.81, process 14 / SOF3) decoder — pure TypeScript.
+- **`src/raw/nef.ts`** (426 lines) — Nikon NEF (Compression 34713) decoder — pure TypeScript.
+- **`src/raw/tiff.ts`** (127 lines) — Minimal TIFF/DNG reader shared by the JPEG and mosaiced-raw decode paths.
 - **`src/savefile.ts`** (66 lines) — GETTING A FILE OUT OF THE APP, and the one decision that governs it.
 - **`src/session.ts`** (599 lines) — Crash-safe store for a photo SESSION — the set you opened and are moving between, each photo keeping its own edit.
 - **`src/shadowcast.ts`** (252 lines) — THE SHADOW'S OWN ILLUMINANT, MEASURED FROM THIS PHOTOGRAPH (decision 034).

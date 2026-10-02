@@ -5,11 +5,11 @@
 import { lensGains, lensCurveForSource, turnOfOrientation } from "./lensflat";
 import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, aimedSampler, maskGroupsForRender, AIM_NOISE, AIM_TEXTURE, type BrushMask, type EditParams, type LensCurve, lensGeom, lensLerp, lensRadius } from "./pipeline";
 import { demosaicPixelLinearInto, type RawCfa } from "./raw/demosaic";
-import { readMosaicedCfa } from "./raw/dngRaw";
+import { findDngRaw } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
 import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, nikonColorMatrix } from "./color";
-import { cameraModel, readCameraMatrix } from "./decode";
+import { cameraModel, readDngSource } from "./decode";
 import { makeRowDenoiser, type LinearSampler } from "./raw/denoise";
 import { canRunParallel, exportBands } from "./exportparallel";
 import { makeRowDetail } from "./raw/detail";
@@ -303,8 +303,9 @@ function releaseCanvas(canvas: HTMLCanvasElement): void {
  *  Takes `current`, the `DecodedImage` the editor is holding. Returns a plain
  *  object carrying only its data fields, which `postMessage` can structured-
  *  clone. The invariant the callers depend on: everything `getSource` reads for
- *  a non-mosaiced source — `pixels`, `width`, `height` — survives, and nothing
- *  that cannot be cloned does.
+ *  a source it cannot re-read from the file — `pixels`, `width`, `height`, and
+ *  a lossy DNG's `lossyCodes` — survives, and nothing that cannot be cloned
+ *  does.
  *
  *  WHY THIS EXISTS, AND WHY IT NAMES ITS FIELDS ONE BY ONE. The two posts below
  *  used to hand the live `DecodedImage` straight to `postMessage`. That object
@@ -347,6 +348,7 @@ function forTheWire(current: DecodedImage): DecodedImage {
     isRaw: current.isRaw,
     pixels: current.pixels,
     linear: current.linear,
+    lossyCodes: current.lossyCodes,
     camMatrix: current.camMatrix,
     rotate: current.rotate,
     lensApplied: current.lensApplied,
@@ -759,8 +761,9 @@ export async function exportImage(
           // preview decode is dead weight on the wire — tens of megabytes
           // copied per worker for pixels `getSource` will not look at. Sent
           // whole only when the decode IS the source (JPEG, HEIC, a preview,
-          // a lossy-linear DNG), which is the same test getSource makes.
-          "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
+          // and a lossy-linear DNG, whose tiles only the browser can decode, so
+          // its codes travel), which is `sourceIsMosaiced`'s test.
+          sourceIsMosaiced(file) ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
           params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, job, onProgress);
         // The JPEG path asked for 8-bit bands, so 8-bit bands are what came
         // back; the check is here rather than assumed because `exportBands`
@@ -927,7 +930,7 @@ export async function exportImage(
       try {
         const split = await exportBands(
           file,
-          "cfa" in src ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
+          sourceIsMosaiced(file) ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
           params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, jobT, onProgress);
         if (!split.rgb) throw new Error("the workers returned no 16-bit pixels");
         rgb = split.rgb;   // ADOPTED, not copied into a buffer made in advance
@@ -1078,18 +1081,25 @@ export function proxyFactorFor(src: Source, srcW: number, srcH: number): number 
 
 /** WILL THIS EXPORT RE-READ THE FILE rather than use the decode on screen?
  *
- *  The same two tests `getSource` makes, without doing any of the reading: a NEF
- *  always, a DNG when it carries a mosaiced image. It matters to the caller
- *  because a mosaiced export needs nothing from the decoded frame but its size,
- *  so holding that frame for the length of an export keeps ~84 MB of
- *  half-resolution float alive for no reason — and the app's memory envelope is
- *  the one that already forced the full-resolution working copy off. */
+ *  The same test `getSource` makes, without doing any of the reading: a NEF
+ *  always, a DNG when its raw image is one `readDngRaw` reads straight from the
+ *  bytes (a mosaic, or LinearRaw uncompressed or lossless). A LOSSY LinearRaw
+ *  DNG answers false: it is still a raw source, but its tiles need the
+ *  browser's decoder, so its codes ride on the decoded frame and the frame
+ *  must be kept. It matters to the caller because a re-read export needs
+ *  nothing from the decoded frame but its size, so holding that frame for the
+ *  length of an export keeps ~84 MB of half-resolution float alive for no
+ *  reason — and the app's memory envelope is the one that already forced the
+ *  full-resolution working copy off.
+ *  @param file  the photograph being exported.
+ *  @returns true when getSource will read the file itself; false when it needs
+ *    the decoded frame (main.ts keeps the frame, exportBands posts it). */
 export function sourceIsMosaiced(file: ImportedFile): boolean {
   try {
     if (file.kind === "nef") return true;
-    if (file.kind === "dng") {
-      const ifds = new Tiff(file.bytes).allIfds();
-      return !!ifds.find((d) => d.num(254)[0] === 0 && d.num(262)[0] === 32803 && (d.num(259)[0] === 7 || d.num(259)[0] === 1));
+    if (file.kind === "dng" || file.kind === "tiff") {
+      const kind = findDngRaw(new Tiff(file.bytes).allIfds()).kind;
+      return kind === "cfa" || kind === "linear";
     }
   } catch {
     /* unreadable metadata — treat it as the safe answer and keep the frame */
@@ -1097,21 +1107,28 @@ export function sourceIsMosaiced(file: ImportedFile): boolean {
   return false;
 }
 
+/**
+ * The full-resolution source an export reads its pixels from.
+ * @param file  the photograph.
+ * @param current  its decoded frame; read only for a source the file cannot
+ *   give back by itself (8-bit pixels, a lossy DNG's codes).
+ * @returns `{ cfa, cam }` for every raw — NEF, and any DNG raw image `findDngRaw`
+ *   can read, LinearRaw included — built by the same functions as the preview
+ *   (`readNefCfa`; decode.ts `readDngSource`), so the export's size, levels,
+ *   crop and colour are the preview's; otherwise the decoded 8-bit pixels.
+ *   Throws when neither exists.
+ */
 export function getSource(file: ImportedFile, current: DecodedImage): Source {
   if (file.kind === "nef") {
     const ifds = new Tiff(file.bytes).allIfds();
     return { cfa: readNefCfa(file.bytes), cam: camToSrgbLinear(nikonColorMatrix(cameraModel(ifds))) };
   }
-  if (file.kind === "dng") {
+  if (file.kind === "dng" || file.kind === "tiff") {
     const ifds = new Tiff(file.bytes).allIfds();
-    const raw = ifds.find((d) => d.num(254)[0] === 0 && d.num(262)[0] === 32803 && (d.num(259)[0] === 7 || d.num(259)[0] === 1));
-    if (raw) {
-      const cm = readCameraMatrix(ifds) ?? nikonColorMatrix(cameraModel(ifds));
-      return { cfa: readMosaicedCfa(file.bytes, raw), cam: camToSrgbLinear(cm) };
-    }
+    const found = findDngRaw(ifds);
+    if (found.kind) return readDngSource(file.bytes, ifds, found, current.lossyCodes);
   }
-  // Non-mosaiced (JPEG/PNG/lossy-linear DNG/preview): the decode is already
-  // full-resolution 8-bit.
+  // Non-raw (JPEG/PNG/preview): the decode is already full-resolution 8-bit.
   if (!current.pixels) throw new Error("No full-resolution source available to export.");
   return { pixels: current.pixels, width: current.width, height: current.height };
 }

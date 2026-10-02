@@ -70,7 +70,18 @@ export function decodeNef(bytes: Uint8Array): LinearImage {
   return demosaicBinned(c.cfa, c.width, c.height, c.pattern, c.black, c.white);
 }
 
-/** Full Bayer frame + metadata (for native-resolution export). */
+/**
+ * Full Bayer frame + metadata (for native-resolution export).
+ * @param bytes  the whole NEF.
+ * @returns the decoded mosaic with each photosite's own black already
+ *   subtracted — the four MakerNote 0x003D values belong one to each CFA site
+ *   (R, G on the red row, G on the blue row, B), as LibRaw's cblack takes them,
+ *   and were averaged into one until 2026-10-02 — so `black` is 0 and `white` is
+ *   the white level minus the largest of the four (DNG chapter 5's scale).
+ *   When the four are equal, as on every owner file read, the values are the
+ *   ones the single averaged black gave. Consumers: `decodeNef` (preview) and
+ *   export.ts `getSource` (full resolution), which therefore agree.
+ */
 export function readNefCfa(bytes: Uint8Array): RawCfa {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const main = new Reader(view, bytes[0] === 0x49);
@@ -110,14 +121,34 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
   // corrects ("Adjust BL for Nikon 12bit"). Taken unscaled, a 12-bit Z 50 frame
   // (floor 250-256) lost 1008 and 77-94% of its photosites read zero.
   const curveWhite = params.curve[params.curveMax - 1] || 0;
-  const mnBlack = meta.black === undefined ? undefined : bps === 12 ? Math.round(meta.black / 4) : meta.black;
-  const black = raw.num(50714)[0] ?? mnBlack ?? (bps === 14 ? 1008 : bps === 12 ? 252 : 0);
+  // One black per CFA site: [R, G on the R row, G on the B row, B].
+  const siteBlacks = meta.blacks?.map((b) => (bps === 12 ? Math.round(b / 4) : b));
+  const tagBlack = raw.num(50714)[0];
+  const fallback = bps === 14 ? 1008 : bps === 12 ? 252 : 0;
+  const sites = tagBlack !== undefined || !siteBlacks ? [0, 1, 2, 3].map(() => tagBlack ?? fallback) : [0, 1, 2, 3].map((i) => {
+    const c = pattern[i];
+    if (c === 0) return siteBlacks[0];
+    if (c === 2) return siteBlacks[3];
+    // A green on the row that holds red takes the second value, else the third.
+    const rowHasRed = pattern[(i & 2)] === 0 || pattern[(i & 2) + 1] === 0;
+    return rowHasRed ? siteBlacks[1] : siteBlacks[2];
+  });
+  const maxBlack = Math.max(...sites);
   const white =
-    raw.num(50717)[0] ??
-    (params.hasCurve && curveWhite > black ? curveWhite : (1 << bps) - 1);
+    (raw.num(50717)[0] ??
+    (params.hasCurve && curveWhite > maxBlack ? curveWhite : (1 << bps) - 1)) - maxBlack;
+  for (let y = 0; y < height; y++) {
+    const b0 = sites[(y & 1) * 2], b1 = sites[(y & 1) * 2 + 1];
+    for (let x = 0, i = y * width; x < width; x++, i++) {
+      const v = cfa[i] - (x & 1 ? b1 : b0);
+      cfa[i] = v > 0 ? v : 0;
+    }
+  }
+  // The autofocus rows are equalised on the black-subtracted values, so black
+  // is 0 here and white is the subtracted ceiling.
   const model = ifds.map((d) => d.str(272)).find(Boolean) ?? "";
-  if (Z50_PDAF.test(model)) equalisePdafRows(cfa, width, height, pattern, black, white);
-  return { cfa, width, height, pattern, black, white };
+  if (Z50_PDAF.test(model)) equalisePdafRows(cfa, width, height, pattern, 0, white);
+  return { cfa, width, height, pattern, black: 0, white };
 }
 
 /** Bodies whose phase-detect rows are known: the Z 50 and the Z fc share a
@@ -329,7 +360,7 @@ function nikonDecode(bytes: Uint8Array, dataOffset: number, width: number, heigh
  *  D5300 = 600, Z-series = 1008. Assuming the Z value crushed a deeply
  *  underexposed D5300 frame to near-black (owner's DSC_1709, 2026-07-25 —
  *  its Adobe DNG twin carried BlackLevel 600 and rendered fine). */
-function findLinearizationTable(bytes: Uint8Array, main: Reader): { offset: number; le: boolean; black?: number } {
+function findLinearizationTable(bytes: Uint8Array, main: Reader): { offset: number; le: boolean; blacks?: number[] } {
   const u32 = (o: number) => main.u32(o);
   const u16 = (o: number) => main.u16(o);
   const tagVal = (ifd: number, tag: number): number | undefined => {
@@ -361,15 +392,16 @@ function findLinearizationTable(bytes: Uint8Array, main: Reader): { offset: numb
   const mnIfd = base + mn.u32(base + 4);
   const mc = mn.u16(mnIfd);
   let linOff: number | undefined;
-  let black: number | undefined;
+  let blacks: number[] | undefined;
   for (let i = 0; i < mc; i++) {
     const e = mnIfd + 2 + i * 12;
     const tag = mn.u16(e);
     if (tag === 0x0096) linOff = base + mn.u32(e + 8);
     if (tag === 0x003d && mn.u16(e + 2) === 3 && mn.u32(e + 4) === 4) {
-      // Four per-CFA-site shorts (equal in practice); average to one level.
+      // Four per-CFA-site shorts, R, G(R row), G(B row), B — LibRaw's
+      // `FORC4 cblack[RGGB_2_RGBG(c)] = get2()`. Kept apart, never averaged.
       const vo = base + mn.u32(e + 8);
-      black = Math.round((mn.u16(vo) + mn.u16(vo + 2) + mn.u16(vo + 4) + mn.u16(vo + 6)) / 4);
+      blacks = [mn.u16(vo), mn.u16(vo + 2), mn.u16(vo + 4), mn.u16(vo + 6)];
     }
     // 0x000C (WB_RBLevels) IS IN THIS IFD AND IS DELIBERATELY NOT READ.
     // It is the camera's own white balance, [R, B, G, G], and on a visible-
@@ -389,5 +421,5 @@ function findLinearizationTable(bytes: Uint8Array, main: Reader): { offset: numb
     // day; the physics and the numbers are in IR-SCIENCE.md, section 3.
   }
   if (linOff === undefined) throw new Error("NEF: no LinearizationTable (0x0096).");
-  return { offset: linOff, le: mnLe, black };
+  return { offset: linOff, le: mnLe, blacks };
 }
