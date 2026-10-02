@@ -17,7 +17,7 @@ import type { ImportedFile } from "./import";
 import { Tiff, type Ifd } from "./raw/tiff";
 import { binRaw, findDngRaw, rawFromLossyCodes, readDngRaw, withPreMatrix, type DngRaw, type DngRawFind } from "./raw/dngRaw";
 import { decodeNef } from "./raw/nef";
-import { camToSrgbLinear, dngCameraToSrgb, nikonColorMatrix } from "./color";
+import { camToSrgbLinear, dngCalibration, dngCameraToSrgb, nikonColorMatrix } from "./color";
 import { srgbToLinear } from "./icc";
 import { lensGeom, lensRadius, lensLerp, SENSOR_PIN, type BrushMask } from "./pipeline";
 
@@ -706,8 +706,9 @@ export function cameraModel(ifds: Ifd[]): string | undefined {
  * @param ifds  every IFD of the file.
  * @returns the daylight ColorMatrix (XYZ -> camera) as stored, or undefined.
  *   NOT the colour route by itself any more: color.ts `dngCameraToSrgb` uses
- *   the same ranking and adds ForwardMatrix, CameraCalibration and
- *   AnalogBalance. Kept for the measurement tools that read the matrix.
+ *   the same choice (`dngCalibration`) and adds ForwardMatrix,
+ *   CameraCalibration and AnalogBalance. Kept for the measurement tools that
+ *   read the matrix.
  *
  *  Camera ColorMatrix (XYZ -> camera), preferring the daylight calibration.
  *  Adobe DNGs carry two: ColorMatrix1 for CalibrationIlluminant1 (often
@@ -715,9 +716,9 @@ export function cameraModel(ifds: Ifd[]): string | undefined {
  *  (usually D65). IR shooting is daylight-only and dcraw/LibRaw likewise
  *  render from the D65 matrix — picking the tungsten one bends every color
  *  (the D5300 twins mismatched exactly this way, 2026-07-25).
- * What the result must satisfy: it ranks the matrices exactly as
- *   `readCameraMatrixTagged` and `dngCameraToSrgb` do, so a measurement reads
- *   the matrix the rendering starts from. */
+ * What the result must satisfy: it is the ColorMatrix of the set
+ *   `dngCameraToSrgb` renders from (`dngCalibration` chooses for both), so a
+ *   measurement reads the matrix the rendering starts from. */
 export function readCameraMatrix(ifds: Ifd[]): number[] | undefined {
   return readCameraMatrixTagged(ifds)?.matrix;
 }
@@ -725,37 +726,25 @@ export function readCameraMatrix(ifds: Ifd[]): number[] | undefined {
 /**
  * The matrix `readCameraMatrix` picks, WITH the illuminant its file says it was
  * calibrated under — the pair a camera profile has to carry together (DNG:
- * ColorMatrix1 "under the first calibration illuminant").
+ * ColorMatrix1 "under the first calibration illuminant") — and the same set's
+ * ForwardMatrix, when it has one.
  * @param ifds  every IFD of the file.
- * @returns { matrix, illuminant } — illuminant is the EXIF LightSource code from
- *   the matching CalibrationIlluminant tag (21 = D65, 17 = A, ...), undefined
- *   when the file names none — or undefined when no matrix is present.
- * Consumers: readCameraMatrix (the decode and the computed export) and the
- *   .dcp export (dcp.ts), which writes this illuminant rather than guessing one.
+ * @returns { matrix, illuminant, forward } — illuminant is the EXIF LightSource
+ *   code from the matching CalibrationIlluminant tag (21 = D65, 17 = A, ...),
+ *   undefined when the file names none; forward is that set's ForwardMatrix,
+ *   undefined when it has none — or undefined when no matrix is present.
+ * What the result must satisfy: it is color.ts `dngCalibration`'s choice, the
+ *   set `dngCameraToSrgb` renders the photograph from (the third, DNG 1.6, set
+ *   included), so `forward` present means the photograph was shown through it.
+ * Consumers: readCameraMatrix (the measurement tools) and the .dcp export
+ *   (dcp.ts), which writes this illuminant rather than guessing one and the
+ *   ForwardMatrix beside the ColorMatrix, so Lightroom takes the route the app
+ *   took.
  */
-export function readCameraMatrixTagged(ifds: Ifd[]): { matrix: number[]; illuminant: number | undefined } | undefined {
-  // EXIF LightSource ranking, best first: D65, D55, D75, D50, daylight/fine
-  // weather, untagged, then anything else (tungsten et al).
-  const rank = (ill: number | undefined) =>
-    ill === 21 ? 0 : ill === 20 ? 1 : ill === 22 ? 2 : ill === 23 ? 3 : ill === 1 || ill === 9 ? 4 : ill === undefined ? 5 : 6;
-  let best: { matrix: number[]; illuminant: number | undefined } | undefined;
-  let bestRank = Infinity;
-  for (const d of ifds) {
-    for (const [mTag, iTag] of [
-      [50722, 50779],
-      [50721, 50778],
-    ] as const) {
-      const cm = d.num(mTag);
-      if (cm.length !== 9) continue;
-      const ill = d.num(iTag)[0];
-      const r = rank(ill);
-      if (r < bestRank) {
-        bestRank = r;
-        best = { matrix: cm, illuminant: ill };
-      }
-    }
-  }
-  return best;
+export function readCameraMatrixTagged(ifds: Ifd[]): { matrix: number[]; illuminant: number | undefined; forward?: number[] } | undefined {
+  const cal = dngCalibration(ifds);
+  if (!cal) return undefined;
+  return { matrix: cal.cm, illuminant: cal.illuminant, forward: cal.fm.length === 9 ? cal.fm : undefined };
 }
 
 /** Decode a tiled or single-strip baseline-JPEG image and composite it. The

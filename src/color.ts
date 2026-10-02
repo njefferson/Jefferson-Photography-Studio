@@ -30,8 +30,12 @@ export const NIKON_D5300_COLOR_MATRIX = [
 ];
 
 /** Matrix for a native NEF, which carries no ColorMatrix tags — chosen by the
- *  file's own Model string so a NEF and its Adobe DNG twin render alike.
- *  Fallback: Z 50, the owner's primary body. */
+ *  file's own Model string: the ColorMatrix its Adobe DNG twin carries. The
+ *  twins render alike only when that DNG has no ForwardMatrix; one that has
+ *  (the D5300's Lightroom DNGs) renders through it (dngCameraToSrgb below), and
+ *  the NEF cannot, because its numbers were never recorded (NOTES, the
+ *  2026-10-02 correction to the twin ledger). Fallback: Z 50, the owner's
+ *  primary body. */
 /**
  * The sensor's pixel pitch for a camera model, in microns — the number the
  * diffraction limit is measured against (IR-SCIENCE.md §9h: the Airy disk at
@@ -130,10 +134,55 @@ const XYZ_D50_TO_SRGB = (() => {
 
 type Matrixish = { num(tag: number): number[]; str(tag: number): string | undefined };
 
+/** A DNG's calibration sets, best-ranked order of search: [ColorMatrix,
+ *  CalibrationIlluminant, CameraCalibration, ForwardMatrix] for the second,
+ *  first and (DNG 1.6) third illuminant. */
+const CALIBRATION_SETS = [
+  [50722, 50779, 50724, 50965],
+  [50721, 50778, 50723, 50964],
+  [52531, 52529, 52530, 52532],
+] as const;
+
+/**
+ * THE ONE CALIBRATION A DNG IS RENDERED FROM: the daylight one, ranked by
+ * EXIF LightSource — D65, D55, D75, D50, daylight/fine weather, untagged, then
+ * anything else (tungsten et al) — over every IFD and all three sets.
+ * @param ifds  every IFD of the file.
+ * @returns the IFD holding it, its ColorMatrix, its CalibrationIlluminant
+ *   (undefined when the file names none), and its CameraCalibration and
+ *   ForwardMatrix as stored (empty when absent); undefined when the file
+ *   carries no 9-value ColorMatrix.
+ * What the result must satisfy: it is the ONLY place the set is chosen.
+ *   `dngCameraToSrgb` renders from it and decode.ts `readCameraMatrixTagged`
+ *   reports it (to the .dcp export and the measurement tools), so a profile
+ *   written from a file carries the matrices the photograph was shown with.
+ *   They chose separately until 2026-10-02, and only one of them knew the
+ *   third set.
+ */
+export function dngCalibration(ifds: Matrixish[]): { ifd: Matrixish; cm: number[]; illuminant: number | undefined; cc: number[]; fm: number[] } | undefined {
+  const rank = (ill: number | undefined) =>
+    ill === 21 ? 0 : ill === 20 ? 1 : ill === 22 ? 2 : ill === 23 ? 3 : ill === 1 || ill === 9 ? 4 : ill === undefined ? 5 : 6;
+  let best: { d: Matrixish; set: (typeof CALIBRATION_SETS)[number] } | undefined;
+  let bestRank = Infinity;
+  for (const d of ifds) {
+    for (const set of CALIBRATION_SETS) {
+      if (d.num(set[0]).length !== 9) continue;
+      const r = rank(d.num(set[1])[0]);
+      if (r < bestRank) {
+        bestRank = r;
+        best = { d, set };
+      }
+    }
+  }
+  if (!best) return undefined;
+  const { d, set } = best;
+  return { ifd: d, cm: d.num(set[0]), illuminant: d.num(set[1])[0], cc: d.num(set[2]), fm: d.num(set[3]) };
+}
+
 /**
  * The camera -> linear sRGB matrix for a DNG, as DNG 1.7.1.0 chapter 6 builds
- * it, for the calibration this app renders from (the daylight one: the ranking
- * readCameraMatrix in decode.ts uses).
+ * it, for the calibration this app renders from (the daylight one,
+ * `dngCalibration`, which decode.ts readCameraMatrixTagged reports too).
  * @param ifds  every IFD of the file. The colour tags live in IFD 0.
  * @returns undefined when the file carries no ColorMatrix (the caller falls
  *   back to the per-model NEF default); otherwise `cam`, a row-major 3x3 the
@@ -169,39 +218,19 @@ type Matrixish = { num(tag: number): number[]; str(tag: number): string | undefi
  *   when CameraCalibrationSignature equals ProfileCalibrationSignature (both
  *   empty counts as equal, as in Adobe's SDK); otherwise identity.
  *   Consumers: decode.ts (camMatrix at open) and export.ts getSource, so the
- *   preview and the export render through the same matrix.
+ *   preview and the export render through the same matrix; and the .dcp
+ *   export writes the same ColorMatrix and ForwardMatrix (dcp.ts), so a reader
+ *   applying that profile takes the same route.
  */
 export function dngCameraToSrgb(ifds: Matrixish[]): { cam: number[]; pre?: number[] } | undefined {
-  const rank = (ill: number | undefined) =>
-    ill === 21 ? 0 : ill === 20 ? 1 : ill === 22 ? 2 : ill === 23 ? 3 : ill === 1 || ill === 9 ? 4 : ill === undefined ? 5 : 6;
-  // [ColorMatrix, CalibrationIlluminant, CameraCalibration, ForwardMatrix] per set.
-  const sets = [
-    [50722, 50779, 50724, 50965],
-    [50721, 50778, 50723, 50964],
-    [52531, 52529, 52530, 52532],
-  ] as const;
-  let best: { d: Matrixish; set: (typeof sets)[number] } | undefined;
-  let bestRank = Infinity;
-  for (const d of ifds) {
-    for (const set of sets) {
-      if (d.num(set[0]).length !== 9) continue;
-      const r = rank(d.num(set[1])[0]);
-      if (r < bestRank) {
-        bestRank = r;
-        best = { d, set };
-      }
-    }
-  }
-  if (!best) return undefined;
-  const { d, set } = best;
-  const cm = d.num(set[0]);
+  const cal = dngCalibration(ifds);
+  if (!cal) return undefined;
+  const { ifd: d, cm, cc: ccTag, fm } = cal;
   const ab = d.num(50727);
   const AB = [ab[0] ?? 1, 0, 0, 0, ab[1] ?? 1, 0, 0, 0, ab[2] ?? 1];
-  const ccTag = d.num(set[2]);
   const sigOk = (d.str(50931) ?? "") === (d.str(50932) ?? "");
   const CC = ccTag.length === 9 && sigOk ? ccTag : [1, 0, 0, 0, 1, 0, 0, 0, 1];
   const ABCC = mul3(AB, CC);
-  const fm = d.num(set[3]);
   if (fm.length !== 9) return { cam: camToSrgbLinear(mul3(ABCC, cm)) };
 
   const cam = mul3(XYZ_D50_TO_SRGB, fm);

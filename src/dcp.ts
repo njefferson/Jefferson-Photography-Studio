@@ -79,13 +79,19 @@ interface Entry {
  * @param name         ProfileName, as Lightroom lists it.
  * @param raw          true when the app rendered this photograph through a
  *   camera matrix with `params.wb` as raw gains — only then are those gains a
- *   camera neutral the matrix can be recentred on. False (a camera JPEG, a
- *   lossy-linear DNG) writes the matrix unshifted.
+ *   camera neutral the matrix can be recentred on. False (a camera JPEG or
+ *   PNG, an embedded preview) writes the matrix unshifted. Every DNG raw image
+ *   is camera-native now, lossy LinearRaw included, and passes true.
  * @returns the .dcp file (TIFF structure, magic 0x4352).
  * What the result must satisfy (DNG 1.7.1.0): ColorMatrix1 is the matrix the
  *   decode rendered with (readCameraMatrixTagged, else nikonColorMatrix) and
  *   CalibrationIlluminant1 is the one its file names — absent when it names
- *   none, never a guessed D65; UniqueCameraModel names the camera that matrix
+ *   none, never a guessed D65; ForwardMatrix1 is present exactly when that
+ *   set carries one, because then the decode rendered through it
+ *   (color.ts dngCameraToSrgb: CameraToXYZ_D50 = FM * D) and a reader given
+ *   the ColorMatrix alone takes the other route (until 2026-10-02 it was
+ *   never written, and a profile made from a ForwardMatrix DNG rendered
+ *   colours nowhere near the app's in a spec reader); UniqueCameraModel names the camera that matrix
  *   belongs to; every zero-saturation table entry is [0, 1, 1] ("All zero input
  *   saturation entries are required to have a value scale factor of 1.0");
  *   ProfileEmbedPolicy is 0, "allow copying" — a profile meant to be shared,
@@ -101,6 +107,10 @@ export function generateDcp(params: EditParams, sourceBytes: Uint8Array | undefi
   const entries: Entry[] = [
     asciiEntry(50708, src.model), // UniqueCameraModel
     srationalEntry(50721, colorMatrix), // ColorMatrix1
+    // ForwardMatrix1, when the source's own set has one: it is the route the
+    // decode rendered through, and the recentred ColorMatrix above then only
+    // turns a white balance into a camera neutral, as the spec gives it.
+    ...(src.forward ? [srationalEntry(50964, src.forward)] : []),
     asciiEntry(50936, name), // ProfileName
     longEntry(50937, [HUE_DIVS, SAT_DIVS, VAL_DIVS]), // ProfileHueSatMapDims
     floatEntry(50938, hsm), // ProfileHueSatMapData1
@@ -128,11 +138,12 @@ const D65_XYZ = [0.950456, 1.0, 1.088754];
 /** D50, the PCS white, as ProPhoto's own primaries sum to it. */
 const D50_XYZ = [0.96422, 1.0, 0.82521];
 
-/** The matrix the decode rendered with, the illuminant its file names for it,
- *  and the UniqueCameraModel a reader indexes profiles by. Mirrors decode.ts:
+/** The matrix the decode rendered with, the same set's ForwardMatrix when it
+ *  has one, the illuminant its file names for it, and the UniqueCameraModel a
+ *  reader indexes profiles by. Mirrors decode.ts:
  *  readCameraMatrixTagged first, then nikonColorMatrix by the Model string,
  *  whose two constants are both Adobe-converter ColorMatrix2 values (D65). */
-function profileSource(sourceBytes: Uint8Array | undefined): { matrix: number[]; illuminant: number | undefined; model: string } {
+function profileSource(sourceBytes: Uint8Array | undefined): { matrix: number[]; forward?: number[]; illuminant: number | undefined; model: string } {
   let ifds: Ifd[] = [];
   try {
     if (sourceBytes && (sourceBytes[0] === 0x49 || sourceBytes[0] === 0x4d)) ifds = new Tiff(sourceBytes).allIfds();
@@ -143,7 +154,7 @@ function profileSource(sourceBytes: Uint8Array | undefined): { matrix: number[];
   const body = cameraModel(ifds);
   const matrix = tagged?.matrix ?? nikonColorMatrix(body);
   const illuminant = tagged ? tagged.illuminant : 21;
-  return { matrix, illuminant, model: uniqueCameraModel(ifds) ?? "Nikon Z 50" };
+  return { matrix, forward: tagged?.forward, illuminant, model: uniqueCameraModel(ifds) ?? "Nikon Z 50" };
 }
 
 /** UniqueCameraModel for the profile: a DNG's own (tag 50708) when it carries

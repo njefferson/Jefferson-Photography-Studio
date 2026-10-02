@@ -121,8 +121,16 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
   // corrects ("Adjust BL for Nikon 12bit"). Taken unscaled, a 12-bit Z 50 frame
   // (floor 250-256) lost 1008 and 77-94% of its photosites read zero.
   const curveWhite = params.curve[params.curveMax - 1] || 0;
-  // One black per CFA site: [R, G on the R row, G on the B row, B].
-  const siteBlacks = meta.blacks?.map((b) => (bps === 12 ? Math.round(b / 4) : b));
+  // One black per CFA site: [R, G on the R row, G on the B row, B]. At 12 bits
+  // LibRaw divides as UNSIGNED INTEGERS, the common part and each site's
+  // remainder apart (0x003D's parse moves the smallest of the four into
+  // `black`, then `C.black /= 4; FORC4 C.cblack[c] /= 4;`), so a site's black
+  // is floor(min / 4) + floor((b - min) / 4). It was Math.round(b / 4) until
+  // 2026-10-02, a level above LibRaw's for any value not a multiple of four
+  // (1010 read 253 against 252); 1008, what every owner file carries, is 252
+  // either way.
+  const lowBlack = meta.blacks ? Math.min(...meta.blacks) : 0;
+  const siteBlacks = meta.blacks?.map((b) => (bps === 12 ? Math.floor(lowBlack / 4) + Math.floor((b - lowBlack) / 4) : b));
   const tagBlack = raw.num(50714)[0];
   const fallback = bps === 14 ? 1008 : bps === 12 ? 252 : 0;
   const sites = tagBlack !== undefined || !siteBlacks ? [0, 1, 2, 3].map(() => tagBlack ?? fallback) : [0, 1, 2, 3].map((i) => {

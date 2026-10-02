@@ -753,11 +753,11 @@ cannot describe something the code does not say about itself.
 
 - **`src/batchstore.ts`** (174 lines) — Crash-safe store for finished batch frames.
 - **`src/chooser.ts`** (65 lines) — Two-door landing page.
-- **`src/color.ts`** (216 lines) — Camera color science.
+- **`src/color.ts`** (245 lines) — Camera color science.
 - **`src/cubeimport.ts`** (181 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
-- **`src/dcp.ts`** (504 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
+- **`src/dcp.ts`** (515 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 - **`src/debug.ts`** (2128 lines) — The test page behind the version number.
-- **`src/decode.ts`** (817 lines) — Image decoding. Real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
+- **`src/decode.ts`** (806 lines) — Image decoding. Real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (61 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
@@ -802,13 +802,13 @@ cannot describe something the code does not say about itself.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
-- **`src/raw/demosaic.ts`** (610 lines) — Bayer demosaic + black/white-level normalization -> linear RGB: a binned half-size proxy, and RCD at full resolution.
+- **`src/raw/demosaic.ts`** (609 lines) — Bayer demosaic + black/white-level normalization -> linear RGB: a binned half-size proxy, and RCD at full resolution.
 - **`src/raw/denoise.ts`** (699 lines) — Edge-preserving denoise (13x13 bilateral, colour on a 7x7 grid at stride 2) on LINEAR sensor data.
 - **`src/raw/detail.ts`** (302 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
 - **`src/raw/dngOpcodes.ts`** (345 lines) — DNG opcode lists (DNG 1.7.1.0, chapter 7): the corrections a DNG says must be applied at three points of decoding.
 - **`src/raw/dngRaw.ts`** (494 lines) — Decode a DNG's raw image into linear camera values.
 - **`src/raw/lj92.ts`** (260 lines) — Lossless JPEG (ITU-T T.81, process 14 / SOF3) decoder — pure TypeScript.
-- **`src/raw/nef.ts`** (456 lines) — Nikon NEF (Compression 34713) decoder — pure TypeScript.
+- **`src/raw/nef.ts`** (464 lines) — Nikon NEF (Compression 34713) decoder — pure TypeScript.
 - **`src/raw/tiff.ts`** (127 lines) — Minimal TIFF/DNG reader shared by the JPEG and mosaiced-raw decode paths.
 - **`src/savefile.ts`** (66 lines) — GETTING A FILE OUT OF THE APP, and the one decision that governs it.
 - **`src/session.ts`** (599 lines) — Crash-safe store for a photo SESSION — the set you opened and are moving between, each photo keeping its own edit.

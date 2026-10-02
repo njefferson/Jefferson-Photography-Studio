@@ -124,22 +124,21 @@ export function demosaicBinned(
  *  maps from its binned copy. Every pixel the export SAVES comes from
  *  `makeDemosaicSampler`; this must never be used for those.
  *
- *  WHY THERE ARE TWO OF THESE. An export of a 21-megapixel raw calls this once
- *  per source pixel, and the version above allocated an array AND TWO CLOSURES
- *  on every one of those calls — sixty-odd million short-lived objects for one
- *  photograph. The arithmetic below is character for character what it was; the
- *  only change is where the numbers are put and that `at` and `colorAt` are
- *  written out rather than built per call. Proven by hashing the exported
- *  file: identical bytes, measurably less time.
+ *  WHY IT WRITES INTO `out`. It is called once per sample of every map grid,
+ *  and once per pixel of a LinearRaw export, and the allocating version it
+ *  replaced (removed 2026-10-02, when RCD took the export's pixels) built an
+ *  array and two closures on each of those calls.
  *
  *  @param c    the frame (a mosaic, or a 3-sample LinearRaw frame, read as is).
  *  @param x    the pixel's column in the frame.
  *  @param y    its row.
  *  @param out  receives the camera-native linear R,G,B, 1.0 = the frame's white.
  *  @returns nothing; `out` holds the pixel, after the frame's after-demosaic
- *    stage (`c.post`) when it has one. Every full-resolution consumer — the
- *    export, the native-resolution rebuild — reads pixels only through this,
- *    so it must agree with the binned preview's colour and levels.
+ *    stage (`c.post`) when it has one. Consumers: the export's coarse maps
+ *    (export.ts `mapSample`), and, for a LinearRaw frame only — which needs no
+ *    demosaic, so this read is exact — `makeDemosaicSampler` and gpuexport.ts
+ *    `rcdTiles`. On a mosaic its levels must match RCD's and the binned
+ *    preview's (the native sample is the same normalised value in all three).
  *
  *  At the border the neighbour is read by REFLECTION, not clamping: the colour
  *  is chosen by the neighbour's position, so the photosite read must be one of

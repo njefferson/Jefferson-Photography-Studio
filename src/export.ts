@@ -494,11 +494,11 @@ export async function exportImage(
           rawOut[2] = toLinear8(src.pixels[i + 2]);
           return rawOut;
         };
-  // THE CURVE THE GRADE CARRIES for a source with no linear copy: none for a
-  // mosaiced raw (the sampler above already laid the flat), the whole curve for
-  // a lossy-linear DNG, and the brightness half alone for a camera-rendered
-  // picture, turned upright with it when the browser turned a JPEG by its
-  // Orientation (lensCurveForSource, LN1).
+  // THE CURVE THE GRADE CARRIES: none for a raw (the sampler above already laid
+  // the flat — every DNG raw image is a `cfa` source now, lossy LinearRaw
+  // included), and the brightness half alone for a camera-rendered picture,
+  // turned upright with it when the browser turned a JPEG by its Orientation
+  // (lensCurveForSource, LN1).
   const gradeLens = "cfa" in src
     ? null
     : lensCurveForSource(lens ?? null, {
