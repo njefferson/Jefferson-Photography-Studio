@@ -22,7 +22,7 @@
 // edit.
 
 import type { BrushMask } from "./pipeline";
-import { linearAt, type DecodedImage, type SkySelection } from "./decode";
+import { linearAt, pinTest, pinFloor, grayWorldFromMeans, type DecodedImage, type SkySelection } from "./decode";
 import { buildSkyMask, skyTurn } from "./sky";
 import { BRUSH_MAX_EDGE, sampleBrush } from "./pipeline";
 
@@ -220,6 +220,12 @@ export interface SkySource {
   h: number;
   /** Linear RGB, interleaved, w*h*3. */
   rgb: Float32Array;
+  /** 1 where the cell's source block holds a sensor-clipped pixel (decode.ts
+   *  pinTest, read before the lens flat), 0 elsewhere; w*h. The gray-world
+   *  balance the selection is built at leaves those cells out, as LibRaw's
+   *  auto white balance drops any block holding a clipped photosite. Absent on
+   *  a copy taken before this existed, which then counts every cell. */
+  clip?: Uint8Array;
   srcW: number;
   srcH: number;
   cam: number[] | null;
@@ -235,7 +241,8 @@ export interface SkySource {
  *   file's own turn (`img.rotate`), which is how a photograph opens.
  * @returns a SkySource at SKY_FINE_EDGE on the long edge, each pixel the box
  *   mean of its source block, read straight from the linear buffer when there
- *   is one and through `linearAt` otherwise, carrying `turn`.
+ *   is one and through `linearAt` otherwise, carrying `turn`, and a `clip`
+ *   flag on every cell whose block holds a pixel `pinTest` calls clipped.
  * What the result must satisfy: it is complete before the decode's buffer is
  * transferred — the worker calls this first and posts the picture second —
  * and it carries enough for `buildSkySelectionFrom` to need nothing else,
@@ -246,22 +253,26 @@ export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): Sky
   const sc = Math.min(1, SKY_FINE_EDGE / Math.max(srcW, srcH));
   const w = Math.max(1, Math.round(srcW * sc)), h = Math.max(1, Math.round(srcH * sc));
   const rgb = new Float32Array(w * h * 3);
+  const clip = new Uint8Array(w * h);
+  const pinned = pinTest(img);
+  const fl = pinFloor(img); // below it on every channel, pinTest is known to say no
   const lin = img.linear;
   for (let y = 0; y < h; y++) {
     const y0 = Math.floor((y * srcH) / h), y1 = Math.max(y0 + 1, Math.floor(((y + 1) * srcH) / h));
     for (let x = 0; x < w; x++) {
       const x0 = Math.floor((x * srcW) / w), x1 = Math.max(x0 + 1, Math.floor(((x + 1) * srcW) / w));
-      let r = 0, g = 0, b = 0, n = 0;
+      let r = 0, g = 0, b = 0, n = 0, c = 0;
       if (lin) {
-        for (let sy = y0; sy < y1; sy++) { let o = (sy * srcW + x0) * 4; for (let sx = x0; sx < x1; sx++, o += 4) { const pr = lin[o], pg = lin[o + 1], pb = lin[o + 2]; if (pr === pr && pg === pg && pb === pb) { r += pr; g += pg; b += pb; n++; } } }
+        for (let sy = y0; sy < y1; sy++) { let o = (sy * srcW + x0) * 4; for (let sx = x0; sx < x1; sx++, o += 4) { const pr = lin[o], pg = lin[o + 1], pb = lin[o + 2]; if (pr === pr && pg === pg && pb === pb) { r += pr; g += pg; b += pb; n++; if (!c && (pr >= fl || pg >= fl || pb >= fl) && pinned(sx, sy)) c = 1; } } }
       } else {
-        for (let sy = y0; sy < y1; sy++) for (let sx = x0; sx < x1; sx++) { const q = linearAt(img, sx, sy); r += q[0]; g += q[1]; b += q[2]; n++; }
+        for (let sy = y0; sy < y1; sy++) for (let sx = x0; sx < x1; sx++) { const q = linearAt(img, sx, sy); r += q[0]; g += q[1]; b += q[2]; n++; if (!c && pinned(sx, sy)) c = 1; }
       }
       const o = (y * w + x) * 3;
       if (n) { rgb[o] = r / n; rgb[o + 1] = g / n; rgb[o + 2] = b / n; }
+      clip[y * w + x] = c;
     }
   }
-  return { w, h, rgb, srcW, srcH, cam: img.camMatrix ?? null, turn: skyTurn(turn) };
+  return { w, h, rgb, clip, srcW, srcH, cam: img.camMatrix ?? null, turn: skyTurn(turn) };
 }
 
 /**
@@ -271,8 +282,8 @@ export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): Sky
  * @returns the coarse bitmap (null when buildSkyMask finds no clear sky), its
  *   refinement (null with it, and null when `refine` is false), and the turn
  *   both were found at, which is `src.turn`. Gray-world gains are taken from
- *   the copy itself, the same statistic the main thread computes over the full
- *   frame.
+ *   the copy itself, its clipped cells left out, by the same rule the main
+ *   thread's grayWorldWB applies over the full frame (grayWorldFromMeans).
  * What the result must satisfy: it is the selection `DecodedImage.skySel`
  * carries and every sky-aware stage reads — built at gray-world balance and
  * nothing else, so it never moves as the photograph is graded; and seeded from
@@ -281,14 +292,14 @@ export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): Sky
  * A caller showing the picture at another turn must not use it.
  */
 export function buildSkySelectionFrom(src: SkySource, refine = true): SkySelection {
-  const { w, h, rgb } = src;
-  let r = 0, g = 0, b = 0;
-  for (let i = 0; i < w * h; i++) { r += rgb[i * 3]; g += rgb[i * 3 + 1]; b += rgb[i * 3 + 2]; }
-  r = Math.max(1e-4, r / (w * h)); g = Math.max(1e-4, g / (w * h)); b = Math.max(1e-4, b / (w * h));
-  const mean = (r + g + b) / 3;
-  const l = 0.2126 * (mean / r) + 0.7152 * (mean / g) + 0.0722 * (mean / b) || 1;
-  const cl = (v: number) => Math.max(0.02, Math.min(16, v));
-  const wb: [number, number, number] = [cl(mean / r / l), cl(mean / g / l), cl(mean / b / l)];
+  const { w, h, rgb, clip } = src;
+  // CLIPPED CELLS LEFT OUT, as grayWorldMeans leaves clipped samples out; a
+  // frame where every cell clipped has nothing else to read and counts them all.
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < w * h; i++) { if (clip && clip[i]) continue; r += rgb[i * 3]; g += rgb[i * 3 + 1]; b += rgb[i * 3 + 2]; n++; }
+  if (!n) { for (let i = 0; i < w * h; i++) { r += rgb[i * 3]; g += rgb[i * 3 + 1]; b += rgb[i * 3 + 2]; } n = w * h; }
+  r = Math.max(1e-4, r / n); g = Math.max(1e-4, g / n); b = Math.max(1e-4, b / n);
+  const wb = grayWorldFromMeans(r, g, b);
   const sample = (x: number, y: number): [number, number, number] => { const o = (y * w + x) * 3; return [rgb[o], rgb[o + 1], rgb[o + 2]]; };
   // AT THE TURN THE PICTURE IS SHOWN AT (070). This was a literal 0: the border
   // runs down each column from the display's top edge, so on a photograph

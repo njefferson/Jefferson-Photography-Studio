@@ -120,6 +120,13 @@ shade safe by construction rather than by calibration.
   cannot move brightness, the sky excluded, and exact unity on every frame it
   cannot measure. The app reports it in the §7f diagnostic as "Shadow light"
   and corrects nothing with it.
+  **Its space was corrected 2026-10-01** (IR-SCIENCE 9s): it was handed the
+  camera-native decode, where unit Rec.709 luma is not luminance and the
+  populations were binned on what is mostly red. It now measures in linear
+  sRGB at the photograph's open balance and exposure, and the gain is
+  luminance-neutral there and only there — so whatever applies it applies it
+  after the camera matrix. Every reading in the next bullet was taken in the
+  old space.
 - **AND IT DOES NOT YET DO WHAT THIS RECORD NEEDS.** IR-SCIENCE 9j-ii has the
   run: NIR_3406, whose shadows are a roof, reads 17.6% where the design
   requires it to read nothing, against NIR_1376's 9.3%; NIR_3394 and NIR_3429

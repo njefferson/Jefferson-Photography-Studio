@@ -41,7 +41,14 @@ decode -> LINEAR camera-native RGB
                        hard once the WB gains amplify it (field bug 2026-07-05).
                        Spatial -> NOT in the .cube LUT. CPU bilinears the SAME
                        encoded bytes the GPU filters, then decodes — parity.)
-  -> EXPOSURE, WB     (linear multipliers; WB luminance-normalized)
+  -> EXPOSURE, WB     (linear multipliers; WB scaled so its SMALLEST gain is 1,
+                       as LibRaw and RawTherapee scale it — brightness is
+                       exposure's business, not the balance's)
+  -> HIGHLIGHT RECOVERY (raw only: dcraw's blend_highlights — channel sum held,
+                       chroma scaled by what cutting each value at the lowest
+                       CLIPPED channel's own clip level leaves; clip read per
+                       channel on the source value BEFORE the decode-time lens
+                       flat, which is divided back out at the pixel)
   -> IR LENS FIX      (radial luminance gain: hot-spot darkens centre, vignette
                        brightens/darkens corners. `radialGain` is CIRCULAR IN
                        PIXELS — hot-spots are optically round — via an aspect
@@ -174,12 +181,21 @@ decoder, re-verify against LibRaw before pushing.
   handles types 3/4/5/10/11).
 - camToSrgbLinear = XYZ2sRGB * inverse(CM1), then ROW-NORMALIZED so neutrals
   survive (keeps tap-WB meaningful).
-- Auto WB: gray-world, gains scaled to unit Rec.709 luma (`lumNormalize`).
-  "Never darkens" was wrong (corrected 2026-10-01): Rec.709 weights belong to
-  sRGB primaries, not camera RGB, and a coloured pixel balanced to neutral lands
-  at the luma-weighted harmonic mean, below its luma — 0.072 against 0.266 at
-  the measured R0.42/G7.8/B2.1. LibRaw instead scales so the smallest gain is 1.
-- Auto exposure: 97th-percentile of post-matrix luma -> 0.85, clamp to slider.
+- Auto WB: gray-world over the samples the sensor did NOT clip (`pinTest`,
+  read before the lens flat — LibRaw's auto-WB drops any block holding a
+  photosite above maximum-25), gains scaled so the SMALLEST is 1
+  (`unitMinGains`), as LibRaw's scale_colors and RawTherapee do. It was scaled
+  to unit Rec.709 luma (`lumNormalize`) and called brightness-preserving until
+  2026-10-01; Rec.709 weights belong to sRGB primaries, not camera RGB, and on
+  an infrared balance that put the least-gained channel's ceiling about 3.8
+  stops below white. Every path that applies a gray-world balance re-derives
+  exposure; the two controls that move the balance alone (tap-WB, the IR tab's
+  Auto WB) hold the balanced colour's luminance after the matrix
+  (`exposureHoldingNeutral`).
+- Auto exposure (`autoExposure`, decode.ts): 97th percentile of post-matrix
+  CHANNEL values, all three pooled as RawTherapee pools them, unclipped samples
+  only -> 0.85, clamp 0.05..16. Was luma until 2026-10-01; on the owner's six
+  raws the two agree within 0.02 stops where nothing clips.
 - Auto denoise: median relative neighbor luma diff in darkest 40% ->
   strength = clamp(0.2 + (med-0.013)*25, 0, 0.8).
 
@@ -505,9 +521,12 @@ and NO Nikon body can channel-swap in camera. Field guide:
     adjust; rendered before→after proof (foliage untouched, treeline hugged,
     holes filled); and a real add→grade→invert→undo UI flow (foliage Δ0, sky
     strongly graded, invert flips the effect to the ground, undo restores exactly).
-- WB gain + exposure sliders are LOG-scale: the `<input>` stores a 0..1000
-  position; `toPos`/`fromPos` in main.ts map it exponentially over
-  0.02–16x (WB) / 0.1–16x (exposure) so 1.0 sits near mid-track. On a linear
+- WB gain + exposure sliders are LOG-scale: the `<input>` stores a position;
+  `toPos`/`fromPos` in main.ts map it exponentially over 0.05–64x on 0..1000
+  (exposure) and 0.02–118.8x on 0..1300 (WB, `WB_GAIN_*` in decode.ts — the old
+  0.02–16x track on 0..1000 extended upward with the same step, so every old
+  position keeps its value, because a balance whose smallest gain is 1 needs
+  room above it). On a linear
   track every realistic gain crowded into the bottom tenth and read as
   "auto WB collapsed to the floor" even when correct.
 - Headless verification: the real shader can be exercised in the sandbox with
@@ -621,16 +640,16 @@ cannot describe something the code does not say about itself.
 - **`src/cubeimport.ts`** (136 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (259 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 - **`src/debug.ts`** (2115 lines) — The test page behind the version number.
-- **`src/decode.ts`** (406 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
-- **`src/decode.worker.ts`** (59 lines) — Decoding, off the main thread.
+- **`src/decode.ts`** (730 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
+- **`src/decode.worker.ts`** (60 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (258 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1128 lines) — Full-resolution export.
+- **`src/export.ts`** (1130 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (2627 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (2719 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
@@ -659,10 +678,10 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (19629 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (19597 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (2588 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (2719 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
@@ -675,14 +694,14 @@ cannot describe something the code does not say about itself.
 - **`src/raw/tiff.ts`** (92 lines) — Minimal TIFF/DNG reader shared by the JPEG and mosaiced-raw decode paths.
 - **`src/savefile.ts`** (66 lines) — GETTING A FILE OUT OF THE APP, and the one decision that governs it.
 - **`src/session.ts`** (599 lines) — Crash-safe store for a photo SESSION — the set you opened and are moving between, each photo keeping its own edit.
-- **`src/shadowcast.ts`** (225 lines) — THE SHADOW'S OWN ILLUMINANT, MEASURED FROM THIS PHOTOGRAPH (decision 034).
+- **`src/shadowcast.ts`** (252 lines) — THE SHADOW'S OWN ILLUMINANT, MEASURED FROM THIS PHOTOGRAPH (decision 034).
 - **`src/share.ts`** (156 lines) — Share / copy-link for the INSTALLED (standalone) app.
 - **`src/sky.ts`** (663 lines) — Classical sky detection (mask type 4).
 - **`src/sky.worker.ts`** (31 lines) — The sky selection, built off the main thread on a lane of its own.
 - **`src/skyClient.ts`** (62 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
-- **`src/skyfine.ts`** (620 lines) — The sky selection refined to the picture's own edges.
+- **`src/skyfine.ts`** (631 lines) — The sky selection refined to the picture's own edges.
 - **`src/skyhorizon.ts`** (600 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
-- **`src/skymap.ts`** (257 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
+- **`src/skymap.ts`** (261 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
 - **`src/stamp.ts`** (27 lines) — ONE HASH, BECAUSE THE SECOND COPY IS WHERE THE TWO ANSWERS COME FROM.
 - **`src/startup.ts`** (154 lines) — WHAT THE FIRST SECONDS OF THIS LAUNCH COST, AND WHERE (decision 071).
 - **`src/sticker.ts`** (577 lines) — Sticker compositing — rhymes with heal.ts (src/heal.ts): stickers are baked INTO the linear source (pre-pipeline), so each one inherits the channel swap / WB / looks / grade / grain and lands in the I

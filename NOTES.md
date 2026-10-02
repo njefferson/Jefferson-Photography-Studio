@@ -12940,6 +12940,15 @@ a grey sample gives mean/r = mean/g = mean/b = 1, so the sliders CANNOT move.
 The control could not have passed. Also: reading the toast after waiting for it
 to fade returns the PREVIOUS message, because the element stays in the DOM.
 
+**Changed 2026-10-01 (IR-SCIENCE 9s), so two things above no longer hold.** A
+clipped pixel is now left OUT of the patch's average instead of counted toward
+a quarter — RawTherapee's spot balance sums only unclipped samples — and the
+tap is refused as blown only when fewer than 9 of the 25 are left; the clip is
+read before the lens flat. And the gains are no longer `lumNormalize`d: the
+smallest is 1 and the exposure moves to keep the tapped spot as bright as it
+was, so the slider positions quoted above (456/598/675) belong to the old
+scaling and the old 0..1000 track. `sampleForWb` now lives in `src/decode.ts`.
+
 ## The hidden duplicate controls are not an accessibility defect, 2026-09-09
 
 **Reported by the cold read** as hidden interactive duplicates mounted in the

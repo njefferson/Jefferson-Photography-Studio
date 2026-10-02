@@ -638,19 +638,20 @@
           <!-- ===== BASIC ===== -->
           <section class="section" role="tabpanel" id="sec-basic" aria-labelledby="ptab-basic" data-tab="basic">
             <button id="autoBtn" class="accent-outline" type="button">Auto &mdash; white balance + exposure</button>
-            <!-- Log-scale tracks: the input stores a 0..1000 position; main.ts
-                 maps it exponentially so 1x sits near mid-track (values below = 1.0). -->
+            <!-- Log-scale tracks: the input stores a position (0..1000 for
+                 Exposure, 0..1300 for the three gains); main.ts maps it
+                 exponentially, and 585 is 1x on the gain tracks. -->
             <label>Exposure <input id="expo" type="range" min="0" max="1000" step="1" value="419" /></label>
             <!-- A MASK GETS A RELATIVE WARM OR COOL, never an absolute white
                  point (042), so while a mask is picked this takes the place of
                  the three gains below. -->
             <label id="maskWarmthRow" hidden>Warmth <input id="maskWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
-            <label>Red gain <input id="wbR" type="range" min="0" max="1000" step="1" value="585" /></label>
-            <label>Green gain <input id="wbG" type="range" min="0" max="1000" step="1" value="585" /></label>
-            <label>Blue gain <input id="wbB" type="range" min="0" max="1000" step="1" value="585" /></label>
+            <label>Red gain <input id="wbR" type="range" min="0" max="1300" step="1" value="585" /></label>
+            <label>Green gain <input id="wbG" type="range" min="0" max="1300" step="1" value="585" /></label>
+            <label>Blue gain <input id="wbB" type="range" min="0" max="1300" step="1" value="585" /></label>
             <p class="note">Tip: tap foliage in the image to set white balance.</p>
             <label>Recover highlights <input id="recover" type="range" min="0" max="1" step="0.01" value="0" /></label>
-            <p class="note">Pulls genuinely blown (sensor-clipped) areas toward clean neutral for your current white balance &mdash; it re-aims live as you rebalance. Set automatically at open when the frame has clipping; 0 = untouched.</p>
+            <p class="note">Takes the false colour out of genuinely blown (sensor-clipped) areas for your current white balance, keeping their brightness &mdash; where every colour clipped the area goes clean neutral, and where only one did, the colour the others recorded stays. It re-aims live as you rebalance. Set automatically at open when the frame has clipping; 0 = untouched.</p>
             <!-- A DIAGNOSTIC, NOT A PROMISE — misdescribed until that was pointed out.
                  This was carried for a long time as the standing PROOF that
                  opening a photograph did not touch pixels — which it never was:
@@ -691,7 +692,7 @@
           <!-- ===== IR ===== -->
           <section class="section" role="tabpanel" id="sec-ir" aria-labelledby="ptab-ir" data-tab="ir" hidden>
             <button id="irAutoWb" class="accent-outline" type="button">Auto white balance</button>
-            <p class="note">Rebalances to this photo's own neutral &mdash; the quick way back out of a look's color cast. Touches nothing else.</p>
+            <p class="note">Rebalances to this photo's own neutral &mdash; the quick way back out of a look's color cast. Exposure moves only to keep the picture as bright as it was; nothing else is touched.</p>
             <button id="swapBtn" type="button" class="toggle full-btn" aria-pressed="true">R &#8646; B channel swap</button>
             <p class="note">Swaps the red and blue channels &mdash; the building block under every colour look, not a look itself. <strong>On its own it usually goes flat and purple:</strong> set white balance first (tap foliage) or pick a look, and this becomes the switch that flips the result.</p>
             <div class="sub-title">Looks</div>
@@ -1053,7 +1054,7 @@
             <p class="tip-body" id="tipTone3" hidden>The curve's point three quarters of the way up &mdash; the bright half, just below the brightest point. Pull it down to hold back foliage that is running away to white, which in infrared is where most of the brightness sits; push it up to open that foliage out.</p>
             <label>Highlights <input id="tone4" type="range" min="-25" max="25" step="0.5" value="0" aria-describedby="tipTone4" /></label>
             <button type="button" class="inline-btn toggletip" data-tip="tipTone4" data-tip-for="tone4" aria-controls="tipTone4" aria-expanded="false"><span class="toggletip-mark" aria-hidden="true">&#9656;</span><span class="toggletip-txt">What this does</span></button>
-            <p class="tip-body" id="tipTone4" hidden>The curve's top point, at the very brightest end. It is already at the ceiling, so it only comes <strong>down</strong> &mdash; dragging right does nothing. Bringing it down rolls off a white that has gone featureless. It is not the same tool as <strong>Recover highlights</strong> on the Basic tab: that one works on what the sensor actually clipped, this one shapes the bright end whether it clipped or not.</p>
+            <p class="tip-body" id="tipTone4" hidden>The curve's top point, at the very brightest end. It is already at the ceiling, so it only comes <strong>down</strong> &mdash; dragging right does nothing. Bringing it down dims the brightest tones and turns pure white into a light grey. It works on the finished picture, after anything brighter than white has already been rolled into white, so it cannot bring back texture that is not there: a white with no detail in it becomes a grey with no detail in it. To bring back bright detail, lower <strong>Exposure</strong> instead. It is not the same tool as <strong>Recover highlights</strong> on the Basic tab: that one works on what the sensor actually clipped, this one shapes the bright end whether it clipped or not.</p>
             <p class="note">The channel chips steer just one color's curve &mdash; lift Red's shadows to warm them, drop Blue's highlights to un-cool a sky. All rides every saved look and bakes into .cube exports.</p>
             <button id="toneReset" type="button">Reset tone</button>
           </section>
@@ -1790,8 +1791,10 @@
 
         <p><strong>Recover highlights</strong> (Basic tab) is for areas the sensor genuinely clipped
         &mdash; a blown sky, a hot window &mdash; where one or more channels stopped recording before the
-        others did, so the area goes an untrue colour rather than clean white. It pulls those areas
-        back toward neutral for your current white balance, and re-aims itself live as you rebalance.
+        others did, so the area goes an untrue colour rather than clean white. It takes that untrue
+        colour out for your current white balance and keeps the area's brightness: where every colour
+        clipped the area goes clean neutral, and where only one did, the colour the others recorded
+        stays. It re-aims itself live as you rebalance.
         It is set automatically at open when a raw frame actually has clipping, and sits at 0 when it
         does not. It cannot invent detail that was never recorded &mdash; it fixes the COLOUR of a blown
         area, not its texture.</p>
@@ -1799,12 +1802,15 @@
         <details class="help-sub">
           <summary>White balance, one channel at a time</summary>
         <p><strong>Red, Green and Blue gain</strong> (Basic tab) are white balance itself, one channel
-        at a time, on a log track so 1x sits near the middle. Tapping foliage in the photo sets all
-        three at once and is the usual way in; the sliders are there for when you want to nudge one
+        at a time, on a log track. An automatic balance puts the least-boosted channel at 1x and
+        the other two above it, as raw developers do, and leaves brightness to Exposure. Tapping
+        foliage in the photo sets all three at once, keeping the spot you tapped as bright as it was,
+        and is the usual way in; the sliders are there for when you want to nudge one
         channel on its own, or push past what any ordinary editor allows &mdash; which is the whole
         reason this app exists, since infrared needs a balance far outside the visible-light range.
         <strong>Auto white balance</strong> rebalances to the photo's own neutral, and is the quick way
-        back out of a look's colour cast without losing anything else.</p>
+        back out of a look's colour cast without losing anything else &mdash; Exposure moves only to keep
+        the picture as bright as it was.</p>
         </details>
         <details class="help-sub">
           <summary>The coloured disc in the sky, and measuring your lens</summary>

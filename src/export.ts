@@ -600,11 +600,13 @@ export async function exportImage(
   // amount is off or no sky was found, which is what makes it cost nothing on
   // the frames that do not need it.
   const skyMap = ((params.skySmooth ?? 0) > 0 || ((params.skyDepth ?? 0) > 0 && skyFine)) && sky
-    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, sky)
+    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, sky, flat)
     : null;
   // A raw's pixels already carry the flat (above), so the grade gets no curve
-  // for it; an 8-bit source still takes it here.
-  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, skyMap, skyFine ?? null);
+  // for it; an 8-bit source still takes it here. The flat itself goes in as
+  // `srcFlat`, so highlight recovery reads each pixel's clip as the sensor
+  // recorded it — the same division the preview's shader makes.
+  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, skyMap, skyFine ?? null, flat);
   // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
   // pixel averages an ss×ss grid of source taps placed in OUTPUT space and
   // mapped through toSrcF — so the filter stays correct under crop, rotation,

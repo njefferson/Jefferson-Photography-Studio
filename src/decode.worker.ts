@@ -51,6 +51,7 @@ self.onmessage = async (e: MessageEvent<Job>) => {
     if (img.pixels) transfer.push(img.pixels.buffer);
     if (img.linear) transfer.push(img.linear.buffer);
     if (skySrc) transfer.push(skySrc.rgb.buffer);
+    if (skySrc?.clip) transfer.push(skySrc.clip.buffer);
     (self as unknown as Worker).postMessage({ id, ok: true, img, skySrc }, transfer);
   } catch (err) {
     (self as unknown as Worker).postMessage({ id, ok: false, message: (err as Error).message });

@@ -21,7 +21,7 @@ import "./style.css";
 import "./verdlg.css";
 import { importFile, sniff, refineKind, isZip, readLimitMs, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
-import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, lumNormalize } from "./decode";
+import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, grayWorldMeans, unitMinGains, exposureHoldingNeutral, autoExposure, autoRecover, sampleForWb, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS } from "./decode";
 import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
 import { sourceIsMosaiced, type ExportOptions } from "./export";
 import { Renderer, VERT, FRAG, type EditParams } from "./gl";
@@ -41,7 +41,7 @@ import { lensGains, lensCentreLine, applyLensFlat, lensPlanStamp, type LensPlan 
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
-import type { Sticker, BrushMask, LensCurve } from "./pipeline";
+import type { Sticker, BrushMask, LensCurve, SourceFlat } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -1093,6 +1093,15 @@ function lensForEdit(img: { linear?: Float32Array } | null | undefined, curve: L
   return img?.linear ? null : curve;
 }
 
+/** The other half of the same fact: the flat a raw's pixels DO carry, which
+ *  highlight recovery divides back out so it tests the value the sensor
+ *  recorded. Null for an 8-bit source, whose pixels carry none. Every
+ *  compileEdit and buildSkyMap call for a picture passes this beside
+ *  `lensForEdit`, as the export passes its own `flat`. */
+function srcFlatOf(img: DecodedImage | null | undefined): SourceFlat | null {
+  return img?.linear ? img.lensApplied?.gains ?? null : null;
+}
+
 function currentLensCurve(): LensCurve | null {
   const { colour, bump } = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
   if (!colour && !bump) return null;
@@ -1365,24 +1374,26 @@ histCanvas.addEventListener("click", () => {
 });
 updateHistVisibility(); // reflect the stored preference on the toggle at startup
 
-// WB gains and exposure span 0.02–16x / 0.1–16x; on a linear track every
-// realistic value (0.3–3) crowds into the bottom tenth, which reads as the
-// sliders "falling to the floor" even when the balance is correct. The track
-// therefore stores a 0..1000 position mapped exponentially, putting 1.0 near
-// mid-track with fine control around it.
+// WB gains and exposure span 0.02–119x / 0.05–64x; on a linear track every
+// realistic value crowds into the bottom tenth, which reads as the sliders
+// "falling to the floor" even when the balance is correct. The track therefore
+// stores a position mapped exponentially: 0..1000 for exposure, putting 1.0 near
+// mid-track with fine control around it, and 0..WB_GAIN_STEPS (1300) for the
+// gains — the old 0..1000 track extended upward with the same step, because a
+// balance whose smallest gain is 1 needs room above it (decode.ts says why).
 // Exposure slider spans 0.05..64x (about -4.3 to +6 stops): auto stops at
 // 16x (below) but a dark frame must stay PUSHABLE past where auto gives up —
 // the owner's twilight D5300 frame opened with auto railed at the old 16x
 // ceiling and nowhere left to go (IMG_1253, 2026-07-25).
-const WB_LO = 0.02, WB_HI = 16, EX_LO = 0.05, EX_HI = 64;
+const WB_LO = WB_GAIN_LO, WB_HI = WB_GAIN_HI, WB_STEPS = WB_GAIN_STEPS, EX_LO = 0.05, EX_HI = 64;
 // Global luminance spans 0.5–2x on the same kind of log track; 1.0 (neutral)
 // lands dead centre so brighten/darken are symmetric around it.
 const LUM_LO = 0.5, LUM_HI = 2;
-function toPos(v: number, lo: number, hi: number): number {
-  return Math.round((1000 * Math.log(clamp(v, lo, hi) / lo)) / Math.log(hi / lo));
+function toPos(v: number, lo: number, hi: number, steps = 1000): number {
+  return Math.round((steps * Math.log(clamp(v, lo, hi) / lo)) / Math.log(hi / lo));
 }
-function fromPos(p: number, lo: number, hi: number): number {
-  return lo * Math.pow(hi / lo, clamp(p, 0, 1000) / 1000);
+function fromPos(p: number, lo: number, hi: number, steps = 1000): number {
+  return lo * Math.pow(hi / lo, clamp(p, 0, steps) / steps);
 }
 
 function syncFromUI() {
@@ -1390,9 +1401,9 @@ function syncFromUI() {
   // write to the mask below, and the whole photo's own values stay as they are.
   const tm = overlayReady ? targetMask() : null;
   params.wb = [
-    fromPos(Number(ui.wbR.value), WB_LO, WB_HI),
-    fromPos(Number(ui.wbG.value), WB_LO, WB_HI),
-    fromPos(Number(ui.wbB.value), WB_LO, WB_HI),
+    fromPos(Number(ui.wbR.value), WB_LO, WB_HI, WB_STEPS),
+    fromPos(Number(ui.wbG.value), WB_LO, WB_HI, WB_STEPS),
+    fromPos(Number(ui.wbB.value), WB_LO, WB_HI, WB_STEPS),
   ];
   if (!tm) {
     params.exposure = fromPos(Number(ui.expo.value), EX_LO, EX_HI);
@@ -1455,9 +1466,9 @@ function clampToneOrder() {
 }
 
 function syncToUI() {
-  ui.wbR.value = String(toPos(params.wb[0], WB_LO, WB_HI));
-  ui.wbG.value = String(toPos(params.wb[1], WB_LO, WB_HI));
-  ui.wbB.value = String(toPos(params.wb[2], WB_LO, WB_HI));
+  ui.wbR.value = String(toPos(params.wb[0], WB_LO, WB_HI, WB_STEPS));
+  ui.wbG.value = String(toPos(params.wb[1], WB_LO, WB_HI, WB_STEPS));
+  ui.wbB.value = String(toPos(params.wb[2], WB_LO, WB_HI, WB_STEPS));
   ui.expo.value = String(toPos(params.exposure, EX_LO, EX_HI));
   ui.dn.value = String(params.denoise);
   ui.chroma.value = String(params.chroma ?? 0);
@@ -1523,7 +1534,7 @@ function updateBandLabels() {
   folSub.textContent = swapped ? "(teals & blues — swapped)" : "(reds & golds)";
 }
 
-// Auto: gray-world white balance scaled to unit Rec.709 luma + auto-exposure.
+// Auto: gray-world white balance (smallest gain 1) + auto-exposure.
 ui.autoBtn.addEventListener("click", () => {
   if (!current) return;
   autoAdjust(current);
@@ -1533,11 +1544,16 @@ ui.autoBtn.addEventListener("click", () => {
 });
 
 // IR-tab Auto WB: rebalance to this photo's own neutral, clearing any WB bias
-// a look baked in — the quick way back OUT of a look choice. WB only: it never
-// touches exposure, swap, saturation or the rest of the look.
+// a look baked in — the quick way back OUT of a look choice. It never touches
+// swap, saturation or the rest of the look. Exposure moves only to HOLD
+// brightness: gains scaled so the smallest is 1 do not keep it by themselves,
+// so the frame's own grey (the means gray-world balances) is kept at the
+// luminance it had under the balance being replaced.
 ui.irAutoWb.addEventListener("click", () => {
   if (!current) return;
-  params.wb = grayWorldWB(current);
+  const next = grayWorldWB(current);
+  params.exposure = clamp(exposureHoldingNeutral(current, grayWorldMeans(current), params.wb, params.exposure, next), EX_LO, EX_HI);
+  params.wb = next;
   lookBias = [1, 1, 1];
   lookWb = null;
   syncToUI();
@@ -1998,7 +2014,10 @@ function skyMaskFor(img: DecodedImage, turn: number): BrushMask | null {
  *
  *  What the caller relies on: it reads `img.linear` through `linearAt` and
  *  never the displayed pixel, so the answer is a property of the light the
- *  photograph was taken in and does not re-key under a look. */
+ *  photograph was taken in and does not re-key under a look. It is measured
+ *  AT THE OPEN BASELINE's balance and exposure through the camera matrix
+ *  (freshBaseline's gray-world and autoExposure, never the live edit) —
+ *  linear sRGB, the space measureShadowCast's luminance weights belong to. */
 function shadowCastFor(img: DecodedImage, turn: number): ShadowCast {
   const t = skyTurn(turn);
   const hit = shadowCastOf.get(img);
@@ -2009,11 +2028,13 @@ function shadowCastFor(img: DecodedImage, turn: number): ShadowCast {
   const sy = Math.max(1, Math.floor(img.height / N));
   const gw = Math.max(2, Math.floor(img.width / sx));
   const gh = Math.max(2, Math.floor(img.height / sy));
+  const base = freshBaseline(img);
   const cast = measureShadowCast(
     (x, y) => linearAt(img, Math.min(img.width - 1, x * sx), Math.min(img.height - 1, y * sy)),
     gw,
     gh,
     (x, y) => !!sky && sampleBrush(sky, (x * sx + 0.5) / img.width, (y * sy + 0.5) / img.height) > 0.5,
+    { gains: [base.wb[0] * base.exposure, base.wb[1] * base.exposure, base.wb[2] * base.exposure], cam: img.camMatrix ?? null },
   );
   shadowCastOf.set(img, { turn: t, cast });
   return cast;
@@ -2094,7 +2115,7 @@ function syncSkyMap(): void {
   // saturated than the rendered one — skymap.ts has the measurement.
   const raw = (x: number, y: number) => linearAt(img, x, y);
   const pre = makeRowDetail(raw, makeRowDenoiser(raw, img.width, img.height, params.denoise, 1, params.chroma ?? 0, params.despeckle ?? 0), img.width, img.height, params.sharpen ?? 0, params.texture ?? 0, 1);
-  lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), undefined, lensForEdit(img), skyBitmap);
+  lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), undefined, lensForEdit(img), skyBitmap, srcFlatOf(img));
   renderer.setSkyMap(lastSkyMap);
 }
 
@@ -2139,10 +2160,15 @@ function applyLook(name: keyof typeof LOOKS) {
   // written to a stepped control does not come back" this file already carries
   // two notes about. A balance a reader actually set differs by far more than
   // one slider step.
+  // A RELATIVE tolerance, 1%: one step of the gain track is 0.67% of the value
+  // wherever it sits. It was 0.01 absolute, which was one step only while the
+  // gains sat near 1; scaled so the smallest gain is 1, an infrared balance
+  // carries gains of 3 and more, where 0.01 is a fraction of one step and a
+  // stepped copy of the app's own balance read as the reader's.
   // Neutral means the photo opened this way and nothing has touched it; equal to
   // what this function last wrote means the app put it there, which is equally
   // not the reader. Either way the balance is ours to re-derive.
-  const step = (a: number, b: number) => Math.abs(a - b) < 0.01;
+  const step = (a: number, b: number) => Math.abs(a / b - 1) < 0.01;
   const untouched = base.every((v) => step(v, 1))
     || (!!lookWb && base.every((v, i) => step(v, lookWb![i])));
   const balancing = untouched && !!current && !current.isRaw;
@@ -2209,9 +2235,9 @@ function applyLook(name: keyof typeof LOOKS) {
     lookWb = null;
   }
   params.wb = [
-    clamp(base[0] * bias[0], 0.02, 16),
-    clamp(base[1] * bias[1], 0.02, 16),
-    clamp(base[2] * bias[2], 0.02, 16),
+    clamp(base[0] * bias[0], WB_LO, WB_HI),
+    clamp(base[1] * bias[1], WB_LO, WB_HI),
+    clamp(base[2] * bias[2], WB_LO, WB_HI),
   ];
   // AND THE EXPOSURE THAT GOES WITH IT. A camera-rendered file opens at
   // exposure 1 because it opens as the camera made it; gray-world balancing an
@@ -2448,7 +2474,7 @@ function takeLookOff(): void {
     return;
   }
   flushRecord(); // whatever was pending is its own step
-  const step = (a: number, b: number) => Math.abs(a - b) < 0.01;
+  const step = (a: number, b: number) => Math.abs(a / b - 1) < 0.01; // relative, as applyLook says
   const base: [number, number, number] = [
     params.wb[0] / lookBias[0], params.wb[1] / lookBias[1], params.wb[2] / lookBias[2],
   ];
@@ -2456,7 +2482,7 @@ function takeLookOff(): void {
     base[0] = 1; base[1] = 1; base[2] = 1;
     if (origParams) params.exposure = origParams.exposure;
   }
-  params.wb = [clamp(base[0], 0.02, 16), clamp(base[1], 0.02, 16), clamp(base[2], 0.02, 16)];
+  params.wb = [clamp(base[0], WB_LO, WB_HI), clamp(base[1], WB_LO, WB_HI), clamp(base[2], WB_LO, WB_HI)];
   lookBias = [1, 1, 1];
   lookWb = null;
   params.swapRB = freshBaseline(current).swapRB;
@@ -3753,9 +3779,9 @@ function wireVersionMenu() {
 // luminance and 0.16–0.24 warm saturation. That gap is what "drab" is, and it
 // is a full stop of lift and half the colour.
 //
-// Neither automatic is wrong. Auto exposure anchors the 97th percentile at
-// 0.85 (dcraw's auto-bright shape), so a histogram with no dark region gets
-// lifted whole. Gray-world balance makes the frame's own average neutral —
+// Neither automatic is wrong. Auto exposure anchors the 97th percentile of the
+// frame's unclipped channel values at 0.85 (decode.ts autoExposure), so a
+// histogram with no dark region gets lifted whole. Gray-world balance makes the frame's own average neutral —
 // and in an infrared frame that is nine tenths foliage, the average IS the
 // foliage, so the balance neutralises the one material the false-colour looks
 // need a cast on. There is no white balance that both neutralises the dominant
@@ -3893,7 +3919,7 @@ function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID, s
   // correction is part of it. With a sky bitmap the edit runs with a position,
   // so the sky's own saturation stage (skySat) is in what is measured — the
   // lift solves that stage against the SKY population, by place, below.
-  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height), undefined, lensForEdit(img), null, skyMask);
+  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height), undefined, lensForEdit(img), null, skyMask, srcFlatOf(img));
   const px = new Float32Array(3);
   const lums: number[] = [];
   let warmW = 0, warmS = 0, coolW = 0, coolS = 0, skyW = 0, skyS = 0;
@@ -3901,7 +3927,9 @@ function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID, s
     for (let x = 0; x < img.width; x += step) {
       const [r, g, b] = linearAt(img, x, y);
       const u = (x + 0.5) / img.width, v = (y + 0.5) / img.height;
-      edit(r, g, b, px, 0, skyMask ? u : undefined, skyMask ? v : undefined);
+      // The position always goes in as fu/fv: recovery reads the flat there,
+      // whether or not the spatial stages run.
+      edit(r, g, b, px, 0, skyMask ? u : undefined, skyMask ? v : undefined, u, v);
       const cr = clamp(px[0], 0, 1), cg = clamp(px[1], 0, 1), cb = clamp(px[2], 0, 1);
       lums.push(0.2126 * cr + 0.7152 * cg + 0.0722 * cb);
       const [h, sat] = rgb2hsv(cr, cg, cb);
@@ -8881,6 +8909,11 @@ function uploadPreview() {
   // so the two can never be out of step — that pairing is the whole defect.
   renderer.setTapScale(previewTapScale);
   renderer.setImage(previewSrc);
+  // AND WHICH LENS FLAT THOSE PIXELS CARRY, beside the upload for the same
+  // reason as the tap scale: highlight recovery divides it back out to test the
+  // clip as the sensor recorded it, so the two must never be out of step. This
+  // is reached again whenever ensureLensApplied re-lays the flat.
+  renderer.setSourceFlat(srcFlatOf(current));
   renderer.setOverlaySize(previewSrc.width, previewSrc.height); // on-top overlays track the source size
   bakedSpots = [];
   bakedStickers = [];
@@ -9223,6 +9256,13 @@ async function upgradeToNativeResolution(gen: number): Promise<void> {
     previewTapScale = proxyFactorFor(src, width, height);
     renderer.setTapScale(previewTapScale);
     renderer.setImage(previewSrc);
+    // NONE: this texture is demosaiced straight from the file
+    // (buildLinearSourceInBands) and no lens flat is laid on it, so there is
+    // nothing for highlight recovery to divide back out. Naming the working
+    // copy's flat here would divide out a correction these pixels never got.
+    // (That the native build lays no flat at all is its own gap; the path is
+    // off, NATIVE_ENABLED.)
+    renderer.setSourceFlat(null);
     renderer.setOverlaySize(previewSrc.width, previewSrc.height);
     // The texture is new, so everything baked into the old one is gone. Same
     // reset uploadPreview does — a stale "already baked" flag here would leave
@@ -12234,9 +12274,9 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, o
   const gw = own ? own.params.wb : base!.wb;
   const bias = own ? ([1, 1, 1] as [number, number, number]) : lookBias;
   const wb: [number, number, number] = [
-    clamp(gw[0] * bias[0], 0.02, 16),
-    clamp(gw[1] * bias[1], 0.02, 16),
-    clamp(gw[2] * bias[2], 0.02, 16),
+    clamp(gw[0] * bias[0], WB_LO, WB_HI),
+    clamp(gw[1] * bias[1], WB_LO, WB_HI),
+    clamp(gw[2] * bias[2], WB_LO, WB_HI),
   ];
   const p: EditParams = {
     ...cloneParams(own ? own.params : params),
@@ -12347,9 +12387,9 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, o
   if (sessLook && !own && !img.isRaw && !oneBandFile(img, p)) {
     const gw = grayWorldWB(img);
     p.wb = [
-      clamp(gw[0] * bias[0], 0.02, 16),
-      clamp(gw[1] * bias[1], 0.02, 16),
-      clamp(gw[2] * bias[2], 0.02, 16),
+      clamp(gw[0] * bias[0], WB_LO, WB_HI),
+      clamp(gw[1] * bias[1], WB_LO, WB_HI),
+      clamp(gw[2] * bias[2], WB_LO, WB_HI),
     ];
     p.exposure = autoExposure(img, p.wb);
   }
@@ -12398,8 +12438,8 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, o
   // (applySnapshot merges over it), so the tile does the same.
   if (own) bringLensTo(img, lens, { lensFix: own.params.lensFix ?? lensStrengthAtOpen(ex), lensBypass: own.params.lensBypass });
   const tileSample = (x: number, y: number) => linearAt(img, Math.min(img.width - 1, Math.floor(x / s)), Math.min(img.height - 1, Math.floor(y / s)));
-  const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileSky) : null;
-  const edit = compileEdit(p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileMap, tileSky);
+  const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileSky, srcFlatOf(img)) : null;
+  const edit = compileEdit(p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null), tileMap, tileSky, srcFlatOf(img));
   const px = new Float32Array(3);
   const out = new Uint8ClampedArray(ow * oh * 4);
   for (let oy = 0; oy < oh; oy++) {
@@ -12410,7 +12450,7 @@ async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, o
       const sx = Math.min(img.width - 1, Math.floor(x / s));
       const sy = Math.min(img.height - 1, Math.floor(y / s));
       const [r, g, b] = linearAt(img, sx, sy);
-      edit(r, g, b, px, 0, tileMap ? (x + 0.5) / w : undefined, tileMap ? (y + 0.5) / h : undefined);
+      edit(r, g, b, px, 0, tileMap ? (x + 0.5) / w : undefined, tileMap ? (y + 0.5) / h : undefined, (x + 0.5) / w, (y + 0.5) / h);
       const i = (oy * ow + ox) * 4;
       out[i] = Math.round(255 * clamp(px[0], 0, 1));
       out[i + 1] = Math.round(255 * clamp(px[1], 0, 1));
@@ -17619,12 +17659,12 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
   // the residue was the rounding and not the pipeline. Same rule as the
   // existing note in establishFreshEdit: a full-precision value written to a
   // stepped control does not come back.
-  const snapPos = (v: number, lo: number, hi: number) => fromPos(toPos(v, lo, hi), lo, hi);
+  const snapPos = (v: number, lo: number, hi: number, steps = 1000) => fromPos(toPos(v, lo, hi, steps), lo, hi, steps);
   const snapStep = (v: number, step: number) => Math.round(v / step) * step;
   let wb: [number, number, number] = [
-    snapPos(base.wb[0], WB_LO, WB_HI),
-    snapPos(base.wb[1], WB_LO, WB_HI),
-    snapPos(base.wb[2], WB_LO, WB_HI),
+    snapPos(base.wb[0], WB_LO, WB_HI, WB_STEPS),
+    snapPos(base.wb[1], WB_LO, WB_HI, WB_STEPS),
+    snapPos(base.wb[2], WB_LO, WB_HI, WB_STEPS),
   ];
   let look: SavedLook;
   /** The denoise floor the chosen grade asks for, or null. Only a BUILT-IN look
@@ -17638,9 +17678,9 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     const strength = img.camMatrix ? l.raw : l.jpeg;
     const bias = l.wbBias ?? [1, 1, 1];
     wb = [
-      clamp(wb[0] * bias[0], 0.02, 16),
-      clamp(wb[1] * bias[1], 0.02, 16),
-      clamp(wb[2] * bias[2], 0.02, 16),
+      clamp(wb[0] * bias[0], WB_LO, WB_HI),
+      clamp(wb[1] * bias[1], WB_LO, WB_HI),
+      clamp(wb[2] * bias[2], WB_LO, WB_HI),
     ];
     // AND THE COLOUR HALF OF THE RECIPE, WHICH THIS DROPPED. It built from
     // neutralLook() and copied six fields; `hsl` and `mix3` were not among
@@ -19025,10 +19065,15 @@ canvas.addEventListener("click", (e) => {
   }
   const [r, g, b] = sample.lin;
   const mean = (r + g + b) / 3;
-  // Scaled to unit Rec.709 luma (lumNormalize). That is not brightness-
-  // preserving on camera channels: a coloured patch balanced to neutral lands
-  // at the luma-weighted harmonic mean, below its luma (corrected 2026-10-01).
-  params.wb = lumNormalize([mean / r, mean / g, mean / b]);
+  // Smallest gain 1 (unitMinGains), as LibRaw and RawTherapee scale a balance.
+  // That does not hold brightness — nor did the unit-luma scaling it replaces,
+  // which landed a coloured patch at the luma-weighted harmonic mean, below its
+  // luma — so the exposure is moved to keep THE TAPPED SPOT at the luminance it
+  // had, read after the camera matrix where luminance is defined: the tap
+  // changes its colour, not how bright it is.
+  const next = unitMinGains([mean / r, mean / g, mean / b]);
+  params.exposure = clamp(exposureHoldingNeutral(current, sample.lin, params.wb, params.exposure, next), EX_LO, EX_HI);
+  params.wb = next;
   lookBias = [1, 1, 1]; // fresh neutral WB — no look bias baked in
   syncToUI();
   draw();
@@ -19041,35 +19086,11 @@ canvas.addEventListener("click", (e) => {
 // first, which is why tapping a sunlit highlight threw the whole frame into
 // magenta — the app did exactly what it was told with a number that meant
 // nothing. The dark end fails the same way from the other side: near zero, the
-// ratio is noise, and lumNormalize's clamp turns it into an extreme gain rather
-// than an obviously wrong one.
-const WB_CLIP_LIN = 0.985; // linear; the decode maps the white point to 1
-const WB_DARK_LIN = 0.02;
-const WB_PATCH = 2; // 5x5 — one pixel of a raw frame is not a measurement
+// ratio is noise, and the gain clamp turns it into an extreme gain rather than
+// an obviously wrong one. The clip is read as the sensor recorded it, before
+// the lens flat (decode.ts pinTest, SENSOR_PIN).
+// sampleForWb lives in decode.ts with the clip test it reads.
 
-/** Average a small patch and say whether it can carry a white balance. */
-function sampleForWb(img: DecodedImage, cx: number, cy: number):
-  { verdict: "ok" | "blown" | "dark"; lin: [number, number, number] } {
-  let r = 0, g = 0, b = 0, n = 0, clipped = 0;
-  for (let dy = -WB_PATCH; dy <= WB_PATCH; dy++) {
-    for (let dx = -WB_PATCH; dx <= WB_PATCH; dx++) {
-      const x = clamp(cx + dx, 0, img.width - 1);
-      const y = clamp(cy + dy, 0, img.height - 1);
-      const [pr, pg, pb] = linearAt(img, x, y);
-      if (pr >= WB_CLIP_LIN || pg >= WB_CLIP_LIN || pb >= WB_CLIP_LIN) clipped++;
-      r += pr; g += pg; b += pb; n++;
-    }
-  }
-  const lin: [number, number, number] = [r / n, g / n, b / n];
-  // A quarter of the patch, not one pixel: a lone hot pixel beside good ones is
-  // not a blown highlight, and refusing on it would make the tool feel broken
-  // in the other direction.
-  if (clipped / n > 0.25) return { verdict: "blown", lin };
-  if (Math.max(lin[0], lin[1], lin[2]) < WB_DARK_LIN) return { verdict: "dark", lin };
-  return { verdict: "ok", lin };
-}
-
-/** Scale WB gains so a neutral keeps its luminance (no overall darkening). */
 
 /** White balance + exposure + noise-matched denoise (+ highlight recovery on
  *  clipped camera-native raw) in one shot — the same baseline open applies. */
@@ -19079,32 +19100,6 @@ function autoAdjust(img: DecodedImage) {
   params.denoise = estimateDenoise(img);
   params.recover = img.camMatrix ? autoRecover(img) : 0;
   lookBias = [1, 1, 1]; // fresh neutral WB — no look bias baked in
-}
-
-/** Auto position for the Recover-highlights slider: 0.7 when the frame has
- *  real sensor clipping, 0 when it doesn't. 0.7 is calibrated on the D5300
- *  full-spectrum reference frame — the lowest clean value there is 0.6 (green
- *  edge artifacts fully gone), plus margin; Lightroom-class raw apps apply
- *  their (stronger) reconstruction unconditionally, so a measured 0.7 is the
- *  conservative version of industry-normal. Clipping test: >0.05% of sampled
- *  pixels with a channel at >=98.5% of white — the same pin the slider keys on. */
-function autoRecover(img: DecodedImage): number {
-  if (!img.linear) return 0;
-  const { width, height, linear } = img;
-  const step = Math.max(1, Math.floor(Math.min(width, height) / 256));
-  let clipped = 0;
-  let n = 0;
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
-      const o = (y * width + x) * 4;
-      if (Math.max(linear[o], linear[o + 1], linear[o + 2]) >= 0.985) clipped++;
-      n++;
-    }
-  }
-  // 0.05% of the frame: catches any visually meaningful blown area (the
-  // D5300 reference frame is ~13% clipped) while ignoring single specular
-  // glints and border slivers (hillside.dng's 5-row edge strip stays 0).
-  return n && clipped / n > 0.0005 ? 0.7 : 0;
 }
 
 /**
@@ -19148,35 +19143,8 @@ function estimateDenoise(img: DecodedImage): number {
   return clamp(Math.sqrt(targetSigma / 0.1), 0, 0.6);
 }
 
-/** Exposure so the bright end of the image (post WB + camera matrix) ~= 0.85. */
-function autoExposure(img: DecodedImage, wb: [number, number, number]): number {
-  const cm = img.camMatrix;
-  const { width, height } = img;
-  const lums: number[] = [];
-  const step = Math.max(1, Math.floor(Math.min(width, height) / 160));
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
-      let [r, g, b] = linearAt(img, x, y);
-      r *= wb[0];
-      g *= wb[1];
-      b *= wb[2];
-      if (cm) {
-        const cr = cm[0] * r + cm[1] * g + cm[2] * b;
-        const cg = cm[3] * r + cm[4] * g + cm[5] * b;
-        const cb = cm[6] * r + cm[7] * g + cm[8] * b;
-        r = cr; g = cg; b = cb;
-      }
-      lums.push(0.2126 * r + 0.7152 * g + 0.0722 * b);
-    }
-  }
-  lums.sort((a, b) => a - b);
-  const p = lums[Math.floor(lums.length * 0.97)] || 1e-4;
-  // Auto deliberately tops out at 16x — brightening a genuinely dark frame
-  // beyond that is a taste call, so the slider keeps going (to EX_HI) but
-  // auto doesn't. Both bounds sit inside the slider range, so the value
-  // round-trips exactly.
-  return clamp(0.85 / Math.max(p, 1e-4), 0.1, 16);
-}
+// autoExposure and autoRecover live in decode.ts, beside the balance they are
+// measured with, where a check can reach them without the page.
 
 // iOS Safari silently clamps large WebGL drawing buffers (symptom: black
 // canvas). The raw paths already produce a <=2800px half-res proxy, but the

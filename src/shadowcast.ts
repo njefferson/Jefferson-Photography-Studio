@@ -68,7 +68,10 @@ const MAX_GAIN = 0.25;
  *  with, so dividing a near-black pixel by its own luminance produces a huge
  *  meaningless blue ratio. Measured on the real corpus — with no floor, the
  *  carport (NIR_3406), whose shadows are a roof and must read no cast at all,
- *  read 25% and pinned against the held range, and so did both camera JPEGs. */
+ *  read 25% and pinned against the held range, and so did both camera JPEGs.
+ *  That measurement was taken on the camera-native decode; the luminance is
+ *  now display-linear at the photograph's open balance and exposure, where
+ *  0.004 is near black on screen (L* about 3.6). */
 const BLACK_FLOOR = 0.004;
 
 /** The shaded population is a BAND rather than everything below a threshold.
@@ -82,9 +85,21 @@ const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
 /** WHAT THE SHADOWS OF THIS PHOTOGRAPH ARE LIT BY, RELATIVE TO ITS SUNLIT FACE.
  *
  *  Takes `at`, which returns the LINEAR rgb of the pixel at `x`, `y`; `w` and
- *  `h`, the copy's size; and `isSky`, which answers for an `x`, `y` whether
- *  that pixel belongs to the sky and is therefore excluded from both
- *  populations.
+ *  `h`, the copy's size; `isSky`, which answers for an `x`, `y` whether that
+ *  pixel belongs to the sky and is therefore excluded from both populations;
+ *  and `toDisplay`, the balance and camera matrix that carry `at`'s values into
+ *  linear sRGB — omitted when `at` already returns linear sRGB.
+ *
+ *  THE MEASUREMENT IS IN LINEAR sRGB, AFTER BALANCE AND THE CAMERA MATRIX.
+ *  Everything below — the luminance the populations are binned on, the floor,
+ *  the chromaticities, the unit-luma normalisation — uses Rec.709 weights, and
+ *  those are luminance only on sRGB primaries. It used to be handed the
+ *  un-balanced camera-native decode, where red carries about 80% of that
+ *  "luma" in an infrared frame: the populations were picked by red, and the
+ *  promise that the gain leaves a neutral's luminance alone was made in a space
+ *  where neither "neutral" nor "luminance" holds. The DNG specification maps
+ *  camera values to XYZ only through the camera matrix, and darktable uses the
+ *  sRGB weights only on a source that is not raw.
  *
  *  Returns a `ShadowCast`. Its `gain` is exactly `[1, 1, 1]` whenever the frame
  *  cannot be measured or the two populations agree, so a caller may apply it
@@ -95,20 +110,32 @@ const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
  *  keyed on the display re-keys under every look — the defect decision 032
  *  names, and the reason 034 declares `touches 032`.
  *
- *  What the caller relies on: the gain moves COLOUR and not brightness. Its
- *  Rec.709 luma is normalised to 1, so applying it at any strength leaves a
- *  neutral pixel's luminance where it was and can only rotate its hue — which
- *  is what makes it safe where the additive complement was not. Each channel is
- *  additionally held within `MAX_GAIN` of unity, so no single measurement can
- *  swing a frame further than a real shadow illuminant does. */
+ *  What the caller relies on: the gain moves COLOUR and not brightness, IN
+ *  LINEAR sRGB — the space it is measured in and the one it must be applied
+ *  in (after the camera matrix). Its Rec.709 luma is normalised to 1, so
+ *  applied there at any strength it leaves a neutral pixel's luminance where it
+ *  was and can only rotate its hue — which is what makes it safe where the
+ *  additive complement was not. Each channel is additionally held within
+ *  `MAX_GAIN` of unity, so no single measurement can swing a frame further than
+ *  a real shadow illuminant does. */
 export function measureShadowCast(
   at: (x: number, y: number) => [number, number, number],
   w: number,
   h: number,
   isSky: (x: number, y: number) => boolean,
+  toDisplay?: { gains: [number, number, number]; cam: number[] | null } | null,
 ): ShadowCast {
   const none: ShadowCast = { gain: [1, 1, 1], spread: 0, shadePx: 0, sunPx: 0, measured: false };
   if (w < 2 || h < 2) return none;
+  // Into linear sRGB first, once per read, so every statistic below is taken
+  // where its weights mean what they say.
+  const px: (x: number, y: number) => [number, number, number] = !toDisplay ? at : (x, y) => {
+    const q = at(x, y);
+    const r = q[0] * toDisplay.gains[0], g = q[1] * toDisplay.gains[1], b = q[2] * toDisplay.gains[2];
+    const m = toDisplay.cam;
+    if (!m) return [r, g, b];
+    return [m[0] * r + m[1] * g + m[2] * b, m[3] * r + m[4] * g + m[5] * b, m[6] * r + m[7] * g + m[8] * b];
+  };
 
   // ONE PASS FOR THE THRESHOLDS, over the non-sky pixels only. A histogram
   // rather than a sort: the frame can be a megapixel and the answer needs two
@@ -120,7 +147,7 @@ export function measureShadowCast(
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (isSky(x, y)) continue;
-      const [r, g, b] = at(x, y);
+      const [r, g, b] = px(x, y);
       const L = lum(r, g, b);
       if (!(L > BLACK_FLOOR)) continue; // see BLACK_FLOOR: below it there is no colour to read
       const bin = Math.min(BINS - 1, Math.max(0, Math.round(Math.sqrt(Math.min(1, L)) * (BINS - 1))));
@@ -161,7 +188,7 @@ export function measureShadowCast(
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (isSky(x, y)) continue;
-      const [r, g, b] = at(x, y);
+      const [r, g, b] = px(x, y);
       const L = lum(r, g, b);
       if (!(L > BLACK_FLOOR)) continue;
       const bin = Math.min(BINS - 1, Math.max(0, Math.round(Math.sqrt(Math.min(1, L)) * (BINS - 1))));

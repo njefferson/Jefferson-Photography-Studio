@@ -3894,6 +3894,18 @@ the gate caught two real defects in it before any pixel moved — a binning
 inconsistency that emptied the sunlit population entirely, and a per-channel
 clamp that broke the unit-luma invariant at 1.0198.
 
+**THE SPACE IT MEASURED IN WAS WRONG, corrected 2026-10-01 (9s).** Everything
+in the measurement is a Rec.709 weight, and it was handed the camera-native
+decode before balance and the camera matrix, where red carries about 80% of
+that "luma" in an infrared frame. It now measures in linear sRGB at the
+photograph's open balance and exposure. A scratch run of the same sampling on
+the owner's cached raws, old space against new: the oak (NIR_1376) from 7.7% to
+12.4%, NIR_3716 from 2.6% to 4.4% and NIR_1688 from 8.9% to 14.6%, with the
+same direction of cast on each. That run's old-space 7.7% for the oak is not
+the 9.3% in the list below, which was read through the app on 2026-09-21; the
+difference was not traced. Every figure in the list below was measured in the
+old space, and the carport and the JPEGs have not been re-measured.
+
 **AND ON THE REAL CORPUS IT DOES NOT SEPARATE THE TWO CASES.** Measured through
 the app at open, sky excluded, on the frames named at the end of 9j:
 
@@ -4948,3 +4960,67 @@ helpx.adobe.com (403 to the web fetcher and to a browser-identity curl; its
 flat-field page was then fetched in a browser's identity), support.captureone.com and userguides.dxo.com (403), blog.kasson.com
 (403), www.edwardnoble.com (503), and siril.readthedocs.io, docs.rawtherapee.com,
 www.captureintegration.com and www.on1.com (egress proxy).
+
+### 9s. THE BALANCE'S SCALE, THE CLIP TEST AND HIGHLIGHT RECOVERY, AS THE RAW REFERENCES DO THEM (2026-10-01)
+
+An audit read the white balance, exposure and highlight stages against primary
+sources and found each one doing something the references do not. What the
+sources say, and what the app does now:
+
+- **A clip is read on the value the sensor recorded.** LibRaw's auto white
+  balance (`scale_colors`, `src/postprocessing/postprocessing_utils_dcrdefs.cpp`)
+  drops any 8x8 block holding a photosite above `maximum - 25` and keeps
+  near-black ones. darktable runs highlight reconstruction before its lens
+  module, and darktable issue 12128 (9r) is what happens otherwise. This app
+  lays the lens flat on the linear copy at decode (decision 021), with ring
+  gains from about 0.56 to 1.14 on the shipped profiles, so a pinned photosite
+  in the centre read BELOW the 0.985 pin in 71 of 72 profiles and an unclipped
+  value near the edge was lifted over it. Every clip test now divides the flat
+  back out at the pixel (`pinTest` in `src/decode.ts`; the same division in
+  `compileEdit` and the shader): gray-world, auto exposure, auto recover,
+  tap-to-balance and the recovery itself.
+- **Gray-world leaves clipped samples out**, as LibRaw does. In infrared red
+  floods and clips first, so a counted pin capped red's mean and inflated red's
+  gain, and this one balance drives the open baseline, the sky selection and
+  a look's own balance.
+- **The balance is scaled so its smallest gain is 1** (`unitMinGains`).
+  LibRaw: `if (!highlight) dmax = dmin;` then `pre_mul[c] /= dmax`;
+  RawTherapee's getImage: "adjust gain so the maximum raw value of the least
+  scaled channel just hits max". Brightness is the exposure's. The app scaled
+  to unit Rec.709 luma on camera channels and called that brightness
+  preserving; those weights are sRGB's, and on an infrared balance it put the
+  least-gained channel's ceiling about 3.8 stops below white.
+- **Auto exposure reads channel values, not luma, and not the pins.** LibRaw's
+  auto-bright (`write_ppm_tiff`) takes each output channel's level above which
+  1% of pixels lie and maps the largest to white; RawTherapee's getAutoExp pools
+  the channels. A luma percentile does not bound a channel (a saturated pixel's
+  top channel can be several times its luma), and a counted pin placed the pin
+  at 0.85 once more than 3% of a frame was blown. The app keeps its 97% and
+  0.85 and pools the three channels of the unclipped samples.
+- **Highlight recovery is dcraw's `blend_highlights`** (LibRaw
+  `src/postprocessing/postprocessing_aux.cpp`, read 2026-10-01; RawTherapee's
+  HLRecovery_Luminance is the same construction): the channel SUM is held
+  (row 0 of `trans` is {1, 1, 1}) and the chroma is scaled by
+  `chratio = sqrt(sum[1] / sum[0])`, the chroma left when every value over the
+  clip is cut to it against the chroma there was. dcraw cuts at ONE level, the
+  lowest channel's saturation after balance; with infrared gains that far
+  apart the lowest level would reach unclipped pixels across the frame, so the
+  app cuts at the lowest of the CLIPPED channels' own levels. Every channel
+  clipped therefore goes fully neutral; one clipped channel keeps the colour the
+  others recorded. The old construction pulled every clipped pixel 70% toward
+  Rec.709 luma of pre-matrix values at the at-open 0.7, which left a fully
+  blown pixel 30% of the balance's cast and took 70% of the colour a partly
+  clipped one had recorded. The slider stays the strength, as an exponent on
+  `chratio` (1 is the reference).
+
+**Measured.** On the owner's six cached raws (none of which clips) the
+at-open product of balance and exposure moves by -0.006 to +0.023 stops and
+the channel ratios are identical to four decimals, so a frame that does not
+clip opens as it did. NIR_1376 pushed two stops into clipping in scratch (its
+recorded values times four, held at white, before the flat; 11.8% pinned):
+the old render showed the blown meadow in yellow-green patches, which is the
+30% cast left by the old pull after the swap; the new one shows it clean white
+with the grass texture intact and no fringe at the edges of the blown areas,
+and the frame comes up 0.37 stops brighter because the bright end is read from
+the samples that did not clip. Both renders were opened, whole and at two
+full-resolution crops.

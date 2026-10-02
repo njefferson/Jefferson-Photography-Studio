@@ -39,16 +39,23 @@ export interface EditParams {
    *  compileEdit's per-pixel math and skipped in the .cube LUT like the other
    *  two. 0 changes nothing. */
   despeckle?: number;
-  /** 0..1 highlight recovery — pulls genuinely sensor-clipped pixels toward
-   *  post-white-balance NEUTRAL, scaled by clip severity. Runs AFTER WB and
-   *  BEFORE the camera matrix, where "blown = neutral" is actually defined —
-   *  and the row-normalized matrix preserves neutral, so a recovered pixel
-   *  can never turn green/orange (the failure of every decode-stage repair;
-   *  see NOTES.md 2026-07-24/25 ledger). Per-pixel only: no neighbourhoods,
-   *  no spatial search — structurally incapable of seams or squares. Clip is
-   *  detected on the SOURCE value at the sensor pin (>=98.5% of white), so
-   *  real data below the pin is never touched. Raw sources only. DEFAULT 0 in
-   *  the parameters; at open autoRecover sets 0.7 when the frame has real
+  /** 0..1 highlight recovery — dcraw's blend_highlights (`recoverHighlight`):
+   *  a sensor-clipped pixel keeps its channel SUM and loses the chroma the
+   *  clip manufactured, measured against each clipped channel's own clip
+   *  level after white balance. A pixel whose every channel clipped recorded
+   *  no colour and goes fully NEUTRAL at any strength above 0; one with a
+   *  single clipped channel keeps the colour its other channels recorded, less
+   *  what the cut takes. The slider is the strength, as an exponent on the
+   *  reference's chroma ratio (1 is the reference, 0 is off). Runs AFTER WB
+   *  and BEFORE the camera matrix, where "blown = neutral" is actually
+   *  defined — and the row-normalized matrix preserves neutral, so a recovered
+   *  pixel can never turn green/orange (the failure of every decode-stage
+   *  repair; see NOTES.md 2026-07-24/25 ledger). Per-pixel only: no
+   *  neighbourhoods, no spatial search — structurally incapable of seams or
+   *  squares. Clip is detected on the SOURCE value at the sensor pin (>=98.5%
+   *  of white, `SENSOR_PIN`) read BEFORE the decode-time lens flat, so real
+   *  data below the pin is never touched. Raw sources only. DEFAULT 0 in the
+   *  parameters; at open autoRecover sets 0.7 when the frame has real
    *  clipping (the at-open ruling, rev. 2 of 2026-07-25); this is an explicit
    *  per-shot control, excluded from saved looks like WB. */
   recover?: number;
@@ -1949,6 +1956,108 @@ export function lensGainsFor(lens: LensCurve | null | undefined, strength: numbe
   return { n, gr, gb, gg };
 }
 
+/** THE SENSOR PIN, ONE PLACE. A source value at or above `SENSOR_PIN` in any
+ *  channel, read as the sensor recorded it (BEFORE the decode-time lens flat),
+ *  is clipped; the recovery ramp runs from it to `SENSOR_PIN_FULL`, where the
+ *  channel counts as wholly clipped. The decode maps the white level to 1, so
+ *  this is 98.5% of white. Gray-world balance, auto exposure, auto recover and
+ *  tap-to-balance (decode.ts, main.ts) all test against `SENSOR_PIN`; the
+ *  shader in gl.ts carries the same two numbers as literals, because it is a
+ *  template literal that must not grow an interpolation (see its notes). */
+export const SENSOR_PIN = 0.985;
+export const SENSOR_PIN_FULL = 0.995;
+
+/** The gain tables a decode laid on its linear copy (lensflat.ts `LensGains`),
+ *  by shape, so this module need not import that one. */
+export interface SourceFlat {
+  n: number;
+  gr: ArrayLike<number>;
+  gg: ArrayLike<number>;
+  gb: ArrayLike<number>;
+}
+
+/**
+ * HIGHLIGHT RECOVERY FOR ONE PIXEL — dcraw's `blend_highlights` (LibRaw
+ * postprocessing_aux.cpp; RawTherapee's HLRecovery_Luminance is the same
+ * construction), with the clip level taken per channel.
+ *
+ * The reference: hold the pixel's channel SUM, and scale its chroma by the
+ * ratio of the chroma it would have with every value over the clip level cut to
+ * that level, to the chroma it has. A pixel whose every channel clipped cuts to
+ * one value, so that ratio is 0 and it goes fully neutral; a pixel with one
+ * channel clipped loses only the colour the cut takes, so the colour its other
+ * channels recorded stays. dcraw cuts at ONE level, the lowest channel's
+ * saturation after white balance; infrared gains sit so far apart that the
+ * lowest level would reach unclipped pixels across the whole frame, so here
+ * the level is the lowest of the CLIPPED channels' own levels — `k / sev` per
+ * channel, which falls from infinity to that channel's clip level as its
+ * severity rises across the pin, so a channel entering the ramp changes nothing
+ * abruptly.
+ *
+ * @param c  the pixel after white balance and exposure, camera-native, before
+ *   the matrix; rewritten in place.
+ * @param s0  red's clip severity 0..1 (`smooth01(SENSOR_PIN, SENSOR_PIN_FULL,
+ *   v)` of its value before the lens flat); `s1` green's, `s2` blue's.
+ * @param k0  red's clip level in `c`'s units: `SENSOR_PIN` times the lens flat
+ *   at this pixel times red's white-balance gain times exposure; `k1`, `k2`
+ *   green's and blue's.
+ * @param strength  the Recover highlights slider, 0..1: the share of the
+ *   reference's chroma loss applied, as an exponent on the ratio — 1 is dcraw,
+ *   lower keeps more of a partly clipped pixel's colour, 0 changes nothing.
+ * @returns nothing; `c` holds the recovered pixel.
+ * What the result must satisfy: `c[0] + c[1] + c[2]` is unchanged (brightness
+ *   is held as the references hold it); a pixel with all three severities at 1
+ *   comes out exactly neutral at any strength above 0; a pixel with every
+ *   severity 0 is untouched. The shader's recovery block in gl.ts is the same
+ *   arithmetic and the GPU agreement test holds the two together. Consumer:
+ *   `compileEdit`.
+ */
+export function recoverHighlight(c: Float32Array | Float64Array | number[], s0: number, s1: number, s2: number, k0: number, k1: number, k2: number, strength: number): void {
+  if (!(strength > 0) || !(s0 > 0 || s1 > 0 || s2 > 0)) return;
+  let m = Infinity;
+  if (s0 > 0) m = Math.min(m, k0 / s0);
+  if (s1 > 0) m = Math.min(m, k1 / s1);
+  if (s2 > 0) m = Math.min(m, k2 / s2);
+  const r = c[0], g = c[1], b = c[2];
+  const mean = (r + g + b) / 3;
+  const dr = r - mean, dg = g - mean, db = b - mean;
+  const q0 = dr * dr + dg * dg + db * db;
+  if (!(q0 > 0)) return;
+  const r1 = Math.min(r, m), g1 = Math.min(g, m), b1 = Math.min(b, m);
+  const mean1 = (r1 + g1 + b1) / 3;
+  const er = r1 - mean1, eg = g1 - mean1, eb = b1 - mean1;
+  const ratio = Math.min(1, Math.sqrt((er * er + eg * eg + eb * eb) / q0));
+  const keep = ratio > 0 ? Math.pow(ratio, strength) : 0;
+  c[0] = mean + dr * keep;
+  c[1] = mean + dg * keep;
+  c[2] = mean + db * keep;
+}
+
+/**
+ * THE GRADE AS ONE PER-PIXEL FUNCTION — the CPU mirror of the fragment shader
+ * in gl.ts, used by the export, the tiles, the frame measurements, the sky map
+ * and the .cube bake.
+ * @param p  the edit.
+ * @param cam  camera-native -> linear sRGB 3x3, row-major, for a raw; omitted
+ *   for a source that is already display-referred (and then highlight recovery,
+ *   which only means anything on sensor values, does not run).
+ * @param aspect  the source's width over height, for every radial stage.
+ * @param local  the clarity/dehaze maps, or omitted to skip both.
+ * @param lens  the in-grade lens curve for an 8-bit source; null for a raw.
+ * @param skyMap  the per-edit sky chroma map, or null.
+ * @param skyFine  the refined sky bitmap, or null.
+ * @param srcFlat  the lens flat already in a raw's source pixels, or null.
+ * @returns a function `(r, g, b, out, glow, u, v, fu, fv)` that writes the
+ *   finished DISPLAY sRGB pixel into `out` for one linear source pixel. `u`,
+ *   `v` are its image uv and switch the spatial stages on; `fu`, `fv` are the
+ *   same position given only so `srcFlat` can be read back for highlight
+ *   recovery, for callers that want that without the spatial stages, and
+ *   default to `u`, `v`.
+ * What the result must satisfy: it agrees with the shader for the same edit
+ *   and source within the agreement walk's and the GPU parity tests'
+ *   tolerances — every stage here has its line in gl.ts, and a change to one
+ *   without the other renders the export differently from the preview.
+ */
 export function compileEdit(
   p: EditParams,
   cam?: number[],
@@ -1971,7 +2080,14 @@ export function compileEdit(
    *  `p.skyDepth`; the depth is off without it. A tile passes the coarse
    *  bitmap, which at 260 px is finer than the tile. */
   skyFine?: BrushMask | null,
-): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number) => void {
+  /** The lens flat the SOURCE pixels already carry — a raw's decode-time
+   *  correction (decision 021): `img.lensApplied.gains` for the working copy,
+   *  the export's own `flat` for a full-resolution render. Read back out at the
+   *  pixel so highlight recovery tests the value the sensor recorded rather
+   *  than the corrected one; nothing else here uses it. Omit for an 8-bit
+   *  source, whose correction is the in-grade stage above. */
+  srcFlat?: SourceFlat | null,
+): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number, fu?: number, fv?: number) => void {
   // The YIQ hue rotation, written as its ROWS (cRC = weight of input C in
   // output R) and applied as rows, so grey stays grey. It was applied
   // transposed until 2026-10-01, which tinted every neutral. Applied as rows,
@@ -1990,7 +2106,8 @@ export function compileEdit(
   const c21 = 0.587 - 0.588 * cos - 1.05 * sin;
   const c22 = 0.114 + 0.886 * cos - 0.203 * sin;
   // Fold exposure into the WB gains (both linear; order commutes). The
-  // neutral-pull below is scale-invariant, so folding exposure in is safe.
+  // highlight recovery below carries each clip level through these same
+  // folded gains, so folding exposure in is safe.
   const ex = p.exposure;
   const wr = p.wb[0] * ex, wg = p.wb[1] * ex, wb = p.wb[2] * ex;
   const recover = p.recover ?? 0;
@@ -2096,13 +2213,28 @@ export function compileEdit(
   const lut = p.lut && p.lut.strength > 0 ? p.lut : null;
   const lutTmp = lut ? new Float32Array(3) : null;
 
-  return (r, g, b, out, glow = 0, u, v) => {
-    // Clip severity from the SOURCE values, before anything modifies them —
-    // the sensor pin lives in native space (matches the shader's srcClip).
-    const sev =
-      cam && recover > 0
-        ? Math.max(smooth01(0.985, 0.995, r), smooth01(0.985, 0.995, g), smooth01(0.985, 0.995, b))
-        : 0;
+  const recPx = new Float64Array(3);
+  return (r, g, b, out, glow = 0, u, v, fu = u, fv = v) => {
+    // Clip severity PER CHANNEL from the SOURCE values, before anything
+    // modifies them — the sensor pin lives in native space (matches the
+    // shader's srcSev). AND READ AS THE SENSOR RECORDED THEM: a raw's pixels
+    // carry the decode-time lens flat (decision 021), whose centre gain sits
+    // below 0.985 on a channel in 71 of the 72 shipped profiles, so a pinned
+    // photosite there read below the pin and kept its cast, and gains above 1
+    // lifted unclipped values into the test. The flat is divided back out at
+    // this pixel — darktable runs highlight reconstruction before its lens
+    // module for the same reason. `fr`/`fg`/`fb` are that flat, kept for the
+    // clip level below.
+    let s0 = 0, s1 = 0, s2 = 0, fr = 1, fg = 1, fb = 1;
+    if (cam && recover > 0) {
+      if (srcFlat && fu !== undefined && fv !== undefined) {
+        const i = lensBin(fu, fv, aspect, srcFlat.n);
+        fr = srcFlat.gr[i]; fg = srcFlat.gg[i]; fb = srcFlat.gb[i];
+      }
+      s0 = smooth01(SENSOR_PIN, SENSOR_PIN_FULL, r / fr);
+      s1 = smooth01(SENSOR_PIN, SENSOR_PIN_FULL, g / fg);
+      s2 = smooth01(SENSOR_PIN, SENSOR_PIN_FULL, b / fb);
+    }
     // Clarity/dehaze act on LINEAR source data before exposure/WB, using the
     // per-image maps — matching the shader (which runs them after denoise).
     if (localOn && u !== undefined && v !== undefined) {
@@ -2141,15 +2273,14 @@ export function compileEdit(
     r *= wr;
     g *= wg;
     b *= wb;
-    // Highlight recovery: blown pixels move toward post-WB neutral at their
-    // own luminance — the survivor channels keep driving the texture. Matches
-    // the shader exactly.
-    if (sev > 0) {
-      const F = recover * sev;
-      const Y = r * REC709[0] + g * REC709[1] + b * REC709[2];
-      r += (Y - r) * F;
-      g += (Y - g) * F;
-      b += (Y - b) * F;
+    // Highlight recovery (recoverHighlight): dcraw's blend, holding the
+    // channel sum, with each channel's clip level carried through the flat,
+    // the white balance and exposure to where this pixel now is. Matches the
+    // shader.
+    if (s0 > 0 || s1 > 0 || s2 > 0) {
+      recPx[0] = r; recPx[1] = g; recPx[2] = b;
+      recoverHighlight(recPx, s0, s1, s2, SENSOR_PIN * fr * wr, SENSOR_PIN * fg * wg, SENSOR_PIN * fb * wb, recover);
+      r = recPx[0]; g = recPx[1]; b = recPx[2];
     }
     // IR lens correction: radial luminance gain after WB (spatial -> skipped in
     // the LUT bake where u/v are absent), matching the shader.

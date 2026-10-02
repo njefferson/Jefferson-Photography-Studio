@@ -56,6 +56,6 @@ export function requestSkySelection(src: SkySource): Promise<SkySelection | null
   return new Promise<SkySelection | null>((res) => {
     const id = nextId++;
     waiting.set(id, res);
-    w.postMessage({ id, src }, [src.rgb.buffer]);
+    w.postMessage({ id, src }, src.clip ? [src.rgb.buffer, src.clip.buffer] : [src.rgb.buffer]);
   });
 }

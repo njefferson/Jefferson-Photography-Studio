@@ -29,7 +29,7 @@
 // 20–25 px footprint of a 2800 px frame, which is the measured radius, so no
 // further pass is needed and a strided kernel — the lattice trap 4c-xii and
 // 4c-xxii both record — never enters it.
-import { compileEdit, SKY_CHROMA_RANGE, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, smooth01, rgb2hsv, type EditParams, type BrushMask, type LensCurve, type LocalMap, type SkyMap } from "./pipeline";
+import { compileEdit, SKY_CHROMA_RANGE, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, smooth01, rgb2hsv, type EditParams, type BrushMask, type LensCurve, type LocalMap, type SkyMap, type SourceFlat } from "./pipeline";
 export { sampleSkyMap, decSkyChroma, type SkyMap } from "./pipeline";
 
 const REC = [0.2126, 0.7152, 0.0722];
@@ -107,6 +107,9 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  *           built from the look's own output and never from itself.
  * @param cam,aspect,local,lens  exactly what compileEdit takes, passed through.
  * @param sky  the sky bitmap built once per image by buildSkyMask.
+ * @param srcFlat  the lens flat already in a raw's source pixels, passed through
+ *   to compileEdit so highlight recovery here reads the clip the way the
+ *   rendered pixels do; null for an 8-bit source.
  * @returns the map, or null when the bitmap selects nothing. Four bytes per
  *   texel: encoded chroma a and b, the bitmap's mean weight, and the depth
  *   key — the PHOTOGRAPH's key (SKY_DEPTH_CHROMA_LO/HI on the sky's mean
@@ -138,6 +141,7 @@ export function buildSkyMap(
   local: LocalMap | undefined,
   lens: LensCurve | null | undefined,
   sky: BrushMask,
+  srcFlat: SourceFlat | null = null,
 ): SkyMap | null {
   const W = SKY_MAP_W;
   const H = Math.max(8, Math.round((W * srcH) / srcW));
@@ -148,7 +152,7 @@ export function buildSkyMap(
   if (!any) return null;
   // Rendered WITHOUT this stage. compileEdit reads `skySmooth` from the params
   // it is given, so the copy here is what stops the map depending on itself.
-  const edit = compileEdit({ ...p, skySmooth: 0, skyDepth: 0, skySat: 0 }, cam, aspect, local, lens);
+  const edit = compileEdit({ ...p, skySmooth: 0, skyDepth: 0, skySat: 0 }, cam, aspect, local, lens, null, null, srcFlat);
   const out = new Float32Array(3);
   const rgba = new Uint8Array(W * H * 4);
   // Per-texel mean chroma for the grey guard, and the photograph's sums for

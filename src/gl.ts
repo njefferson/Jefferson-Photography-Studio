@@ -160,7 +160,15 @@ uniform float u_lensFix;  // measured colour strength; 0 is off
 uniform float u_lensBump;  // shipped brightness strength; 0 is off
 uniform float u_vignette;    // -1..1 (+ brighten corners, - darken)
 uniform float u_aspect;      // image width/height — keeps the lens fix circular in pixels
-uniform float u_recover;     // 0..1 pull sensor-clipped pixels to post-WB neutral
+uniform float u_recover;     // 0..1 highlight recovery strength (pipeline.ts recoverHighlight)
+// The lens flat the SOURCE texture already carries — a raw's decode-time
+// correction (decision 021) — one texel per radial bin, RGB = the gain on red,
+// green and blue. Read back out at the pixel so the clip test behind highlight
+// recovery sees the value the sensor recorded. u_flatN is 0 when the pixels
+// carry none (an 8-bit source, or no lens matched). texelFetch, as for the lens
+// curve above: the bin read is exactly the bin pipeline.ts lensBin indexes.
+uniform sampler2D u_flatTex;
+uniform int u_flatN;
 uniform float u_clarity;     // -1..1 local contrast vs the blurred-luma map
 uniform float u_dehaze;      // -1..1 veil subtraction vs the dark-channel map
 uniform sampler2D u_localTex; // RG8: sqrt-encoded blurred luma (R) + dark channel (G)
@@ -574,12 +582,23 @@ void main() {
   }
 
   vec3 c = fetchLin(v_uv);
-  // Clip severity from the SOURCE sample (sensor pin lives in native space),
-  // captured before denoise/clarity can blur it. Used by highlight recovery.
-  float srcClip = 0.0;
+  // Clip severity PER CHANNEL from the SOURCE sample (the sensor pin lives in
+  // native space), captured before denoise/clarity can blur it, and read as the
+  // sensor recorded it: the decode-time lens flat in the texture is divided
+  // back out at this pixel, or a pinned photosite in a ring whose gain is below
+  // 0.985 escapes the test (71 of the 72 shipped profiles have one) and an
+  // unclipped one in a ring above 1 is pulled in. 0.985 and 0.995 are
+  // pipeline.ts SENSOR_PIN and SENSOR_PIN_FULL. Used by highlight recovery.
+  vec3 srcSev = vec3(0.0);
+  vec3 srcFlat = vec3(1.0);
   if (u_useCam && u_recover > 0.0) {
-    vec3 k = smoothstep(vec3(0.985), vec3(0.995), c);
-    srcClip = max(k.r, max(k.g, k.b));
+    if (u_flatN > 0) {
+      vec2 fd = vec2((v_uv.x - 0.5) * u_aspect, v_uv.y - 0.5);
+      float fr = 2.0 * length(fd) / sqrt(u_aspect * u_aspect + 1.0);
+      int fi = clamp(int(floor(fr * float(u_flatN))), 0, u_flatN - 1);
+      srcFlat = texelFetch(u_flatTex, ivec2(fi, 0), 0).rgb;
+    }
+    srcSev = smoothstep(vec3(0.985), vec3(0.995), c / srcFlat);
   }
 
   // Denoise FIRST, on linear sensor data, before the big IR gains amplify the
@@ -755,16 +774,34 @@ void main() {
   c *= u_exposure;
   c *= u_wb;
 
-  // Highlight recovery: blown pixels move toward post-WB neutral at their own
-  // luminance. Post-WB "neutral" is the one hue the row-normalized camera
-  // matrix preserves exactly, so a recovered pixel cannot shift colour; the
-  // pull is scale-invariant, so exposure folding is safe. Raw only, user
-  // slider, default 0 in the parameters; at open autoRecover sets 0.7 when
-  // the frame has real clipping (the at-open ruling, rev. 2 of 2026-07-25).
-  if (srcClip > 0.0) {
-    float F = u_recover * srcClip;
-    float Yr = dot(c, LUMA_W);
-    c = mix(c, vec3(Yr), F);
+  // Highlight recovery, the arithmetic of pipeline.ts recoverHighlight:
+  // dcraw's blend_highlights. The channel SUM is held, and the chroma is
+  // scaled by the ratio of the chroma left once every value over the clip
+  // level is cut to it — the lowest of the CLIPPED channels' own levels, each
+  // carried through the flat, the balance and exposure (k / sev, so a channel
+  // entering the ramp changes nothing abruptly). Every channel clipped cuts to
+  // one value and goes fully neutral; one clipped channel keeps the colour the
+  // others recorded. The slider is an exponent on that ratio. Post-WB
+  // "neutral" is the one hue the row-normalized camera matrix preserves
+  // exactly, so a recovered pixel cannot shift colour. Raw only, user slider,
+  // default 0 in the parameters; at open autoRecover sets 0.7 when the frame
+  // has real clipping (the at-open ruling, rev. 2 of 2026-07-25).
+  if (srcSev.r > 0.0 || srcSev.g > 0.0 || srcSev.b > 0.0) {
+    vec3 kc = 0.985 * srcFlat * u_exposure * u_wb;
+    float lim = 1e30;
+    if (srcSev.r > 0.0) lim = min(lim, kc.r / srcSev.r);
+    if (srcSev.g > 0.0) lim = min(lim, kc.g / srcSev.g);
+    if (srcSev.b > 0.0) lim = min(lim, kc.b / srcSev.b);
+    float m0 = (c.r + c.g + c.b) / 3.0;
+    vec3 d0 = c - vec3(m0);
+    float q0 = dot(d0, d0);
+    if (q0 > 0.0) {
+      vec3 c1 = min(c, vec3(lim));
+      vec3 d1 = c1 - vec3((c1.r + c1.g + c1.b) / 3.0);
+      float ratio = min(1.0, sqrt(dot(d1, d1) / q0));
+      float keep = ratio > 0.0 ? pow(ratio, u_recover) : 0.0;
+      c = vec3(m0) + d0 * keep;
+    }
   }
 
   // IR lens correction: radial luminance gain (hot-spot / vignette) after WB.
@@ -1186,7 +1223,7 @@ export interface BuildOptions {
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -1288,9 +1325,48 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, n, 1, 0, gl.RGB, gl.FLOAT, data);
   }
 
+  /**
+   * Tell the renderer which lens flat the source texture's pixels already carry.
+   * @param gains  the decode-time gains (`DecodedImage.lensApplied.gains`,
+   *   lensflat.ts), or null when the pixels carry none.
+   * @returns nothing; the table is uploaded to unit 14 and read by the
+   *   highlight-recovery clip test only.
+   * What the result must satisfy: it names exactly the gains in the texture
+   *   last given to `setImage`, so the shader divides out what is there — the
+   *   caller sets it beside every `setImage` of a raw and again whenever the
+   *   flat on the working copy is re-applied (main.ts uploadPreview), as
+   *   compileEdit takes the same table as `srcFlat`.
+   */
+  setSourceFlat(gains: { n: number; gr: ArrayLike<number>; gg: ArrayLike<number>; gb: ArrayLike<number> } | null): void {
+    const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE14);
+    gl.bindTexture(gl.TEXTURE_2D, this.flatTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    if (!gains || gains.n < 1) {
+      this.flatN = 0;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array([1, 1, 1]));
+      gl.activeTexture(gl.TEXTURE0);
+      return;
+    }
+    const n = gains.n;
+    const data = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      data[i * 3] = gains.gr[i];
+      data[i * 3 + 1] = gains.gg[i];
+      data[i * 3 + 2] = gains.gb[i];
+    }
+    this.flatN = n;
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, n, 1, 0, gl.RGB, gl.FLOAT, data);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+
   private toneTex: WebGLTexture;
   private lensTex: WebGLTexture;
   private lensN = 0;
+  /** The lens flat in the source texture (unit 14) and its bin count; 0 bins
+   *  when the source carries none. */
+  private flatTex: WebGLTexture;
+  private flatN = 0;
   private lensHasColour = false;
   private lensHasBump = false;
   private toneRgbTex: WebGLTexture;
@@ -1417,6 +1493,17 @@ export class Renderer {
     // The measured lens curve (unit 10). RG32F so a 5% correction is not
     // quantised into 8-bit steps, and NEAREST because the shader fetches an
     // exact texel rather than sampling between them.
+    // The flat the source pixels carry (unit 14), for the recovery clip test.
+    // RGB32F, NEAREST, one texel per bin, the same reasons as the lens curve.
+    this.flatTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.flatTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array([1, 1, 1]));
+
     this.lensTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -2072,6 +2159,7 @@ export class Renderer {
     gl.uniform1f(this.loc.u_vignette, p.vignette ?? 0);
     gl.uniform1f(this.loc.u_aspect, this.imgH ? this.imgW / this.imgH : 1);
     gl.uniform1f(this.loc.u_recover, p.recover ?? 0);
+    gl.uniform1i(this.loc.u_flatN, this.flatN);
     gl.uniform1f(this.loc.u_clarity, p.clarity ?? 0);
     gl.uniform1f(this.loc.u_dehaze, p.dehaze ?? 0);
     // A head's own colour mixer switches the mixer on too (042, stage 2b), even
@@ -2293,6 +2381,10 @@ export class Renderer {
     gl.uniform1f(this.loc.u_lensBump, this.lensHasBump && !p.lensBypass ? (p.lensFix ?? 0) : 0);
     gl.activeTexture(gl.TEXTURE10);
     gl.bindTexture(gl.TEXTURE_2D, this.lensTex);
+    // The source's own lens flat (unit 14), uploaded by setSourceFlat.
+    gl.uniform1i(this.loc.u_flatTex, 14);
+    gl.activeTexture(gl.TEXTURE14);
+    gl.bindTexture(gl.TEXTURE_2D, this.flatTex);
     // Imported .cube LUT (unit 5). The sig check IS the uploader: the lattice
     // re-uploads only when the LUT identity changes; strength-only changes are
     // just a uniform. Data is padded RGB -> RGBA32F (RGB32F is driver-fragile).

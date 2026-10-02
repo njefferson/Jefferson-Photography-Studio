@@ -485,7 +485,7 @@ where every matched frame opens, and inside that clamp, two flats that differ
 by one scale per channel give gains that also differ by one scale per channel.
 Gray-world (`grayWorldWB`, `src/decode.ts`) then sets one scale per channel
 from the means of the corrected copy, which absorbs that difference. The only
-exceptions are the white-balance slider's steps and `lumNormalize`'s clamp. So
+exceptions are the white-balance slider's steps and `unitMinGains`'s clamp. So
 at strength 1, while white balance at open is gray-world, the choice of
 normalisation cannot bring the centre's red back. At any other strength the
 gain is not a plain scale of `k`, and this arithmetic does not hold exactly.

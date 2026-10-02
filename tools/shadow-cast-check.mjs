@@ -180,5 +180,50 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   else ok(`an extreme frame is held to ${worst.toFixed(3)} of unity rather than acting at full strength`);
 }
 
+// ── 8 · IT MEASURES IN LINEAR sRGB, NOT ON THE CAMERA'S CHANNELS. ──────────
+// Every weight in the measurement is a Rec.709 luminance weight, which is
+// luminance only on sRGB primaries. The caller hands it the camera-native
+// decode WITH the balance and camera matrix that carry it there (`toDisplay`);
+// it used to measure the camera-native numbers directly, where an infrared
+// frame's red carries most of that "luma" and a cast known in display terms
+// comes back as something else. So the fixture is built in DISPLAY space — a
+// neutral sun, a shade with a known warm cast — and handed over as the camera
+// would record it: through the inverse of a channel-mixing matrix and the
+// inverse of a balance. Only a measurement made after converting back can
+// return the reciprocal of the display cast.
+{
+  // A row-normalised camera matrix of the shape camToSrgbLinear produces
+  // (rows sum to 1, strong off-diagonals as an infrared conversion has).
+  const cam = [1.9, -0.6, -0.3, -0.4, 1.7, -0.3, -0.1, -0.7, 1.8];
+  const inv3 = (m) => {
+    const [a, b, c, d, e, f, g, h, i] = m;
+    const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
+    const det = a * A + b * B + c * C;
+    return [A / det, -(b * i - c * h) / det, (b * f - c * e) / det,
+            B / det, (a * i - c * g) / det, -(a * f - c * d) / det,
+            C / det, -(a * h - b * g) / det, (a * e - b * d) / det];
+  };
+  const camInv = inv3(cam);
+  const gains = [1, 2.3, 4.1]; // an infrared-like balance, smallest gain 1
+  const toCamera = (rgb) => {
+    const r = camInv[0] * rgb[0] + camInv[1] * rgb[1] + camInv[2] * rgb[2];
+    const g = camInv[3] * rgb[0] + camInv[4] * rgb[1] + camInv[5] * rgb[2];
+    const b = camInv[6] * rgb[0] + camInv[7] * rgb[1] + camInv[8] * rgb[2];
+    return [r / gains[0], g / gains[1], b / gains[2]];
+  };
+  const CAST = [1.18, 1.0, 0.92];
+  const sunD = [0.6, 0.6, 0.6];
+  const shadeD = [0.06 * CAST[0], 0.06 * CAST[1], 0.06 * CAST[2]];
+  const f = frame({ shade: toCamera(shadeD), sun: toCamera(sunD) });
+  const c = measureShadowCast(f.at, f.w, f.h, f.isSky, { gains, cam });
+  const inv = [1 / CAST[0], 1 / CAST[1], 1 / CAST[2]];
+  const gl = inv[0] * 0.2126 + inv[1] * 0.7152 + inv[2] * 0.0722;
+  const want = inv.map((v) => v / gl);
+  const off = Math.max(...c.gain.map((v, i) => Math.abs(v - want[i])));
+  if (!c.measured) fail(`camera-native input with its conversion: not measured (${c.shadePx}/${c.sunPx} px)`);
+  else if (off > 0.01) fail(`a cast known in display space must be recovered from camera-native input — got ${c.gain.map((v) => v.toFixed(3)).join(", ")}, wanted ${want.map((v) => v.toFixed(3)).join(", ")}`);
+  else ok(`camera-native input is measured after its balance and matrix: the display cast comes back within ${off.toFixed(4)}`);
+}
+
 console.log(bad ? `\n${bad} failed` : "\nthe shadow measurement returns unity when there is nothing to correct.");
 process.exit(bad ? 1 : 0);

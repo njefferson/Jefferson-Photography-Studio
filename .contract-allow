@@ -143,7 +143,6 @@ src/pipeline.ts:creativeVignette
 src/pipeline.ts:applyCreativeVignette
 src/pipeline.ts:lensGain
 src/pipeline.ts:lensBin
-src/pipeline.ts:compileEdit
 src/pipeline.ts:toLinear8
 src/platform.ts:device
 src/platform.ts:deviceNoun
