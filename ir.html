@@ -124,10 +124,10 @@
                (Reported from the device, 2026-09-16.) -->
           <label class="open-btn bar-primary" title="Edit one photo — or several as a session">
             Open image(s)
-            <input id="file" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple />
+            <input id="file" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,.json,image/*" multiple />
           </label>
-          <input id="batchFiles" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple hidden />
-          <input id="quickFiles" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple hidden />
+          <input id="batchFiles" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,.json,image/*" multiple hidden />
+          <input id="quickFiles" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,.json,image/*" multiple hidden />
         </span></span>
       </header>
 
@@ -320,7 +320,7 @@
             <p id="preparing" role="status" aria-live="polite"></p>
             <span id="preparingFor" aria-hidden="true"></span>
           </div>
-          <label class="open-btn welcome-open"><input id="welcomeFile" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple />Open image(s)</label>
+          <label class="open-btn welcome-open"><input id="welcomeFile" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,.json,image/*" multiple />Open image(s)</label>
           <p class="welcome-open-hint">One photo, or a set to work through &mdash; each keeps its own edit.</p>
           <!-- DOCTRINE 7e's first-run half, said on the first screen every reader
                meets rather than in a dialog that interrupts them. What it IS,
@@ -335,7 +335,7 @@
                ships hidden and is revealed on iOS only (src/platform.ts); the
                full version, for every platform, is in Help either way. -->
           <p class="welcome-open-hint" data-only-plat="ios" hidden><strong>If the Files picker sits there after you tap Open:</strong> that wait is iOS fetching your photos out of iCloud, before this app is handed anything. A file with a cloud badge, or one that says &ldquo;Waiting&hellip;&rdquo;, is not on this <span data-device-noun>device</span> yet. Download the folder in Files first and it opens straight away — see <strong>Help &rarr; Why the Files picker hangs</strong>.</p>
-          <label class="welcome-batch" id="welcomeQuickBtn"><input id="welcomeQuickFiles" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,image/*" multiple />Quick look a folder…</label>
+          <label class="welcome-batch" id="welcomeQuickBtn"><input id="welcomeQuickFiles" class="file-input" type="file" accept=".dng,.nef,.zip,.ipslook,.ipskeep,.json,image/*" multiple />Quick look a folder…</label>
           <p class="welcome-batch-hint">An instant grid of a whole folder. Nothing is saved.</p>
           <button class="welcome-batch" id="welcomeBatchBtn" type="button">Develop a whole set unattended — one .zip…</button>
           <p class="welcome-batch-hint">Develops a whole set into one .zip, unattended.</p>
@@ -1425,7 +1425,7 @@
       <p id="lookLutNote" class="note look-hint" hidden>This look uses an imported LUT. Links, files and codes carry the grade only &mdash; the LUT travels as its own .cube file. Share both.</p>
       <button id="lookLutShare" type="button" hidden>Share LUT .cube file</button>
       <button id="lookShareLink" type="button" class="primary">Share link</button>
-      <button id="lookShareFile" type="button">Share as file (.ipslook)</button>
+      <button id="lookShareFile" type="button">Share as file (.ipslook.json)</button>
       <button id="lookCopyCode" type="button">Copy look code</button>
       <button id="lookShowQr" type="button">Show QR code</button>
       <div id="lookQrBox" hidden>
@@ -1801,7 +1801,7 @@
         subject through a channel swap (Sky keeps meaning sky); the small text under each box shows the
         colors it's grabbing right now.</p>
         <p><strong>Share a look</strong> from any My-looks slot (the &#8943; button): a link, a small
-        .ipslook file, a paste-able code, or a <strong>QR code</strong> to scan in person — the whole grade
+        .ipslook.json file, a paste-able code, or a <strong>QR code</strong> to scan in person — the whole grade
         travels inside, nothing is uploaded. Exported <strong>JPEGs carry their look recipe</strong> too
         (switch it off in Export if you prefer): anyone opening one here is offered your look. Honest
         caveat: apps that recompress images — Photos edits, Messages optimization, social uploads — strip

@@ -1,6 +1,6 @@
 // Shareable looks. A look is the CREATIVE grade only (see SavedLook) — small
 // enough (~0.5 KB of JSON) to travel as a link fragment, a paste-able code, or
-// a tiny .ipslook file, with no server and no account. This module is pure
+// a tiny .ipslook.json file, with no server and no account. This module is pure
 // (no DOM): schema, hardened parsing, and the link/file encodings.
 //
 // Wire format (key order is deliberate — `f` FIRST, so every emitted payload
@@ -286,8 +286,28 @@ export function sniffLook(bytes: Uint8Array): boolean {
   return true;
 }
 
-/** Filename for a shared look file: the sanitized name + .ipslook. */
+/** Filename for a shared look file (decision 063).
+ *
+ *  @param name  the look's name as the reader typed it, or nothing.
+ *  @returns the name with the characters no filesystem takes removed, cut to
+ *  `LOOK_NAME_MAX`, or `look` when nothing is left — followed by `.ipslook.json`.
+ *
+ *  WHY `.json` ON THE END. iOS filters every file picker by type identifier,
+ *  and an extension no installed app declares resolves to none, so a file
+ *  named `.ipslook` sat greyed out in every picker that should take it — the
+ *  shape 056 measured for `.cube` and 043 for `.ipskeep`. `.json` is a type the
+ *  platform registers, and the file already IS JSON saved as
+ *  `application/json`, so the name is honest as well as selectable. The
+ *  `.ipslook` before it keeps the name saying what the file is for.
+ *
+ *  What the result must satisfy: it ends in an extension `OPENABLE_EXT` in
+ *  `main.ts` accepts and that the five photograph pickers' `accept` lists in
+ *  `ir.html` carry (`tools/openable-check.mjs` holds those six together), or
+ *  the start screen's Open cannot take back the file this app just wrote.
+ *  The router never trusts the name — `sniffLook` decides by content — so a
+ *  file saved earlier as plain `.ipslook` still opens wherever it can be
+ *  picked. Caller: the Share as file button in My looks (`main.ts`). */
 export function lookFileName(name?: string): string {
   const base = (name ?? "").replace(/[/\\:*?"<>|]/g, "").trim().slice(0, LOOK_NAME_MAX) || "look";
-  return `${base}.ipslook`;
+  return `${base}.ipslook.json`;
 }

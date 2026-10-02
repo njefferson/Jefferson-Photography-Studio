@@ -97,7 +97,6 @@ src/look.ts:buildLookLink
 src/look.ts:parseLookPayload
 src/look.ts:parseLookText
 src/look.ts:sniffLook
-src/look.ts:lookFileName
 src/lookmark.ts:embedLookInJpeg
 src/lookmark.ts:extractLookFromJpeg
 src/luts.ts:listLuts

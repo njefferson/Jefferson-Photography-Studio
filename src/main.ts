@@ -11893,8 +11893,13 @@ document.addEventListener("keydown", (e) => {
 
 /** The picker's own accept list, applied to files that arrive by other routes.
  *  A drop and a paste have to be as fussy as the picker or they hand the decoder
- *  something it will fail on later, further from the thing the reader did. */
-const OPENABLE_EXT = /\.(dng|nef|zip|ipslook|ipskeep)$/i;
+ *  something it will fail on later, further from the thing the reader did.
+ *
+ *  `json` is here for one file only: a shared look, written as `.ipslook.json`
+ *  (decision 063) because iOS greys out a `.ipslook` in every picker. Plain
+ *  `ipslook` stays, so a look saved before that still opens. A `.json` that is
+ *  not a look is named and set aside in `openPickedNow`, never decoded. */
+const OPENABLE_EXT = /\.(dng|nef|zip|ipslook|ipskeep|json)$/i;
 function openableFiles(list: FileList | null | undefined): File[] {
   return Array.from(list ?? []).filter((f) => f.type.startsWith("image/") || OPENABLE_EXT.test(f.name));
 }
@@ -12993,7 +12998,8 @@ const SNIFF_OFFER_MS = 10_000;
 /** The reader a sniff inside an open uses: the offer, named for the file. */
 const sniffRead = (name: string): ReadBytes => (b) => readOrSkip(b, name, SNIFF_OFFER_MS);
 
-/** A cheap head-sniff: is this picked file a shared look (.ipslook JSON)?
+/** A cheap head-sniff: is this picked file a shared look (.ipslook.json, or
+ *  .ipslook from before decision 063)?
  *  Reads only the first bytes, through `read`; anything big is not a look. */
 async function isLookFile(f: File, read: ReadBytes = plainRead): Promise<boolean> {
   if (f.size === 0 || f.size > 64 * 1024) return false;
@@ -13053,7 +13059,7 @@ function inShutterOrder(files: File[]): File[] {
 
 /** Open a freshly-picked set. One file → ephemeral single open (unchanged).
  *  Two or more → a persisted session with the switch strip.
- *  Shared-look files (.ipslook) are peeled off FIRST: a look is not a photo —
+ *  Shared-look files (.ipslook.json, .ipslook) are peeled off FIRST: a look is not a photo —
  *  it must never destroy, join, or be counted against a photo session. */
 /** WHAT THE QUICK LOOK HANDS ACROSS when its picks become a session. It used to
  *  be the strip picture alone, which is why the verdict the reader had just made
@@ -13222,6 +13228,14 @@ async function openPickedNow(files: File[], ready: Map<File, ReadyFile> | undefi
   const lookSniff = await Promise.all(files.map((f) => sniffed(f, isLookFile)));
   const lookFiles = files.filter((_, i) => lookSniff[i] === "yes");
   files = files.filter((_, i) => lookSniff[i] === "no");
+  // A .json THAT IS NOT A LOOK (decision 063). Open takes `.json` only so a
+  // shared look saved as `.ipslook.json` can be picked on an iPad; the sniff
+  // above has already taken every one that is a look, by content. Anything
+  // else with that name is not a photograph either, so it is named among the
+  // files that could not be opened — in a sentence, before any decode — rather
+  // than handed to the decoder to fail later in a decode's words.
+  for (const f of files) if (/\.json$/i.test(f.name)) unread.push(`${f.name} (not a shared look — a .json opens here only when it is one)`);
+  files = files.filter((f) => !/\.json$/i.test(f.name));
   // Everything there is to say about the looks in this drop, said ONCE
   // (`toastAll`) — and only once the card that would swallow it is down: here
   // when nothing else is left to open, otherwise wherever the open takes its

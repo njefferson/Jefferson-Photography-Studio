@@ -5,8 +5,8 @@
 import { readZip, pickImageEntry } from "./zip";
 import { sniffLook } from "./look";
 
-// "look" is a shared-look file (.ipslook JSON), not an image — the editor
-// intercepts it before any decode. Look-inside-zip is unsupported on purpose
+// "look" is a shared-look file (.ipslook.json, or .ipslook from before decision
+// 063), not an image — the editor intercepts it before any decode. Look-inside-zip is unsupported on purpose
 // (pickImageEntry only surfaces images).
 export type ImageKind = "dng" | "nef" | "tiff" | "jpeg" | "png" | "look" | "unknown";
 

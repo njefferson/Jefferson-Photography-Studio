@@ -98,7 +98,7 @@ export interface KeepManifest {
  *  @param name  the picked file's name, any case.
  *  @returns whether the picker should route it here rather than to the decoder.
  *  Callers: the picker's routing in `main.ts`, which peels these off before the
- *  decode path the way it already peels off `.ipslook`. */
+ *  decode path the way it already peels off a shared look. */
 export function isKeepName(name: string): boolean {
   return name.toLowerCase().endsWith(KEEP_EXT);
 }
