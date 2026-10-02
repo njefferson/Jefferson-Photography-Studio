@@ -54,6 +54,14 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+v2.64.39 went to production on 2026-10-02, by a fast-forward push to `main`:
+fcbf876's fix to the test page and its staging note, rebased onto the docs
+commit 9fb9eb5 as 0341624 and 7ce7f56, then this note. Staging and this commit
+hold the same shipped files, compared path for path; only the docs differ. The
+number reads .46 rather than .39 because the count includes the docs and NOTES
+commits on `main`. What it carried is the v2.64.39 entry below; its PC run now
+runs on production.
+
 **v2.64.39 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-09-30 (fcbf876).** Production's code (v2.64.35) plus one fix to the test
 page, for 071. Staging's offline worker was read naming fcbf876 as
