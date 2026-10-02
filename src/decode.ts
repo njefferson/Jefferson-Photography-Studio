@@ -654,10 +654,7 @@ async function decodeDng(bytes: Uint8Array, file?: ImportedFile): Promise<Decode
       camMatrix: cam,
       isRaw: true,
       rotate: orientationToRotate(ifds),
-      decodeNotice: cfa.skipped.length
-        ? `This DNG asks for ${listWords([...new Set(cfa.skipped)])}, which this app doesn't apply, so the photograph is shown without ${cfa.skipped.length > 1 ? "them" : "it"}. ` +
-          "Lightroom or Adobe Camera Raw will apply it; everything else about the raw data is here."
-        : undefined,
+      decodeNotice: cfa.skipped.length ? skippedOpsNotice(cfa.skipped) : undefined,
     };
   }
 
@@ -686,6 +683,23 @@ async function decodeDng(bytes: Uint8Array, file?: ImportedFile): Promise<Decode
           ? "No decodable image found in this DNG."
           : "No decodable image found in this TIFF file.",
   );
+}
+
+/** WHAT THE READER IS TOLD WHEN A DNG ASKS FOR A CORRECTION THIS APP DOES NOT
+ *  APPLY (decode.ts `decodeNotice`, shown once at open by main.ts).
+ *  @param skipped  the reader-facing names `applyStoredOps` / `buildPost`
+ *    returned, one per opcode NOT applied — so one opcode required on four
+ *    planes arrives four times.
+ *  @returns two sentences naming each correction ONCE, and calling them "it"
+ *    or "them" by how many DIFFERENT corrections there are, in both
+ *    sentences. It counted the raw list for the first and wrote "it" in the
+ *    second, so four planes of one offset read "shown without them ... will
+ *    apply it", and two corrections "without them ... will apply it". */
+export function skippedOpsNotice(skipped: string[]): string {
+  const names = [...new Set(skipped)];
+  const them = names.length > 1 ? "them" : "it";
+  return `This DNG asks for ${listWords(names)}, which this app doesn't apply, so the photograph is shown without ${them}. ` +
+    `Lightroom or Adobe Camera Raw will apply ${them}; everything else about the raw data is here.`;
 }
 
 /** "a, b and c" — a list in words for a notice. */

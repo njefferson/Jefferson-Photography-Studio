@@ -77,11 +77,22 @@ const fail = (s) => { failed++; console.log(`FAIL  ${s}`); };
  *  viewport, each grid track of `#app`, the strip's parts and the drawn canvas,
  *  plus the canvas's intrinsic size and whether the strip is on the stage.
  *  Hidden elements read 0 rather than being skipped, so `tracksSum` is always
- *  comparable with `vh` and an unaccounted remainder is visible. The caller
- *  relies on `drawnW`/`drawnH` being the canvas's on-screen box, not its pixel
- *  buffer: the buffer is `pxW`/`pxH`. */
+ *  comparable with `vh` and an unaccounted remainder is visible.
+ *
+ *  `tracksSum` is the height the tracks COVER — the union of their vertical
+ *  spans — not their sum. Past the 760px breakpoint the panel sits BESIDE the
+ *  stage, and adding the two counted the same rows twice: at 834x1194 the
+ *  first run read "2187 of 1194" and failed its own MADE TO FAIL block on a
+ *  layout that was whole. On a phone, where they stack, the union IS the sum.
+ *  `panelBeside` says which shape was read.
+ *
+ *  The caller relies on `drawnW`/`drawnH` being the canvas's on-screen box,
+ *  not its pixel buffer: the buffer is `pxW`/`pxH`. A photograph that is open
+ *  has a buffer; one drawn at 0x0 with a buffer is a MEASUREMENT (no room was
+ *  left for it), not the no-photograph state. */
 function readHeights() {
   const h = (el) => (el && !el.hidden ? Math.round(el.getBoundingClientRect().height) : 0);
+  const span = (el) => { if (!el || el.hidden) return null; const r = el.getBoundingClientRect(); return r.height > 0 ? [r.top, r.bottom] : null; };
   const stage = document.getElementById("stage");
   const view = document.getElementById("view");
   const strip = document.getElementById("sessionStrip");
@@ -92,10 +103,21 @@ function readHeights() {
   const sw = h(document.getElementById("swStrip"));
   const panel = h(document.getElementById("panel"));
   const sessionVar = getComputedStyle(stage).getPropertyValue("--session-h").trim();
+  const panelEl = document.getElementById("panel");
+  const pr = panelEl && !panelEl.hidden ? panelEl.getBoundingClientRect() : null;
+  const panelBeside = !!pr && pr.height > 0 && pr.left >= st.right - 1 && pr.top < st.bottom - 1;
+  const spans = [span(document.querySelector("header.bar")), span(document.getElementById("swStrip")), span(stage), span(panelEl)]
+    .filter(Boolean).sort((a, b) => a[0] - b[0]);
+  let covered = 0, end = -Infinity;
+  for (const [t, bt] of spans) {
+    if (bt <= end) continue;
+    covered += bt - Math.max(t, end);
+    end = bt;
+  }
   return {
     vw: innerWidth, vh: innerHeight,
-    bar, sw, stage: Math.round(st.height), stageW: Math.round(st.width), panel,
-    tracksSum: bar + sw + Math.round(st.height) + panel,
+    bar, sw, stage: Math.round(st.height), stageW: Math.round(st.width), panel, panelBeside,
+    tracksSum: Math.round(covered),
     hasSession: stage.classList.contains("has-session"),
     sessionVar,
     stripH: h(strip),
@@ -109,8 +131,12 @@ function readHeights() {
   };
 }
 
-/** Wait until the layout has stopped moving: the canvas has a box, and two
- *  reads 300ms apart agree on the stage, the strip and the drawn photograph.
+/** Wait until the layout has stopped moving: a photograph is open (the canvas
+ *  has a pixel buffer), and two reads 300ms apart agree on the stage, the strip
+ *  and the drawn photograph. It used to require a drawn box as well, so a
+ *  layout that had settled with the photograph drawn at 0x0 — 302x656 with the
+ *  strip up, the very state 053 is about — was reported as "never stopped
+ *  moving" instead of measured.
  *  Takes the page; gives back true when settled, false after ~15s of motion.
  *  The caller reports an unsettled read as an instrument failure rather than
  *  taking a number off a layout still landing (thumbnails arriving change the
@@ -120,7 +146,7 @@ async function settleLayout(p) {
   for (let i = 0; i < 50; i++) {
     const r = await p.evaluate(readHeights);
     const key = `${r.stage}|${r.stripH}|${r.sessionVar}|${r.drawnW}x${r.drawnH}|${r.panel}|${r.bar}`;
-    if (r.drawnW > 0 && r.drawnH > 0 && key === last) return true;
+    if (r.pxW > 0 && r.pxH > 0 && key === last) return true;
     last = key;
     await p.waitForTimeout(300);
   }
@@ -161,7 +187,7 @@ function report(state, r) {
   const pc = (n) => `${Math.round((n / r.vh) * 100)}%`;
   const unacc = r.vh - r.tracksSum;
   console.log(`  ${state}`);
-  console.log(`    shell: bar ${r.bar} (${pc(r.bar)}) · update strip ${r.sw} · stage ${r.stage} (${pc(r.stage)}) · panel ${r.panel} (${pc(r.panel)})${r.panelHidden ? " [hidden]" : ""}${unacc ? ` · unaccounted ${unacc}` : ""}`);
+  console.log(`    shell: bar ${r.bar} (${pc(r.bar)}) · update strip ${r.sw} · stage ${r.stage} (${pc(r.stage)}) · panel ${r.panel} (${pc(r.panel)})${r.panelBeside ? " BESIDE the stage" : ""}${r.panelHidden ? " [hidden]" : ""}${unacc ? ` · unaccounted ${unacc}` : ""}`);
   if (r.hasSession) {
     console.log(`    stage: session strip ${r.stripH} (head ${r.headH}, thumbs row ${r.thumbsH}, one thumb ${r.thumb}) reserved as --session-h ${r.sessionVar || "unset"}`);
     console.log(`           #view's box by its own rule: ${r.stage} - 32 - ${parseInt(r.sessionVar, 10) || 0} = ${r.stage - 32 - (parseInt(r.sessionVar, 10) || 0)} tall`);
@@ -170,7 +196,8 @@ function report(state, r) {
   }
   const limitedBy = r.drawnW >= r.stageW - 40 ? "WIDTH-limited" : "HEIGHT-limited";
   const area = Math.round(((r.drawnW * r.drawnH) / (r.vw * r.vh)) * 1000) / 10;
-  console.log(`    photograph: ${r.pxW}x${r.pxH} pixels drawn at ${r.drawnW}x${r.drawnH} — ${limitedBy} — ${pc(r.drawnH)} of the screen's height, ${area}% of its area`);
+  const none = r.drawnW === 0 || r.drawnH === 0 ? " — NOT DRAWN: no room was left for it, none of it is on screen" : "";
+  console.log(`    photograph: ${r.pxW}x${r.pxH} pixels drawn at ${r.drawnW}x${r.drawnH} — ${limitedBy} — ${pc(r.drawnH)} of the screen's height, ${area}% of its area${none}`);
 }
 
 // EVERY READ IS TAKEN FIRST, and printed only after the MADE TO FAIL block
@@ -189,7 +216,7 @@ try {
         // meaningless, and the record's own arithmetic was taken from exactly
         // such a state (a 0x0 canvas with no photograph open).
         if (!settled) fail(`${w}x${h} ${state}: the layout never stopped moving, so no read was taken from it`);
-        else if (r.pxW === 0 || r.pxH === 0 || r.drawnW === 0 || r.drawnH === 0 || /no photo open/.test(r.label)) fail(`${w}x${h} ${state}: no photograph is drawn (${r.pxW}x${r.pxH} drawn at ${r.drawnW}x${r.drawnH}) — this is the 0x0 state the record's arithmetic came from`);
+        else if (r.pxW === 0 || r.pxH === 0 || /no photo open/.test(r.label)) fail(`${w}x${h} ${state}: no photograph is drawn (${r.pxW}x${r.pxH} drawn at ${r.drawnW}x${r.drawnH}) — this is the 0x0 state the record's arithmetic came from`);
         else if (r.pxW <= r.pxH) fail(`${w}x${h} ${state}: the photograph is ${r.pxW}x${r.pxH}, not landscape — the report is about a landscape photograph`);
         else if (files.length > 1 && !r.hasSession) fail(`${w}x${h} ${state}: two photographs are open and the stage has no session strip`);
         else if (files.length === 1 && r.hasSession) fail(`${w}x${h} ${state}: one photograph is open and the stage still carries a session strip`);
@@ -214,9 +241,10 @@ try {
 //   2. `--session-h` equals the strip's own measured height in every strip
 //      state, because updateSessionStrip writes it from the strip's
 //      offsetHeight; a disagreement means the read caught a strip mid-change.
-//   3. The shell's tracks (bar, update strip, stage, panel) sum to the
+//   3. The shell's tracks (bar, update strip, stage, panel) cover the
 //      viewport's height within 1px in every state, or a track is missing
 //      from the account and the "largest claim" below is not the largest.
+//      Covered, not summed: past 760px the panel sits beside the stage.
 console.log("\nMADE TO FAIL — known quantities the instrument must reproduce:");
 let known = 0;
 const knownCheck = (ok, s) => { console.log(`  ${ok ? "ok  " : "FAIL"}  ${s}`); if (!ok) { known++; failed++; } };
@@ -226,7 +254,7 @@ for (const x of runs.filter((y) => y.n === 2)) {
   knownCheck(parseInt(x.r.sessionVar, 10) === x.r.stripH, `${x.size[0]}x${x.size[1]}: --session-h ${x.r.sessionVar || "unset"} against the strip's measured ${x.r.stripH}px`);
 }
 for (const x of runs) {
-  knownCheck(Math.abs(x.r.vh - x.r.tracksSum) <= 1, `${x.size[0]}x${x.size[1]}, ${x.state}: the shell's tracks sum to ${x.r.tracksSum} of ${x.r.vh}`);
+  knownCheck(Math.abs(x.r.vh - x.r.tracksSum) <= 1, `${x.size[0]}x${x.size[1]}, ${x.state}: the shell's tracks cover ${x.r.tracksSum} of ${x.r.vh}${x.r.panelBeside ? " (the panel beside the stage)" : ""}`);
 }
 if (known) console.log(`  ${known} known quantit${known === 1 ? "y was" : "ies were"} not reproduced — NOTHING BELOW IS TRUSTWORTHY until that is explained`);
 
@@ -242,8 +270,9 @@ for (const size of SIZES) {
   // the height in the strip state, largest first.
   if (a && s) {
     console.log(`  the strip costs the photograph ${a.r.drawnH - s.r.drawnH}px of drawn height (${a.r.drawnH} -> ${s.r.drawnH}), against --session-h ${s.r.sessionVar}`);
-    const claims = [["bar", s.r.bar], ["panel", s.r.panel], ["session strip", s.r.stripH], ["update strip", s.r.sw], ["photograph", s.r.drawnH]]
-      .filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]);
+    // A panel BESIDE the stage claims none of the photograph's height.
+    const claims = [["bar", s.r.bar], ["panel", s.r.panelBeside ? 0 : s.r.panel], ["session strip", s.r.stripH], ["update strip", s.r.sw], ["photograph", s.r.drawnH]]
+      .filter(([k, v]) => v > 0 || k === "photograph").sort((x, y) => y[1] - x[1]);
     console.log(`  claims on ${s.r.vh}px of height, largest first: ${claims.map(([k, v]) => `${k} ${v}`).join(" · ")}`);
   }
 }

@@ -8965,9 +8965,10 @@ function viewDiagnostic(): string {
  *  the image times the crop) and `stageEl`. Returns the intrinsic size, the
  *  size it is actually drawn at, and the stage's — and says so in words when
  *  the drawn picture is larger than the stage, which is the state that cannot
- *  happen while the contain rules in `#view` are doing their job, and when, at
+ *  happen while the contain rules in `#view` are doing their job; when, at
  *  100%, part of it sits under the session strip, which is the state a stale
- *  `--session-h` produces. That second reading is `photoCutOff`'s, the same
+ *  `--session-h` produces; and when it is drawn at no size because the strip's
+ *  reserve left it no room. Those two readings are `photoCutOff`'s, the same
  *  measurement that raises the on-screen way back, so the report and the
  *  screen cannot disagree about whether the photograph was cut off. Consumed by
  *  the diagnostic assembly. */
@@ -8976,10 +8977,11 @@ function canvasDiagnostic(): string {
   const r = canvas.getBoundingClientRect();
   const st = stageEl.getBoundingClientRect();
   const over = r.width > st.width + 1 || r.height > st.height + 1;
-  const under = !over && zoom <= 1.001 && photoCutOff() === CUT_UNDER_STRIP;
+  const cut = !over && zoom <= 1.001 ? photoCutOff() : null;
   return `${canvas.width}x${canvas.height} pixels, drawn at ${Math.round(r.width)}x${Math.round(r.height)} inside a stage of ${Math.round(st.width)}x${Math.round(st.height)}`
     + (over ? " — DRAWN LARGER THAN THE STAGE, so part of it is off the edge" : "")
-    + (under ? " — PARTLY UNDER THE SESSION STRIP, so its bottom is hidden" : "");
+    + (cut === CUT_UNDER_STRIP ? " — PARTLY UNDER THE SESSION STRIP, so its bottom is hidden" : "")
+    + (cut === CUT_NO_ROOM ? " — NO ROOM LEFT TO DRAW IT, so none of it is on screen" : "");
 }
 
 /** What the session strip is taking off the photograph's height.
@@ -9094,6 +9096,21 @@ zoomReady = true; // applyZoom may now refresh the control
 const CUT_OFF_EDGE = "part of it is off the edge of the screen";
 /** The reason `photoCutOff` gives when the session strip is drawn over it. */
 const CUT_UNDER_STRIP = "part of it is under the strip of photos";
+/** The reason `photoCutOff` gives when NONE of the picture is drawn: the box
+ *  `#view` is fitted into has come out at no size. The strip's reserve does
+ *  that on a short phone screen — decision 053's layout viewport, 302x656,
+ *  gives the stage 198px and the strip 168, and `#view`'s max-height of
+ *  198 - 32 - 168 is below zero — so the photograph is drawn at 0x0 there. */
+const CUT_NO_ROOM = "there is no room left on the screen to draw it";
+
+/** How a sentence about a cut-off opens: the whole photograph when none of it
+ *  is drawn, part of it otherwise.
+ *  @param why  a reason `photoCutOff` returned.
+ *  @returns "The photo" or "Part of the photo". Consumers: the way back's
+ *    status line and Fit's answer, so the two say the same thing. */
+function hiddenWho(why: string): string {
+  return why === CUT_NO_ROOM ? "The photo" : "Part of the photo";
+}
 
 const viewEscapeBtn = $("viewEscape") as HTMLButtonElement;
 const fitStatusEl = $("fitStatus") as HTMLParagraphElement;
@@ -9102,11 +9119,15 @@ const fitStatusEl = $("fitStatus") as HTMLParagraphElement;
  *  screen rather than inferred from the zoom number.
  *
  *  Takes nothing; reads the canvas's drawn box, its stage's box and, when a
- *  session strip is up, the strip's box. Returns `CUT_OFF_EDGE` when the drawn
- *  picture crosses an edge of the stage (which clips with overflow hidden),
- *  `CUT_UNDER_STRIP` when the strip is drawn over its bottom, or null when the
- *  whole picture is visible — and null when nothing is open or the canvas has
- *  no box, because a state that cannot be measured is not reported as a fault.
+ *  session strip is up, the strip's box. Returns `CUT_NO_ROOM` when a picture
+ *  with pixels is drawn at no size inside a stage that has one (none of it is
+ *  on screen — the worst cut-off there is, not an unmeasurable state: it is
+ *  what decision 053's phone shows with the strip up), `CUT_OFF_EDGE` when the
+ *  drawn picture crosses an edge of the stage (which clips with overflow
+ *  hidden), `CUT_UNDER_STRIP` when the strip is drawn over its bottom, or null
+ *  when the whole picture is visible — and null when nothing is open, or when
+ *  the stage or the canvas itself has no size yet, because a state that cannot
+ *  be measured is not reported as a fault.
  *
  *  ONLY MEANINGFUL AT 100%: zoomed in, the transform puts the picture off the
  *  edge on purpose, so every caller asks this only with `zoom` at fit. The
@@ -9118,8 +9139,14 @@ function photoCutOff(): string | null {
   const stage = canvas.parentElement;
   if (!current || !stage) return null;
   const r = canvas.getBoundingClientRect();
-  if (!r.width || !r.height) return null;
   const st = stage.getBoundingClientRect();
+  if (r.width < 1 || r.height < 1) {
+    // NOTHING DRAWN. It was read as "cannot be measured" and returned null, so
+    // on a phone where the strip's reserve left the photograph no room at all,
+    // the way back stayed hidden and Fit answered "The whole photo is already
+    // on screen" over a stage with no photograph in it.
+    return st.width >= 1 && st.height >= 1 && canvas.width > 0 && canvas.height > 0 ? CUT_NO_ROOM : null;
+  }
   if (r.left < st.left - 1 || r.top < st.top - 1 || r.right > st.right + 1 || r.bottom > st.bottom + 1) return CUT_OFF_EDGE;
   // Looked up by id rather than through `sessionStrip`: that const is declared
   // much further down the module, and this runs from callbacks wired here.
@@ -9183,7 +9210,7 @@ function updateViewEscape(now = false) {
     if (!still) return;
     viewEscapeBtn.hidden = false;
     clearTimeout(fitStatusTimer);
-    fitStatusEl.textContent = `Part of the photo is hidden: ${still}.`;
+    fitStatusEl.textContent = `${hiddenWho(still)} is hidden: ${still}.`;
   };
   if (now) { clearTimeout(escapeShowTimer); show(); return; }
   if (!escapeShowTimer) escapeShowTimer = window.setTimeout(show, 400);
@@ -9235,7 +9262,7 @@ function fitWholePhoto() {
   updateZoomCtl();
   updateViewEscape(true);
   if (cut) {
-    sayFit(`Part of the photo is still hidden: ${cut}. Open ⓘ and choose Something’s wrong for a report to send — it says what is doing this.`);
+    sayFit(`${hiddenWho(cut)} is still hidden: ${cut}. Open ⓘ and choose Something’s wrong for a report to send — it says what is doing this.`);
   } else if (pageZoomed) {
     sayFit("The photo fits, but the page itself is zoomed in. Pinch two fingers together outside the photo to zoom the page back out — the app cannot undo a browser zoom.");
   } else if (wasCut) {
@@ -9436,7 +9463,11 @@ for (const def of HEAL_MODES) {
     updateHealModeUI();
     // The spot with the highlighted ring takes the mode too, the way Spot
     // size resizes it — choose after the tap, see the difference, keep it.
-    const s = activeSpotIdx >= 0 ? params.spots?.[activeSpotIdx] : null;
+    // And only while that ring is DRAWN, which is while Heal is on: Spot size
+    // refuses the same way. With Heal off the overlay is hidden, and a press
+    // here rewrote the last spot placed — a change to the photograph on a
+    // spot nothing on screen said was the target.
+    const s = healArmed && activeSpotIdx >= 0 ? params.spots?.[activeSpotIdx] : null;
     if (s && spotMode(s) !== def.mode) {
       if (def.mode === "clone") s.mode = "clone";
       else delete s.mode;

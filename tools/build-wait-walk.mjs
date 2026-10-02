@@ -390,7 +390,31 @@ try {
     let p = await open(ctx, { delay: 0, par: true });
     await p.setInputFiles("#welcomeFile", JPG);
     await p.waitForFunction(() => document.getElementById("welcome").hidden && !document.getElementById("busy").open, null, { timeout: 120000 });
-    await p.waitForTimeout(3000); // the set's writes land
+    // THE SET'S WRITES LAND — waited for, not timed. A fixed 3 s was enough on
+    // the machine this arm was written on; in a container drawing through
+    // SwiftShader both photographs' records landed 9.5 to 14.8 s after the open
+    // finished, on the build before this release and on this one alike, so the
+    // arm failed its own set-up there and said "the stored session was deleted"
+    // about a session that had not been written yet. Read from the session
+    // store itself (src/session.ts: database "ips-session", store "meta"), by
+    // `evaluate`, which awaits the promise — `waitForFunction` would not, and
+    // would pass on the promise object at once (CLAUDE.md). A read that came
+    // before the app had made the database must not make it — an empty one at
+    // version 1 would stop the app's own upgrade from ever creating its stores —
+    // so an upgrade here is aborted and read as nothing stored yet.
+    const storedPhotos = () => p.evaluate(() => new Promise((res) => {
+      const rq = indexedDB.open("ips-session", 1);
+      rq.onupgradeneeded = () => rq.transaction?.abort();
+      rq.onsuccess = () => {
+        const d = rq.result;
+        if (!d.objectStoreNames.contains("meta")) { d.close(); res(0); return; }
+        const c = d.transaction("meta").objectStore("meta").count();
+        c.onsuccess = () => { d.close(); res(c.result); };
+        c.onerror = () => { d.close(); res(0); };
+      };
+      rq.onerror = () => res(0);
+    }));
+    for (const until = Date.now() + 60000; Date.now() < until && (await storedPhotos()) < 2;) await p.waitForTimeout(250);
     await p.close();
     const resumeText = (q) => q.waitForFunction(() => { const b = document.getElementById("resumeSession"); return b && !b.hidden ? b.textContent : ""; }, null, { timeout: 20000 }).then((h) => h.jsonValue()).catch(() => "");
     p = await open(ctx, { delay: 0, par: true });
