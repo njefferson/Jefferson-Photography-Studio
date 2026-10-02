@@ -33,17 +33,31 @@ decode -> LINEAR camera-native RGB
                        share one Poisson-Gaussian noise curve, so the range is
                        measured in noise units on an equal-weight guide — what
                        darktable's 1/wb-weighted guide is after the gains)
+  -> SHARPEN/TEXTURE  (raw/detail.ts: a luminance high-pass of the DENOISED
+                       picture — the shader draws its luminance once in a
+                       pre-pass — folded back as a hue-preserving gain; a soft
+                       threshold relative to the local mean keeps grain out;
+                       sharpen's sigma is in SENSOR pixels, so the export runs
+                       it at native resolution and the preview approximates it)
   -> CLARITY/DEHAZE   (before exposure/WB, on linear source data, vs per-image
-                       LOW-RES MAPS (localmap.ts, RG8: blurred luma + blurred
-                       dark-channel, sqrt-encoded, shared scale). Clarity =
-                       pow(L/Lblur, k) — ratio-based, so exposure/WB-invariant.
-                       Dehaze is HUE-PRESERVING: veil-subtracts LUMINANCE only
-                       ((L-dV)/(1-dV)), then scales all channels by L1/L0.
-                       NEVER subtract per-channel here — camera-native channels
-                       are wildly imbalanced pre-WB, so an equal cut shifts hue
-                       hard once the WB gains amplify it (field bug 2026-07-05).
+                       LOW-RES MAPS (localmap.ts, RGBA16F: R = blurred luma,
+                       sqrt-encoded; G/B = the dehaze guided filter's a/b).
+                       Clarity = pow(L/Lblur, k) — ratio-based, so
+                       exposure/WB-invariant. Dehaze is He, Sun and Tang's dark
+                       channel (2026-10-02): airlight A estimated PER CHANNEL
+                       from the picture, dark channel = patch MINIMUM of
+                       min_c(I/A) refined by a guided filter and capped at the
+                       pixel's own min_c(I/A), t = 1 - 0.95*k*D floored at 0.1,
+                       J = (I - A)/t + A per channel. Per channel is safe before
+                       WB because each channel is divided by ITS OWN airlight,
+                       estimated in the same camera-native space, so the gains
+                       that follow cancel. (The luminance-only cut this replaced
+                       guarded against an EQUAL per-channel cut, which does
+                       shift hue once WB amplifies it — field bug 2026-07-05.)
+                       The maps are read at the WARPED position (warpUv) since
+                       they are built from the unwarped source.
                        Spatial -> NOT in the .cube LUT. CPU bilinears the SAME
-                       encoded bytes the GPU filters, then decodes — parity.)
+                       half-float texels the GPU filters, then decodes — parity.)
   -> EXPOSURE, WB     (linear multipliers; WB scaled so its SMALLEST gain is 1,
                        as LibRaw and RawTherapee scale it — brightness is
                        exposure's business, not the balance's)
@@ -701,17 +715,17 @@ cannot describe something the code does not say about itself.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (258 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1133 lines) — Full-resolution export.
+- **`src/export.ts`** (1161 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (2907 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (3127 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
-- **`src/gpuexport.ts`** (281 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
+- **`src/gpuexport.ts`** (287 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
 - **`src/half.ts`** (69 lines) — IEEE half-precision, both directions, in one place.
-- **`src/heal.ts`** (811 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
+- **`src/heal.ts`** (1100 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
 - **`src/histogram.ts`** (114 lines) — Lightroom-style floating histogram.
 - **`src/hotspot.ts`** (197 lines) — The per-lens IR hot-spot correction that comes WITH the app, as opposed to one the reader measured for themselves (lensstore.ts).
 - **`src/hotspotProfiles.ts`** (32 lines) — GENERATED — do not hand-edit.
@@ -724,7 +738,7 @@ cannot describe something the code does not say about itself.
 - **`src/lensprofile.ts`** (924 lines) — Measuring an IR lens's hot-spot ON THE DEVICE, from flat frames, per channel.
 - **`src/lensrig.ts`** (929 lines) — Measuring a lens, as a destination in the app.
 - **`src/lensstore.ts`** (802 lines) — Keeping a lens profile the reader measured, and putting it back to work.
-- **`src/localmap.ts`** (100 lines) — Per-image reference maps for Clarity and Dehaze (glow-map pattern: built once per image from LINEAR source data, sampled as a texture by the GPU and bilinearly by the CPU export).
+- **`src/localmap.ts`** (309 lines) — Per-image reference maps for Clarity and Dehaze (glow-map pattern: built once per image from LINEAR source data, sampled as a texture by the GPU and bilinearly by the CPU export).
 - **`src/look.ts`** (314 lines) — Shareable looks. A look is the CREATIVE grade only (see SavedLook) — small enough (~0.5 KB of JSON) to travel as a link fragment, a paste-able code, or a tiny .ipslook.json file, with no server and no
 - **`src/lookmark.ts`** (75 lines) — The traveling recipe: every exported JPEG can carry the look that made it, as an APP11 segment ("IPSLOOK\0" + the look.ts wire-format JSON, ~600 bytes).
 - **`src/lut.ts`** (84 lines) — 3D LUT (.cube) export.
@@ -734,16 +748,16 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (20056 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (20116 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (2870 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (2931 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
 - **`src/raw/demosaic.ts`** (126 lines) — Bayer demosaic + black/white-level normalization -> linear RGB.
 - **`src/raw/denoise.ts`** (699 lines) — Edge-preserving denoise (13x13 bilateral, colour on a 7x7 grid at stride 2) on LINEAR sensor data.
-- **`src/raw/detail.ts`** (239 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
+- **`src/raw/detail.ts`** (302 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
 - **`src/raw/dngRaw.ts`** (124 lines) — Decode a mosaiced (Bayer) DNG whose raw image is lossless-JPEG compressed (Compression 7, PhotometricInterpretation 32803 = CFA).
 - **`src/raw/lj92.ts`** (240 lines) — Lossless JPEG (ITU-T T.81, process 14 / SOF3) decoder — pure TypeScript.
 - **`src/raw/nef.ts`** (394 lines) — Nikon NEF (Compression 34713) decoder — pure TypeScript.
@@ -757,7 +771,7 @@ cannot describe something the code does not say about itself.
 - **`src/skyClient.ts`** (62 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
 - **`src/skyfine.ts`** (631 lines) — The sky selection refined to the picture's own edges.
 - **`src/skyhorizon.ts`** (600 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
-- **`src/skymap.ts`** (261 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
+- **`src/skymap.ts`** (271 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
 - **`src/stamp.ts`** (27 lines) — ONE HASH, BECAUSE THE SECOND COPY IS WHERE THE TWO ANSWERS COME FROM.
 - **`src/startup.ts`** (154 lines) — WHAT THE FIRST SECONDS OF THIS LAUNCH COST, AND WHERE (decision 071).
 - **`src/sticker.ts`** (577 lines) — Sticker compositing — rhymes with heal.ts (src/heal.ts): stickers are baked INTO the linear source (pre-pipeline), so each one inherits the channel swap / WB / looks / grade / grain and lands in the I
@@ -768,7 +782,7 @@ cannot describe something the code does not say about itself.
 - **`src/verdlg.ts`** (135 lines) — THE "THIS BUILD" PANEL — what changed, and the report to send (Doctrine §7d, §7f).
 - **`src/verstamp.ts`** (29 lines) — THE BUILD STAMP, WRITTEN AT BOOT (Doctrine §7b) — the version visible on every page, so a reader reporting a problem can say which build they are on without being asked to go looking for it.
 - **`src/wakelock.ts`** (77 lines) — Keeping the screen awake while a long job runs.
-- **`src/warp.ts`** (158 lines) — Playful warp tools — Swirl / Push (liquefy) / Pinch & Bloat.
+- **`src/warp.ts`** (197 lines) — Playful warp tools — Swirl / Push (liquefy) / Pinch & Bloat.
 - **`src/zip.ts`** (308 lines) — Minimal ZIP reader — no dependencies.
 
 <!-- END MODULE MAP -->

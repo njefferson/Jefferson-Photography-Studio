@@ -7115,7 +7115,11 @@ read as authoritative, and an invented one is worse than a missing one.
   SOURCE patch from a ring search (16 angles × 3 distances; scored by
   surround-annulus SAD — the spot itself holds the defect so it can't vote —
   plus a smoothness penalty so an edge never gets cloned onto sky), then a
-  feathered clone (weight 1 inside 0.45·r, smoothstep to 0 at r). Dashed ring
+  feathered clone (weight 1 inside 0.45·r, smoothstep to 0 at r) — CORRECTED
+  2026-10-02: a heal is now that copy PLUS the Laplace correction (Perez,
+  Gangnet and Blake 2003; darktable's heal.c), so the patch meets its surround
+  with no offset at the rim; Clone is its own mode beside it for texture that
+  must copy unchanged (HealSpot.mode, absent = heal). Dashed ring
   markers ride the photo while armed (SVG #healOverlay, imageUvToClient like
   the mask overlay); tapping a ring REMOVES that fix (direct manipulation);
   one tap = one undo step; a Spot-size slider (r stored as a fraction of image
@@ -8982,9 +8986,15 @@ read as authoritative, and an invented one is worse than a missing one.
   Creative betas out of beta). A new **Warp** tab COMPLETES the 4×3 tab grid
   (row 4 = Grade, Stickers, Warp — 12 tabs; the grade full-width rule is gone).
   ARCHITECTURE (src/warp.ts): a per-photo UV DISPLACEMENT FIELD (WARP_RES=160²,
-  WARP_MAX=0.28 uv). Finger strokes paint du/dv (push = drag vector, swirl =
+  WARP_MAX=0.28 uv). Finger strokes paint du/dv (push = MINUS the drag
+  vector, at a gain of at most 1 — corrected 2026-10-02, see below; swirl =
   tangential, pinch/bloat = radial, aspect-corrected so brushes stay round);
-  a smoothstep brush falloff accumulates. Applied as a SOURCE-SPACE REMAP at
+  a smoothstep brush falloff accumulates. CORRECTED 2026-10-02: push stored
+  +drag x 6 x (strength/2) into a BACKWARD map (output reads the source at
+  uv + d), which moved the picture AGAINST the finger by up to three times its
+  travel. It now subtracts the drag, as darktable's liquify does
+  (`w_strength = -strength * lookup_table[idist]`), so under the brush centre
+  at full strength the picture moves with the finger and exactly as far. Applied as a SOURCE-SPACE REMAP at
   the very top: shader fetchLin reads u_tex at warpUv(uv) (unit 7, RGBA8
   LINEAR); export.ts wraps the source sampler (warpSampler) BEFORE denoise —
   so denoise/detail/the whole pipeline follow the moved image on both sides.
@@ -14004,7 +14014,10 @@ Classical, subscription-grade tools (fit the current architecture directly):
   iPad testing found colour shifts — now hue-preserving: luminance-only veil
   subtraction, all channels scaled alike) — in Hue/Saturation/Tone.
   Per-image low-res maps (localmap.ts): clarity = exposure-invariant ratio vs
-  blurred luma; dehaze = dark-channel veil subtraction. GPU==CPU ≤1 LSB; part
+  blurred luma; dehaze = dark-channel veil subtraction. (REPLACED 2026-10-02
+  by He, Sun and Tang's model: per-channel airlight from the picture, patch
+  minimum dark channel refined by a guided filter, per-channel recovery —
+  localmap.ts says why per channel is safe before WB.) GPU==CPU ≤1 LSB; part
   of saved looks; rebuilt at full res on export. **Texture** (fine-radius local
   contrast) shipped folded into the Detail-sharpening item below (2026-07-14) —
   it needs pixel-neighbourhood taps, not a low-res map.

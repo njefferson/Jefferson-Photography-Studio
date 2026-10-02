@@ -53,7 +53,24 @@ export type WarpTool = "push" | "swirl" | "pinch" | "bloat";
 /** Paint one stroke step into the field. Geometry in uv; `aspect` = W/H keeps
  *  swirls/pinches round despite uv's per-axis scale. `move` is the pointer's
  *  uv delta since the last step (for push). Accumulates, then caller re-encodes.
- *  Returns true if anything changed. */
+ *
+ *  @param f        the field to paint into; its du/dv are changed in place.
+ *  @param tool     which warp.
+ *  @param cx       brush centre, image-uv x — for push, the finger's NEW place.
+ *  @param cy       brush centre, image-uv y.
+ *  @param radius   brush radius as a fraction of the image width.
+ *  @param strength 0..1, the slider.
+ *  @param aspect   image width / height.
+ *  @param move     the finger's uv travel since the last step (push only).
+ *  @returns true if any cell changed; the caller then re-encodes (encodeWarp).
+ *
+ *  What the result must satisfy: the field is a BACKWARD map — output at uv
+ *  reads the source at uv + d — so a push SUBTRACTS the drag, as darktable's
+ *  liquify does (`w_strength = -strength * lookup_table[...]`). Under the
+ *  brush centre at full strength the picture moves exactly as far as the
+ *  finger, never further, and in the same direction. Adding the drag (as this
+ *  did until 2026-10-02, at six times half the strength) moved the picture
+ *  AGAINST the finger by up to three times its travel. */
 export function paintWarp(
   f: WarpField,
   tool: WarpTool,
@@ -88,7 +105,13 @@ export function paintWarp(
       const idx = j * res + i;
       let au = 0, av = 0;
       if (tool === "push") {
-        au = move[0] * w * 6; av = move[1] * w * 6;
+        // MINUS THE DRAG, GAIN AT MOST ONE. To show at the finger's new place
+        // what the old place showed, the backward map there must read
+        // d - move (to first order, as liquify writes it). `fall * strength`
+        // is 1 at the centre at full strength — the picture under the finger
+        // travels with it — and less everywhere else.
+        const k = fall * strength;
+        au = -move[0] * k; av = -move[1] * k;
       } else if (tool === "swirl") {
         // tangential (rotate CW): (dy, -dx) in aspect-corrected pixels -> back to uv.
         au = dyp * w; av = -dxp * aspect * w;
@@ -134,7 +157,22 @@ export type Sampler = (x: number, y: number) => ArrayLike<number>;
 /** Wrap a source sampler with the warp remap: reading pixel (x,y) returns the
  *  source at (x,y) + displacement, BILINEAR (the displaced coord is
  *  fractional). Applied at the very top of the export chain, before denoise —
- *  mirroring the shader's fetchLin warp. */
+ *  mirroring the shader's fetchLin warp.
+ *
+ *  @param sample the source; its returned array may be REUSED by its next call
+ *                (LinearSampler's contract — the raw export's sampler does).
+ *  @param f      the warp field.
+ *  @param W      the source's width in pixels.
+ *  @param H      the source's height in pixels.
+ *  @returns a sampler giving a fresh [r, g, b] per call.
+ *
+ *  What the result must satisfy: at every pixel it is the bilinear blend of the
+ *  four source pixels around the displaced position, as the shader's LINEAR
+ *  fetch at warpUv is. EACH CORNER IS READ OUT BEFORE THE NEXT ONE IS ASKED
+ *  FOR: holding the four arrays and blending afterwards (as this did until
+ *  2026-10-02) blended four references to ONE reused array, so the export took
+ *  the lower-right corner for every warped pixel — up to a pixel's shift and no
+ *  interpolation, against a preview that interpolates. */
 export function warpSampler(sample: Sampler, f: WarpField, W: number, H: number): (x: number, y: number) => [number, number, number] {
   const d = new Float32Array(2);
   const clampI = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v);
@@ -144,14 +182,15 @@ export function warpSampler(sample: Sampler, f: WarpField, W: number, H: number)
     const x0 = Math.floor(sx), y0 = Math.floor(sy);
     const x1 = x0 + 1, y1 = y0 + 1;
     const tx = sx - x0, ty = sy - y0;
-    const a = sample(clampI(x0, W - 1), clampI(y0, H - 1));
-    const b = sample(clampI(x1, W - 1), clampI(y0, H - 1));
-    const c = sample(clampI(x0, W - 1), clampI(y1, H - 1));
-    const e = sample(clampI(x1, W - 1), clampI(y1, H - 1));
-    return [
-      (a[0] * (1 - tx) + b[0] * tx) * (1 - ty) + (c[0] * (1 - tx) + e[0] * tx) * ty,
-      (a[1] * (1 - tx) + b[1] * tx) * (1 - ty) + (c[1] * (1 - tx) + e[1] * tx) * ty,
-      (a[2] * (1 - tx) + b[2] * tx) * (1 - ty) + (c[2] * (1 - tx) + e[2] * tx) * ty,
-    ];
+    const w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+    let s = sample(clampI(x0, W - 1), clampI(y0, H - 1));
+    let r = s[0] * w00, g = s[1] * w00, b = s[2] * w00;
+    s = sample(clampI(x1, W - 1), clampI(y0, H - 1));
+    r += s[0] * w10; g += s[1] * w10; b += s[2] * w10;
+    s = sample(clampI(x0, W - 1), clampI(y1, H - 1));
+    r += s[0] * w01; g += s[1] * w01; b += s[2] * w01;
+    s = sample(clampI(x1, W - 1), clampI(y1, H - 1));
+    r += s[0] * w11; g += s[1] * w11; b += s[2] * w11;
+    return [r, g, b];
   };
 }

@@ -3594,8 +3594,10 @@ manual**, and consistent across sources: a radial filter centred on the spot wit
 the mask inverted and roughly 50% feather; Exposure down until the centre matches
 its surroundings; **Clarity and Dehaze up** to clear the haze the spot creates;
 **Saturation up** to match the rest of the frame. Reaching for Dehaze is the
-field arriving empirically at veil removal, and this app already has a
-hue-preserving luminance veil subtraction in its dehaze stage.
+field arriving empirically at veil removal, and this app's dehaze stage is that
+removal: He, Sun and Tang's dark-channel model with the airlight estimated per
+channel from the photograph (since 2026-10-02; before that it was a
+luminance-only veil subtraction that kept the haze's tint).
 
 **Note the direction of that last slider.** The practitioner recipe RAISES
 saturation inside the hot spot. This app's correction lowers it.

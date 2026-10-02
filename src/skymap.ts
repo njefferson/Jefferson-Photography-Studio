@@ -29,6 +29,7 @@
 // 20–25 px footprint of a 2800 px frame, which is the measured radius, so no
 // further pass is needed and a strided kernel — the lattice trap 4c-xii and
 // 4c-xxii both record — never enters it.
+import { sampleWarp, warpIsEmpty, type WarpField } from "./warp";
 import { compileEdit, SKY_CHROMA_RANGE, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, smooth01, rgb2hsv, type EditParams, type BrushMask, type LensCurve, type LocalMap, type SkyMap, type SourceFlat } from "./pipeline";
 export { sampleSkyMap, decSkyChroma, type SkyMap } from "./pipeline";
 
@@ -110,6 +111,10 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  * @param srcFlat  the lens flat already in a raw's source pixels, passed through
  *   to compileEdit so highlight recovery here reads the clip the way the
  *   rendered pixels do; null for an 8-bit source.
+ * @param warp the edit's warp field, when it has one: `local` is built from the
+ *             unwarped source, so each sample reads it where its pixel came
+ *             from, as the export and the shader do (2026-10-02). Omitted or
+ *             empty, the maps are read in place.
  * @returns the map, or null when the bitmap selects nothing. Four bytes per
  *   texel: encoded chroma a and b, the bitmap's mean weight, and the depth
  *   key — the PHOTOGRAPH's key (SKY_DEPTH_CHROMA_LO/HI on the sky's mean
@@ -142,7 +147,10 @@ export function buildSkyMap(
   lens: LensCurve | null | undefined,
   sky: BrushMask,
   srcFlat: SourceFlat | null = null,
+  warp?: WarpField | null,
 ): SkyMap | null {
+  const warpF = local && warp && !warpIsEmpty(warp) ? warp : null;
+  const wd = new Float32Array(2);
   const W = SKY_MAP_W;
   const H = Math.max(8, Math.round((W * srcH) / srcW));
   // NO SKY, NO MAP — and a map of zeros would still cost a texture upload and
@@ -180,7 +188,9 @@ export function buildSkyMap(
           n++; wall += wgt;
           if (wgt < 1 / 255) continue;
           const s = sample(sx, sy);
-          edit(s[0], s[1], s[2], out, 0, (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+          const u = (sx + 0.5) / srcW, v = (sy + 0.5) / srcH;
+          if (warpF) sampleWarp(warpF, u, v, wd); else { wd[0] = 0; wd[1] = 0; }
+          edit(s[0], s[1], s[2], out, 0, u, v, u + wd[0], v + wd[1]);
           const L = out[0] * REC[0] + out[1] * REC[1] + out[2] * REC[2];
           const a = out[0] - L, b = out[2] - L;
           if (!Number.isFinite(a) || !Number.isFinite(b)) continue;

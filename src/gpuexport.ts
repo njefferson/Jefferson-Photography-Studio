@@ -60,6 +60,12 @@ export interface DrawnFrame {
 // multiplied by the proxy factor as well, so the picture saved matches the
 // picture previewed. Until that exists, the comparison above is the honest
 // state: the colour is right and the detail is not.
+//
+// CAPTURE SHARPENING LEFT THAT RULE ON 2026-10-02 (raw/detail.ts): it restores
+// blur measured in SENSOR pixels, so both exports now run it at native
+// resolution — the computed one with pitch 1, this one because a fresh
+// Renderer's native pitch is 1 — and the preview approximates it. Only the
+// noise reduction and the texture band keep the previewed proxy footprint.
 
 /** What the drawn path can do TODAY. Narrow on purpose: this is a measurement
  *  instrument, and every one of these is a stage the shaders do have but whose

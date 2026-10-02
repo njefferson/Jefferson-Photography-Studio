@@ -3,148 +3,211 @@
 //
 // Both are a luminance high-pass built from the pixel's neighbourhood and folded
 // back as a HUE-PRESERVING luminance gain (multiply all three channels alike),
-// so colour never shifts — only local contrast changes. Two Gaussian blurs of
-// the linear luma give three bands:
-//   sharpen = Lc - blurS       (finer than sigma S — edges/detail)
-//   texture = blurS - blurT     (a band between sigma S and T — surface structure)
+// so colour never shifts — only local contrast changes:
+//   sharpen = Lc - blurX              (finer than sigma X — edges/detail)
+//   texture = blurS - blurT            (a band between sigma S and T — surface structure)
 // Clarity/dehaze already own the LOW band (a big blurred map, see localmap.ts),
 // so sharpen/texture stay in the high/mid bands and don't fight it.
 //
 // Placement mirrors denoise: it runs on linear sensor data right AFTER denoise
-// and BEFORE white balance / exposure amplify things — the GPU preview shader
-// (gl.ts) implements the identical formula inline, so keep the constants below
-// in sync with the u_sharpen/u_texture block there. GPU==CPU parity is verified
-// in a headless harness the same way the bilateral is.
+// and BEFORE white balance / exposure — the GPU preview shader (gl.ts)
+// implements the identical formula inline, so keep the constants below in sync
+// with the u_sharpen/u_texture block there.
 //
-// Note (accepted for v1): the high-pass is measured from the RAW (pre-denoise)
-// neighbourhood while the gain scales the DENOISED centre — cheap on the GPU (no
-// per-neighbour denoise) and matched on the CPU. With denoise off (the common
-// case) raw == denoised, so it's a pure unsharp; with denoise on, strong
-// sharpening can re-introduce a little of the grain denoise removed, as in most
-// pipelines that sharpen after denoise.
+// FIVE THINGS CHANGED ON 2026-10-02, each the way the reference does it:
+//
+// 1. THE HIGH-PASS IS MEASURED FROM THE DENOISED PICTURE. It used to be taken
+//    from the raw, pre-denoise neighbourhood and multiplied onto the denoised
+//    centre, so Sharpen 1 put back 1.54x the raw's OWN noise on a flat field.
+//    darktable's order runs denoise (9.0) before sharpen (35.0) and each module
+//    reads the one before; its sharpen builds its blur from its own input. The
+//    shader does the same through a luminance pre-pass (gl.ts, u_detailTex).
+// 2. A SOFT THRESHOLD on the sharpening, as darktable's sharpen.c has it
+//    (`detail = |diff| > threshold ? copysign(|diff| - threshold, diff) : 0`).
+//    Without one, every flat region's grain was sharpened — in this app, the
+//    infrared sky. The threshold here is RELATIVE to the local mean, so it
+//    means the same at every exposure (darktable's is 0.5 L*, which is about 2%
+//    of the luminance at mid-grey).
+// 3. CAPTURE SHARPENING AT NATIVE RESOLUTION. The sharpen blur's sigma is in
+//    NATIVE sensor pixels and its taps are one sampler pixel apart; the export
+//    used to space them `proxyFactor` (2 for a raw) apart to copy the preview,
+//    and a stride-2 kernel has no response at the sensor's Nyquist, so the
+//    finest detail was never sharpened. RawTherapee's capture sharpening works
+//    on full-resolution luminance with a radius measured in sensor pixels. The
+//    preview APPROXIMATES it: on a proxy one texel is `pitch` native pixels, so
+//    the same sigma is sigma/pitch texels there.
+// 4. A PURE RATIO. The gain divided by (Lc + 0.05) on values taken BEFORE
+//    exposure and white balance, so the same edge sharpened differently
+//    depending on how the frame was exposed in camera. It is Lout / Lc now with
+//    RawTherapee's 0.00001 floor (`YNew / max(YOld, 0.00001f)`), so the result
+//    scales with the input.
+// 5. THE TEXTURE BLUR IS THE GAUSSIAN IT NAMES. Sigma 2 sat in a 7x7 window,
+//    +/-1.5 sigma; it has the 13x13 RawTherapee gives a sigma above 1.5.
+//    Texture stays in PREVIEW units (its taps `step` apart at export): it is a
+//    mid-frequency band the reader tuned by eye on the proxy, not a sensor
+//    property.
 
 import type { LinearSampler } from "./denoise";
 
 const REC = [0.2126, 0.7152, 0.0722];
 
 // --- Shared constants (mirror these literals in gl.ts) ---
-export const DETAIL_R = 3; // 7x7 neighbourhood (the larger, texture, radius)
-export const DETAIL_SIGMA_S = 1.0; // sharpen blur sigma (high-frequency cut)
-export const DETAIL_SIGMA_T = 2.0; // texture blur sigma (mid-frequency cut)
+export const DETAIL_RS = 3; // sharpen window, +/-3 taps (7x7) one sampler pixel apart
+export const DETAIL_R = 6; // texture window, +/-6 taps (13x13): +/-3 sigma of sigma T
+export const DETAIL_SIGMA_S = 1.0; // sharpen blur sigma, in NATIVE sensor pixels
+export const DETAIL_SIGMA_M = 1.0; // texture band's inner blur sigma, in taps
+export const DETAIL_SIGMA_T = 2.0; // texture band's outer blur sigma, in taps
 export const DETAIL_KS = 2.2; // sharpen strength (slider 0..1)
 export const DETAIL_KT = 2.4; // texture strength (slider -1..1)
-export const DETAIL_EPS = 0.05; // shadow floor for the relative high-pass — also
-                                // keeps sharpening from amplifying deep-shadow noise
+export const DETAIL_THRESH = 0.02; // soft threshold on sharpen's high-pass, as a fraction of the local mean
+export const DETAIL_EPS = 1e-5; // ratio floor (RawTherapee's) — not a shadow floor
 export const DETAIL_GAIN_MIN = 0.25; // clamp the luminance gain so haloes stay bounded
 export const DETAIL_GAIN_MAX = 3.0;
 
-/** Gaussian weights for the two blurs over the [-R..R]^2 window, row-major. */
-function gauss(sigma: number): number[] {
+/** Gaussian weights over a [-r..r]^2 window, row-major, in tap-index units.
+ *  @param sigma the blur's sigma in taps.
+ *  @param r     the window's half-width in taps.
+ *  @returns (2r+1)^2 unnormalised weights; the caller divides by their sum, as
+ *  the shader does. */
+function gauss(sigma: number, r: number): number[] {
   const w: number[] = [];
   const inv = 1 / (2 * sigma * sigma);
-  for (let dy = -DETAIL_R; dy <= DETAIL_R; dy++) {
-    for (let dx = -DETAIL_R; dx <= DETAIL_R; dx++) {
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
       w.push(Math.exp(-(dx * dx + dy * dy) * inv));
     }
   }
   return w;
 }
-const WS = gauss(DETAIL_SIGMA_S);
-const WT = gauss(DETAIL_SIGMA_T);
+const WM = gauss(DETAIL_SIGMA_M, DETAIL_R);
+const WT = gauss(DETAIL_SIGMA_T, DETAIL_R);
+
+/** THE GAIN DETAIL APPLIES TO ONE PIXEL, from the three blurs around it — the
+ *  one formula, so the CPU sampler below and anything that checks it cannot
+ *  hold two versions.
+ *
+ *  @param lc      the denoised luminance at the pixel.
+ *  @param blurX   the sharpen blur (sigma DETAIL_SIGMA_S native pixels); unused
+ *                 when `sharpen` is 0.
+ *  @param blurM   the texture band's inner blur; unused when `texture` is 0.
+ *  @param blurT   the texture band's outer blur; unused when `texture` is 0.
+ *  @param sharpen the slider, 0..1.
+ *  @param texture the slider, -1..1.
+ *  @returns the factor to multiply all three channels by, in
+ *  [DETAIL_GAIN_MIN, DETAIL_GAIN_MAX].
+ *
+ *  What the result must satisfy: it is the shader's `gain` in gl.ts's detail
+ *  block, number for number. A pixel whose relative high-pass is inside the
+ *  threshold gets no sharpening at all (gain 1 when texture is 0), and scaling
+ *  the whole neighbourhood by any exposure leaves the gain unchanged above the
+ *  1e-5 floor. */
+export function detailGain(lc: number, blurX: number, blurM: number, blurT: number, sharpen: number, texture: number): number {
+  let lout = lc;
+  if (sharpen > 0) {
+    const ref = blurX > DETAIL_EPS ? blurX : DETAIL_EPS;
+    const rel = (lc - blurX) / ref;
+    const soft = rel > DETAIL_THRESH ? rel - DETAIL_THRESH : rel < -DETAIL_THRESH ? rel + DETAIL_THRESH : 0;
+    lout += DETAIL_KS * sharpen * soft * ref;
+  }
+  if (texture !== 0) lout += DETAIL_KT * texture * (blurM - blurT);
+  let gain = lout / (lc > DETAIL_EPS ? lc : DETAIL_EPS);
+  if (gain < DETAIL_GAIN_MIN) gain = DETAIL_GAIN_MIN;
+  else if (gain > DETAIL_GAIN_MAX) gain = DETAIL_GAIN_MAX;
+  return gain;
+}
 
 /**
- * Wrap a linear-RGB sampler with sharpen + texture. `raw` supplies the
- * neighbourhood the high-pass is measured from (pre-denoise, matching the
- * shader's fetchLin); `base` supplies the centre colour the gain scales
- * (post-denoise).
+ * Wrap a linear-RGB sampler with sharpen + texture.
+ *
+ * @param base    the DENOISED sampler (after the noise stage and its aim):
+ *                both the neighbourhood the high-pass is measured from and the
+ *                centre colour the gain scales — one picture, as darktable's
+ *                sharpen reads its own input.
+ * @param width   the sampler's width in pixels.
+ * @param height  the sampler's height in pixels.
+ * @param sharpen the Sharpen slider, 0..1.
+ * @param texture the Texture slider, -1..1.
+ * @param step    how many sampler pixels apart the TEXTURE taps sit: the
+ *                proxy factor at export, so the band is the one the reader
+ *                previewed; 1 on the proxy itself.
+ * @param pitch   how many NATIVE sensor pixels one sampler pixel spans: 1 at
+ *                export, 2 on a raw's half-size proxy. The sharpen sigma is
+ *                DETAIL_SIGMA_S / pitch sampler pixels.
+ * @returns a sampler giving the detailed colour, or `base` itself when both
+ *          sliders are off. Its array is reused by the next call.
+ *
+ * What the result must satisfy: at every pixel it is `base` times
+ * `detailGain(...)` of that pixel's own blurs, which is what the shader computes
+ * at the same texel when its taps match (u_detailPx, u_texel, u_sharpK); the
+ * GPU parity harness holds the two together. Consumers: export.ts (wrapped in
+ * AIM_TEXTURE's aimedSampler) and the sky map's pre-pass in main.ts.
  *
  * A ROW IS FILLED WHERE IT IS READ, NOT ACROSS THE WHOLE IMAGE — the same fix
- * the denoiser carries, and this file CLAIMED to carry it: the sentence here
- * used to say luma rows were cached in a small ring "like the denoiser, so
- * scanning exports stay close to 1x decode cost", above a Map that filled every
- * pixel of a source row the first time any tap landed on it. A comment is not a
- * ring.
+ * the denoiser carries. Measured when that landed, on 700,000 output pixels of
+ * a 1000x700 source: 2.0 samples per pixel scanning row by row, 4.4 through a
+ * 30% crop, 75.6 down a four-degree slant, and 1001 down the columns, against
+ * an image-wide fill; on the real export path a straightened crop went from 207
+ * seconds to 8.8. Under a straighten of a few degrees the source row changes
+ * every handful of pixels, so a whole-row fill paid an image width of decode
+ * for three or four pixels.
  *
- * MEASURED, on 700,000 output pixels of a 1000x700 source, counting the samples
- * the fill takes against the pixels the picture asks for: 2.0 samples per pixel
- * scanning row by row, 4.4 through a 30% crop, 75.6 down a four-degree slant,
- * and 1001 down the columns. On the real export path a 1.88-megapixel crop of a
- * 20.9-megapixel raw took 4.8 seconds sharpened, and 207 seconds sharpened and
- * straightened by four degrees — 110 seconds a megapixel against 2.6, for the
- * same picture. The horizon leveller makes that combination ordinary.
- *
- * Under a straighten of a few degrees, consecutive output pixels move down the
- * source by sin(angle), so the source row changes every handful of pixels and a
- * ring of ten evicts constantly; each miss paid a full image width of decode for
- * the three or four pixels actually wanted. Filling on demand makes the cost
- * proportional to the pixels actually touched, which is what a cache is for.
- *
- * The values are unchanged — the same sampler is called for the same
- * coordinates and the luma is stored in the same float32 array it always was,
- * so it rounds where it always rounded. `detailparity.mjs` asserts that rather
- * than assuming it, over four scan orders including the slant.
- *
- * A GENERATION COUNTER RATHER THAN CLEARING THE FLAGS, for the reason the
- * denoiser gives: clearing `width` flags per miss puts most of the thrashing
- * cost straight back.
+ * THE ROW HOLDS THE DENOISED COLOUR AS WELL AS ITS LUMA, so each pixel is
+ * denoised ONCE: the neighbourhood is the denoised picture now, and asking
+ * `base` again for the centre would run the 13x13 bilateral a second time per
+ * pixel. A GENERATION COUNTER RATHER THAN CLEARING THE FLAGS, for the reason
+ * the denoiser gives: clearing `width` flags per miss puts most of the
+ * thrashing cost straight back.
  */
 export function makeRowDetail(
-  raw: LinearSampler,
   base: LinearSampler,
   width: number,
   height: number,
   sharpen: number,
   texture: number,
   step = 1,
+  pitch = 1,
 ): LinearSampler {
   if (sharpen <= 0 && texture === 0) return base;
 
-  // The GPU preview taps in PROXY texels (gl.ts uses `* u_texel`, and the live
-  // texture is downscaled by `step` — a half-res RAW bin, or toPreview's copy).
-  // One proxy texel spans `step` native pixels, so at export we tap the SAME
-  // 7x7 grid at `step`-pixel spacing to reproduce the previewed footprint. The
-  // WS/WT weights are in tap-index units, so they stay identical — only the
-  // sample positions widen. step === 1 leaves the sampling byte-identical.
+  // Texture taps in PROXY texels, `step` sampler pixels apart, so the band is
+  // the one the reader tuned; the weights are in tap-index units and stay put.
   const tapOff = new Int32Array(DETAIL_R * 2 + 1);
   for (let d = -DETAIL_R; d <= DETAIL_R; d++) tapOff[d + DETAIL_R] = Math.round(d * step);
-  const rowSpan = tapOff[DETAIL_R * 2] * 2 + 4; // rows the vertical taps reach + scan margin
+  // Sharpen taps one sampler pixel apart, sigma in native pixels.
+  const sigX = DETAIL_SIGMA_S / Math.max(1, pitch);
+  const WX = gauss(sigX, DETAIL_RS);
+  const reach = Math.max(texture !== 0 ? tapOff[DETAIL_R * 2] : 0, sharpen > 0 ? DETAIL_RS : 0);
+  const rowSpan = reach * 2 + 4; // rows the vertical taps reach + scan margin
 
-  interface LumaRow {
+  interface DetailRow {
     y: number;
-    /** FLOAT32 ON PURPOSE. The luma is a double computed from the sampler's
-     *  values and has always been stored here, so it has always been rounded to
-     *  float32 before anything read it back. A wider array would be more
-     *  accurate and would change every sharpened pixel in the app. */
+    /** FLOAT32: the luma the blurs read. */
     l: Float32Array;
-    /** How many blocks of this generation are filled — `blocks` means the row is
-     *  whole, which is the ordinary case one output row into a full-frame export
-     *  and lets the span check below be a single comparison. */
+    /** The denoised colour, three per pixel — the centre the gain scales. */
+    c: Float32Array;
+    /** How many blocks of this generation are filled — `blocks` means whole. */
     full: number;
-    /** Which generation filled each BLOCK of sixteen pixels. Equal to `gen`
-     *  means present. A miss fills sixteen pixels rather than the five thousand
-     *  six hundred an image-wide fill would, and the extra samples inside a
-     *  block cannot change a value: the sampler is asked for coordinates it
-     *  would have been asked for anyway. */
+    /** Which generation filled each BLOCK of sixteen pixels. */
     seen: Int32Array;
     gen: number;
   }
-  /** Sixteen pixels, aligned — see LumaRow.seen for why sixteen. */
+  /** Sixteen pixels, aligned — a miss fills sixteen rather than a whole row. */
   const BLOCK = 16, BSHIFT = 4;
   const blocks = ((width + BLOCK - 1) >> BSHIFT) || 1;
-  const ring: LumaRow[] = [];
-  const byY = new Map<number, LumaRow>();
+  const ring: DetailRow[] = [];
+  const byY = new Map<number, DetailRow>();
   let nextSlot = 0;
-  const getLumaRow = (y: number): LumaRow => {
+  const getRow = (y: number): DetailRow => {
     const cy = y < 0 ? 0 : y >= height ? height - 1 : y;
     const hit = byY.get(cy);
     if (hit) return hit;
-    let row: LumaRow;
+    let row: DetailRow;
     if (ring.length < rowSpan) {
-      row = { y: cy, l: new Float32Array(width), seen: new Int32Array(blocks), gen: 1, full: 0 };
+      row = { y: cy, l: new Float32Array(width), c: new Float32Array(width * 3), seen: new Int32Array(blocks), gen: 1, full: 0 };
       ring.push(row);
     } else {
-      // Oldest slot, round-robin — the eviction order the Map had, and the right
-      // one for a scan that drifts in one direction.
+      // Oldest slot, round-robin — the right eviction for a scan that drifts
+      // in one direction.
       row = ring[nextSlot];
       nextSlot = (nextSlot + 1) % rowSpan;
       byY.delete(row.y);
@@ -155,36 +218,25 @@ export function makeRowDetail(
     byY.set(cy, row);
     return row;
   };
-  /** Make sure this row holds every pixel the seven taps at cx will read, then
-   *  get out of the inner loop's way.
-   *
-   *  ONCE PER TAP ROW, NOT ONCE PER TAP, and getting there took three measured
-   *  attempts. Asking a small function for each of the forty-nine taps cost 18%
-   *  on an ordinary whole-frame export — 33.2 seconds to 39.3 — whether it
-   *  tested one pixel or a block of sixteen, so the expense was never the test:
-   *  it was replacing forty-nine array loads with forty-nine calls. Hoisted to
-   *  one call per tap row, with the whole-row short circuit above, the same
-   *  export is 34.6 seconds — 4% over the eager fill it replaces — while the
-   *  straightened crop that cost 207 seconds costs 8.8. The dx loop below reads
-   *  straight out of the row again.
-   *
-   *  (A fourth attempt held the seven row objects while y stood still, to skip
-   *  seven map lookups per pixel. It is NOT here: round-robin eviction can
-   *  recycle a row that is still being held, and the parity harness said so.
-   *  It was worth two seconds.) */
-  const fillSpan = (row: LumaRow, cx: number): void => {
+  /** Make sure this row holds every pixel the taps at cx will read. Once per
+   *  tap ROW, not once per tap: forty-nine calls per pixel cost 18% of a
+   *  whole-frame export when that was measured; one per row costs 4%. */
+  const fillSpan = (row: DetailRow, cx: number): void => {
     if (row.full === blocks) return;
-    let lo = cx + tapOff[0];
+    let lo = cx - reach;
     if (lo < 0) lo = 0;
-    let hi = cx + tapOff[DETAIL_R * 2];
+    let hi = cx + reach;
     if (hi > width - 1) hi = width - 1;
     const bHi = hi >> BSHIFT;
     for (let b = lo >> BSHIFT; b <= bHi; b++) {
       if (row.seen[b] === row.gen) continue;
       const x1 = Math.min(width, (b << BSHIFT) + BLOCK);
       for (let i = b << BSHIFT; i < x1; i++) {
-        const s = raw(i, row.y);
-        row.l[i] = s[0] * REC[0] + s[1] * REC[1] + s[2] * REC[2];
+        // Read at once: `base` may hand back an array it reuses.
+        const s = base(i, row.y);
+        const r = s[0], g = s[1], bl = s[2];
+        row.c[i * 3] = r; row.c[i * 3 + 1] = g; row.c[i * 3 + 2] = bl;
+        row.l[i] = r * REC[0] + g * REC[1] + bl * REC[2];
       }
       row.seen[b] = row.gen;
       row.full++;
@@ -194,42 +246,53 @@ export function makeRowDetail(
   // One array for the life of this sampler — see LinearSampler on why.
   const scratch: [number, number, number] = [0, 0, 0];
   return (x, y) => {
-    // THE CENTRE COLOUR, HELD AS THREE NUMBERS AND NOT AS AN ARRAY. `base` is
-    // allowed to hand back a buffer it reuses — the contract on LinearSampler
-    // says so in those words — and when denoise is off `makeRowDenoiser` returns
-    // the RAW sampler unchanged, so `base` and `raw` are then the same function
-    // with the same scratch array. Holding the array across the forty-nine taps
-    // below meant the centre colour became whatever the last tap sampled: a
-    // wrong pixel wherever a tap missed the cache, which is the first pixel of
-    // every row on an ordinary export and most of the picture on a straightened
-    // one. Only ever visible with denoise at zero and sharpen or texture up.
-    const cb = base(x, y);
-    const c0 = cb[0], c1 = cb[1], c2 = cb[2];
     const cx = x < 0 ? 0 : x >= width ? width - 1 : x;
-    let sumS = 0, sumT = 0, wsumS = 0, wsumT = 0, Lc = 0;
-    let k = 0;
-    for (let dy = -DETAIL_R; dy <= DETAIL_R; dy++) {
-      const row = getLumaRow(y + tapOff[dy + DETAIL_R]);
-      fillSpan(row, cx);
-      const l = row.l;
-      for (let dx = -DETAIL_R; dx <= DETAIL_R; dx++, k++) {
-        let sx = cx + tapOff[dx + DETAIL_R];
-        if (sx < 0) sx = 0;
-        else if (sx >= width) sx = width - 1;
-        const L = l[sx];
-        if (dx === 0 && dy === 0) Lc = L;
-        sumS += L * WS[k];
-        wsumS += WS[k];
-        sumT += L * WT[k];
-        wsumT += WT[k];
+    const cy = y < 0 ? 0 : y >= height ? height - 1 : y;
+    // The centre row first, so its colour is read before any eviction below
+    // can recycle it; the ring holds at least rowSpan rows, more than the taps
+    // reach, so the centre row survives the loops anyway.
+    const crow = getRow(cy);
+    fillSpan(crow, cx);
+    const c0 = crow.c[cx * 3], c1 = crow.c[cx * 3 + 1], c2 = crow.c[cx * 3 + 2];
+    const Lc = crow.l[cx];
+    let blurX = 0, blurM = 0, blurT = 0;
+    if (sharpen > 0) {
+      let sum = 0, wsum = 0, k = 0;
+      for (let dy = -DETAIL_RS; dy <= DETAIL_RS; dy++) {
+        const row = getRow(cy + dy);
+        fillSpan(row, cx);
+        const l = row.l;
+        for (let dx = -DETAIL_RS; dx <= DETAIL_RS; dx++, k++) {
+          let sx = cx + dx;
+          if (sx < 0) sx = 0;
+          else if (sx >= width) sx = width - 1;
+          sum += l[sx] * WX[k];
+          wsum += WX[k];
+        }
       }
+      blurX = sum / wsum;
     }
-    const blurS = sumS / wsumS;
-    const blurT = sumT / wsumT;
-    const hp = DETAIL_KS * sharpen * (Lc - blurS) + DETAIL_KT * texture * (blurS - blurT);
-    let gain = 1 + hp / (Lc + DETAIL_EPS);
-    if (gain < DETAIL_GAIN_MIN) gain = DETAIL_GAIN_MIN;
-    else if (gain > DETAIL_GAIN_MAX) gain = DETAIL_GAIN_MAX;
+    if (texture !== 0) {
+      let sumM = 0, sumT = 0, wsumM = 0, wsumT = 0, k = 0;
+      for (let dy = -DETAIL_R; dy <= DETAIL_R; dy++) {
+        const row = getRow(cy + tapOff[dy + DETAIL_R]);
+        fillSpan(row, cx);
+        const l = row.l;
+        for (let dx = -DETAIL_R; dx <= DETAIL_R; dx++, k++) {
+          let sx = cx + tapOff[dx + DETAIL_R];
+          if (sx < 0) sx = 0;
+          else if (sx >= width) sx = width - 1;
+          const L = l[sx];
+          sumM += L * WM[k];
+          wsumM += WM[k];
+          sumT += L * WT[k];
+          wsumT += WT[k];
+        }
+      }
+      blurM = sumM / wsumM;
+      blurT = sumT / wsumT;
+    }
+    const gain = detailGain(Lc, blurX, blurM, blurT, sharpen, texture);
     scratch[0] = c0 * gain;
     scratch[1] = c1 * gain;
     scratch[2] = c2 * gain;

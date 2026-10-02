@@ -5,7 +5,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, LENS_GAIN_LO, LENS_GAIN_HI, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensAreaMean, aimsAt, AIM_NOISE, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer } from "./half";
 export type { EditParams };
 
@@ -175,8 +175,9 @@ uniform sampler2D u_flatTex;
 uniform int u_flatN;
 uniform float u_clarity;     // -1..1 local contrast vs the blurred-luma map
 uniform float u_dehaze;      // -1..1 veil subtraction vs the dark-channel map
-uniform sampler2D u_localTex; // RG8: sqrt-encoded blurred luma (R) + dark channel (G)
-uniform float u_localScale;   // linear decode scale for u_localTex
+uniform sampler2D u_localTex; // RGBA16F (localmap.ts): R sqrt-encoded blurred luma, G/B dehaze guided-filter a/b
+uniform float u_localScale;   // linear decode scale for u_localTex's R
+uniform vec3 u_hazeA;         // the airlight per channel, in the source's own linear space (localmap.ts)
 uniform bool u_hslOn;        // 8-channel HSL mixer active
 uniform vec3 u_hsl[8];       // per band: (hueShiftDeg, satScale, lumScale)
 uniform bool u_bwOn;         // black & white: channel-weighted mono
@@ -209,6 +210,10 @@ uniform float u_despeckle; // 0..1 decision-based median on the centre pixel (ra
 uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/detail.ts
 uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
 uniform vec2 u_texel;    // one PROXY texel: tapScale / textureSize (see setTapScale)
+uniform float u_sharpK;  // 1/(2 sigma^2) of the sharpen blur in TEXELS: sigma = 1 native pixel / pitch (raw/detail.ts)
+uniform sampler2D u_detailTex; // R16F denoised LUMINANCE, one texel per source texel (unit 14) — detail's input
+uniform bool u_detailPre;      // u_detailTex holds the pre-pass for this draw; false = read u_tex itself
+uniform int u_stage;           // 1 = the detail pre-pass: emit the denoised luminance and stop
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
 uniform int u_spotVis;   // 1 = "Visualize spots": amplified high-pass luma view
 uniform int u_maskViz;   // >=0 = show that mask's coverage as a preview overlay
@@ -365,6 +370,20 @@ vec2 warpUv(vec2 uv){
 // textureLod(..., 0.0) returns the same texel; only the compile changes.
 // tools/agreement-walk.mjs's shader check refuses texture( back in a loop.
 vec3 fetchLin(vec2 uv){ vec3 s = textureLod(u_tex, warpUv(uv), 0.0).rgb; return u_linear ? s : toLinear(s); }
+
+// THE DENOISED LUMINANCE AT ONE TEXEL — detail's input, the base sampler of raw/detail.ts.
+// From the pre-pass when it exists; otherwise from the source at that texel's
+// centre through the warp (fetchLin), which IS the denoised picture when noise
+// reduction is off (the case that skips the pre-pass) and is the CPU's warped
+// sampler there; on a device that cannot render to a float target it is the
+// old pre-denoise behaviour. texelFetch / textureLod: no gradients, so a loop
+// over either compiles as a loop (071).
+float detailLum(ivec2 p){
+  ivec2 sz = textureSize(u_tex, 0);
+  ivec2 q = clamp(p, ivec2(0), sz - 1);
+  if (u_detailPre) return texelFetch(u_detailTex, q, 0).r;
+  return dot(fetchLin((vec2(q) + 0.5) / vec2(sz)), LUMA_W);
+}
 
 // MEDIAN OF NINE, the same nineteen-pair network as raw/denoise.ts. There is no
 // sorting in GLSL and there does not need to be: a fixed network is branchless,
@@ -538,9 +557,13 @@ float maskWeight(int i, vec2 uv){
     float r = sqrt(dx*dx + dy*dy);
     w = 1.0 - smoothstep(1.0 - u_maskGeoB[i].x, 1.0, r);
   } else {
+    // A GRADIENT MEASURES IN PIXELS (x scaled by the aspect), so its lines of
+    // equal weight stand perpendicular to the line drawn on a frame that is
+    // not square. Identical arithmetic to maskWeight in pipeline.ts.
+    vec2 k = vec2(u_aspect * u_aspect, 1.0);
     vec2 g = vec2(gA.z - gA.x, gA.w - gA.y);
-    float len2 = max(1e-4, dot(g, g));
-    float t = dot(uv - gA.xy, g) / len2;
+    float len2 = max(1e-4, dot(g * k, g));
+    float t = dot((uv - gA.xy) * k, g) / len2;
     w = 1.0 - clamp(t, 0.0, 1.0);
   }
   if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;
@@ -696,12 +719,13 @@ void main() {
   // "Visualize spots": a high-contrast luminance high-pass of the SOURCE (the
   // healed texture — so a fixed spot visibly disappears), Lightroom's trick
   // for surfacing dust in flat skies. Preview-only; never exported, so it has
-  // no CPU mirror. Same 7x7 sigma-2 blur as the texture band in detail.ts.
+  // no CPU mirror. The same sigma-2 blur as the texture band in detail.ts, in
+  // the same 13x13 window (+/-3 sigma) since 2026-10-02.
   if (u_spotVis == 1) {
     vec2 ctr = (floor(v_uv / u_texel) + 0.5) * u_texel;
     float sum = 0.0, wsum = 0.0, Lc = 0.0;
-    for (int dy = -3; dy <= 3; dy++) {
-      for (int dx = -3; dx <= 3; dx++) {
+    for (int dy = -6; dy <= 6; dy++) {
+      for (int dx = -6; dx <= 6; dx++) {
         float L = dot(fetchLin(ctr + vec2(float(dx), float(dy)) * u_texel), LUMA_W);
         if (dx == 0 && dy == 0) Lc = L;
         float w = exp(-float(dx * dx + dy * dy) / 8.0);
@@ -893,32 +917,61 @@ void main() {
     c = mix(preNoise, c, aimWeightOf(16));
   }
 
+  // THE DETAIL PRE-PASS STOPS HERE (Renderer.ensureDetailPre): the denoised
+  // picture's luminance at this texel, which is what sharpen and texture
+  // measure their high-pass from — the base sampler of raw/detail.ts. Drawn once into an
+  // R16F target the size of the source, mirrored in y (u_flip 2) so its texel
+  // (x, y) is the source's.
+  if (u_stage == 1) { frag = vec4(dot(c, LUMA_W), 0.0, 0.0, 1.0); return; }
+
   // Detail: sharpen (high-freq) + texture (mid-freq) on LINEAR data, after
-  // denoise and before WB — a hue-preserving luminance gain from two Gaussian
-  // blurs of the neighbourhood luma. Same math + constants as raw/detail.ts
-  // (R=3, sigma 1.0/2.0 -> 2*sigma^2 = 2.0/8.0; KS=2.2, KT=2.4, EPS=0.05).
+  // denoise and before WB — a hue-preserving luminance gain from Gaussian blurs
+  // of the DENOISED neighbourhood luma. Same math + constants as raw/detail.ts
+  // (detailGain): sharpen 7x7, sigma 1 native pixel (u_sharpK), soft threshold
+  // 0.02 of the local mean; texture 13x13 at the tap scale, sigma 1 and 2 taps
+  // (2*sigma^2 = 2.0 / 8.0); KS 2.2, KT 2.4; a pure ratio over max(Lc, 1e-5).
+  // Integer texel addressing (texelFetch, clamped like the CPU's index) so the
+  // neighbourhood is whole texels, as raw/detail.ts indexes integer pixels.
   if (u_sharpen > 0.0 || u_texture != 0.0) {
-    // Snap to the exact texel CENTRE so LINEAR filtering returns whole texels —
-    // otherwise sub-texel drift in the interpolated v_uv, amplified by the
-    // unsharp gain at hard edges, breaks GPU==CPU parity (the CPU indexes
-    // integer pixels). Matches raw/detail.ts's exact-pixel neighbourhood.
-    vec2 ctr = (floor(v_uv / u_texel) + 0.5) * u_texel;
-    float sumS = 0.0, sumT = 0.0, wsumS = 0.0, wsumT = 0.0, Lc = 0.0;
-    for (int dy = -3; dy <= 3; dy++) {
-      for (int dx = -3; dx <= 3; dx++) {
-        float L = dot(fetchLin(ctr + vec2(float(dx), float(dy)) * u_texel), LUMA_W);
-        if (dx == 0 && dy == 0) Lc = L;
-        float d2 = float(dx * dx + dy * dy);
-        float wS = exp(-d2 / 2.0);
-        float wT = exp(-d2 / 8.0);
-        sumS += L * wS; wsumS += wS;
-        sumT += L * wT; wsumT += wT;
+    ivec2 tsz = textureSize(u_tex, 0);
+    ivec2 tc = clamp(ivec2(floor(v_uv * vec2(tsz))), ivec2(0), tsz - 1);
+    float Lc = detailLum(tc);
+    float lout = Lc;
+    if (u_sharpen > 0.0) {
+      float sumX = 0.0, wsumX = 0.0;
+      for (int dy = -3; dy <= 3; dy++) {
+        for (int dx = -3; dx <= 3; dx++) {
+          float wX = exp(-float(dx * dx + dy * dy) * u_sharpK);
+          sumX += detailLum(tc + ivec2(dx, dy)) * wX; wsumX += wX;
+        }
       }
+      float blurX = sumX / wsumX;
+      // darktable's soft threshold (sharpen.c), on the high-pass RELATIVE to
+      // the local mean so it reads the same at every exposure.
+      float ref = max(blurX, 1e-5);
+      float rel = (Lc - blurX) / ref;
+      float soft = sign(rel) * max(abs(rel) - 0.02, 0.0);
+      lout += 2.2 * u_sharpen * soft * ref;
     }
-    float blurS = sumS / wsumS;
-    float blurT = sumT / wsumT;
-    float hp = 2.2 * u_sharpen * (Lc - blurS) + 2.4 * u_texture * (blurS - blurT);
-    float gain = clamp(1.0 + hp / (Lc + 0.05), 0.25, 3.0);
+    if (u_texture != 0.0) {
+      // The texture band's taps sit the tap scale apart (u_texel is
+      // tapScale/size): the band the reader tuned on the proxy.
+      float st = u_texel.x * float(tsz.x);
+      float sumM = 0.0, sumT = 0.0, wsumM = 0.0, wsumT = 0.0;
+      for (int dy = -6; dy <= 6; dy++) {
+        for (int dx = -6; dx <= 6; dx++) {
+          ivec2 o = ivec2(floor(vec2(float(dx), float(dy)) * st + 0.5));
+          float L = detailLum(tc + o);
+          float d2 = float(dx * dx + dy * dy);
+          float wM = exp(-d2 / 2.0);
+          float wT = exp(-d2 / 8.0);
+          sumM += L * wM; wsumM += wM;
+          sumT += L * wT; wsumT += wT;
+        }
+      }
+      lout += 2.4 * u_texture * (sumM / wsumM - sumT / wsumT);
+    }
+    float gain = clamp(lout / max(Lc, 1e-5), 0.25, 3.0);
     // TOWARD 1, NOT TOWARD THE UNFILTERED COLOUR, and the two are the same
     // number: mix(c, c*gain, w) == c * mix(1.0, gain, w). The CPU mixes the
     // sampler's output because the gain lives inside a closure it does not own;
@@ -931,21 +984,28 @@ void main() {
 
   // Clarity / Dehaze on LINEAR source data (after denoise, before exposure/WB),
   // referencing the per-image maps. Identical math to compileEdit.
+  // THE MAPS ARE READ WHERE THE PIXEL CAME FROM: they are built from the
+  // unwarped source, so a pixel Warp has moved reads them at warpUv(v_uv) —
+  // the place its colour was fetched from — not at a neighbourhood that is no
+  // longer under it (2026-10-02).
   if (u_clarity != 0.0 || u_dehaze != 0.0) {
-    vec2 e = texture(u_localTex, v_uv).rg;
+    vec4 e = texture(u_localTex, warpUv(v_uv));
     float Lb = e.r * e.r * u_localScale;
-    float Dv = e.g * e.g * u_localScale;
     // Aimed, if any mask asked (030). Both are the slider unchanged when
     // nothing aims at them.
     float dzA = u_dehaze * aimWeightOf(1);
     float clA = u_clarity * aimWeightOf(2);
     if (dzA != 0.0) {
-      // Hue-preserving: veil-subtract the luminance, scale all channels alike.
-      float L0 = dot(c, LUMA_W);
-      if (L0 > 1e-6) {
-        float L1 = max(0.0, L0 - dzA * Dv) / max(0.1, 1.0 - dzA * Dv);
-        c *= L1 / L0;
-      }
+      // He, Sun and Tang, per channel (localmap.ts): the refined dark channel
+      // is the guided filter's a * g + b HERE (g the channels over their
+      // airlights, averaged), floored at zero and capped at the pixel's own
+      // min_c(I^c/A^c); t = 1 - strength * omega(0.95) * D, floored at t0
+      // (0.1); each channel recovered against its own airlight. Identical to
+      // compileEdit.
+      vec3 nI = c / u_hazeA;
+      float D = clamp(e.g * ((nI.r + nI.g + nI.b) / 3.0) + e.b, 0.0, max(min(min(nI.r, nI.g), nI.b), 0.0));
+      float t = max(1.0 - dzA * 0.95 * D, 0.1);
+      c = max((c - u_hazeA) / t + u_hazeA, 0.0);
     }
     if (clA != 0.0) {
       float L = dot(c, LUMA_W);
@@ -1070,8 +1130,10 @@ void main() {
   c *= u_tint;
 
   // Halation glow: scattered light adds in LINEAR, before contrast/gamma.
-  // 0.7 = GLOW_GAIN in glow.ts — keep in sync.
-  c += vec3(u_glow * 0.7 * texture(u_glowTex, v_uv).r);
+  // 0.7 = GLOW_GAIN in glow.ts — keep in sync. Read where the pixel CAME FROM
+  // (warpUv), like the clarity/dehaze maps: the glow map is built from the
+  // unwarped source, and a pushed highlight takes its glow with it.
+  c += vec3(u_glow * 0.7 * texture(u_glowTex, warpUv(v_uv)).r);
 
   // Colour-mask key read: emit the key-space colour (keyDisplay of the
   // pre-mask colour) and stop, so a tap samples exactly what colorMaskWeight
@@ -1393,7 +1455,7 @@ export interface BuildOptions {
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -1567,6 +1629,25 @@ export class Renderer {
   private overlayScreenTex!: WebGLTexture; // screen-blend (glow) overlay (unit 9)
   private overlayScreenOn = false;
   private localScale = 1;
+  /** The airlight the open photograph's local map estimated (localmap.ts). */
+  private hazeA: [number, number, number] = [1, 1, 1];
+  /** How many native sensor pixels one texel of the bound texture spans — see
+   *  setNativePitch. */
+  private nativePitch = 1;
+  /** THE DETAIL PRE-PASS: the denoised picture's luminance, one R16F texel per
+   *  source texel, which sharpen and texture measure their high-pass from (see
+   *  ensureDetailPre). Allocated on first need, freed when the image size
+   *  changes; null when the device cannot render to it (`detailOk` false). */
+  private detailTex: WebGLTexture | null = null;
+  private detailFbo: WebGLFramebuffer | null = null;
+  private detailW = 0;
+  private detailH = 0;
+  private detailOk: boolean | null = null;
+  /** What the pre-pass now holds was drawn under — redrawn only when it moves. */
+  private detailKey = "";
+  /** Bumped whenever the source texture's content or the warp field changes,
+   *  so the pre-pass key sees every change that is not a parameter. */
+  private srcGen = 0;
   private lutTex: WebGLTexture;
   private lutSig = ""; // re-upload the 3D LUT only when its identity changes
   // Small offscreen target for the live histogram: the full edit re-rendered at
@@ -1759,7 +1840,7 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, 1, 1, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array([0, 0]));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, new Uint16Array(4));
 
     // Imported-.cube LUT lattice (unit 5): a 3D texture, NEAREST on purpose —
     // WebGL2 won't linearly filter 32F, and the shader interpolates manually
@@ -1935,6 +2016,7 @@ export class Renderer {
   /** Upload the warp displacement field (RGBA8 res×res), or clear with null. */
   setWarpField(field: { res: number; rgba: Uint8Array } | null) {
     const gl = this.gl;
+    this.srcGen++; // the detail pre-pass reads through the warp
     gl.bindTexture(gl.TEXTURE_2D, this.warpTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (!field) {
@@ -1979,17 +2061,26 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, m.w, m.h, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array(m.data));
   }
 
+  /** Upload the per-image clarity/dehaze map, or clear it with null.
+   *  @param m the map buildLocalMap made for the open photograph.
+   *  @returns nothing.
+   *  What it must satisfy: the texture holds exactly `m.rgba`'s half-float
+   *  numbers, LINEAR-filtered, so the shader and sampleLocalMap read the same
+   *  thing; `u_hazeA` is the map's own airlight, so compileEdit (which reads
+   *  `m.air`) and the shader recover against the same colour. */
   setLocalMap(m: LocalMap | null) {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.localTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (!m) {
       this.localScale = 1;
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, 1, 1, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array([0, 0]));
+      this.hazeA = [1, 1, 1];
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, new Uint16Array(4));
       return;
     }
     this.localScale = m.scale;
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, m.width, m.height, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array(m.rg));
+    this.hazeA = [m.air[0], m.air[1], m.air[2]];
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, m.width, m.height, 0, gl.RGBA, gl.HALF_FLOAT, new Uint16Array(m.rgba));
   }
 
   /** Pack the active bitmap masks — brush (type 2) and sky (type 4) — into the
@@ -2158,6 +2249,23 @@ export class Renderer {
     this.tapScale = Number.isFinite(texels) && texels >= 1 ? texels : 1;
   }
 
+  /** HOW MANY NATIVE SENSOR PIXELS ONE TEXEL OF THE LOADED IMAGE SPANS: 2 for
+   *  a raw's half-size proxy, the downscale for an 8-bit proxy, 1 for a
+   *  full-resolution working copy or a drawn export (the default).
+   *
+   *  @param pitch native pixels per texel, at least 1.
+   *  @returns nothing.
+   *
+   *  What it must satisfy: capture sharpening's blur has a sigma of
+   *  DETAIL_SIGMA_S NATIVE pixels (raw/detail.ts), so the shader's sigma is
+   *  that over this many texels — the export sharpens at native resolution and
+   *  the preview approximates it, rather than the export copying the proxy's
+   *  coarser kernel. Unlike setTapScale it does not move the texture band or
+   *  the denoise, which stay in the proxy's units. */
+  setNativePitch(pitch: number) {
+    this.nativePitch = Number.isFinite(pitch) && pitch >= 1 ? pitch : 1;
+  }
+
   /** GIVE THE GRAPHICS CONTEXT BACK.
    *
    *  A browser allows only a handful of live WebGL contexts — around sixteen in
@@ -2246,6 +2354,8 @@ export class Renderer {
   setImage(img: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] }) {
     const gl = this.gl;
     const { width, height } = img;
+    this.srcGen++; // a new picture: the detail pre-pass is stale
+    if (width !== this.detailW || height !== this.detailH) this.freeDetail();
     this.imgW = width;
     this.imgH = height;
     this.isLinear = !!(img.linear || img.linear16);
@@ -2286,10 +2396,24 @@ export class Renderer {
    *  "read" pass (histogram, tap-pick, colour-key) — those work in TRUE
    *  image-uv (see readUvPixel's doc comment), which crop/straighten would
    *  otherwise remap out from under callers like clientToImageUv. */
-  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0, applyCrop = true, maskViz = -1, maskMatte = false) {
+  private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0, applyCrop = true, maskViz = -1, maskMatte = false, stage = 0) {
     const gl = this.gl;
+    // The detail pre-pass FIRST, while nothing of this draw is bound yet — it
+    // binds this same program and its own target, and puts both back.
+    const pre = stage === 0 && this.ensureDetailPre(p, split);
     gl.useProgram(this.program);
     gl.uniform1i(this.loc.u_tex, 0);
+    gl.uniform1i(this.loc.u_stage, stage);
+    gl.uniform1i(this.loc.u_detailPre, pre ? 1 : 0);
+    gl.uniform1i(this.loc.u_detailTex, 14);
+    gl.activeTexture(gl.TEXTURE14);
+    // NEVER the pre-pass's own target while it is being drawn into: a texture
+    // that is both sampled and attached is a feedback loop WebGL refuses.
+    gl.bindTexture(gl.TEXTURE_2D, pre ? this.detailTex : null);
+    gl.activeTexture(gl.TEXTURE0);
+    const sigTex = 1.0 / this.nativePitch; // DETAIL_SIGMA_S (1 native pixel) in texels
+    gl.uniform1f(this.loc.u_sharpK, 1 / (2 * sigTex * sigTex));
+    gl.uniform3f(this.loc.u_hazeA, this.hazeA[0], this.hazeA[1], this.hazeA[2]);
     const crop = applyCrop ? p.crop ?? CROP_DEFAULT : CROP_DEFAULT;
     const straighten = applyCrop ? p.straighten ?? 0 : 0;
     gl.uniform4f(this.loc.u_crop, crop.x, crop.y, crop.w, crop.h);
@@ -2335,7 +2459,9 @@ export class Renderer {
     if (this.camMatrix) gl.uniformMatrix3fv(this.loc.u_cam, false, this.camMatrix);
     gl.uniform1f(this.loc.u_glow, p.glow);
     gl.uniform1i(this.loc.u_rot, rot);
-    gl.uniform1i(this.loc.u_flip, applyCrop ? this.flipBits : 0);
+    // The pre-pass is mirrored in y (2) so that its texel (x, y) is the
+    // source's — see the stage-1 exit in the shader.
+    gl.uniform1i(this.loc.u_flip, stage === 1 ? 2 : applyCrop ? this.flipBits : 0);
     gl.uniform1f(this.loc.u_lum, p.lum || 1);
     gl.uniform1f(this.loc.u_hotspot, p.hotspot ?? 0);
     gl.uniform1f(this.loc.u_hotspotSize, p.hotspotSize ?? 0.5);
@@ -2616,6 +2742,99 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
   }
 
+  /** Release the detail pre-pass target. Takes nothing; returns nothing. Called
+   *  when the image size changes, so the next need allocates one that fits. */
+  private freeDetail(): void {
+    const gl = this.gl;
+    if (this.detailFbo) gl.deleteFramebuffer(this.detailFbo);
+    if (this.detailTex) gl.deleteTexture(this.detailTex);
+    this.detailFbo = null;
+    this.detailTex = null;
+    this.detailW = 0;
+    this.detailH = 0;
+    this.detailKey = "";
+  }
+
+  /** THE DENOISED LUMINANCE, DRAWN ONCE, FOR SHARPEN AND TEXTURE TO READ.
+   *
+   *  @param p     the edit about to be drawn.
+   *  @param split the compare divider the draw uses (denoise applies right of it).
+   *  @returns true when `detailTex` now holds the pre-pass for `p`, so the
+   *           draw should read it; false when the draw should read the source
+   *           texels themselves.
+   *
+   *  WHY A PASS: detail's high-pass is measured from the DENOISED picture
+   *  (raw/detail.ts), and one fragment cannot denoise its forty-nine or
+   *  hundred-and-sixty-nine neighbours — that is a 13x13 bilateral per tap. So
+   *  the program runs once more, into an R16F target the size of the source,
+   *  stopping after the noise stage (u_stage 1) and writing that pixel's
+   *  luminance. Half precision, like the working copy itself: 2 bytes a texel,
+   *  42 MB for a 21-megapixel native copy, where a full colour copy would be
+   *  four times that.
+   *
+   *  REDRAWN ONLY WHEN WHAT IT DEPENDS ON MOVES: the source (setImage,
+   *  patchImage), the warp field, the three noise sliders, the divider, the
+   *  tap scale, and the masks when one of them aims at noise. Everything else
+   *  a slider touches is downstream of it, so dragging exposure costs no extra
+   *  pass at all.
+   *
+   *  NOT NEEDED, and skipped, when detail is off, or when noise reduction is
+   *  off — then the source, read through the warp at each texel's centre
+   *  (detailLum), IS the denoised picture. When
+   *  the device cannot render to a half-float target, it returns false and
+   *  the shader reads the source: detail then measures the pre-denoise
+   *  picture, as it did before 2026-10-02, rather than nothing. */
+  private ensureDetailPre(p: EditParams, split: number): boolean {
+    const detailOn = (p.sharpen ?? 0) > 0 || (p.texture ?? 0) !== 0;
+    if (!detailOn) return false;
+    const noiseOn = p.denoise > 0 || (p.chroma ?? 0) > 0 || (p.despeckle ?? 0) > 0;
+    if (!noiseOn) return false; // detailLum reads the (warped) source itself
+    if (this.detailOk === false) return false;
+    const gl = this.gl;
+    if (!this.detailTex || this.detailW !== this.imgW || this.detailH !== this.imgH) {
+      this.freeDetail();
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, this.imgW, this.imgH, 0, gl.RED, gl.HALF_FLOAT, null);
+      const fbo = gl.createFramebuffer()!;
+      const prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, prevFbo);
+      if (!ok) {
+        gl.deleteFramebuffer(fbo);
+        gl.deleteTexture(tex);
+        this.detailOk = false;
+        return false;
+      }
+      this.detailOk = true;
+      this.detailTex = tex;
+      this.detailFbo = fbo;
+      this.detailW = this.imgW;
+      this.detailH = this.imgH;
+    }
+    const masks = aimsAt(maskGroupsForRender(p.masks), AIM_NOISE)
+      ? JSON.stringify(p.masks, (k, v) => (k === "data" ? undefined : v))
+      : "";
+    const key = `${this.srcGen}|${p.denoise}|${p.chroma ?? 0}|${p.despeckle ?? 0}|${split}|${this.tapScale}|${masks}`;
+    if (key === this.detailKey) return true;
+    const prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+    const vp = gl.getParameter(gl.VIEWPORT) as Int32Array;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.detailFbo);
+    gl.viewport(0, 0, this.imgW, this.imgH);
+    this.bindPipeline(p, split, 0, 0, 0, false, -1, false, 1);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, prevFbo);
+    gl.viewport(vp[0], vp[1], vp[2], vp[3]);
+    this.detailKey = key;
+    return true;
+  }
+
   /** "Visualize spots" mode for the ON-SCREEN render only (offscreen passes —
    *  histogram, colour picks — always see the real edit). */
   spotVis = false;
@@ -2702,6 +2921,7 @@ export class Renderer {
   patchImage(x: number, y: number, w: number, h: number, data: Uint8Array | Float32Array) {
     const gl = this.gl;
     if (!this.imgW || w <= 0 || h <= 0) return;
+    this.srcGen++; // healed or stickered pixels: the detail pre-pass is stale
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (this.isLinear && this.isHalf) {

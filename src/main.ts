@@ -38,7 +38,7 @@ import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMa
 import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
-import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
+import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, spotMode, SPOT_R_MIN, SPOT_R_MAX, type HealSpot, type HealCache } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
 import type { Sticker, BrushMask, LensCurve, SourceFlat } from "./pipeline";
@@ -1053,7 +1053,10 @@ function healDiagnostic(): string {
       const a = frac(dest), b = frac(from);
       const dist = (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2])) / 2;
       if (dist > worst) worst = dist;
-      note = `colour ${dist.toFixed(3)}${dist >= 0.05 ? " — CLONED FROM A DIFFERENT COLOUR" : ""}`;
+      // A CLONE keeps the difference; a HEAL's Laplace correction takes it
+      // out at the rim (heal.ts), so the flag means something else for each.
+      const m = spotMode(sp);
+      note = `${m} · colour ${dist.toFixed(3)}${dist >= 0.05 ? (m === "clone" ? " — CLONED FROM A DIFFERENT COLOUR" : " — source differs; the heal's correction matches it to its surround") : ""}`;
     }
     out.push(`${(d / rPx).toFixed(1)}r away, ${note}`);
   }
@@ -2169,7 +2172,7 @@ function syncSkyMap(): void {
   // Built from the raw decode instead, the map targeted a sky 16% more
   // saturated than the rendered one — skymap.ts has the measurement.
   const raw = (x: number, y: number) => linearAt(img, x, y);
-  const pre = makeRowDetail(raw, makeRowDenoiser(raw, img.width, img.height, params.denoise, 1, params.chroma ?? 0, params.despeckle ?? 0), img.width, img.height, params.sharpen ?? 0, params.texture ?? 0, 1);
+  const pre = makeRowDetail(makeRowDenoiser(raw, img.width, img.height, params.denoise, 1, params.chroma ?? 0, params.despeckle ?? 0), img.width, img.height, params.sharpen ?? 0, params.texture ?? 0, 1, decodePitch);
   lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), undefined, lensForEdit(img), skyBitmap, srcFlatOf(img));
   renderer.setSkyMap(lastSkyMap);
 }
@@ -3982,7 +3985,7 @@ function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID, s
     for (let x = 0; x < img.width; x += step) {
       const [r, g, b] = linearAt(img, x, y);
       const u = (x + 0.5) / img.width, v = (y + 0.5) / img.height;
-      // The position always goes in as fu/fv: recovery reads the flat there,
+      // The position always goes in as mu/mv: recovery reads the flat there,
       // whether or not the spatial stages run.
       edit(r, g, b, px, 0, skyMask ? u : undefined, skyMask ? v : undefined, u, v);
       const cr = clamp(px[0], 0, 1), cg = clamp(px[1], 0, 1), cb = clamp(px[2], 0, 1);
@@ -9323,6 +9326,47 @@ const healSize = $("healSize") as HTMLInputElement;
 const healVisBtn = $("healVis") as HTMLButtonElement;
 const healAutoBtn = $("healAuto") as HTMLButtonElement;
 const healClearBtn = $("healClear") as HTMLButtonElement;
+const healModesEl = $("healModes") as HTMLDivElement;
+/** WHAT THE NEXT TAP PLACES: a heal (the copy plus the Laplace correction that
+ *  blends it into its surround — heal.ts) or a clone (the copy alone). Stored
+ *  on each spot as HealSpot.mode, "clone" only — absent means heal, which is
+ *  what every spot placed before Clone existed reads as. View state like the
+ *  spot size: not part of an edit, so not in a snapshot. */
+let healMode: "heal" | "clone" = "heal";
+const HEAL_MODES: { label: string; mode: "heal" | "clone" }[] = [
+  { label: "Heal", mode: "heal" },
+  { label: "Clone", mode: "clone" },
+];
+const healModeBtns: HTMLButtonElement[] = [];
+for (const def of HEAL_MODES) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mix-chip";
+  b.addEventListener("click", () => {
+    healMode = def.mode;
+    updateHealModeUI();
+    // The spot with the highlighted ring takes the mode too, the way Spot
+    // size resizes it — choose after the tap, see the difference, keep it.
+    const s = activeSpotIdx >= 0 ? params.spots?.[activeSpotIdx] : null;
+    if (s && spotMode(s) !== def.mode) {
+      if (def.mode === "clone") s.mode = "clone";
+      else delete s.mode;
+      draw();
+      flushRecord(); // one press = one undo step
+    }
+  });
+  healModesEl.append(b);
+  healModeBtns.push(b);
+}
+/** Mark the pressed mode in words as well as state ("✓ "), never colour alone. */
+function updateHealModeUI(): void {
+  healModeBtns.forEach((b, i) => {
+    const on = healMode === HEAL_MODES[i].mode;
+    b.textContent = (on ? "✓ " : "") + HEAL_MODES[i].label;
+    b.setAttribute("aria-pressed", String(on));
+  });
+}
+updateHealModeUI();
 const healStatus = $("healStatus") as HTMLElement;
 
 /** The exact buffer the GPU texture was uploaded from (current's own pixel/
@@ -9373,6 +9417,12 @@ function uploadPreview() {
   // would quietly narrow to half the footprint they chose. Set beside setImage
   // so the two can never be out of step — that pairing is the whole defect.
   renderer.setTapScale(previewTapScale);
+  // HOW MANY SENSOR PIXELS ONE TEXEL OF THIS TEXTURE IS — capture sharpening's
+  // radius is in sensor pixels (raw/detail.ts), so on a proxy the shader
+  // narrows it by this. A raw's decode is a half-size bin (2), and an 8-bit
+  // proxy is the decode scaled down by toPreview.
+  decodePitch = currentFile && sourceIsMosaiced(currentFile) ? 2 : 1;
+  renderer.setNativePitch(decodePitch * (current.width / Math.max(1, previewSrc.width)));
   renderer.setImage(previewSrc);
   // AND WHICH LENS FLAT THOSE PIXELS CARRY, beside the upload for the same
   // reason as the tap scale: highlight recovery divides it back out to test the
@@ -9720,6 +9770,7 @@ async function upgradeToNativeResolution(gen: number): Promise<void> {
     previewH = built.image.height;
     previewTapScale = proxyFactorFor(src, width, height);
     renderer.setTapScale(previewTapScale);
+    renderer.setNativePitch(1); // one texel IS one sensor pixel now
     renderer.setImage(previewSrc);
     // NONE: this texture is demosaiced straight from the file
     // (buildLinearSourceInBands) and no lens flat is laid on it, so there is
@@ -9807,14 +9858,17 @@ function syncSpotsToTexture() {
       const a = stickerAssets[s.asset];
       if (a) rects.push(stickerRect(s, W, H, a, dispRot));
     }
+    // One heal solve for every rect of this pass (heal.ts HealCache) — and
+    // only this pass: the pristine buffer can be rewritten between passes.
+    const healCache: HealCache = {};
     for (const rect of rects) {
       if (rect.w <= 0 || rect.h <= 0) continue;
       if (previewSrc.linear || previewSrc.linear16) {
-        const data = bakeRgbaF32((previewSrc.linear ?? previewSrc.linear16)!, W, H, cur, rect);
+        const data = bakeRgbaF32((previewSrc.linear ?? previewSrc.linear16)!, W, H, cur, rect, healCache);
         compositeStickersIntoRectF32(data, rect, W, H, inLook, stickerAssets, occ, dispRot);
         renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
       } else {
-        const data = bakeRgba8(previewSrc.pixels!, W, H, cur, rect);
+        const data = bakeRgba8(previewSrc.pixels!, W, H, cur, rect, healCache);
         compositeStickersIntoRect8(data, rect, W, H, inLook, stickerAssets, occ, dispRot);
         renderer.patchImage(rect.x0, rect.y0, rect.w, rect.h, data);
       }
@@ -11059,7 +11113,7 @@ function handleHealTap(clientX: number, clientY: number): boolean {
     healStatus.textContent = "No clean patch found near that spot — try a smaller spot size or zoom in.";
     return true;
   }
-  params.spots.push({ x: u, y: v, r, dx: src.offX / W, dy: src.offY / H });
+  params.spots.push({ x: u, y: v, r, dx: src.offX / W, dy: src.offY / H, ...(healMode === "clone" ? { mode: "clone" as const } : {}) });
   activeSpotIdx = params.spots.length - 1; // the slider now resizes this one
   draw(); // the rAF pass bakes it into the texture
   flushRecord(); // one tap = one undo step
@@ -19617,6 +19671,12 @@ let previewH = 0;
  *  number `setTapScale` wants. 1 whenever the working copy IS what the editor
  *  has always used; the real proxy factor when it is the native-resolution one. */
 let previewTapScale = 1;
+
+/** How many native sensor pixels one pixel of the open DECODE (`current`)
+ *  spans: 2 for a mosaiced raw, whose decode is a half-size bin, 1 otherwise.
+ *  Set by uploadPreview. The sky map's CPU pre-pass runs on that decode and
+ *  needs it for the sharpening radius, which is in sensor pixels. */
+let decodePitch = 1;
 
 /** Above this the native-resolution working copy is refused and the old proxy
  *  is used instead. 24 megapixels in half precision is about 192 MB held while

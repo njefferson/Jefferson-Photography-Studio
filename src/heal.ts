@@ -3,6 +3,20 @@ import { fromHalf } from "./half";
 // THE SOURCE — each spot copies a clean patch from a nearby offset over the
 // defect, blended by a radial feather.
 //
+// A HEAL IS A CLONE PLUS THE LAPLACE CORRECTION (2026-10-02), and only a spot
+// set to Clone is the plain copy. The correction is the defining step of the
+// reference heal — Perez, Gangnet and Blake, "Poisson Image Editing" (SIGGRAPH
+// 2003, section 2, eq. 5): seamless cloning is the copy plus an additive
+// correction that is a MEMBRANE interpolant of the source/destination mismatch
+// on the boundary, Delta f = 0 inside with f = (destination - source) on the
+// edge. darktable's heal.c (after GIMP's Healing Tool) solves exactly that with
+// a red/black Gauss-Seidel over-relaxation, and so does `laplaceFill` here.
+// What it buys is the thing no source search can: the copied patch meets its
+// surround with ZERO offset at the rim, whatever its brightness was — NOTES
+// recorded a 0.001 raw mismatch becoming 0.095 on the canvas after the swap
+// and the look, with the search already optimal. Clone stays as its own mode
+// (HealSpot.mode) for texture that must be copied exactly as it is.
+//
 // GPU/CPU strategy (deliberately NOT a shader uniform loop): denoise and
 // sharpen sample the source texture with 25/49 neighbourhood taps, so an
 // in-shader heal is either invisible to them (taps read the unhealed texel) or
@@ -16,6 +30,9 @@ import { fromHalf } from "./half";
 // Spots always read the ORIGINAL (pre-heal) source: within a rebaked rect each
 // pixel starts from the pristine value and the spots mix over it in list
 // order — deterministic, order-stable, and idempotent under partial rebakes.
+// What a heal's rim MEETS is the composite so far (healLayers), so a heal
+// beside an earlier one matches that one's healed pixels, not the dust under
+// them.
 //
 // Geometry lives in image-uv so a spot anchors to the photo across the preview
 // proxy and the full-res export; the radius is a fraction of the image WIDTH
@@ -30,6 +47,19 @@ export interface HealSpot {
   /** Offset to the clean source patch, image-uv (source centre = x+dx, y+dy). */
   dx: number;
   dy: number;
+  /** "heal" (the default, and what an absent mode means): the copy plus the
+   *  Laplace correction, so the patch takes on its surround's level and colour.
+   *  "clone": the copy alone, exactly as the source has it. */
+  mode?: "heal" | "clone";
+}
+
+/** The mode a spot is in.
+ *  @param s the spot.
+ *  @returns "clone" when it says so, otherwise "heal" — absent is heal, so every
+ *  spot placed before Clone existed keeps meaning what the button said. The
+ *  bake (healLayers) and the Corrections panel both read it through here. */
+export function spotMode(s: HealSpot): "heal" | "clone" {
+  return s.mode === "clone" ? "clone" : "heal";
 }
 
 /** Feather start: weight is 1 inside HEAL_CORE·r, easing to 0 at r. */
@@ -64,12 +94,22 @@ export function spotRect(s: HealSpot, W: number, H: number): Rect {
   return { x0, y0, w: Math.max(0, x1 - x0 + 1), h: Math.max(0, y1 - y0 + 1) };
 }
 
+/** What one pixel of the spot being SOLVED holds while its heal is worked out,
+ *  on top of the patches: the composite under it, the source, the correction
+ *  (three float32 each), the feather weight (float32), the domain flag and its
+ *  place in the red/black sweep lists (one byte, one int32), and the coarser
+ *  grids the solve starts from (a third more of the correction and the flag).
+ *  Freed before the next spot. healLayers allocates exactly these. */
+const HEAL_SOLVE_BYTES_PX = 12 + 12 + 12 + 4 + 1 + 4 + 7;
+
 /** WHAT THE HEALED PATCHES WEIGH, in bytes, at a given resolution.
  *
  *  Takes `spots`, the edit's heal list, and `W`/`H`, the SOURCE dimensions the
- *  patches are baked at. Returns the total bytes those patches occupy —
- *  `spotRect`'s area for each, at the 12 bytes a pixel `HealPatch.data` costs
- *  as three floats of linear RGB.
+ *  patches are baked at. Returns the bytes a bake holds at its peak — every
+ *  patch (`spotRect`'s area at the 12 bytes a pixel `HealPatch.data` costs as
+ *  three floats of linear RGB), plus the working set of the largest spot while
+ *  its Laplace correction is solved (HEAL_SOLVE_BYTES_PX a pixel, one spot at a
+ *  time).
  *
  *  What the caller relies on, and the whole reason it exists: the export's
  *  memory model bills this PER WORKER, because every worker bakes every patch
@@ -80,12 +120,13 @@ export function spotRect(s: HealSpot, W: number, H: number): Rect {
  *  that it reads `spotRect` — the same geometry the bake uses — instead of a
  *  second copy of that arithmetic that could drift from it. */
 export function healPatchBytes(spots: readonly HealSpot[] | undefined, W: number, H: number): number {
-  let bytes = 0;
+  let bytes = 0, solve = 0;
   for (const s of spots ?? []) {
     const r = spotRect(s, W, H);
     bytes += r.w * r.h * 12;
+    solve = Math.max(solve, r.w * r.h * HEAL_SOLVE_BYTES_PX); // a clone holds less; one rule
   }
-  return bytes;
+  return bytes + solve;
 }
 
 /** Per-spot constants at a resolution, precomputed once per bake/scan. */
@@ -95,6 +136,7 @@ interface SpotPx {
   rPx: number;
   offX: number; // whole-pixel source offset (no resampling)
   offY: number;
+  heal: boolean; // the Laplace correction applies (mode heal)
 }
 
 function toPx(spots: readonly HealSpot[], W: number, H: number): SpotPx[] {
@@ -104,6 +146,7 @@ function toPx(spots: readonly HealSpot[], W: number, H: number): SpotPx[] {
     rPx: Math.max(1, s.r * W),
     offX: Math.round(s.dx * W),
     offY: Math.round(s.dy * H),
+    heal: spotMode(s) === "heal",
   }));
 }
 
@@ -115,11 +158,270 @@ function weightAt(s: SpotPx, px: number, py: number): number {
 
 const clampI = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v);
 
+/** Reads one PRISTINE source pixel into `out` (three channels). */
+type PxReader = (x: number, y: number, out: Float64Array) => void;
+
+/** One spot's result: the composite AFTER this spot (and every one before it),
+ *  three float32 numbers a pixel over the spot's rect. FLOAT32 ON PURPOSE: it is
+ *  what a patch holds anyway (HealPatch.data), so the layers ARE the export's
+ *  patches and a bake never holds the composite twice. */
+interface HealLayer extends Rect {
+  data: Float32Array;
+}
+
+/** darktable's convergence floor for the solve, in the buffer's own units: a
+ *  tenth of an 8-bit step (heal.c's `epsilon = 0.1/255` in its 0..1 units). */
+const EPS_BYTES = 0.1;
+/** The same for linear float sources — sixteen times finer, because a raw's
+ *  linear values are taken BEFORE exposure, which multiplies them by up to 16. */
+const EPS_LINEAR = 0.1 / 255 / 16;
+/** darktable's retouch module caps the heal at 2000 iterations; so does this. */
+const MAX_ITER = 2000;
+/** Below this many unknowns the solve starts from the ring's mean; above it,
+ *  from the same problem solved on a grid half the size (laplaceFill). */
+const COARSE_MIN = 256;
+
+/**
+ * THE MEMBRANE: solve Delta D = 0 over the pixels of `dom`, with D held at its
+ * given values everywhere else, by red/black Gauss-Seidel with over-relaxation
+ * — darktable's heal.c, its empirical relaxation factor and its stopping rule.
+ *
+ * @param D   rw x rh x 3 values; on entry the boundary values are set; on
+ *            return the domain holds the solution (its entry values are
+ *            overwritten by the starting guess).
+ * @param dom 1 where D is unknown.
+ * @param rw  the rect's width.
+ * @param rh  the rect's height.
+ * @param eps the stopping tolerance in the buffer's units.
+ * @returns the number of sweeps taken at this resolution.
+ *
+ * THE STARTING GUESS IS THE SAME PROBLEM ON A COARSER GRID, which heal.c's own
+ * notes name as what it is missing ("It could benefit from a multi-grid
+ * evaluation of an initial solution before the main iteration loop") and which
+ * Perez, Gangnet and Blake list beside SOR. A cell of the half-size grid is
+ * unknown when all four of its pixels are, and otherwise holds the mean of its
+ * known ones; that grid is solved the same way (recursively), and its answer,
+ * interpolated, is where the full-size sweeps begin. The sweeps then run to
+ * darktable's stopping rule exactly as they would from any other start, so the
+ * answer is the same membrane — what changes is that the smooth part of it no
+ * longer has to diffuse in from the rim one pixel a sweep, which is what made a
+ * spot of the largest size take seconds at native resolution.
+ *
+ * A neighbour outside the rect does not exist (a spot at the frame's edge):
+ * the update divides by the neighbours there are, as heal.c does at a stamp's
+ * edge.
+ */
+function laplaceFill(D: Float32Array, dom: Uint8Array, rw: number, rh: number, eps: number): number {
+  let nRed = 0, nBlack = 0;
+  for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) if (dom[y * rw + x]) { if ((x + y) & 1) nRed++; else nBlack++; }
+  const n = nRed + nBlack;
+  if (!n) return 0;
+  const red = new Int32Array(nRed), black = new Int32Array(nBlack);
+  nRed = 0; nBlack = 0;
+  for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) {
+    const i = y * rw + x;
+    if (dom[i]) { if ((x + y) & 1) red[nRed++] = i; else black[nBlack++] = i; }
+  }
+  if (n > COARSE_MIN && rw >= 8 && rh >= 8) {
+    // THE HALF-SIZE PROBLEM: unknown where all four children are unknown,
+    // otherwise the mean of the known children.
+    const cw = (rw + 1) >> 1, ch = (rh + 1) >> 1;
+    const Dc = new Float32Array(cw * ch * 3), domc = new Uint8Array(cw * ch);
+    for (let Y = 0; Y < ch; Y++) for (let X = 0; X < cw; X++) {
+      let k = 0, s0 = 0, s1 = 0, s2 = 0;
+      for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
+        const x = 2 * X + i, y = 2 * Y + j;
+        if (x >= rw || y >= rh) continue;
+        const p = y * rw + x;
+        if (dom[p]) continue;
+        s0 += D[p * 3]; s1 += D[p * 3 + 1]; s2 += D[p * 3 + 2]; k++;
+      }
+      const c = Y * cw + X;
+      if (k) { Dc[c * 3] = s0 / k; Dc[c * 3 + 1] = s1 / k; Dc[c * 3 + 2] = s2 / k; } else domc[c] = 1;
+    }
+    laplaceFill(Dc, domc, cw, ch, eps);
+    // Bilinear from the coarse grid, cell centres at 2X + 0.5.
+    for (let y = 0; y < rh; y++) {
+      const fy = Math.min(ch - 1, Math.max(0, (y - 0.5) / 2));
+      const y0 = Math.floor(fy), y1 = Math.min(ch - 1, y0 + 1), ty = fy - y0;
+      for (let x = 0; x < rw; x++) {
+        const p = y * rw + x;
+        if (!dom[p]) continue;
+        const fx = Math.min(cw - 1, Math.max(0, (x - 0.5) / 2));
+        const x0 = Math.floor(fx), x1 = Math.min(cw - 1, x0 + 1), tx = fx - x0;
+        const a = (y0 * cw + x0) * 3, b = (y0 * cw + x1) * 3, c = (y1 * cw + x0) * 3, d = (y1 * cw + x1) * 3;
+        for (let k = 0; k < 3; k++) {
+          D[p * 3 + k] = (Dc[a + k] * (1 - tx) + Dc[b + k] * tx) * (1 - ty) + (Dc[c + k] * (1 - tx) + Dc[d + k] * tx) * ty;
+        }
+      }
+    }
+  } else {
+    // Small enough to start from the mean of everything known.
+    let m0 = 0, m1 = 0, m2 = 0, mc = 0;
+    for (let p = 0; p < rw * rh; p++) if (!dom[p]) { m0 += D[p * 3]; m1 += D[p * 3 + 1]; m2 += D[p * 3 + 2]; mc++; }
+    if (mc) { m0 /= mc; m1 /= mc; m2 /= mc; }
+    for (let p = 0; p < rw * rh; p++) if (dom[p]) { D[p * 3] = m0; D[p * 3 + 1] = m1; D[p * 3 + 2] = m2; }
+  }
+  // heal.c: w = (2 - 1/(0.1575 sqrt(n) + 0.8)) / 4, applied to (a*D - sum).
+  const w = (2 - 1 / (0.1575 * Math.sqrt(n) + 0.8)) * 0.25;
+  const errExit = eps * eps * w * w;
+  const sweep = (list: Int32Array): number => {
+    let err = 0;
+    for (let k = 0; k < list.length; k++) {
+      const i = list[k];
+      const x = i % rw, y = (i - x) / rw;
+      let a = 0, s0 = 0, s1 = 0, s2 = 0;
+      if (x > 0) { const j = (i - 1) * 3; s0 += D[j]; s1 += D[j + 1]; s2 += D[j + 2]; a++; }
+      if (x < rw - 1) { const j = (i + 1) * 3; s0 += D[j]; s1 += D[j + 1]; s2 += D[j + 2]; a++; }
+      if (y > 0) { const j = (i - rw) * 3; s0 += D[j]; s1 += D[j + 1]; s2 += D[j + 2]; a++; }
+      if (y < rh - 1) { const j = (i + rw) * 3; s0 += D[j]; s1 += D[j + 1]; s2 += D[j + 2]; a++; }
+      const o = i * 3;
+      const d0 = w * (a * D[o] - s0), d1 = w * (a * D[o + 1] - s1), d2 = w * (a * D[o + 2] - s2);
+      D[o] -= d0; D[o + 1] -= d1; D[o + 2] -= d2;
+      err += d0 * d0 + d1 * d1 + d2 * d2;
+    }
+    return err;
+  };
+  let it = 0;
+  while (it < MAX_ITER) {
+    const err = sweep(black) + sweep(red);
+    it++;
+    if (err < errExit) break;
+  }
+  return it;
+}
+
+/**
+ * Every spot's composite, in list order, from a pristine reader.
+ *
+ * @param read the pristine source.
+ * @param W    the source's width.
+ * @param H    the source's height.
+ * @param spots the edit's spots.
+ * @param eps  the solve's tolerance (EPS_BYTES or EPS_LINEAR).
+ * @returns one layer per spot: its rect, holding the composite after it.
+ *
+ * SOURCES ALWAYS READ THE PRISTINE PICTURE, as they always have; what a spot
+ * lands ON is the composite so far, so a heal whose rim crosses an earlier
+ * spot meets that spot's healed pixels rather than the dust under them —
+ * darktable applies its shapes the same way, one after another. Within each
+ * layer: before + (source + D - before) * weight, D the Laplace correction for
+ * a heal and zero for a clone; at weight 1 that is exactly the healed patch,
+ * and the feather blends it as darktable blends its heal by the mask.
+ *
+ * What it holds: the layers (12 bytes a pixel, which healPatchBytes bills as
+ * the patches, because they are), and one spot's working set at a time
+ * (HEAL_SOLVE_BYTES_PX).
+ */
+function healLayers(read: PxReader, W: number, H: number, spots: readonly HealSpot[], eps: number): HealLayer[] {
+  const sp = toPx(spots, W, H);
+  const layers: HealLayer[] = [];
+  const t = new Float64Array(3);
+  for (let k = 0; k < spots.length; k++) {
+    const s = sp[k];
+    const rect = spotRect(spots[k], W, H);
+    const rw = rect.w, rh = rect.h, n = rw * rh;
+    const before = new Float32Array(n * 3);
+    const src = new Float32Array(n * 3);
+    const wgt = new Float32Array(n);
+    for (let y = 0; y < rh; y++) {
+      const py = rect.y0 + y;
+      for (let x = 0; x < rw; x++) {
+        const px = rect.x0 + x;
+        const i = y * rw + x;
+        // The composite so far: the latest earlier layer holding this pixel.
+        let got = false;
+        for (let j = k - 1; j >= 0 && !got; j--) {
+          const L = layers[j];
+          if (px >= L.x0 && px < L.x0 + L.w && py >= L.y0 && py < L.y0 + L.h) {
+            const o = ((py - L.y0) * L.w + (px - L.x0)) * 3;
+            before[i * 3] = L.data[o]; before[i * 3 + 1] = L.data[o + 1]; before[i * 3 + 2] = L.data[o + 2];
+            got = true;
+          }
+        }
+        if (!got) { read(px, py, t); before[i * 3] = t[0]; before[i * 3 + 1] = t[1]; before[i * 3 + 2] = t[2]; }
+        read(clampI(px + s.offX, W - 1), clampI(py + s.offY, H - 1), t);
+        src[i * 3] = t[0]; src[i * 3 + 1] = t[1]; src[i * 3 + 2] = t[2];
+        wgt[i] = weightAt(s, px, py);
+      }
+    }
+    const data = new Float32Array(n * 3);
+    let D: Float32Array | null = null;
+    if (s.heal) {
+      // Boundary: destination minus source wherever the spot does not reach.
+      D = new Float32Array(n * 3);
+      const dom = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        if (wgt[i] > 0) { dom[i] = 1; continue; }
+        const o = i * 3;
+        D[o] = before[o] - src[o]; D[o + 1] = before[o + 1] - src[o + 1]; D[o + 2] = before[o + 2] - src[o + 2];
+      }
+      laplaceFill(D, dom, rw, rh, eps);
+    }
+    for (let i = 0; i < n; i++) {
+      const w = wgt[i];
+      for (let c = 0; c < 3; c++) {
+        const o = i * 3 + c;
+        const b = before[o];
+        data[o] = w > 0 ? b + (src[o] + (D ? D[o] : 0) - b) * w : b;
+      }
+    }
+    layers.push({ ...rect, data });
+  }
+  return layers;
+}
+
+/** The final composite at one pixel: the latest layer holding it, else the
+ *  pristine reader. Writes `out`; returns nothing. */
+function finalAt(layers: readonly HealLayer[], read: PxReader, px: number, py: number, out: Float64Array): void {
+  for (let j = layers.length - 1; j >= 0; j--) {
+    const L = layers[j];
+    if (px >= L.x0 && px < L.x0 + L.w && py >= L.y0 && py < L.y0 + L.h) {
+      const o = ((py - L.y0) * L.w + (px - L.x0)) * 3;
+      out[0] = L.data[o]; out[1] = L.data[o + 1]; out[2] = L.data[o + 2];
+      return;
+    }
+  }
+  read(px, py, out);
+}
+
+/** ONE SOLVE PER CHANGE, NOT PER RECT. The preview re-bakes every rect a change
+ *  touched (main.ts), each through the same spot list, and the layers are the
+ *  same for all of them — so the caller may hand every bake of one pass the same
+ *  cache. It belongs to that pass and no longer: the pristine buffer is
+ *  rewritten in place when the lens correction moves (main.ts bringLensTo), so
+ *  a cache kept across passes against the buffer would heal from old pixels. */
+export interface HealCache {
+  /** What the layers were solved for; private to heal.ts. */
+  key?: string;
+  layers?: unknown;
+}
+function cachedLayers(cache: HealCache | undefined, W: number, H: number, spots: readonly HealSpot[], read: PxReader, eps: number): HealLayer[] {
+  if (!cache) return healLayers(read, W, H, spots, eps);
+  const key = `${W}x${H}|${eps}|${JSON.stringify(spots)}`;
+  if (cache.key === key && cache.layers) return cache.layers as HealLayer[];
+  const layers = healLayers(read, W, H, spots, eps);
+  cache.key = key;
+  cache.layers = layers;
+  return layers;
+}
+
 /**
  * Bake a rect of HEALED 8-bit RGBA from pristine gamma bytes. Returns a tightly
  * packed RGBA patch (for texSubImage2D and for the export's patch overlay).
- * Accumulates in float across overlapping spots, quantizes ONCE at the end —
- * the export reads these exact bytes back, so both paths stay bit-identical.
+ *
+ * @param src   the pristine RGBA bytes.
+ * @param W     their width.
+ * @param H     their height.
+ * @param spots the edit's spots, in order.
+ * @param rect  the rect to bake.
+ * @param cache optional, shared by every bake of one pass (see HealCache).
+ * @returns rect.w x rect.h RGBA bytes, alpha copied from the source.
+ *
+ * What the result must satisfy: accumulated in float across overlapping spots
+ * and quantised ONCE at the end — the export quantises the same layers the same
+ * way (healPatches8), so both paths stay bit-identical. A Clone spot composites
+ * as every spot did before heals carried the Laplace correction.
  */
 export function bakeRgba8(
   src: Uint8ClampedArray,
@@ -127,30 +429,22 @@ export function bakeRgba8(
   H: number,
   spots: readonly HealSpot[],
   rect: Rect,
+  cache?: HealCache,
 ): Uint8Array {
-  const sp = toPx(spots, W, H);
+  const read: PxReader = (x, y, o) => { const i = (y * W + x) * 4; o[0] = src[i]; o[1] = src[i + 1]; o[2] = src[i + 2]; };
+  const layers = cachedLayers(cache, W, H, spots, read, EPS_BYTES);
   const out = new Uint8Array(rect.w * rect.h * 4);
+  const t = new Float64Array(3);
   for (let y = 0; y < rect.h; y++) {
     const py = rect.y0 + y;
     for (let x = 0; x < rect.w; x++) {
       const px = rect.x0 + x;
-      const si = (py * W + px) * 4;
-      let r = src[si], g = src[si + 1], b = src[si + 2];
-      for (const s of sp) {
-        const w = weightAt(s, px, py);
-        if (w <= 0) continue;
-        const qx = clampI(px + s.offX, W - 1);
-        const qy = clampI(py + s.offY, H - 1);
-        const qi = (qy * W + qx) * 4;
-        r += (src[qi] - r) * w;
-        g += (src[qi + 1] - g) * w;
-        b += (src[qi + 2] - b) * w;
-      }
+      finalAt(layers, read, px, py, t);
       const o = (y * rect.w + x) * 4;
-      out[o] = Math.round(r);
-      out[o + 1] = Math.round(g);
-      out[o + 2] = Math.round(b);
-      out[o + 3] = src[si + 3];
+      out[o] = Math.round(t[0]);
+      out[o + 1] = Math.round(t[1]);
+      out[o + 2] = Math.round(t[2]);
+      out[o + 3] = src[(py * W + px) * 4 + 3];
     }
   }
   return out;
@@ -158,8 +452,19 @@ export function bakeRgba8(
 
 /**
  * Bake a rect of HEALED linear-float RGBA from a pristine linear buffer (the
- * RAW preview texture). Float32Array storage rounds to f32 exactly like the
- * RGBA32F texture upload, keeping the export mirror within float epsilon.
+ * RAW preview texture).
+ *
+ * @param src   the pristine linear RGBA, float32 or half-float bits.
+ * @param W     its width.
+ * @param H     its height.
+ * @param spots the edit's spots, in order.
+ * @param rect  the rect to bake.
+ * @param cache optional, shared by every bake of one pass (see HealCache).
+ * @returns rect.w x rect.h RGBA floats, alpha copied from the source.
+ *
+ * What the result must satisfy: f32-rounded exactly like the RGBA32F texture
+ * upload, and the same arithmetic healPatchesFromSampler runs at full
+ * resolution, so the export mirrors it within float epsilon at equal sizes.
  */
 export function bakeRgbaF32(
   src: Float32Array | Uint16Array,
@@ -167,38 +472,28 @@ export function bakeRgbaF32(
   H: number,
   spots: readonly HealSpot[],
   rect: Rect,
+  cache?: HealCache,
 ): Float32Array {
-  const sp = toPx(spots, W, H);
   // THE PRISTINE BUFFER MAY BE HALF-FLOAT NOW — the editor's working copy holds
   // a whole photograph at native resolution, which is affordable in half
-  // precision and not in float32. The arithmetic below is untouched; only how a
-  // value is fetched changes, and a heal rectangle is a few hundred pixels, so
-  // the indirection is not worth avoiding.
+  // precision and not in float32. Only how a value is fetched changes.
   const at: (i: number) => number = src instanceof Uint16Array
     ? (i) => fromHalf((src as Uint16Array)[i])
     : (i) => (src as Float32Array)[i];
+  const read: PxReader = (x, y, o) => { const i = (y * W + x) * 4; o[0] = at(i); o[1] = at(i + 1); o[2] = at(i + 2); };
+  const layers = cachedLayers(cache, W, H, spots, read, EPS_LINEAR);
   const out = new Float32Array(rect.w * rect.h * 4);
+  const t = new Float64Array(3);
   for (let y = 0; y < rect.h; y++) {
     const py = rect.y0 + y;
     for (let x = 0; x < rect.w; x++) {
       const px = rect.x0 + x;
-      const si = (py * W + px) * 4;
-      let r = at(si), g = at(si + 1), b = at(si + 2);
-      for (const s of sp) {
-        const w = weightAt(s, px, py);
-        if (w <= 0) continue;
-        const qx = clampI(px + s.offX, W - 1);
-        const qy = clampI(py + s.offY, H - 1);
-        const qi = (qy * W + qx) * 4;
-        r += (at(qi) - r) * w;
-        g += (at(qi + 1) - g) * w;
-        b += (at(qi + 2) - b) * w;
-      }
+      finalAt(layers, read, px, py, t);
       const o = (y * rect.w + x) * 4;
-      out[o] = Math.fround(r);
-      out[o + 1] = Math.fround(g);
-      out[o + 2] = Math.fround(b);
-      out[o + 3] = at(si + 3);
+      out[o] = Math.fround(t[0]);
+      out[o + 1] = Math.fround(t[1]);
+      out[o + 2] = Math.fround(t[2]);
+      out[o + 3] = at((py * W + px) * 4 + 3);
     }
   }
   return out;
@@ -220,6 +515,19 @@ export interface HealPatch extends Rect {
  * Healed patches for a full-res 8-bit source: the SAME quantized bytes the
  * preview bakes (bakeRgba8), lifted to linear with the caller's transfer
  * function — so the CPU export reads exactly what the GPU texture holds.
+ *
+ * @param pixels   the pristine RGBA bytes.
+ * @param W        their width.
+ * @param H        their height.
+ * @param spots    the edit's spots.
+ * @param toLinear the transfer function the export decodes bytes with.
+ * @returns one patch per spot, for wrapWithPatches: patch k holds the
+ *          composite after spot k over its rect, so the LATEST patch holding a
+ *          pixel holds that pixel's final composite — the value bakeRgba8
+ *          quantises there.
+ *
+ * What it holds: the layers, converted to linear IN PLACE once every spot has
+ * been solved, so a bake never keeps the composite twice (healPatchBytes).
  */
 export function healPatches8(
   pixels: Uint8ClampedArray,
@@ -228,23 +536,28 @@ export function healPatches8(
   spots: readonly HealSpot[],
   toLinear: (v: number) => number,
 ): HealPatch[] {
-  return spots.map((s) => {
-    const rect = spotRect(s, W, H);
-    const bytes = bakeRgba8(pixels, W, H, spots, rect);
-    const data = new Float32Array(rect.w * rect.h * 3);
-    for (let p = 0, n = rect.w * rect.h; p < n; p++) {
-      data[p * 3] = toLinear(bytes[p * 4]);
-      data[p * 3 + 1] = toLinear(bytes[p * 4 + 1]);
-      data[p * 3 + 2] = toLinear(bytes[p * 4 + 2]);
-    }
-    return { ...rect, data };
-  });
+  const read: PxReader = (x, y, o) => { const i = (y * W + x) * 4; o[0] = pixels[i]; o[1] = pixels[i + 1]; o[2] = pixels[i + 2]; };
+  const layers = healLayers(read, W, H, spots, EPS_BYTES);
+  for (const L of layers) {
+    const d = L.data;
+    for (let o = 0; o < d.length; o++) d[o] = toLinear(Math.round(d[o]));
+  }
+  return layers;
 }
 
 /**
  * Healed patches computed through a linear sampler (the RAW export path, where
  * the full-res image only exists as an on-demand demosaic). Mirrors
- * bakeRgbaF32: same mix math, f32-rounded like the preview texture.
+ * bakeRgbaF32: same layers, same arithmetic, f32 like the preview texture.
+ *
+ * @param sample the pristine linear sampler.
+ * @param W      the source's width.
+ * @param H      the source's height.
+ * @param spots  the edit's spots.
+ * @returns one patch per spot, for wrapWithPatches: the layers themselves —
+ *          patch k holds the composite after spot k over its rect, so the
+ *          LATEST patch holding a pixel holds that pixel's final composite,
+ *          which is what bakeRgbaF32 writes there.
  */
 export function healPatchesFromSampler(
   sample: Sampler,
@@ -252,33 +565,8 @@ export function healPatchesFromSampler(
   H: number,
   spots: readonly HealSpot[],
 ): HealPatch[] {
-  const sp = toPx(spots, W, H);
-  return spots.map((s) => {
-    const rect = spotRect(s, W, H);
-    const data = new Float32Array(rect.w * rect.h * 3);
-    for (let y = 0; y < rect.h; y++) {
-      const py = rect.y0 + y;
-      for (let x = 0; x < rect.w; x++) {
-        const px = rect.x0 + x;
-        const s0 = sample(px, py);
-        let r = s0[0], g = s0[1], b = s0[2];
-        for (const c of sp) {
-          const w = weightAt(c, px, py);
-          if (w <= 0) continue;
-          const q = sample(clampI(px + c.offX, W - 1), clampI(py + c.offY, H - 1));
-          const qr = q[0], qg = q[1], qb = q[2];
-          r += (qr - r) * w;
-          g += (qg - g) * w;
-          b += (qb - b) * w;
-        }
-        const o = (y * rect.w + x) * 3;
-        data[o] = Math.fround(r);
-        data[o + 1] = Math.fround(g);
-        data[o + 2] = Math.fround(b);
-      }
-    }
-    return { ...rect, data };
-  });
+  const read: PxReader = (x, y, o) => { const q = sample(x, y); o[0] = q[0]; o[1] = q[1]; o[2] = q[2]; };
+  return healLayers(read, W, H, spots, EPS_LINEAR);
 }
 
 /**
@@ -295,8 +583,9 @@ export function wrapWithPatches(sample: Sampler, patches: HealPatch[], H: number
     const cy = clampI(y, H - 1);
     const bucket = rows[cy];
     if (bucket) {
-      // Later patches win where rects overlap — they were baked with the full
-      // spot list, so any overlapping patch holds the same composite values.
+      // THE LATEST PATCH HOLDING THE PIXEL WINS, and it must: patch k holds the
+      // composite after spot k, so only the last one over a pixel holds what
+      // every spot made of it (healLayers).
       for (let i = bucket.length - 1; i >= 0; i--) {
         const p = bucket[i];
         const cx = x < p.x0 ? -1 : x >= p.x0 + p.w ? -1 : x;

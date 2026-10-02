@@ -161,8 +161,9 @@ structure that is not there.
 wrong band: the canopy's missing modelling is leaf-cluster scale, which is what
 the mid-frequency band-pass covers, and the high-frequency pass re-introduces
 exactly the grain the denoise floor exists to remove — `detail.ts`'s own header
-says the high-pass is measured pre-denoise, so sharpening after denoising puts
-some of it back.
+said the high-pass was measured pre-denoise, so sharpening after denoising put
+some of it back. (Since 2026-10-02 the high-pass is taken from the denoised
+picture behind a soft threshold; the rejection stands on the band argument.)
 
 **Making the radius a reader control instead.** Deferred, not rejected on
 merit: it is a second slider for a kernel whose two populations pull opposite

@@ -6,6 +6,7 @@ import type { HealSpot } from "./heal";
 import type { WarpField } from "./warp";
 import { sampleLut3d } from "./lut3d";
 import { srgbFromLinear, srgbToLinear } from "./icc";
+import { fromHalf } from "./half";
 export type { HealSpot };
 
 export interface EditParams {
@@ -275,9 +276,11 @@ export interface EditParams {
    *  it is exposure- and WB-invariant. Applied on LINEAR source data before
    *  exposure/WB. Spatial (needs the map + uv) -> skipped in the .cube LUT. */
   clarity: number;
-  /** Dehaze -1..1: subtracts the local veil (blurred dark-channel map) with a
-   *  white-airlight renormalisation — + removes haze, - adds it. Same spatial
-   *  caveats as clarity. */
+  /** Dehaze -1..1: He, Sun and Tang's dark-channel haze removal — the airlight
+   *  estimated per channel from the picture, the transmission from the dark
+   *  channel's patch minimum refined by a guided filter, and each channel
+   *  recovered as (I - A)/t + A (localmap.ts says how and why). + removes haze,
+   *  - adds it. Same spatial caveats as clarity. */
   dehaze: number;
   /** Sharpen 0..1: capture sharpening — a HIGH-frequency luminance high-pass
    *  folded back as a hue-preserving gain, on LINEAR data after denoise. A
@@ -457,33 +460,57 @@ export function cropIsIdentity(c: CropRect, straighten: number): boolean {
   );
 }
 
-/** Per-image low-res reference maps for clarity/dehaze: blurred luminance (R)
- *  and blurred dark-channel (G), sqrt-encoded to 8 bits with a shared linear
- *  `scale` (decode: (v/255)^2 * scale). The GPU samples the SAME bytes as an
- *  RG8 texture, so CPU/GPU stay within filtering error of each other. Built
- *  once per image by buildLocalMap (localmap.ts) — glow-map pattern. */
+/** He, Sun and Tang's omega — how much of the haze full strength removes
+ *  (TPAMI 2011, eq. 12: "We fix it to 0.95"). Mirrored as a literal in gl.ts. */
+export const HAZE_OMEGA = 0.95;
+/** Their t0 — the floor on the transmission in the recovery (eq. 22: "A typical
+ *  value of t0 is 0.1"). Mirrored as a literal in gl.ts. */
+export const HAZE_T0 = 0.1;
+
+/** Per-image low-res reference maps for clarity/dehaze, built once per image
+ *  by buildLocalMap (localmap.ts) — glow-map pattern. The GPU samples the SAME
+ *  half-float texels as an RGBA16F texture, so CPU/GPU stay within filtering
+ *  error of each other. */
 export interface LocalMap {
   width: number;
   height: number;
-  /** RG interleaved, 2 bytes per texel: [lumaEnc, darkEnc]. */
-  rg: Uint8Array;
+  /** RGBA half-float bits, 4 per texel: R = clarity's blurred luma,
+   *  sqrt-encoded (the stored number is enc/255; decode (v)^2 * scale); G, B =
+   *  the dehaze guided filter's coefficients a, b (the refined dark channel at
+   *  a pixel is a * g + b, g = mean_c(I^c / A^c)); A = 0. */
+  rgba: Uint16Array;
   scale: number;
+  /** The airlight, per channel, in the source's own linear space — positive. */
+  air: [number, number, number];
 }
 
-/** Bilinear sample of the ENCODED map bytes at image-uv, then decode — the
- *  same order the GPU uses (texture filtering happens on encoded values). */
-export function sampleLocalMap(m: LocalMap, u: number, v: number): [number, number] {
+/** Bilinear sample of the map at image-uv — the stored values filtered first
+ *  and the luma decoded after, the same order the GPU uses.
+ *
+ *  @param m   the map.
+ *  @param u   image-uv x — the place the pixel CAME FROM under a warp (the
+ *             map is built from the unwarped source).
+ *  @param v   image-uv y, the same.
+ *  @param out filled with [clarity's local mean luma, dehaze a, dehaze b].
+ *  @returns nothing; `out` carries the result.
+ *
+ *  What the result must satisfy: equal, to the GPU's filtering precision, to
+ *  what the shader reads from `u_localTex` at the same uv — compileEdit and
+ *  the shader then do identical arithmetic with it. */
+export function sampleLocalMap(m: LocalMap, u: number, v: number, out: Float64Array | number[]): void {
   const x = Math.min(m.width - 1.001, Math.max(0, u * m.width - 0.5));
   const y = Math.min(m.height - 1.001, Math.max(0, v * m.height - 0.5));
   const x0 = Math.floor(x), y0 = Math.floor(y);
   const fx = x - x0, fy = y - y0;
-  const at = (xx: number, yy: number, c: number) => m.rg[(yy * m.width + xx) * 2 + c];
+  const at = (xx: number, yy: number, c: number) => fromHalf(m.rgba[(yy * m.width + xx) * 4 + c]);
   const bil = (c: number) => {
     const a = at(x0, y0, c), b = at(x0 + 1, y0, c), d = at(x0, y0 + 1, c), e = at(x0 + 1, y0 + 1, c);
     return a + (b - a) * fx + (d - a) * fy + (a - b - d + e) * fx * fy;
   };
-  const dec = (enc: number) => { const t = enc / 255; return t * t * m.scale; };
-  return [dec(bil(0)), dec(bil(1))];
+  const t = bil(0);
+  out[0] = t * t * m.scale;
+  out[1] = bil(1);
+  out[2] = bil(2);
 }
 
 /** The per-edit sky chroma map built by skymap.ts: opponent chroma of the
@@ -1126,7 +1153,12 @@ export function groupCanAim(group: readonly MaskLayer[]): boolean {
  *  not exist this early — and so is a head whose group contains one
  *  (`groupCanAim`); a reader who aims either gets no effect rather than a wrong
  *  one, and the panel says why. `src/gl.ts` carries the same arithmetic and
- *  `tools/agreement-walk.mjs` is what holds the two together. */
+ *  `tools/agreement-walk.mjs` is what holds the two together.
+ *
+ *  `aspect` is the image's width over its height, which a Gradient needs to
+ *  measure its distance in pixels (see `maskWeight`); 1 by default, so a caller
+ *  that has no frame (none today that reaches a gradient or a turned radial
+ *  mask) reads it as before. */
 export function aimWeight(groups: readonly (readonly MaskLayer[])[], bit: number, u: number, v: number, aspect = 1): number {
   let w = 0, any = false;
   for (const g of groups) {
@@ -1222,9 +1254,11 @@ export function groupHslOffset(group: readonly MaskLayer[]): readonly number[] |
 /** THE FOLIAGE BAND'S VALUE AT ONE PIXEL (042, stage 2): the whole-photo value
  *  plus each group's offsets times that group's joined place weight, summed
  *  where masks overlap, then held to FOL_MIN..FOL_MAX. Takes `base` (the
- *  whole-photo `foliage`), the active groups, image uv, `out`, which it
- *  fills, and `aspect`, the image's width over its height, for a turned radial
- *  mask (027); returns nothing. What the result must satisfy: it is `base` exactly
+ *  whole-photo `foliage`), the active groups, image uv, `out`, which it fills,
+ *  and `aspect`, the image's width over its height, which a Gradient needs to
+ *  measure in pixels and a turned radial mask (027) to keep its shape (see
+ *  maskWeight; 1 by default); returns nothing. What the
+ *  result must satisfy: it is `base` exactly
  *  wherever no offset reaches, so an edit with no offsets renders unchanged,
  *  and it is what the shader's `foliageHere` computes at the same uv. */
 export function foliageAt(
@@ -1242,8 +1276,8 @@ export function foliageAt(
  *  sum as `foliageAt` over each group's `skyBand`, held to the same ranges,
  *  which the Sky band's sliders share with Foliage's. Takes `base` (the
  *  whole-photo `sky`), the active groups, image uv, `out`, which it fills, and
- *  `aspect`, the image's width over its height, for a turned radial mask (027);
- *  returns nothing. What the result must satisfy: `base` exactly wherever no
+ *  `aspect` as `foliageAt` takes it; returns nothing. What the result must
+ *  satisfy: `base` exactly wherever no
  *  offset reaches, and what the shader's `skyBandHere` computes at that uv. */
 export function skyBandAt(
   base: readonly [number, number, number],
@@ -1315,9 +1349,9 @@ type LinearTap = (x: number, y: number) => ArrayLike<number>;
  *
  *  What the caller relies on: the uv here is the texel CENTRE, `(x + 0.5) / w`,
  *  because that is what the shader's interpolated `v_uv` is at the same pixel
- *  and `maskWeight` is the same function on both sides; and `w / h` is the
- *  aspect a turned radial mask is weighed at, so `w` and `h` must be the
- *  frame's own (027). */
+ *  and `maskWeight` is the same function on both sides — given the frame's
+ *  aspect `w / h`, as the shader is given `u_aspect`, which a Gradient and a
+ *  turned radial mask (027) both read, so `w` and `h` must be the frame's own. */
 export function aimedSampler(
   off: LinearTap,
   on: LinearTap,
@@ -1403,18 +1437,25 @@ export function radialPoint(m: MaskLayer, t: number, aspect: number): [number, n
   return [m.cx + c * qx - (s * qy) / asp, m.cy + c * qy + s * qx * asp];
 }
 
-/** HOW MUCH OF A GEOMETRIC OR PAINTED MASK APPLIES AT ONE PIXEL. Takes the
- *  mask `m`, the pixel's image uv `u`, `v`, and `aspect`, the image's width
- *  over its height, which only a TURNED radial mask reads (027) and which
- *  defaults to 1 for callers that hold no turned mask. Returns the weight,
- *  0..1, with the mask's invert applied.
+/** ONE MASK'S OWN WEIGHT AT ONE PLACE, for every mask type but Colour.
  *
- *  What the result has to satisfy: it is the same number the shader's
- *  `maskWeight` in src/gl.ts gives at the same uv — `tools/agreement-walk.mjs`
- *  holds the two together — and a caller that holds a turned radial mask must
- *  pass the photograph's own aspect, or the oval it weighs is not the one the
- *  screen draws. A radial mask with no angle weighs exactly what it did before
- *  `angle` existed. Colour masks (type 3) never reach here. */
+ *  @param m      the mask.
+ *  @param u      image-uv x of the place.
+ *  @param v      image-uv y.
+ *  @param aspect the image's width over its height. A Gradient measures its
+ *                distance IN PIXELS and a TURNED radial mask (027) keeps its
+ *                shape in pixels, so both need it; the other types ignore it.
+ *                1 by default.
+ *  @returns 0..1, already inverted when the mask is.
+ *
+ *  What the result must satisfy: it is the CPU twin of the shader's
+ *  `maskWeight`/`maskWeightOf` (src/gl.ts) at the same uv — `compileEdit`,
+ *  `aimWeight` and the band lookups all read it, and the agreement walk holds
+ *  the two sides together. A Gradient's lines of equal weight are
+ *  PERPENDICULAR TO THE LINE DRAWN, in pixels, as darktable's gradient mask
+ *  measures them; in uv, on a 3:2 frame a 45-degree drag gave lines at 24
+ *  degrees, until 2026-10-02. A radial mask with no angle weighs exactly what
+ *  it did before `angle` existed. */
 export function maskWeight(m: MaskLayer, u: number, v: number, aspect = 1): number {
   let w: number;
   if (m.type === 0) {
@@ -1424,9 +1465,13 @@ export function maskWeight(m: MaskLayer, u: number, v: number, aspect = 1): numb
     const r = Math.sqrt(dx * dx + dy * dy);
     w = 1 - smooth01(1 - m.feather, 1, r); // 1 in the core, 0 past the edge
   } else if (m.type === 1) {
+    // IN PIXELS: x scaled by the aspect so a step across the frame and a step
+    // down it are the same distance (both in units of the image HEIGHT, which
+    // cancels). The same arithmetic as the shader's maskWeight, floor included.
+    const a2 = aspect * aspect;
     const gx = m.lx - m.cx, gy = m.ly - m.cy;
-    const len2 = gx * gx + gy * gy || 1e-4;
-    const t = ((u - m.cx) * gx + (v - m.cy) * gy) / len2;
+    const len2 = Math.max(1e-4, gx * gx * a2 + gy * gy);
+    const t = ((u - m.cx) * gx * a2 + (v - m.cy) * gy) / len2;
     w = 1 - Math.min(1, Math.max(0, t)); // full at the start point, 0 at the end
   } else {
     // Brush (type 2) and sky (type 4): weight is the stored bitmap, bilinearly
@@ -2211,11 +2256,12 @@ export function recoverHighlight(c: Float32Array | Float64Array | number[], s0: 
  * @param skyMap  the per-edit sky chroma map, or null.
  * @param skyFine  the refined sky bitmap, or null.
  * @param srcFlat  the lens flat already in a raw's source pixels, or null.
- * @returns a function `(r, g, b, out, glow, u, v, fu, fv)` that writes the
+ * @returns a function `(r, g, b, out, glow, u, v, mu, mv)` that writes the
  *   finished DISPLAY sRGB pixel into `out` for one linear source pixel. `u`,
- *   `v` are its image uv and switch the spatial stages on; `fu`, `fv` are the
- *   same position given only so `srcFlat` can be read back for highlight
- *   recovery, for callers that want that without the spatial stages, and
+ *   `v` are its image uv and switch the spatial stages on; `mu`, `mv` are
+ *   where the pixel came from in the source (the displaced position under a
+ *   warp), where the clarity and dehaze maps and `srcFlat` are read, also for
+ *   callers that want highlight recovery without the spatial stages; they
  *   default to `u`, `v`.
  * What the result must satisfy: it agrees with the shader for the same edit
  *   and source within the agreement walk's and the GPU parity tests'
@@ -2252,7 +2298,7 @@ export function compileEdit(
    *  than the corrected one; nothing else here uses it. Omit for an 8-bit
    *  source, whose correction is the in-grade stage above. */
   srcFlat?: SourceFlat | null,
-): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number, fu?: number, fv?: number) => void {
+): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number, mu?: number, mv?: number) => void {
   // The hue rotation about the Rec.709 luminance axis (hueRotate: W3C
   // feColorMatrix hueRotate), so turning Hue keeps brightness and grey. It
   // was the Rec.601 YIQ matrix until 2026-10-01 (applied transposed before
@@ -2345,6 +2391,10 @@ export function compileEdit(
   const cl = p.clarity ?? 0;
   const dz = p.dehaze ?? 0;
   const localOn = local && (cl !== 0 || dz !== 0);
+  // The map's three numbers at a pixel, and the airlight's luminance — read
+  // once per pixel into one array rather than a fresh tuple per call.
+  const lm = new Float64Array(3);
+  const airR = local ? local.air[0] : 1, airG = local ? local.air[1] : 1, airB = local ? local.air[2] : 1;
   const mixerOn = !hslIsNeutral(p.hsl) || hslGroups.length > 0;
   const bwOn = !!p.bwOn;
   const bwMix = p.bwMix ?? [1, 1, 1];
@@ -2373,7 +2423,12 @@ export function compileEdit(
   const lutTmp = lut ? new Float32Array(3) : null;
 
   const recPx = new Float64Array(3);
-  return (r, g, b, out, glow = 0, u, v, fu = u, fv = v) => {
+  // `mu`, `mv`: where the pixel CAME FROM in the source — under a warp, the
+  // displaced position. The per-image maps (clarity, dehaze) are built from the
+  // unwarped source and the decode-time lens flat sits in the source pixels, so
+  // both are read there. Absent, they are (u, v): no warp, or a caller with no
+  // field.
+  return (r, g, b, out, glow = 0, u, v, mu = u, mv = v) => {
     // Clip severity PER CHANNEL from the SOURCE values, before anything
     // modifies them — the sensor pin lives in native space (matches the
     // shader's srcSev). AND READ AS THE SENSOR RECORDED THEM: a raw's pixels
@@ -2386,8 +2441,8 @@ export function compileEdit(
     // clip level below.
     let s0 = 0, s1 = 0, s2 = 0, fr = 1, fg = 1, fb = 1;
     if (cam && recover > 0) {
-      if (srcFlat && fu !== undefined && fv !== undefined) {
-        const i = lensBin(fu, fv, aspect, srcFlat.n);
+      if (srcFlat && mu !== undefined && mv !== undefined) {
+        const i = lensBin(mu, mv, aspect, srcFlat.n);
         fr = srcFlat.gr[i]; fg = srcFlat.gg[i]; fb = srcFlat.gb[i];
       }
       s0 = smooth01(SENSOR_PIN, SENSOR_PIN_FULL, r / fr);
@@ -2397,7 +2452,8 @@ export function compileEdit(
     // Clarity/dehaze act on LINEAR source data before exposure/WB, using the
     // per-image maps — matching the shader (which runs them after denoise).
     if (localOn && u !== undefined && v !== undefined) {
-      const [Lb, Dv] = sampleLocalMap(local, u, v);
+      sampleLocalMap(local, mu ?? u, mv ?? v, lm);
+      const Lb = lm[0];
       // AIMED, IF ANY MASK ASKED (decision 030). Both return 1 when nothing
       // aims, so the unaimed frame is byte-identical to every render before
       // this existed.
@@ -2409,18 +2465,23 @@ export function compileEdit(
       const dzA = dz * aimWeight(aimGroups, AIM_DEHAZE, u, v, aspect);
       const clA = cl * aimWeight(aimGroups, AIM_CLARITY, u, v, aspect);
       if (dzA !== 0) {
-        // HUE-PRESERVING haze removal: veil-subtract the LUMINANCE only, then
-        // scale all channels by the same factor. (Per-channel subtraction in
-        // camera-native space shifted colours badly — the native channels are
-        // wildly imbalanced pre-WB, so an equal cut is a huge relative cut to
-        // the weak channel, then the WB gains blow the error up. Field-found
-        // on the iPad, 2026-07-05.)
-        const L0 = r * REC709[0] + g * REC709[1] + b * REC709[2];
-        if (L0 > 1e-6) {
-          const L1 = Math.max(0, L0 - dzA * Dv) / Math.max(0.1, 1 - dzA * Dv);
-          const k = L1 / L0;
-          r *= k; g *= k; b *= k;
-        }
+        // HE, SUN AND TANG'S RECOVERY, PER CHANNEL (localmap.ts says why it
+        // replaced a luminance cut, and why it is safe before white balance:
+        // each channel is normalised by its OWN airlight, estimated in this
+        // same camera-native space, so the gains that follow cancel). The dark
+        // channel is the guided filter's a * g + b at this pixel, g the mean of
+        // the channels over their airlights — floored at zero (a transmission
+        // above 1 is not a physical one) and CAPPED at the pixel's own
+        // min_c(I^c/A^c), the bound the dark channel's definition sets and the
+        // one that keeps every channel at or above zero (localmap.ts).
+        // Identical arithmetic to the shader.
+        const nr = r / airR, ng = g / airG, nb = b / airB;
+        const own = Math.min(nr, ng, nb);
+        const D = Math.max(0, Math.min(own, lm[1] * ((nr + ng + nb) / 3) + lm[2]));
+        const t = Math.max(HAZE_T0, 1 - dzA * HAZE_OMEGA * D);
+        r = Math.max(0, (r - airR) / t + airR);
+        g = Math.max(0, (g - airG) / t + airG);
+        b = Math.max(0, (b - airB) / t + airB);
       }
       if (clA !== 0) {
         const L = r * REC709[0] + g * REC709[1] + b * REC709[2];

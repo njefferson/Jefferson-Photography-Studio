@@ -15,7 +15,7 @@ import { canRunParallel, exportBands } from "./exportparallel";
 import { makeRowDetail } from "./raw/detail";
 import { healPatches8, healPatchesFromSampler, wrapWithPatches, healPatchBytes } from "./heal";
 import { stickerPatches, makeStickerOverlaySampler, type StickerAsset } from "./sticker";
-import { warpSampler, warpIsEmpty } from "./warp";
+import { warpSampler, warpIsEmpty, sampleWarp } from "./warp";
 import { buildGlowMap, sampleGlow, GLOW_GAIN } from "./glow";
 import { buildSkyMap } from "./skymap";
 import { buildLocalMap } from "./localmap";
@@ -484,6 +484,13 @@ export async function exportImage(
   // NOTE the maps (and glow below) read the UNHEALED source: the preview's
   // maps are built from the pristine decode too, and a dust mote is invisible
   // to a coarse blurred map — healing must not force a map rebuild per spot.
+  // THEY ARE ALSO STICKER-FREE, deliberately, for the same reason pointed the
+  // other way: an in-look sticker is moved, scaled and re-occluded live, and
+  // rebuilding both maps (and re-uploading them on the preview) on every drag
+  // of one is a cost the preview cannot pay per frame. So a sticker's clarity
+  // and dehaze are measured against the background it covers. They are read
+  // at the WARPED position, though (mapAt below): warp moves pixels a long way,
+  // and the map has to follow the pixel.
   const localMap =
     (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0
       ? buildLocalMap(rawSample, srcW, srcH)
@@ -571,15 +578,21 @@ export async function exportImage(
     : composed;
   // The live preview runs denoise/detail on a DOWNSCALED proxy (RAW: a half-res
   // bin; big 8-bit: toPreview's <=2800px copy) and the GPU taps in proxy texels,
-  // so at native resolution the kernels must tap `proxyFactor` native pixels
-  // apart to reproduce the footprint the user previewed and tuned — otherwise
-  // export sharpens ~2x finer structure than the preview showed. The factor is a
-  // property of the source, so single and batch exports agree. Kept in sync with
-  // main.ts MAX_PREVIEW (8-bit proxy) and demosaic.ts binning (RAW = half-res).
+  // so at native resolution the denoise and TEXTURE kernels tap `proxyFactor`
+  // native pixels apart to reproduce the footprint the user previewed and tuned.
+  // The factor is a property of the source, so single and batch exports agree.
+  // Kept in sync with main.ts MAX_PREVIEW (8-bit proxy) and demosaic.ts binning
+  // (RAW = half-res).
+  // CAPTURE SHARPENING IS THE EXCEPTION (2026-10-02): it restores the lens,
+  // filter and demosaic blur, which is measured in SENSOR pixels, so here it
+  // runs at native resolution with one-pixel taps (pitch 1) and the preview
+  // approximates it — see raw/detail.ts. Spaced `proxyFactor` apart it had no
+  // response at the sensor's Nyquist and never touched the finest detail.
   const proxyFactor = proxyFactorFor(src, srcW, srcH);
-  // Denoise first, then sharpen/texture — the same order the shader runs them
-  // (raw neighbourhood -> denoised centre -> detail gain). Both are no-ops when
-  // their slider is 0, so a plain edit keeps the 1x-decode fast path.
+  // Denoise first, then sharpen/texture — the same order the shader runs them,
+  // and detail's high-pass is measured from the DENOISED picture (the shader's
+  // luminance pre-pass, u_detailTex). Both are no-ops when their slider is 0, so
+  // a plain edit keeps the 1x-decode fast path.
   // AIMED, WHERE A MASK SAYS SO (decision 030). The flattened active groups are
   // the same list and order the shader indexes, taken here rather than reaching
   // into compileEdit's, because these pre-passes are composed before it runs.
@@ -589,7 +602,7 @@ export async function exportImage(
   // as well as the bilateral, because both are inside AIM_NOISE and the shader
   // mixes toward the same pre-despeckle value. See AIM_NOISE.
   const noiseAimed = aimedSampler(warped, denoised, aimGroups, AIM_NOISE, srcW, srcH);
-  const detailed = makeRowDetail(warped, noiseAimed, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor);
+  const detailed = makeRowDetail(noiseAimed, srcW, srcH, params.sharpen ?? 0, params.texture ?? 0, proxyFactor, 1);
   // Back toward the sampler detail was GIVEN, not toward `warped`: detail's
   // base is the denoise result, so holding it back must restore that and not
   // undo the denoise with it.
@@ -603,7 +616,7 @@ export async function exportImage(
   // amount is off or no sky was found, which is what makes it cost nothing on
   // the frames that do not need it.
   const skyMap = ((params.skySmooth ?? 0) > 0 || ((params.skyDepth ?? 0) > 0 && skyFine)) && sky
-    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, sky, flat)
+    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, "cfa" in src ? null : lens ?? null, sky, flat, params.warp)
     : null;
   // A raw's pixels already carry the flat (above), so the grade gets no curve
   // for it; an 8-bit source still takes it here. The flat itself goes in as
@@ -639,8 +652,21 @@ export async function exportImage(
 
   // HIE glow map at full resolution (cheap: built on a coarse grid).
   const gmap = params.glow > 0 ? buildGlowMap(rawSample, srcW, srcH) : null;
-  const glowAt = (sx: number, sy: number) =>
-    gmap ? params.glow * GLOW_GAIN * sampleGlow(gmap, (sx + 0.5) / srcW, (sy + 0.5) / srcH) : 0;
+  // WHERE A PIXEL CAME FROM under the warp, as image-uv: the glow and the
+  // clarity/dehaze maps are built from the UNWARPED source, so they are read at
+  // the displaced position — the shader's warpUv(v_uv) — or a pushed highlight
+  // leaves its glow behind and warped content takes another place's local mean
+  // and haze (2026-10-02). Written into `mapUv`, once per output pixel.
+  const warpF = params.warp && !warpIsEmpty(params.warp) ? params.warp : null;
+  const mapUv = new Float32Array(2);
+  const warpD = new Float32Array(2);
+  const mapAt = (sx: number, sy: number) => {
+    const u = (sx + 0.5) / srcW, v = (sy + 0.5) / srcH;
+    if (warpF) { sampleWarp(warpF, u, v, warpD); mapUv[0] = u + warpD[0]; mapUv[1] = v + warpD[1]; }
+    else { mapUv[0] = u; mapUv[1] = v; }
+  };
+  const glowAt = () =>
+    gmap ? params.glow * GLOW_GAIN * sampleGlow(gmap, mapUv[0], mapUv[1]) : 0;
 
   // When rotated 90/270, the outer loop follows output COLUMNS so that source
   // rows stay constant per pass (keeps the denoiser's row cache effective).
@@ -739,7 +765,8 @@ export async function exportImage(
         const p = toSrc(x, y);
         const sx = p[0], sy = p[1];
         const s = sampleBox(x, y); // box-filtered when scaled (see above)
-        edit(s[0], s[1], s[2], out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+        mapAt(sx, sy);
+        edit(s[0], s[1], s[2], out, glowAt(), (sx + 0.5) / srcW, (sy + 0.5) / srcH, mapUv[0], mapUv[1]);
         applyOnTop(sx, sy); // on-top stickers over the finished look, before grain (matches the shader)
         finishPixel(x, y); // creative vignette + grain, still in sRGB display space
         srgbDisplayToP3Display(out[0], out[1], out[2], p3);
@@ -893,7 +920,8 @@ export async function exportImage(
         const p = toSrc(x, y);
         const sx = p[0], sy = p[1];
         const s = sampleBox(x, y); // box-filtered when scaled (see above)
-        edit(s[0], s[1], s[2], out, glowAt(sx, sy), (sx + 0.5) / srcW, (sy + 0.5) / srcH);
+        mapAt(sx, sy);
+        edit(s[0], s[1], s[2], out, glowAt(), (sx + 0.5) / srcW, (sy + 0.5) / srcH, mapUv[0], mapUv[1]);
         applyOnTop(sx, sy); // on-top stickers over the finished look, before grain (matches the shader)
         finishPixel(x, y); // creative vignette + grain, same as the JPEG path
         const o = ((y - bandY0) * bandW + (x - bandX0)) * 3;

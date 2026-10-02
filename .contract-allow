@@ -56,10 +56,6 @@ src/half.ts:toHalf
 src/half.ts:fromHalf
 src/half.ts:toHalfBuffer
 src/heal.ts:spotRect
-src/heal.ts:bakeRgba8
-src/heal.ts:bakeRgbaF32
-src/heal.ts:healPatches8
-src/heal.ts:healPatchesFromSampler
 src/heal.ts:wrapWithPatches
 src/heal.ts:lumaAccessor
 src/heal.ts:findHealSource
@@ -87,7 +83,6 @@ src/lensprofile.ts:radialMeans
 src/lensprofile.ts:profileFrame
 src/lensprofile.ts:averageProfiles
 src/lensrig.ts:wireLensRig
-src/localmap.ts:buildLocalMap
 src/look.ts:coerceLook
 src/look.ts:cleanName
 src/look.ts:encodeLookPayload
@@ -107,7 +102,6 @@ src/palette.ts:currentPalette
 src/pipeline.ts:mix3IsIdentity
 src/pipeline.ts:gradeIsNeutral
 src/pipeline.ts:cropIsIdentity
-src/pipeline.ts:sampleLocalMap
 src/pipeline.ts:neutralMask
 src/pipeline.ts:maskIsActive
 src/pipeline.ts:smooth01
@@ -154,7 +148,6 @@ src/qr.ts:drawQr
 src/raw/demosaic.ts:demosaicBinned
 src/raw/demosaic.ts:demosaicPixelLinear
 src/raw/demosaic.ts:demosaicPixelLinearInto
-src/raw/detail.ts:makeRowDetail
 src/raw/dngRaw.ts:decodeMosaicedDng
 src/raw/dngRaw.ts:readMosaicedCfa
 src/raw/lj92.ts:decodeLJ92
@@ -196,9 +189,7 @@ src/wakelock.ts:supported
 src/warp.ts:makeWarpField
 src/warp.ts:encodeWarp
 src/warp.ts:warpIsEmpty
-src/warp.ts:paintWarp
 src/warp.ts:sampleWarp
-src/warp.ts:warpSampler
 src/zip.ts:readZipIndex
 src/zip.ts:readZipEntry
 src/zip.ts:readZipEntryPrefix
