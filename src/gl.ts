@@ -227,8 +227,8 @@ uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/deta
 uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
 uniform vec2 u_texel;    // one PROXY texel: tapScale / textureSize (see setTapScale)
 uniform float u_sharpK;  // 1/(2 sigma^2) of the sharpen blur in TEXELS: sigma from sharpenSigmaTexels (raw/detail.ts)
-uniform sampler2D u_detailTex; // R16F denoised LUMINANCE, one texel per source texel (unit 14) — detail's input
-uniform bool u_detailPre;      // u_detailTex holds the pre-pass for this draw; false = read u_tex itself
+uniform sampler2D u_detailTex; // the pre-pass, one texel per source texel (unit 14): .r the denoised LUMINANCE (detail's input), .gba the denoised colour when RGBA16F
+uniform int u_detailPre;       // 0 = no pre-pass, read u_tex itself; 1 = luminance in .r; 2 = and the denoised colour in .gba, sampled LINEAR under straighten
 uniform int u_stage;           // 1 = the detail pre-pass: emit the denoised luminance and stop
 uniform float u_split;   // compare divider: denoise applies where uv.x >= split
 uniform int u_spotVis;   // 1 = "Visualize spots": amplified high-pass luma view
@@ -397,7 +397,7 @@ vec3 fetchLin(vec2 uv){ vec3 s = textureLod(u_tex, warpUv(uv), 0.0).rgb; return 
 float detailLum(ivec2 p){
   ivec2 sz = textureSize(u_tex, 0);
   ivec2 q = clamp(p, ivec2(0), sz - 1);
-  if (u_detailPre) return texelFetch(u_detailTex, q, 0).r;
+  if (u_detailPre > 0) return texelFetch(u_detailTex, q, 0).r;
   return dot(fetchLin((vec2(q) + 0.5) / vec2(sz)), LUMA_W);
 }
 
@@ -779,12 +779,26 @@ void main() {
   // pre-blurred field that changed with phase across the screen, and a +12 sigma
   // speck still showed at about 6 sigma where the export, which reads whole
   // pixels, removed it. The address uses the texture's true size, not u_texel,
-  // which may span several texels on a native-resolution copy.
+  // which may span several texels on a native-resolution copy. UNDER
+  // STRAIGHTEN none of this runs where the pre-pass can be drawn: the
+  // denoised texels are blended instead (dnLive above).
   vec3 preNoise = c;
+  // UNDER STRAIGHTEN, FROM THE PRE-PASS, BLENDED (u_detailPre 2, 2026-10-02).
+  // The export denoises whole pixels and then resamples the DENOISED picture
+  // bilinearly at the straightened position (export.ts tap -> bilinearTap).
+  // Denoised here at the one texel the fragment falls in, a straightened
+  // preview was a nearest-neighbour resample of the denoised picture: jagged
+  // on every straight edge and off the file by up to a texel. The pre-pass
+  // holds the denoised (and AIM_NOISE-held) colour of every texel, so a LINEAR
+  // read at v_uv blends the four around this position exactly as bilinearTap
+  // does, for one fetch where the denoise below is hundreds. The pre-pass is
+  // already warped and split, so neither applies again here.
+  bool dnLive = u_detailPre != 2;
+  if (!dnLive) c = textureLod(u_detailTex, v_uv, 0.0).gba;
   ivec2 dnSize = textureSize(u_tex, 0);
   vec2 dnScale = u_texel * vec2(dnSize); // the tap scale, in texels per proxy texel
   ivec2 dnP = ivec2(floor(v_uv * vec2(dnSize)));
-  if ((u_despeckle > 0.0 || u_denoise > 0.0 || u_chroma > 0.0) && v_uv.x >= u_split) {
+  if (dnLive && (u_despeckle > 0.0 || u_denoise > 0.0 || u_chroma > 0.0) && v_uv.x >= u_split) {
     c = dnFetch(dnP, dnSize);
     // THE PIXEL AS IT ARRIVED, kept for AIM_NOISE. Captured HERE, before the
     // despeckle median as well as the bilateral, because both sit inside that one
@@ -804,7 +818,7 @@ void main() {
   // raw/denoise.ts: the centre must be the extreme of its own 3x3 AND sit
   // further from that window's median than k times the window's spread.
   vec3 ctr = c;
-  if (u_despeckle > 0.0 && v_uv.x >= u_split) {
+  if (dnLive && u_despeckle > 0.0 && v_uv.x >= u_split) {
     float k = 0.45 * (1.0 - u_despeckle) + 0.02; // keep in sync with raw/denoise.ts
     vec3 n[9];
     int q = 0;
@@ -825,7 +839,7 @@ void main() {
     ctr = mix(c, med, vec3(extreme.x && far.x, extreme.y && far.y, extreme.z && far.z));
     c = ctr;
   }
-  if ((u_denoise > 0.0 || u_chroma > 0.0) && v_uv.x >= u_split) {
+  if (dnLive && (u_denoise > 0.0 || u_chroma > 0.0) && v_uv.x >= u_split) {
     // Sigma in NOISE units (dnStab): RANGE_SCALE * s^2, keep the literal in sync
     // with raw/denoise.ts rangeSigma(). With the luminance half off the loop is
     // SKIPPED, as on the CPU: the sigma 1e-6 floor it used to run at still let a
@@ -933,16 +947,18 @@ void main() {
   // load-bearing for the same reason it is on the lens weight below:
   // aimWeightOf walks every mask, and a frame with neither slider on must not
   // pay for it. At weight 1 this is mix(x, y, 1.0) == y exactly.
-  if (u_despeckle > 0.0 || u_denoise > 0.0 || u_chroma > 0.0) {
+  if (dnLive && (u_despeckle > 0.0 || u_denoise > 0.0 || u_chroma > 0.0)) {
     c = mix(preNoise, c, aimWeightOf(16));
   }
 
   // THE DETAIL PRE-PASS STOPS HERE (Renderer.ensureDetailPre): the denoised
   // picture's luminance at this texel, which is what sharpen and texture
-  // measure their high-pass from — the base sampler of raw/detail.ts. Drawn once into an
-  // R16F target the size of the source, mirrored in y (u_flip 2) so its texel
-  // (x, y) is the source's.
-  if (u_stage == 1) { frag = vec4(dot(c, LUMA_W), 0.0, 0.0, 1.0); return; }
+  // measure their high-pass from — the base sampler of raw/detail.ts — and
+  // its colour, which a straightened draw blends (u_detailPre 2). Drawn once
+  // into a target the size of the source, mirrored in y (u_flip 2) so its
+  // texel (x, y) is the source's: R16F keeps the luminance alone, RGBA16F
+  // keeps both, and the luminance in .r is the same half-float either way.
+  if (u_stage == 1) { frag = vec4(dot(c, LUMA_W), c); return; }
 
   // Detail: sharpen (high-freq) + texture (mid-freq) on LINEAR data, after
   // denoise and before WB — a hue-preserving luminance gain from Gaussian blurs
@@ -1493,12 +1509,17 @@ export class Renderer {
   private flipBits = 0; // source-space mirror: bit 1 = x, bit 2 = y (see VERT u_flip)
   private crop: CropRect = CROP_DEFAULT; // last-applied crop, drives canvas size + inverse mapping
   private straighten = 0; // last-applied straighten angle (degrees), for inverse mapping
-  private isLinear = false;
-  private isHalf = false;   // the texture is RGBA16F rather than RGBA32F
+  private isLinear = false;   // a float source (setImage)
+  private isHalf = false;     // ...uploaded RGBA16F rather than RGBA32F (setImage)
   /** OES_texture_float_linear was granted: an RGBA32F texture may be sampled
    *  LINEAR. RGBA16F needs nothing — it is texture-filterable in core GLES 3.0
    *  (table 3.13), so WebGL2 filters it everywhere. */
   private floatLinear = false;
+  /** The 8-bit source is uploaded SRGB8_ALPHA8, so the sampler hands the
+   *  shader linear values and `u_linear` is set for it (setImage). */
+  private srgbSource = false;
+  /** `srgbFiltersLinear`'s answer, measured once; null until asked. */
+  private srgbProbe: boolean | null = null;
   /** The MIN/MAG filter currently set on the source texture, so bindPipeline
    *  changes it only when straighten or warp turns on or off. */
   private srcFilter = 0;
@@ -1691,11 +1712,15 @@ export class Renderer {
   /** How many native sensor pixels one texel of the bound texture spans — see
    *  setNativePitch. */
   private nativePitch = 1;
-  /** THE DETAIL PRE-PASS: the denoised picture's luminance, one R16F texel per
-   *  source texel, which sharpen and texture measure their high-pass from (see
-   *  ensureDetailPre). Allocated on first need, freed when the image size
-   *  changes; null when the device cannot render to it (`detailOk` false). */
+  /** THE DETAIL PRE-PASS: the denoised picture, one texel per source texel —
+   *  its luminance, which sharpen and texture measure their high-pass from,
+   *  and under straighten its colour, which the draw blends (see
+   *  ensureDetailPre). Allocated on first need, freed when the image size or
+   *  the format it needs changes; null when the device cannot render to it
+   *  (`detailOk` false). */
   private detailTex: WebGLTexture | null = null;
+  /** Its internal format: R16F (luminance) or RGBA16F (luminance + colour). */
+  private detailFmt = 0;
   private detailFbo: WebGLFramebuffer | null = null;
   private detailW = 0;
   private detailH = 0;
@@ -1754,12 +1779,12 @@ export class Renderer {
       // work. The flag stays set until a reload builds a real one.
       this.onContextRestored?.();
     });
-    // Float textures (for 14-bit linear raw) need this extension to be color-
-    // renderable; sampling works regardless. OES_texture_float_linear lets an
-    // RGBA32F source be filtered LINEAR under straighten and warp (setImage);
-    // RGBA16F needs no extension. Both asked for BEFORE the build: enabling an
-    // extension makes ANGLE release its shader compiler, and doing that with a
-    // compile in flight is a risk with no gain.
+    // Float textures need this extension to be color-renderable; sampling
+    // works regardless. OES_texture_float_linear lets an RGBA32F source be
+    // filtered LINEAR under straighten and warp; without it setImage uploads
+    // the source RGBA16F, which needs no extension. Both asked for BEFORE the
+    // build: enabling an extension makes ANGLE release its shader compiler,
+    // and doing that with a compile in flight is a risk with no gain.
     gl.getExtension("EXT_color_buffer_float");
     this.floatLinear = !!gl.getExtension("OES_texture_float_linear");
 
@@ -2435,7 +2460,7 @@ export class Renderer {
     this.imgW = width;
     this.imgH = height;
     this.isLinear = !!(img.linear || img.linear16);
-    this.isHalf = !!img.linear16 && !img.linear;
+    this.isHalf = !!img.linear16 || (!!img.linear && !this.floatLinear);
     // Upload column-major for GLSL (our matrix is row-major).
     this.camMatrix = img.camMatrix ? rowToColMajor(img.camMatrix) : null;
     this.applySize();
@@ -2446,16 +2471,11 @@ export class Renderer {
       // centre (crop and quarter-turns keep the grid), so NEAREST returns the
       // texel exactly. Straighten and warp move the sample off the grid, and
       // there NEAREST is a nearest-neighbour resample of the photograph —
-      // bindPipeline switches to LINEAR for them. This used to say float
-      // textures are not reliably linear-filterable, which is true of RGBA32F
-      // (it needs OES_texture_float_linear) and false of RGBA16F: GLES 3.0
-      // table 3.13 marks it texture-filterable, so WebGL2 filters it on every
-      // device. RGBA16F is the native-resolution copy's format (`linear16`);
-      // a raw's half-size working copy arrives as `linear` and is RGBA32F, so
-      // ITS straighten and warp are filtered only where the extension is.
+      // bindPipeline switches to LINEAR for them.
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       this.srcFilter = gl.NEAREST;
+      this.srgbSource = false;
       if (img.linear16) {
         // HALF THE MEMORY, and the reason it matters is a device rather than a
         // preference: a full-resolution frame is 16 MB a megapixel as float32 —
@@ -2464,17 +2484,116 @@ export class Renderer {
         // holds ~11 bits of relative precision, which is what every HDR image
         // pipeline uses for linear data, and the shader samples it identically.
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, width, height, 0, gl.RGBA, gl.HALF_FLOAT, img.linear16);
-      } else {
+      } else if (this.floatLinear) {
+        // A raw's half-size working copy, as float32, where the device filters it.
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, img.linear!);
+      } else {
+        // AND AS HALF-FLOAT WHERE IT DOES NOT (2026-10-02). RGBA32F filters only
+        // where OES_texture_float_linear is granted; on a device without it
+        // a raw's straightened or warped preview was a nearest resample while
+        // its export is bilinear. RGBA16F is texture-filterable in WebGL 2 core
+        // (GLES 3.0 table 3.13), and type FLOAT into an RGBA16F texture is a
+        // valid upload (table 3.2), so the driver rounds the copy as it goes.
+        // The cost is that rounding: measured on the tone and hue parity
+        // checks, the worst preview value moves by up to 0.4 of a level, on
+        // dark channels after a hue turn. Where the extension is granted
+        // nothing changes.
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, width, height, 0, gl.RGBA, gl.FLOAT, img.linear!);
       }
     } else {
+      // SRGB8_ALPHA8, SO THE FILTER BLENDS LIGHT RATHER THAN CODES (2026-10-02).
+      // An 8-bit picture's bytes are sRGB-encoded. Uploaded as plain RGBA8,
+      // the LINEAR filter under straighten blended the encoded bytes and the
+      // shader linearised the blend, which darkens every edge it crosses,
+      // while the export (export.ts bilinearTap) blends linearised values. An
+      // sRGB texture is decoded by the sampler with the piecewise sRGB curve
+      // the shader's toLinear applies (GLES 3.0 section 3.8.16), and is
+      // texture-filterable in WebGL 2 core. The spec asks for the decode
+      // before the filter and permits it after; `srgbFiltersLinear` measures
+      // which this device does, and where it is after, the upload stays RGBA8
+      // and the shader decodes, as before. `u_linear` tells the shader which,
+      // so the curve is applied exactly once.
+      this.srgbSource = this.srgbFiltersLinear();
+      gl.bindTexture(gl.TEXTURE_2D, this.tex);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texImage2D(
-        gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+        gl.TEXTURE_2D, 0, this.srgbSource ? gl.SRGB8_ALPHA8 : gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE,
         new Uint8Array(img.pixels!.buffer),
       );
     }
+  }
+
+  /** DOES THIS DEVICE DECODE AN sRGB TEXTURE BEFORE IT FILTERS IT? GLES 3.0
+   *  section 3.8.16 asks for the conversion on each texel before filtering and
+   *  permits it after. Takes nothing; measured once and kept. Returns true when
+   *  a 2 x 1 SRGB8_ALPHA8 texture holding 0 and 255, sampled LINEAR halfway
+   *  between its texel centres, reads 0.5 (decoded, then blended: 128 of 255)
+   *  rather than toLinear(0.5) (blended, then decoded: 55 of 255); false when
+   *  it does not, or the probe cannot be drawn. What the caller relies on: true
+   *  means an 8-bit source uploaded SRGB8_ALPHA8 filters in linear light, as
+   *  the export's bilinearTap does; false keeps the RGBA8 upload. Puts back
+   *  the framebuffer, viewport and program it found; unit 0's binding it
+   *  leaves to setImage, which binds the source texture straight after. */
+  private srgbFiltersLinear(): boolean {
+    if (this.srgbProbe !== null) return this.srgbProbe;
+    const gl = this.gl;
+    let ok = false;
+    const tex = gl.createTexture();
+    const target = gl.createTexture();
+    const fbo = gl.createFramebuffer();
+    const prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+    const prevProg = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram | null;
+    const vp = gl.getParameter(gl.VIEWPORT) as Int32Array;
+    const vs = gl.createShader(gl.VERTEX_SHADER)!, fs = gl.createShader(gl.FRAGMENT_SHADER)!;
+    const prog = gl.createProgram()!;
+    try {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, 2, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255, 255, 255, 255, 255]));
+      gl.bindTexture(gl.TEXTURE_2D, target);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE) {
+        gl.shaderSource(vs, "#version 300 es\nvoid main(){ gl_Position = vec4(0.0, 0.0, 0.0, 1.0); gl_PointSize = 1.0; }");
+        gl.shaderSource(fs, "#version 300 es\nprecision highp float; uniform highp sampler2D t; out vec4 o; void main(){ o = textureLod(t, vec2(0.5, 0.5), 0.0); }");
+        gl.compileShader(vs);
+        gl.compileShader(fs);
+        gl.attachShader(prog, vs);
+        gl.attachShader(prog, fs);
+        gl.linkProgram(prog);
+        if (gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+          gl.useProgram(prog);
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          gl.uniform1i(gl.getUniformLocation(prog, "t"), 0);
+          gl.viewport(0, 0, 1, 1);
+          gl.drawArrays(gl.POINTS, 0, 1);
+          const px = new Uint8Array(4);
+          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          ok = Math.abs(px[0] - 127.5) <= 3;
+        }
+      }
+    } catch {
+      ok = false;
+    } finally {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, prevFbo);
+      gl.viewport(vp[0], vp[1], vp[2], vp[3]);
+      gl.useProgram(prevProg);
+      gl.deleteFramebuffer(fbo);
+      gl.deleteTexture(tex);
+      gl.deleteTexture(target);
+      gl.deleteProgram(prog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+    }
+    this.srgbProbe = ok;
+    return ok;
   }
 
   /** Bind the program, every edit uniform, and the three input textures. Shared
@@ -2487,22 +2606,22 @@ export class Renderer {
     const gl = this.gl;
     // The detail pre-pass FIRST, while nothing of this draw is bound yet — it
     // binds this same program and its own target, and puts both back.
-    const pre = stage === 0 && this.ensureDetailPre(p, split);
+    const straighten = applyCrop ? p.straighten ?? 0 : 0;
+    const pre = stage === 0 ? this.ensureDetailPre(p, split, straighten !== 0, applyCrop) : 0;
     gl.useProgram(this.program);
     gl.uniform1i(this.loc.u_tex, 0);
     gl.uniform1i(this.loc.u_stage, stage);
-    gl.uniform1i(this.loc.u_detailPre, pre ? 1 : 0);
+    gl.uniform1i(this.loc.u_detailPre, pre);
     gl.uniform1i(this.loc.u_detailTex, 14);
     gl.activeTexture(gl.TEXTURE14);
     // NEVER the pre-pass's own target while it is being drawn into: a texture
     // that is both sampled and attached is a feedback loop WebGL refuses.
-    gl.bindTexture(gl.TEXTURE_2D, pre ? this.detailTex : null);
+    gl.bindTexture(gl.TEXTURE_2D, pre > 0 ? this.detailTex : null);
     gl.activeTexture(gl.TEXTURE0);
     const sigTex = sharpenSigmaTexels(this.nativePitch); // DETAIL_SIGMA_S (1 native pixel) in texels, the proxy's box kept (raw/detail.ts)
     gl.uniform1f(this.loc.u_sharpK, 1 / (2 * sigTex * sigTex));
     gl.uniform3f(this.loc.u_hazeA, this.hazeA[0], this.hazeA[1], this.hazeA[2]);
     const crop = applyCrop ? p.crop ?? CROP_DEFAULT : CROP_DEFAULT;
-    const straighten = applyCrop ? p.straighten ?? 0 : 0;
     gl.uniform4f(this.loc.u_crop, crop.x, crop.y, crop.w, crop.h);
     gl.uniform1f(this.loc.u_straighten, (straighten * Math.PI) / 180);
     gl.uniform2f(this.loc.u_straightenCS, Math.cos((-straighten * Math.PI) / 180), Math.sin((-straighten * Math.PI) / 180));
@@ -2542,7 +2661,7 @@ export class Renderer {
     gl.uniform1f(this.loc.u_sat, p.sat);
     gl.uniform1f(this.loc.u_con, p.contrast);
     gl.uniform1f(this.loc.u_exposure, p.exposure);
-    gl.uniform1i(this.loc.u_linear, this.isLinear ? 1 : 0);
+    gl.uniform1i(this.loc.u_linear, this.isLinear || this.srgbSource ? 1 : 0);
     gl.uniform1i(this.loc.u_useCam, this.camMatrix ? 1 : 0);
     if (this.camMatrix) gl.uniformMatrix3fv(this.loc.u_cam, false, this.camMatrix);
     gl.uniform1f(this.loc.u_glow, p.glow);
@@ -2840,14 +2959,11 @@ export class Renderer {
     // THE LINEAR SOURCE IS FILTERED WHEN THE GRID IS LEFT (see setImage): under
     // straighten or warp the sample falls between texels, and the computed
     // export interpolates bilinearly there too (export.ts bilinearTap; warp.ts
-    // warpSampler), so preview and saved file are the same resample. An
-    // RGBA32F source without OES_texture_float_linear cannot filter and stays
-    // NEAREST. That is not only the drawn-export probe: a raw's working copy
-    // is RGBA32F (setImage), so on a device without the extension a raw's
-    // straightened or warped preview is a nearest resample while its export
-    // is bilinear. Whether the reader's tablet has it is not measured.
+    // warpSampler), so preview and saved file are the same resample. A float
+    // source is RGBA32F only where OES_texture_float_linear lets it filter,
+    // and RGBA16F, which WebGL 2 filters everywhere, otherwise (setImage).
     if (this.isLinear) {
-      const filt = (straighten !== 0 || this.warpOn) && (this.isHalf || this.floatLinear) ? gl.LINEAR : gl.NEAREST;
+      const filt = straighten !== 0 || this.warpOn ? gl.LINEAR : gl.NEAREST;
       if (filt !== this.srcFilter) {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filt);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filt);
@@ -2866,25 +2982,45 @@ export class Renderer {
     this.detailTex = null;
     this.detailW = 0;
     this.detailH = 0;
+    this.detailFmt = 0;
     this.detailKey = "";
   }
 
-  /** THE DENOISED LUMINANCE, DRAWN ONCE, FOR SHARPEN AND TEXTURE TO READ.
+  /** THE DENOISED PICTURE, DRAWN ONCE, FOR SHARPEN, TEXTURE AND STRAIGHTEN.
    *
    *  @param p     the edit about to be drawn.
    *  @param split the compare divider the draw uses (denoise applies right of it).
-   *  @returns true when `detailTex` now holds the pre-pass for `p`, so the
-   *           draw should read it; false when the draw should read the source
-   *           texels themselves.
+   *  @param colour this draw samples the source between texels (straighten), so
+   *           it needs the denoised COLOUR of every texel, to blend.
+   *  @param onScreen the draw is the on-screen one (crop and straighten
+   *           applied) rather than an offscreen read pass; only it may change
+   *           the target's format, so the two never take turns reallocating.
+   *  @returns what `u_detailPre` should say: 0 when the draw should read the
+   *           source texels itself, 1 when `detailTex` holds this edit's
+   *           denoised luminance in .r, 2 when it holds the denoised colour in
+   *           .gba as well, to be read LINEAR at the fragment's position. The
+   *           shader relies on 2 meaning the noise stage and its AIM_NOISE hold
+   *           are already in those texels, for the whole source, warped and
+   *           split as this draw would.
    *
    *  WHY A PASS: detail's high-pass is measured from the DENOISED picture
    *  (raw/detail.ts), and one fragment cannot denoise its forty-nine or
    *  hundred-and-sixty-nine neighbours — that is a 13x13 bilateral per tap. So
-   *  the program runs once more, into an R16F target the size of the source,
-   *  stopping after the noise stage (u_stage 1) and writing that pixel's
-   *  luminance. Half precision, like the working copy itself: 2 bytes a texel,
-   *  42 MB for a 21-megapixel native copy, where a full colour copy would be
-   *  four times that.
+   *  the program runs once more, into a target the size of the source,
+   *  stopping after the noise stage (u_stage 1). R16F, the luminance alone,
+   *  when that is all the draw needs: 2 bytes a texel, 42 MB for a
+   *  21-megapixel native copy.
+   *
+   *  AND UNDER STRAIGHTEN, THE COLOUR (2026-10-02). The export denoises whole
+   *  pixels and resamples the denoised picture bilinearly (export.ts tap ->
+   *  bilinearTap); a fragment can only denoise the one texel it falls in, so a
+   *  straightened preview with noise reduction on — every raw as it opens —
+   *  was a nearest-neighbour resample of it. RGBA16F then, 8 bytes a texel
+   *  (42 MB for a raw's half-size working copy), and the draw reads it LINEAR:
+   *  the four denoised texels around the position, blended as bilinearTap
+   *  blends them. It also makes the straightened draw cheaper, since the
+   *  bilateral then runs once per texel per change of a noise slider, not on
+   *  every draw.
    *
    *  REDRAWN ONLY WHEN WHAT IT DEPENDS ON MOVES: the source (setImage,
    *  patchImage), the warp field, the three noise sliders, the divider, the
@@ -2892,28 +3028,36 @@ export class Renderer {
    *  a slider touches is downstream of it, so dragging exposure costs no extra
    *  pass at all.
    *
-   *  NOT NEEDED, and skipped, when detail is off, or when noise reduction is
-   *  off — then the source, read through the warp at each texel's centre
-   *  (detailLum), IS the denoised picture. When
-   *  the device cannot render to a half-float target, it returns false and
-   *  the shader reads the source: detail then measures the pre-denoise
-   *  picture, as it did before 2026-10-02, rather than nothing. */
-  private ensureDetailPre(p: EditParams, split: number): boolean {
+   *  NOT NEEDED, and skipped, when noise reduction is off — then the source,
+   *  read through the warp at each texel's centre (detailLum) or filtered at
+   *  the position, IS the denoised picture — or when neither detail nor
+   *  straighten is on. When the device cannot render to a half-float target it
+   *  returns 0 and the shader reads the source: detail then measures the
+   *  pre-denoise picture, as it did before 2026-10-02, and a straightened draw
+   *  denoises the texel it falls in, as it did before the colour was kept. */
+  private ensureDetailPre(p: EditParams, split: number, colour: boolean, onScreen: boolean): 0 | 1 | 2 {
     const detailOn = (p.sharpen ?? 0) > 0 || (p.texture ?? 0) !== 0;
-    if (!detailOn) return false;
     const noiseOn = p.denoise > 0 || (p.chroma ?? 0) > 0 || (p.despeckle ?? 0) > 0;
-    if (!noiseOn) return false; // detailLum reads the (warped) source itself
-    if (this.detailOk === false) return false;
+    if (!noiseOn) return 0; // detailLum and fetchLin read the (warped) source itself
+    if (!detailOn && !colour) return 0;
+    if (this.detailOk === false) return 0;
     const gl = this.gl;
-    if (!this.detailTex || this.detailW !== this.imgW || this.detailH !== this.imgH) {
+    // The format this draw needs. An offscreen read pass never straightens and
+    // takes whatever is there, since either format carries the luminance.
+    const fmt = colour ? gl.RGBA16F : onScreen || !this.detailFmt ? gl.R16F : this.detailFmt;
+    if (!this.detailTex || this.detailW !== this.imgW || this.detailH !== this.imgH || this.detailFmt !== fmt) {
       this.freeDetail();
       const tex = gl.createTexture()!;
       gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      // LINEAR: a straightened draw blends the colour between texel centres,
+      // as the export's bilinearTap does. Half-float filters in WebGL 2 core;
+      // the luminance is read with texelFetch, which no filter touches.
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, this.imgW, this.imgH, 0, gl.RED, gl.HALF_FLOAT, null);
+      if (fmt === gl.RGBA16F) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, this.imgW, this.imgH, 0, gl.RGBA, gl.HALF_FLOAT, null);
+      else gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, this.imgW, this.imgH, 0, gl.RED, gl.HALF_FLOAT, null);
       const fbo = gl.createFramebuffer()!;
       const prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -2924,19 +3068,21 @@ export class Renderer {
         gl.deleteFramebuffer(fbo);
         gl.deleteTexture(tex);
         this.detailOk = false;
-        return false;
+        return 0;
       }
       this.detailOk = true;
       this.detailTex = tex;
       this.detailFbo = fbo;
       this.detailW = this.imgW;
       this.detailH = this.imgH;
+      this.detailFmt = fmt;
     }
+    const mode = colour ? 2 : 1;
     const masks = aimsAt(maskGroupsForRender(p.masks), AIM_NOISE)
       ? JSON.stringify(p.masks, (k, v) => (k === "data" ? undefined : v))
       : "";
     const key = `${this.srcGen}|${p.denoise}|${p.chroma ?? 0}|${p.despeckle ?? 0}|${split}|${this.tapScale}|${masks}`;
-    if (key === this.detailKey) return true;
+    if (key === this.detailKey) return mode;
     const prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
     const vp = gl.getParameter(gl.VIEWPORT) as Int32Array;
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.detailFbo);
@@ -2946,7 +3092,7 @@ export class Renderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, prevFbo);
     gl.viewport(vp[0], vp[1], vp[2], vp[3]);
     this.detailKey = key;
-    return true;
+    return mode;
   }
 
   /** "Visualize spots" mode for the ON-SCREEN render only (offscreen passes —

@@ -47,6 +47,40 @@ function bytesPerPixel(opts: ExportOptions): number {
   return opts.format === "tiff" ? 6 : 4;
 }
 
+/** WHAT ONE WORKER'S OWN COPY OF THE SOURCE WEIGHS, per source pixel, by
+ *  what kind of source it is — read from the arrays a worker actually builds,
+ *  because this is the largest per-worker term after the file itself and it
+ *  was billed at a mosaic's two bytes for every kind until 2026-10-02:
+ *    - "mosaic" (a NEF, a mosaiced DNG): `readNefCfa` / `readDngRaw` keep one
+ *      Uint16 photosite a pixel — 2 bytes;
+ *    - "linear" (an uncompressed or lossless LinearRaw DNG): the same reader
+ *      keeps three Uint16 samples a pixel (dngRaw.ts finishRaw) — 6 bytes;
+ *    - "lossy" (a lossy LinearRaw DNG): the worker is posted the browser's
+ *      decoded tiles, RGBA bytes (`DecodedImage.lossyCodes`, 4 bytes), and
+ *      `rawFromLossyCodes` builds its three-sample Uint16 frame from them
+ *      (6 bytes) while the codes stay held for the whole band — 10 bytes;
+ *    - "8bit" (JPEG, PNG, HEIC, an embedded preview): the decoded RGBA bytes
+ *      `getSource` hands back as they are — 4 bytes.
+ *  Takes `kind`, from export.ts `sourceKind`. Returns bytes per source pixel.
+ *  What the result has to satisfy: it is never less than what a worker holds
+ *  for that kind once its source is built, because `perWorkerMb` multiplies it
+ *  by the source's pixel count and the pool is sized from that — billed low,
+ *  a tablet starts more workers than it has memory for and the tab is killed.
+ *  A 20.9-megapixel lossy DNG on a device with no memory hint (every iPad)
+ *  was billed 42 MB of source a worker and holds 209 MB. */
+export function sourceBytesPerPixel(kind: SourceKind): number {
+  switch (kind) {
+    case "mosaic": return 2;
+    case "linear": return 6;
+    case "lossy": return 4 + 6;
+    case "8bit": return 4;
+  }
+}
+
+/** What an export reads its pixels from, as far as memory is concerned — see
+ *  `sourceBytesPerPixel`, and export.ts `sourceKind`, which decides it. */
+export type SourceKind = "mosaic" | "linear" | "lossy" | "8bit";
+
 /** WHAT ONE MORE THREAD COSTS IN MEMORY, in megabytes, and it is not small: a
  *  worker holds its own copy of the file, its own decode of the sensor data,
  *  and its own band of the output.
@@ -57,8 +91,10 @@ function bytesPerPixel(opts: ExportOptions): number {
  *  against the 96 MB this predicts for the same export. The model is the only
  *  part that travels: the same file at 45 megapixels would cost 220 MB a
  *  thread, and three of those is a killed tab on a tablet rather than a slow
- *  export. */
-function perWorkerMb(fileBytes: number, srcPixels: number, outPixels: number, n: number, bytesPerPixel = 4, healBytes = 0): number {
+ *  export. That measurement was a NEF, a mosaic; the source term is billed by
+ *  kind (`sourceBytesPerPixel`), so a LinearRaw or lossy DNG and an 8-bit
+ *  picture are billed what they hold rather than a mosaic's two bytes. */
+function perWorkerMb(fileBytes: number, srcPixels: number, srcBytesPerPixel: number, outPixels: number, n: number, bytesPerPixel = 4, healBytes = 0): number {
   // HEAL IS PER WORKER AND DOES NOT DIVIDE. Every other term here either
   // belongs to the worker alone (its copy of the file, its decode) or is the
   // output split `n` ways — but each worker bakes EVERY patch, from its own
@@ -70,10 +106,10 @@ function perWorkerMb(fileBytes: number, srcPixels: number, outPixels: number, n:
   // at a time, so each worker keeps the tiles it has computed (raw/demosaic.ts):
   // about 14 MB at 21 megapixels. It is billed from the same function that
   // sizes the allocation, so the two cannot drift. (The +104 MB a thread
-  // measured above predates it, when the demosaic held nothing.) An 8-bit
-  // source never builds one, and is billed for it anyway, which errs the safe
-  // way.
-  return (fileBytes + srcPixels * 2 + (outPixels * bytesPerPixel) / n + healBytes + demosaicCacheBytes(srcPixels)) / 1e6 + 10;
+  // measured above predates it, when the demosaic held nothing.) An 8-bit or
+  // LinearRaw source never builds one, and is billed for it anyway, which errs
+  // the safe way.
+  return (fileBytes + srcPixels * srcBytesPerPixel + (outPixels * bytesPerPixel) / n + healBytes + demosaicCacheBytes(srcPixels)) / 1e6 + 10;
 }
 
 /** The memory an export may spend on threads that are not the main one, and how
@@ -112,6 +148,11 @@ export interface ParallelJob {
    *  it would under-bill the budget silently, which is the shape of defect the
    *  budget exists to prevent. Zero when nothing is healed. */
   healBytes: number;
+  /** What kind of source each worker builds, from export.ts `sourceKind` —
+   *  what its own copy weighs a pixel (`sourceBytesPerPixel`). REQUIRED for
+   *  the same reason as `healBytes`: a default would be a mosaic's two bytes,
+   *  which is the under-bill this field exists to end. */
+  source: SourceKind;
 }
 
 /** HOW MANY WORKERS THIS EXPORT MAY START — the one place that answers it.
@@ -188,7 +229,7 @@ export function workerCount(job: ParallelJob, bytesPerPixel = 4): number {
   const byCores = Math.max(2, Math.min(threadCap(), cores - 1));
   const budget = budgetMb();
   for (let n = byCores; n >= 2; n--) {
-    if (n * perWorkerMb(job.fileBytes, job.srcPixels, job.outPixels, n, bytesPerPixel, job.healBytes) <= budget) return n;
+    if (n * perWorkerMb(job.fileBytes, job.srcPixels, sourceBytesPerPixel(job.source), job.outPixels, n, bytesPerPixel, job.healBytes) <= budget) return n;
   }
   return 1;
 }

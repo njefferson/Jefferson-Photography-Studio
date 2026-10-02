@@ -143,7 +143,10 @@ for (const d of DEVICES) {
     const srcH = Math.round(px / srcW);
     for (const sc of SPOTS) {
       const healBytes = healPatchBytes(sc.spots, srcW, srcH);
-      const job = { fileBytes: 26e6, srcPixels: px, outPixels: px, healBytes };
+      // A NEF, whose workers each hold one 16-bit photosite a pixel. The
+      // source's own weight by kind is the subject of sourceBytesPerPixel;
+      // what this check holds is the BAND's, so it keeps the source fixed.
+      const job = { fileBytes: 26e6, srcPixels: px, outPixels: px, healBytes, source: "mosaic" };
       const params = { spots: sc.spots, stickers: [] };
       for (const format of FORMATS) {
         const opts = { format };

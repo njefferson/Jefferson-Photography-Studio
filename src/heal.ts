@@ -478,6 +478,8 @@ export function bakeRgba8(
  * What the result must satisfy: f32-rounded exactly like the RGBA32F texture
  * upload, and the same arithmetic healPatchesFromSampler runs at full
  * resolution, so the export mirrors it within float epsilon at equal sizes.
+ * (On a device without OES_texture_float_linear the preview texture is
+ * RGBA16F, and gl.ts patchImage rounds this to half-float as it uploads it.)
  */
 export function bakeRgbaF32(
   src: Float32Array | Uint16Array,

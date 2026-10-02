@@ -33,7 +33,7 @@ const out: string[] = [];
 
 /** A value that says its row produced no number: did not build, did not draw,
  *  not run, failed, refused, not available, WebGL2 unavailable. */
-const NOT_MEASURED = /^(did not (build|draw)|not run|failed|refused|not available|WebGL2 unavailable)\b/;
+const NOT_MEASURED = /^(did not (build|draw)|not run|does not fit|failed|refused|not available|WebGL2 unavailable)\b/;
 
 /** `samples` is the raw run-to-run spread, and it goes into the COPIED text as
  *  well as the panel. It did not, at first: the spread was added to make a
@@ -290,7 +290,7 @@ function uniqueFrag(src: string, tag: number): string {
  *  nothing (measured headless). What the draw has to satisfy: `timedBuild`
  *  reads `getError` after it and reports anything but 0, so a sampler type this
  *  does not know stays on unit 0 and shows as an error rather than as a time.
- *  The last unit is left for `bindZeroMaskTexture`. */
+ *  `bindZeroMaskTexture` rebinds the unit one of these got, for one variant. */
 function bindSamplers(gl: WebGL2RenderingContext, prog: WebGLProgram): () => void {
   const texs: WebGLTexture[] = [];
   const n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS) as number;
@@ -564,16 +564,46 @@ function masksToBlocks(src: string): { src: string; ok: boolean; sites: number }
  *  texelFetch, as the measured lens curve was until it began filtering between
  *  bins (`u_lensTex`, 2026-10-02): 18 texels
  *  per mask (7 fields, 8 mixer bands, 3 grade rows), one row per mask. Takes a
- *  fragment source; gives back `rewriteMaskArrays`' answer. */
+ *  fragment source; gives back `rewriteMaskArrays`' answer, with `ok` false
+ *  when the source no longer declares the sampler this reads through.
+ *
+ *  THROUGH A SAMPLER THE PROGRAM ALREADY HAS, NOT A NEW ONE (2026-10-02). The
+ *  editor's program uses sixteen samplers, which is every texture unit WebGL 2
+ *  guarantees a fragment shader, so a seventeenth made this copy unbuildable on
+ *  any device at that minimum, and the row read as the device failing. The
+ *  reads go through `MASK_TEX_SAMPLER` instead, whose own reads are by integer
+ *  address too, and `bindZeroMaskTexture` puts the zero mask texture on its
+ *  unit for the one draw. What the compiler sees is the same: thirteen arrays
+ *  of reads turned into texelFetch on a 2D float texture. */
+const MASK_TEX_SAMPLER = "u_flatTex";
 function masksToTexture(src: string): { src: string; ok: boolean; sites: number } {
-  const at = (x: string, y: string) => `texelFetch(u_dbgMaskTex, ivec2(${x}, ${y}), 0)`;
-  return rewriteMaskArrays(src, "uniform highp sampler2D u_dbgMaskTex;", (name, i) => {
+  const at = (x: string, y: string) => `texelFetch(${MASK_TEX_SAMPLER}, ivec2(${x}, ${y}), 0)`;
+  const has = new RegExp(`^uniform (?:highp )?sampler2D ${MASK_TEX_SAMPLER};`, "m").test(src);
+  const r = rewriteMaskArrays(src, "", (name, i) => {
     if (name === "u_maskHsl") return `${at(`7 + (${i}) % 8`, `(${i}) / 8`)}.xyz`;
     if (name === "u_maskGrade") return `${at(`15 + (${i}) % 3`, `(${i}) / 3`)}.xyz`;
     const [, field, sw, isInt] = MASK_FIELDS.find((f) => f[0] === name)!;
     const read = `${at(String(field), `(${i})`)}${sw ? `.${sw}` : ""}`;
     return isInt ? `int(${read})` : read;
   });
+  return { ...r, ok: r.ok && has };
+}
+
+/** HOW MANY TEXTURE UNITS A FRAGMENT SOURCE NEEDS: the samplers it declares
+ *  and reads, comments removed. Takes the source; gives back the count. A
+ *  sampler declared and never read is left out, as a linker drops it. What the
+ *  caller relies on: a program whose count exceeds MAX_TEXTURE_IMAGE_UNITS is
+ *  refused by the link on every device with that limit, so such a row is
+ *  reported as a copy that does not fit rather than as a device that failed.
+ *  Sampler arrays count their length; the editor declares none. */
+function samplerUnits(src: string): number {
+  const s = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  let n = 0;
+  for (const m of s.matchAll(/^uniform (?:(?:lowp|mediump|highp) )?\w*sampler\w+ (\w+)(?:\[(\d+)\])?;/gm)) {
+    const uses = s.match(new RegExp(`\\b${m[1]}\\b`, "g"))?.length ?? 0;
+    if (uses > 1) n += m[2] ? Number(m[2]) : 1;
+  }
+  return n;
 }
 
 /** Bind a zero-filled buffer to every uniform block the variant's program kept,
@@ -595,19 +625,20 @@ function bindZeroBlocks(gl: WebGL2RenderingContext, prog: WebGLProgram): () => v
   return () => { bufs.forEach((b) => gl.deleteBuffer(b)); gl.bindBuffer(gl.UNIFORM_BUFFER, null); };
 }
 
-/** Bind a zero 18 x 8 float texture for the texture variant, on the last texture
- *  unit so it meets none of the program's other samplers. Takes the context and
- *  program; returns the undo. */
+/** Bind a zero 18 x 8 float texture for the texture variant, on the unit
+ *  `bindSamplers` gave `MASK_TEX_SAMPLER`, in place of the 1 x 1 texture put
+ *  there — the variant reads its mask settings through that sampler (see
+ *  `masksToTexture`). Takes the context and program; returns the undo. */
 function bindZeroMaskTexture(gl: WebGL2RenderingContext, prog: WebGLProgram): () => void {
-  const unit = (gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS) as number) - 1;
+  const loc = gl.getUniformLocation(prog, MASK_TEX_SAMPLER);
+  if (!loc) return () => {};
+  const unit = gl.getUniform(prog, loc) as number;
   const tex = gl.createTexture()!;
   gl.activeTexture(gl.TEXTURE0 + unit);
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 18, 8, 0, gl.RGBA, gl.FLOAT, new Float32Array(18 * 8 * 4));
-  const loc = gl.getUniformLocation(prog, "u_dbgMaskTex");
-  if (loc) gl.uniform1i(loc, unit);
   gl.activeTexture(gl.TEXTURE0);
   return () => { gl.deleteTexture(tex); };
 }
@@ -706,7 +737,7 @@ async function whatMakesTheBuildSlow(): Promise<void> {
       { name: "…with the mask settings in uniform blocks", src: blocks.src,
         changed: `${blocks.sites} reads of the thirteen mask arrays moved into three blocks`, ok: blocks.ok, prep: bindZeroBlocks },
       { name: "…with the mask settings in a texture", src: texed.src,
-        changed: `${texed.sites} reads of the thirteen mask arrays moved into one texture`, ok: texed.ok, prep: bindZeroMaskTexture },
+        changed: `${texed.sites} reads of the thirteen mask arrays moved into one texture, read through ${MASK_TEX_SAMPLER}`, ok: texed.ok, prep: bindZeroMaskTexture },
       // THE PER-MASK-COUNT BUILD (decision 071): the mask loops kept, run to a
       // count the compiler can see. LAST, because a count of 8 may unroll into a
       // long build, and a lost context would silence every row after it. TWO,
@@ -719,6 +750,11 @@ async function whatMakesTheBuildSlow(): Promise<void> {
     ];
     const stamp = 1000 + Math.floor(Math.random() * 8e8);
     const timed: { name: string; t: number }[] = [];
+    // THE TEXTURE UNITS THIS DEVICE GIVES A FRAGMENT SHADER. WebGL 2 promises
+    // 16 and the editor uses all 16, so a copy that needs one more cannot build
+    // on a device at the minimum — every such device refuses it at the link,
+    // which says nothing about this one. Such a row is not built.
+    const maxUnits = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) as number;
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
       if (gl.isContextLost() || lostDuring) {
@@ -728,6 +764,12 @@ async function whatMakesTheBuildSlow(): Promise<void> {
       if (!v.ok) {
         row(v.name, "not run",
           "The picture code has changed shape since this test was written, so this rewrite no longer finds what it changes. Timing it would time a program that is not what this row says.");
+        continue;
+      }
+      const units = samplerUnits(v.src);
+      if (units > maxUnits) {
+        row(v.name, "does not fit",
+          `This copy of the picture code reads ${units} textures and this device gives a picture program ${maxUnits}, so it was not built: any device with that limit refuses it, which says nothing about this one. The test needs rewriting to fit, not the device; the editor's own program reads ${samplerUnits(FRAG)}.`);
         continue;
       }
       building = v.name;
@@ -1196,9 +1238,11 @@ function threads(): void {
   // of these stand for a photograph with nothing healed on it, which is what the
   // numbers in the release notes were measured on. A frame with spots costs its
   // patches on top, per thread, and would come out with fewer.
-  const job = { fileBytes: 26.1e6, srcPixels: 5600 * 3728, outPixels: 5600 * 3728, healBytes: 0 };
+  // `source: "mosaic"` likewise: both are NEFs, whose workers each hold one
+  // 16-bit photosite a pixel (exportparallel.ts sourceBytesPerPixel).
+  const job = { fileBytes: 26.1e6, srcPixels: 5600 * 3728, outPixels: 5600 * 3728, healBytes: 0, source: "mosaic" as const };
   const n = workerCount(job);
-  const big = workerCount({ fileBytes: 55e6, srcPixels: 8256 * 5504, outPixels: 8256 * 5504, healBytes: 0 });
+  const big = workerCount({ fileBytes: 55e6, srcPixels: 8256 * 5504, outPixels: 8256 * 5504, healBytes: 0, source: "mosaic" });
   row("Cores this browser admits to", cores ? String(cores) : "not reported",
     cores ? "The export keeps one for the interface and splits the rest of the work." : "Without a number the export assumes two.");
   row("Threads a 21-megapixel export would use", n === 1 ? "one — it would not split" : String(n),

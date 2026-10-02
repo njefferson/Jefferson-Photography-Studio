@@ -11,7 +11,7 @@ import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, nikonColorMatrix } from "./color";
 import { cameraModel, readDngSource } from "./decode";
 import { makeRowDenoiser, type LinearSampler } from "./raw/denoise";
-import { canRunParallel, exportBands } from "./exportparallel";
+import { canRunParallel, exportBands, type ParallelJob, type SourceKind } from "./exportparallel";
 import { makeRowDetail } from "./raw/detail";
 import { healPatches8, healPatchesFromSampler, wrapWithPatches, healPatchBytes } from "./heal";
 import { stickerPatches, makeStickerOverlaySampler, type StickerAsset } from "./sticker";
@@ -684,8 +684,13 @@ export async function exportImage(
   const ss = opts.scale < 1 ? Math.max(2, Math.min(4, Math.round(1 / opts.scale))) : 1;
   const boxN = ss * ss;
   const boxOut: [number, number, number] = [0, 0, 0];
-  // STRAIGHTEN RESAMPLES BILINEARLY, as the preview does (gl.ts bindPipeline
-  // turns the source texture LINEAR whenever straighten is on). A rotated
+  // STRAIGHTEN RESAMPLES BILINEARLY, as the preview does: gl.ts bindPipeline
+  // turns the source texture LINEAR whenever straighten is on, and with noise
+  // reduction on the preview blends the DENOISED texels from its pre-pass
+  // (ensureDetailPre, u_detailPre 2), as this blends `sampleLinear`. With
+  // Sharpen or Texture on as well, this blends four SHARPENED pixels while the
+  // preview sharpens the blend at the texel the position falls in: not yet
+  // the same resample, and not measured. A rotated
   // output grid never lands on source pixel centres, and until 2026-10-02 this
   // took the nearest one (the Math.floor in toSrcF) — a nearest-neighbour
   // rotation, jagged on every straight edge, in both the preview and the file.
@@ -781,7 +786,8 @@ export async function exportImage(
     // WHAT THE PATCHES WEIGH, per worker — every worker bakes every one of them
     // from its own copy of the source, so this is what the budget has to know
     // now that a healed frame is allowed through the pool at all.
-    const job = { fileBytes: file.bytes.length, srcPixels: srcW * srcH, outPixels: w * h, healBytes: healPatchBytes(params.spots, srcW, srcH) };
+    // AND WHAT ITS OWN COPY OF THE SOURCE WEIGHS, by kind (parallelJob).
+    const job = parallelJob(file, srcW, srcH, w, h, params.spots);
     let ranParallel = false;
     if (canRunParallel(params, opts, job)) {
       try {
@@ -954,7 +960,7 @@ export async function exportImage(
     // SEVERAL CORES, when this export can use them — the same call the JPEG
     // path makes, with the same fall-through on any failure: the reader asked
     // for a photograph, not for a particular number of threads.
-    const jobT = { fileBytes: file.bytes.length, srcPixels: srcW * srcH, outPixels: w * h, healBytes: healPatchBytes(params.spots, srcW, srcH) };   // see the JPEG branch
+    const jobT = parallelJob(file, srcW, srcH, w, h, params.spots);   // see the JPEG branch
     let ranParallelT = false;
     if (canRunParallel(params, opts, jobT)) {
       try {
@@ -1125,16 +1131,48 @@ export function proxyFactorFor(src: Source, srcW: number, srcH: number): number 
  *  @returns true when getSource will read the file itself; false when it needs
  *    the decoded frame (main.ts keeps the frame, exportBands posts it). */
 export function sourceIsMosaiced(file: ImportedFile): boolean {
+  const kind = sourceKind(file);
+  return kind === "mosaic" || kind === "linear";
+}
+
+/** WHAT `getSource` WILL BUILD FOR THIS FILE, by kind — the one reading of it
+ *  that both `sourceIsMosaiced` and the thread pool's memory bill
+ *  (exportparallel.ts `sourceBytesPerPixel`) take, so the two cannot disagree
+ *  about what a file is.
+ *  @param file  the photograph being exported.
+ *  @returns "mosaic" for a NEF or a mosaiced DNG, "linear" for an uncompressed
+ *    or lossless LinearRaw DNG, "lossy" for a lossy LinearRaw DNG (built from
+ *    the decode's `lossyCodes`), and "8bit" for everything `getSource` takes
+ *    from the decoded pixels — and for a file whose metadata cannot be read,
+ *    which `getSource` refuses before any pool is sized. */
+export function sourceKind(file: ImportedFile): SourceKind {
   try {
-    if (file.kind === "nef") return true;
+    if (file.kind === "nef") return "mosaic";
     if (file.kind === "dng" || file.kind === "tiff") {
       const kind = findDngRaw(new Tiff(file.bytes).allIfds()).kind;
-      return kind === "cfa" || kind === "linear";
+      if (kind === "cfa") return "mosaic";
+      if (kind === "linear" || kind === "lossy") return kind;
     }
   } catch {
     /* unreadable metadata — treat it as the safe answer and keep the frame */
   }
-  return false;
+  return "8bit";
+}
+
+/** WHAT ONE WORKER OF THIS EXPORT WOULD HOLD, for the pool to price — the job
+ *  the JPEG and TIFF paths both hand `canRunParallel` and `exportBands`, built
+ *  in one place so neither can leave a term out.
+ *  @param file  the photograph (its bytes are copied to every worker, and its
+ *    kind decides what each one decodes — `sourceKind`).
+ *  @param srcW  the source's width in pixels, as `getSource` built it.
+ *  @param srcH  its height.
+ *  @param w  the output's width.
+ *  @param h  the output's height.
+ *  @param spots  the edit's healed spots (every worker bakes all of them).
+ *  @returns the `ParallelJob`; what it must satisfy is exportparallel.ts's
+ *    rule that nothing a worker holds is billed at less than it weighs. */
+export function parallelJob(file: ImportedFile, srcW: number, srcH: number, w: number, h: number, spots: EditParams["spots"]): ParallelJob {
+  return { fileBytes: file.bytes.length, srcPixels: srcW * srcH, outPixels: w * h, healBytes: healPatchBytes(spots, srcW, srcH), source: sourceKind(file) };
 }
 
 /**
