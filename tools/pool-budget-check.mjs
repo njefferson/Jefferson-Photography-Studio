@@ -58,8 +58,9 @@ export function measuredBytesPerPixel(root = ".") {
   return { jpeg: grab("Uint8ClampedArray", 1), tiff: grab("Uint16Array", 2) };
 }
 
-// The module's imports are all `import type`, so it bundles with no runtime
-// dependencies and can be called directly.
+// The module's imports are all `import type` but one, raw/demosaic.ts for the
+// demosaic cache's bill, which is arithmetic with no browser API, so the bundle
+// can be called directly.
 const dir = mkdtempSync(join(tmpdir(), "poolbudget-"));
 const out = join(dir, "ep.mjs");
 // AND heal.ts, because the heal term is part of the budget now. It is bundled

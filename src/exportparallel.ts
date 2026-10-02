@@ -32,6 +32,7 @@ import type { ImportedFile } from "./import";
 import type { DecodedImage } from "./decode";
 import type { BrushMask, EditParams, LensCurve } from "./pipeline";
 import type { ExportOptions, BandResult } from "./export";
+import { demosaicCacheBytes } from "./raw/demosaic";
 
 /** Enough pixels that starting workers is worth it. Below this the whole export
  *  is a second or two and the startup would show. */
@@ -64,7 +65,15 @@ function perWorkerMb(fileBytes: number, srcPixels: number, outPixels: number, n:
   // source, whichever band it was given. So this is added whole to each one,
   // not divided. Three dust spots is a rounding error; forty at the largest
   // radius the app allows is about 75 MB each.
-  return (fileBytes + srcPixels * 2 + (outPixels * bytesPerPixel) / n + healBytes) / 1e6 + 10;
+  //
+  // AND THE DEMOSAIC'S TILE CACHE IS PER WORKER TOO. RCD cannot run one pixel
+  // at a time, so each worker keeps the tiles it has computed (raw/demosaic.ts):
+  // about 14 MB at 21 megapixels. It is billed from the same function that
+  // sizes the allocation, so the two cannot drift. (The +104 MB a thread
+  // measured above predates it, when the demosaic held nothing.) An 8-bit
+  // source never builds one, and is billed for it anyway, which errs the safe
+  // way.
+  return (fileBytes + srcPixels * 2 + (outPixels * bytesPerPixel) / n + healBytes + demosaicCacheBytes(srcPixels)) / 1e6 + 10;
 }
 
 /** The memory an export may spend on threads that are not the main one, and how

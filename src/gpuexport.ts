@@ -9,12 +9,14 @@
 // seconds for the threaded processor export.
 //
 // WHAT THAT NUMBER DOES NOT INCLUDE, and this file exists to be honest about:
-// the shaders need the whole demosaiced frame as a texture. Today's export
-// demosaics one pixel at a time inside its sampler chain and never holds the
-// result. Measured on the same raw: 0.77 s to read the sensor data and 2.4 s to
-// demosaic the whole frame into 334 MB of float. So a drawn export projects to
-// about four seconds, not a tenth of one — still four to five times faster than
-// the threaded export, and the demosaic is itself parallel.
+// the shaders need the whole demosaiced frame as a texture. The computed export
+// demosaics inside its sampler chain, a cached tile at a time, and never holds
+// the result. Measured on the same raw with the bilinear demosaic the app had
+// then: 0.77 s to read the sensor data and 2.4 s to demosaic the whole frame
+// into 334 MB of float. So a drawn export projected to about four seconds, not a
+// tenth of one — still four to five times faster than the threaded export, and
+// the demosaic is itself parallel. The demosaic is RCD now (raw/demosaic.ts),
+// which does more work per pixel; those seconds are owed a new measurement.
 //
 // NOTHING HERE IS WIRED INTO THE EXPORT BUTTON. It is reached only from the test
 // page, so the difference between a drawn frame and a computed one can be
@@ -22,7 +24,8 @@
 // it. A pixel pipeline earns its way in with numbers.
 import { Renderer } from "./gl";
 import { getSource, proxyFactorFor } from "./export";
-import { demosaicPixelLinearInto } from "./raw/demosaic";
+import { DEMOSAIC_TILE, demosaicBalance, demosaicTileInto, demosaicPixelLinearInto, makeRcdWorkspace, type RawCfa } from "./raw/demosaic";
+import { applyPost } from "./raw/dngOpcodes";
 import { toHalf } from "./half";
 import { srgbDisplayToP3Display } from "./icc";
 import type { ImportedFile } from "./import";
@@ -114,6 +117,56 @@ function yieldToBrowser(): Promise<void> {
   });
 }
 
+/** THE WHOLE FRAME'S RCD, AS A LIST OF TILES TO RUN ONE AT A TIME.
+ *
+ *  Takes the frame `c`. Returns `count`, the number of 64-pixel tiles covering
+ *  it in raster order; `run(t, put)`, which demosaics tile `t` and hands every
+ *  pixel of it that lies inside the frame to `put` as its row-major pixel index
+ *  and linear camera R, G and B; and `rowsDone(t)`, how many whole rows of the
+ *  frame are finished once tiles 0 to t - 1 have run. One workspace and one
+ *  tile buffer serve every call. The values are `demosaicTileInto`'s, the same
+ *  ones the computed export's sampler serves, which is what keeps the
+ *  native-resolution working copy and the saved file the same pixels: a
+ *  LinearRaw frame (`samples` 3) is read through `demosaicPixelLinearInto`, and
+ *  the frame's `post` stage is applied to every pixel, as that sampler does. */
+function rcdTiles(c: RawCfa): { count: number; run: (t: number, put: (i: number, r: number, g: number, b: number) => void) => void; rowsDone: (t: number) => number } {
+  const { width, height } = c;
+  const T = DEMOSAIC_TILE;
+  const nx = Math.ceil(width / T), ny = Math.ceil(height / T);
+  const ws = makeRcdWorkspace();
+  const mul = demosaicBalance(c);
+  const tile = new Float32Array(T * T * 3);
+  const px = new Float32Array(3);
+  return {
+    count: nx * ny,
+    run: (t, put) => {
+      const tx = t % nx, ty = (t / nx) | 0;
+      const x0 = tx * T, y0 = ty * T;
+      const w = Math.min(T, width - x0), h = Math.min(T, height - y0);
+      if (c.samples === 3) {
+        for (let ry = 0; ry < h; ry++) {
+          for (let rx = 0, i = (y0 + ry) * width + x0; rx < w; rx++, i++) {
+            demosaicPixelLinearInto(c, x0 + rx, y0 + ry, px);
+            put(i, px[0], px[1], px[2]);
+          }
+        }
+        return;
+      }
+      demosaicTileInto(c, mul, tx, ty, ws, tile, 0);
+      for (let ry = 0; ry < h; ry++) {
+        let k = ry * T * 3;
+        for (let rx = 0, i = (y0 + ry) * width + x0; rx < w; rx++, i++, k += 3) {
+          if (!c.post) { put(i, tile[k], tile[k + 1], tile[k + 2]); continue; }
+          px[0] = tile[k]; px[1] = tile[k + 1]; px[2] = tile[k + 2];
+          applyPost(c.post, x0 + rx, y0 + ry, px);
+          put(i, px[0], px[1], px[2]);
+        }
+      }
+    },
+    rowsDone: (t) => Math.min(height, Math.floor(t / nx) * T),
+  };
+}
+
 /** THE SAME FRAME, BUILT IN SLICES SO NOTHING FREEZES.
  *
  *  `buildLinearSource` runs the whole demosaic in one synchronous loop, which is
@@ -143,7 +196,6 @@ export async function buildLinearSourceInBands(
   const { width, height } = src.cfa;
   const linear16 = new Uint16Array(width * height * 4);
   const ONE = toHalf(1);
-  const px = new Float32Array(3);
   // A TIME BUDGET, NOT A ROW COUNT — and the row count was a real defect, not a
   // tuning preference. It was set to 64 against a 2,800-wide practice frame. A
   // frame from the camera this app is built around is 5,600 wide, so the same
@@ -156,22 +208,26 @@ export async function buildLinearSourceInBands(
   // 16 ms frame for the browser to paint the photograph the reader is already
   // looking at. Total wall time is a little longer; that is the trade being made
   // on purpose.
+  //
+  // THE SLICE IS A TILE, NOT A ROW. The demosaic is RCD, which works on 64-pixel
+  // tiles with a ten-pixel apron (raw/demosaic.ts); a single row cannot be
+  // computed alone. The budget is checked after every tile, so a slice runs
+  // over it by at most one tile; what a tile costs on the tablets has not been
+  // measured yet.
   const budget = Math.max(1, opts.sliceMs ?? 8);
-  let y0 = 0;
-  while (y0 < height) {
+  const tiles = rcdTiles(src.cfa);
+  let t = 0;
+  while (t < tiles.count) {
     if (opts.shouldStop?.()) return null;
     const sliceStart = performance.now();
-    let y1 = y0;
     do {
-      let i = y1 * width * 4;
-      for (let x = 0; x < width; x++, i += 4) {
-        demosaicPixelLinearInto(src.cfa, x, y1, px);
-        linear16[i] = toHalf(px[0]); linear16[i + 1] = toHalf(px[1]); linear16[i + 2] = toHalf(px[2]); linear16[i + 3] = ONE;
-      }
-      y1++;
-    } while (y1 < height && performance.now() - sliceStart < budget);
-    y0 = y1;
-    opts.onRow?.(y1, height);
+      tiles.run(t, (i, r, g, b) => {
+        const o = i * 4;
+        linear16[o] = toHalf(r); linear16[o + 1] = toHalf(g); linear16[o + 2] = toHalf(b); linear16[o + 3] = ONE;
+      });
+      t++;
+    } while (t < tiles.count && performance.now() - sliceStart < budget);
+    opts.onRow?.(tiles.rowsDone(t), height);
     await yieldToBrowser();
   }
   if (opts.shouldStop?.()) return null;
@@ -188,24 +244,24 @@ export function buildLinearSource(file: ImportedFile, current: DecodedImage, hal
   let image: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array; camMatrix?: number[] };
   if ("cfa" in src) {
     const { width, height } = src.cfa;
-    const px = new Float32Array(3);
+    const tiles = rcdTiles(src.cfa);
     if (half) {
       const linear16 = new Uint16Array(width * height * 4);
       const ONE = toHalf(1);
-      for (let y = 0, i = 0; y < height; y++) {
-        for (let x = 0; x < width; x++, i += 4) {
-          demosaicPixelLinearInto(src.cfa, x, y, px);
-          linear16[i] = toHalf(px[0]); linear16[i + 1] = toHalf(px[1]); linear16[i + 2] = toHalf(px[2]); linear16[i + 3] = ONE;
-        }
+      for (let t = 0; t < tiles.count; t++) {
+        tiles.run(t, (i, r, g, b) => {
+          const o = i * 4;
+          linear16[o] = toHalf(r); linear16[o + 1] = toHalf(g); linear16[o + 2] = toHalf(b); linear16[o + 3] = ONE;
+        });
       }
       image = { width, height, linear16, camMatrix: src.cam };
     } else {
       const linear = new Float32Array(width * height * 4);
-      for (let y = 0, i = 0; y < height; y++) {
-        for (let x = 0; x < width; x++, i += 4) {
-          demosaicPixelLinearInto(src.cfa, x, y, px);
-          linear[i] = px[0]; linear[i + 1] = px[1]; linear[i + 2] = px[2]; linear[i + 3] = 1;
-        }
+      for (let t = 0; t < tiles.count; t++) {
+        tiles.run(t, (i, r, g, b) => {
+          const o = i * 4;
+          linear[o] = r; linear[o + 1] = g; linear[o + 2] = b; linear[o + 3] = 1;
+        });
       }
       image = { width, height, linear, camMatrix: src.cam };
     }

@@ -261,38 +261,68 @@ function readNikonParams(bytes: Uint8Array, off: number, le: boolean, bps: numbe
   ];
   p += 8;
 
-  const max = (1 << bps) & 0x7fff;
+  // LibRaw nikon_read_curve: `step = max = 1 << tiff_bps & 0x7fff`, and only a
+  // grid of more than one point divides it.
+  const full = (1 << bps) & 0x7fff;
   const csize = u16(p);
   p += 2;
-  const step = csize > 1 ? Math.floor(max / (csize - 1)) : 0;
+  let max = full;
+  let step = csize > 1 ? Math.floor(full / (csize - 1)) : full;
 
-  const curve = new Uint16Array(max);
-  for (let i = 0; i < max; i++) curve[i] = i; // identity default
-  let curveMax = max;
+  const curve = new Uint16Array(full);
+  for (let i = 0; i < full; i++) curve[i] = i; // identity default
   let split = 0;
   let hasCurve = false;
 
-  if (ver0 === 0x44 && ver1 === 0x20 && step > 0) {
-    // The last grid index (csize-1)*step can equal `max` — clamp the WRITE so
+  // TWO LOSSY LAYOUTS, NOT ONE. Version 0x44 0x20 is the D5300 family's; 0x44
+  // 0x40 is what the D6, D780, Z 5, Z 6, Z 6II, Z 7 and Z 7II write in their
+  // lossy-compressed files (read from the MakerNote bytes of the raw.pixls.us
+  // corpus). In 0x40 the grid covers a quarter of the bit-depth range, so LibRaw
+  // quarters both the step and the curve's length: `if (ver0 == 0x44 && (ver1 ==
+  // 0x20 || (ver1 == 0x40 && step > 3)) && step > 0) { if (ver1 == 0x40) { step
+  // /= 4; max /= 4; } ...`. Both layouts carry the Huffman split row at +562
+  // (nikon_load_raw reads it for either). Read as a full table instead, a 0x40
+  // file's grid became the curve itself and the tree never switched at the split
+  // row, so every row below it decoded as noise. The Z 50 this app is built
+  // around writes neither — its files are 0x46 lossless — so this reaches a
+  // reader's file only from those other bodies, and it is checked against a
+  // synthetic file built from LibRaw's code, not a camera's: no owner file
+  // carries this layout.
+  const lossy40 = ver0 === 0x44 && ver1 === 0x40 && step > 3;
+  if (ver0 === 0x44 && (ver1 === 0x20 || lossy40) && step > 0) {
+    if (lossy40) {
+      step = Math.floor(step / 4);
+      max = Math.floor(max / 4);
+    }
+    // The last grid index (csize-1)*step can equal `full` — clamp the WRITE so
     // the final grid VALUE anchors the top of the curve instead of being
     // silently dropped, which left the tail ramping toward identity (dcraw
-    // uses a 64K buffer for the same reason; audit find, 2026-07-25).
-    for (let i = 0; i < csize; i++) curve[Math.min(i * step, max - 1)] = u16(p + i * 2);
+    // uses a 64K buffer for the same reason; audit find, 2026-07-25). In 0x40
+    // the grid ends at the quartered `max`, inside the buffer, as in LibRaw.
+    for (let i = 0; i < csize; i++) curve[Math.min(i * step, full - 1)] = u16(p + i * 2);
     for (let i = 0; i < max; i++) {
       const r = i % step;
       // Clamp the upper grid index: past the last grid point it would read out
       // of bounds (undefined -> NaN -> 0), decoding highlights to BLACK on
       // lossy-compressed NEFs (review find, 2026-07-15).
-      const hi = Math.min(i - r + step, max - 1);
+      const hi = Math.min(i - r + step, full - 1);
       curve[i] = Math.floor((curve[i - r] * (step - r) + curve[hi] * r) / step);
     }
-    split = u16(off + 562);
     hasCurve = true;
   } else if (ver0 !== 0x46 && csize <= 0x4001) {
+    // A 0x40 grid too coarse to quarter (step <= 3) lands here too, as it does
+    // in nikon_read_curve, and is read as a whole table.
     for (let i = 0; i < csize; i++) curve[i] = u16(p + i * 2);
-    curveMax = csize;
+    max = csize;
     hasCurve = true;
   }
+  // nikon_load_raw reads the split row for BOTH lossy versions, whichever way
+  // the curve was read: `if (ver0 == 0x44 && (ver1 == 0x20 || ver1 == 0x40))
+  // { if (ver1 == 0x40) max /= 4; fseek(ifp, meta_offset + 562, SEEK_SET);
+  // split = get2(); }`.
+  if (ver0 === 0x44 && (ver1 === 0x20 || ver1 === 0x40)) split = u16(off + 562);
+  // nikon_load_raw trims the curve's flat top the same way for the data range.
+  let curveMax = max;
   while (curveMax > 2 && curve[curveMax - 2] === curve[curveMax - 1]) curveMax--;
 
   return { vpred, curve, curveMax, split, huff, hasCurve };

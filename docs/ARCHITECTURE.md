@@ -171,7 +171,8 @@ pipeline.ts (gl.ts re-exports).
 
 **Nikon NEF, compression 34713** — `nef.ts`.
 dcraw's algorithm: fixed Huffman trees, the linearization curve in MakerNote tag
-0x96, and a 2-back predictor. Verified bit-exact. The black is MakerNote
+0x96 (both lossy layouts, 0x44 0x20 and the quartered 0x44 0x40 of the D6, D780
+and Z 5/6/7 bodies, each with its Huffman split row), and a 2-back predictor. Verified bit-exact. The black is MakerNote
 0x003D's four values, one per CFA site, subtracted site by site (all 1008 on the
 Z 50 at 14-bit). Z50 levels are black 1008 and
 white 15520 at 14-bit. Does NOT support Z8 or Z9 High-Efficiency NEF.
@@ -207,9 +208,14 @@ Native decode; the browser applies EXIF orientation itself.
 
 X-Trans (Fuji) is NOT supported anywhere, and a DNG converted from an X-Trans
 RAF is refused rather than developed as RGGB. Preview = half-res 2x2-binned
-demosaic (`demosaic.ts`; a LinearRaw frame is averaged 2x2 by `binRaw`); export
-= full-res bilinear per pixel, through the same `RawCfa`, so crop, levels and
-the after-demosaic stage are the preview's.
+demosaic (`demosaic.ts`; a LinearRaw frame is averaged 2x2 by `binRaw`), whose
+red and blue sit a diagonal site apart; export and the native-resolution
+working copy = full-res RCD (Ratio Corrected Demosaicing, darktable's default),
+ported from darktable's `rcd.c`, run in 64-pixel tiles on gray-world-balanced
+photosites with the balance divided back out, through the same `RawCfa`, so
+crop, levels and the after-demosaic stage are the preview's. A LinearRaw frame
+needs no demosaic and is read pixel by pixel. The export reaches RCD through a
+tile cache billed per worker.
 
 ## Verification methodology (the project's backbone)
 
@@ -756,15 +762,15 @@ cannot describe something the code does not say about itself.
 - **`src/decodeClient.ts`** (260 lines) — Main-thread side of the decode workers.
 - **`src/diagnostic.ts`** (341 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (333 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1279 lines) — Full-resolution export.
+- **`src/export.ts`** (1305 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
-- **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
+- **`src/exportparallel.ts`** (352 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
 - **`src/gl.ts`** (3209 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
-- **`src/gpuexport.ts`** (292 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
+- **`src/gpuexport.ts`** (348 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
 - **`src/half.ts`** (109 lines) — IEEE half-precision, both directions, in one place.
 - **`src/heal.ts`** (1100 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
 - **`src/histogram.ts`** (114 lines) — Lightroom-style floating histogram.
@@ -796,13 +802,13 @@ cannot describe something the code does not say about itself.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
-- **`src/raw/demosaic.ts`** (165 lines) — Bayer demosaic + black/white-level normalization -> linear RGB.
+- **`src/raw/demosaic.ts`** (610 lines) — Bayer demosaic + black/white-level normalization -> linear RGB: a binned half-size proxy, and RCD at full resolution.
 - **`src/raw/denoise.ts`** (699 lines) — Edge-preserving denoise (13x13 bilateral, colour on a 7x7 grid at stride 2) on LINEAR sensor data.
 - **`src/raw/detail.ts`** (302 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
 - **`src/raw/dngOpcodes.ts`** (345 lines) — DNG opcode lists (DNG 1.7.1.0, chapter 7): the corrections a DNG says must be applied at three points of decoding.
 - **`src/raw/dngRaw.ts`** (494 lines) — Decode a DNG's raw image into linear camera values.
 - **`src/raw/lj92.ts`** (260 lines) — Lossless JPEG (ITU-T T.81, process 14 / SOF3) decoder — pure TypeScript.
-- **`src/raw/nef.ts`** (426 lines) — Nikon NEF (Compression 34713) decoder — pure TypeScript.
+- **`src/raw/nef.ts`** (456 lines) — Nikon NEF (Compression 34713) decoder — pure TypeScript.
 - **`src/raw/tiff.ts`** (127 lines) — Minimal TIFF/DNG reader shared by the JPEG and mosaiced-raw decode paths.
 - **`src/savefile.ts`** (66 lines) — GETTING A FILE OUT OF THE APP, and the one decision that governs it.
 - **`src/session.ts`** (599 lines) — Crash-safe store for a photo SESSION — the set you opened and are moving between, each photo keeping its own edit.

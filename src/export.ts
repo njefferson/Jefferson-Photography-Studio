@@ -4,7 +4,7 @@
 
 import { lensGains, lensCurveForSource, turnOfOrientation } from "./lensflat";
 import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativeVignette, applyGrain, grainCellPx, aimedSampler, maskGroupsForRender, AIM_NOISE, AIM_TEXTURE, type BrushMask, type EditParams, type LensCurve, lensGeom, lensLerp, lensRadius } from "./pipeline";
-import { demosaicPixelLinearInto, type RawCfa } from "./raw/demosaic";
+import { makeDemosaicSampler, demosaicPixelLinearInto, type RawCfa } from "./raw/demosaic";
 import { findDngRaw } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
 import { Tiff } from "./raw/tiff";
@@ -462,6 +462,12 @@ export async function exportImage(
   // Once per SOURCE pixel, through the row caches — so the same arithmetic
   // writing into one array rather than making twenty million of them.
   const rawOut: [number, number, number] = [0, 0, 0];
+  // RCD, ONE TILE AT A TIME (raw/demosaic.ts). The sampler computes a 64-pixel
+  // tile the first time any pixel in it is asked for and keeps it, so this walk
+  // pays for each tile about once; its cache is billed per thread in
+  // exportparallel.ts. It replaced a bilinear average of same-coloured
+  // neighbours, which zippered and fringed every edge.
+  const demosaic = "cfa" in src ? makeDemosaicSampler(src.cfa) : null;
   // THE LENS FLAT ON THE RAW, FIRST (decision 021): the same gain tables the
   // decode laid on the working copy, at the strength the params carry now,
   // applied per source pixel before the heal, the warp, the denoise and the
@@ -473,14 +479,14 @@ export async function exportImage(
     "cfa" in src
       ? flat
         ? (x: number, y: number) => {
-            demosaicPixelLinearInto(src.cfa, x, y, rawOut);
+            demosaic!(x, y, rawOut);
             // Between bins, on the flat's radius, about the profile's centre —
             // the decode-time flat's own three reads (lensflat.ts).
             const rr = lensRadius((x + 0.5) / srcW, (y + 0.5) / srcH, flatGeom!);
             rawOut[0] *= lensLerp(flat.gr, rr, flat.n); rawOut[1] *= lensLerp(flat.gg, rr, flat.n); rawOut[2] *= lensLerp(flat.gb, rr, flat.n);
             return rawOut;
           }
-        : (x: number, y: number) => { demosaicPixelLinearInto(src.cfa, x, y, rawOut); return rawOut; }
+        : (x: number, y: number) => { demosaic!(x, y, rawOut); return rawOut; }
       : (x: number, y: number) => {
           const i = (y * src.width + x) * 4;
           rawOut[0] = toLinear8(src.pixels[i]);
@@ -499,6 +505,26 @@ export async function exportImage(
         isRaw: current.isRaw,
         turn: file.kind === "jpeg" ? turnOfOrientation(readExifSubset(file.bytes)?.orientation) : 0,
       });
+
+  // THE COARSE MAPS READ A POINT ESTIMATE, NOT THE RCD TILES. Their grids take
+  // one pixel every 20 to 30 and blur over 3% of the frame, and a grid that
+  // dense touches every 64-pixel tile: through the tile cache each map would
+  // cost a whole-frame RCD, in every worker. So they read the bilinear point
+  // value, through the same lens flat, which is what they read before RCD
+  // existed. (The sky map below reads the pre-passed sampler on purpose and so
+  // does pay for the tiles it touches; skymap.ts says why it must.)
+  const pointOut: [number, number, number] = [0, 0, 0];
+  const mapSample: LinearSampler =
+    "cfa" in src
+      ? (x: number, y: number) => {
+          demosaicPixelLinearInto(src.cfa, x, y, pointOut);
+          if (flat) {
+            const rr = lensRadius((x + 0.5) / srcW, (y + 0.5) / srcH, flatGeom!);
+            pointOut[0] *= lensLerp(flat.gr, rr, flat.n); pointOut[1] *= lensLerp(flat.gg, rr, flat.n); pointOut[2] *= lensLerp(flat.gb, rr, flat.n);
+          }
+          return pointOut;
+        }
+      : rawSample;
   // Aspect = SOURCE dims (the uv we pass below are source-space), so the lens
   // fix stays circular in pixels regardless of display rotation. The clarity/
   // dehaze maps are rebuilt from the full-res source (cheap: coarse grid).
@@ -514,7 +540,7 @@ export async function exportImage(
   // and the map has to follow the pixel.
   const localMap =
     (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0
-      ? buildLocalMap(rawSample, srcW, srcH)
+      ? buildLocalMap(mapSample, srcW, srcH)
       : undefined;
   // The measured lens curve is a PIPELINE stage now, so the export gets it the
   // same way it gets everything else. It used to wrap the raw sampler here,
@@ -682,7 +708,7 @@ export async function exportImage(
   };
 
   // HIE glow map at full resolution (cheap: built on a coarse grid).
-  const gmap = params.glow > 0 ? buildGlowMap(rawSample, srcW, srcH) : null;
+  const gmap = params.glow > 0 ? buildGlowMap(mapSample, srcW, srcH) : null;
   // WHERE A PIXEL CAME FROM under the warp, as image-uv: the glow and the
   // clarity/dehaze maps are built from the UNWARPED source, so they are read at
   // the displaced position — the shader's warpUv(v_uv) — or a pushed highlight

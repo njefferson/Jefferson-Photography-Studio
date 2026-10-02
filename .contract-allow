@@ -130,8 +130,6 @@ src/previewcache.ts:prunePreviews
 src/previewcache.ts:previewStats
 src/qr.ts:encodeQr
 src/qr.ts:drawQr
-src/raw/demosaic.ts:demosaicBinned
-src/raw/demosaic.ts:demosaicPixelLinear
 src/raw/nef.ts:decodeNef
 src/savefile.ts:download
 src/savefile.ts:saveBlob

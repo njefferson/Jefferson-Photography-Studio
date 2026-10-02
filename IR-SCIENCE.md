@@ -2420,6 +2420,18 @@ channel is not native. The export is therefore strictly better-conditioned on
 blue, and exporting the frame and comparing the same sky at the same scene scale
 shows **the same mottle**. The difference is real and it is not the mechanism.
 
+*(2026-10-02: the export no longer averages. It and the native-resolution working
+copy demosaic with RCD, Ratio Corrected Demosaicing, ported from darktable's
+`src/iop/demosaicing/rcd.c`, which is darktable's default demosaic
+(`src/iop/demosaic.c`: `$DEFAULT: DT_IOP_DEMOSAIC_RCD`). Like darktable and
+RawTherapee (`rawimagesource.cc` scales colours in its preprocess), it runs on
+white-balanced photosites — darktable's `temperature.c` describes its job as
+"scale raw RGB channels to balance white and help demosaicing" — and here the
+balance is gray-world on the photosites themselves, because the camera's
+recorded one is a placeholder on these files (section 3), and is divided back
+out so the reader's balance still applies later. The measurement above was taken
+on the bilinear demosaic and has not been repeated on RCD.)*
+
 **WHICH RETURNS THIS TO 4c-iii, WHOSE LAST PARAGRAPH ALREADY SAID IT.** The matrix
 manufactures a cyan sky by differencing channels the app measures at 0.979 to
 0.994 correlation on this frame. A difference of two nearly identical, small,
@@ -2619,6 +2631,14 @@ three independent multiplies (`pipeline.ts`), not the combined balance-and-profi
 matrix the article names as the other mixing path, and the camera matrix runs
 AFTER the denoiser. So the channels arrive at `makeRowDenoiser` with their noise
 still separated, which is the condition per-channel treatment needs.
+
+*(2026-10-02: this is now true of the binned working copy only. The export and
+the native-resolution working copy demosaic with RCD, which DOES mix channels, as
+every edge-directed demosaic does: green at a red or blue site is estimated from
+a low-pass of all three colours, and red and blue are interpolated as differences
+from green. So at full resolution the channels reach `makeRowDenoiser` with some
+of green's noise carried into red and blue, the AHD-style mixing the article
+describes. Not yet measured on these frames.)*
 
 Binning also means the preview's red and blue each come from ONE photosite, so
 per-channel work on the binned image is close to what a reader comment on that
