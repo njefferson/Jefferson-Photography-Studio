@@ -267,3 +267,5 @@ also=tools/keepfile-check.mjs
 # the seventh place to update; the lens rig's own picker is declared as an
 # exception with its reason and printed on every run.
 also=tools/openable-check.mjs
+
+also=tools/mask-turn-check.mjs
