@@ -766,13 +766,13 @@ cannot describe something the code does not say about itself.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (352 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (3240 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (3241 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
 - **`src/gpuexport.ts`** (348 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
 - **`src/half.ts`** (109 lines) — IEEE half-precision, both directions, in one place.
-- **`src/heal.ts`** (1100 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
+- **`src/heal.ts`** (1113 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
 - **`src/histogram.ts`** (114 lines) — Lightroom-style floating histogram.
 - **`src/hotspot.ts`** (225 lines) — The per-lens IR hot-spot correction that comes WITH the app, as opposed to one the reader measured for themselves (lensstore.ts).
 - **`src/hotspotProfiles.ts`** (32 lines) — GENERATED — do not hand-edit.
@@ -795,7 +795,7 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (20281 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (20296 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
 - **`src/pipeline.ts`** (3067 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
@@ -804,7 +804,7 @@ cannot describe something the code does not say about itself.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
 - **`src/raw/demosaic.ts`** (609 lines) — Bayer demosaic + black/white-level normalization -> linear RGB: a binned half-size proxy, and RCD at full resolution.
 - **`src/raw/denoise.ts`** (699 lines) — Edge-preserving denoise (13x13 bilateral, colour on a 7x7 grid at stride 2) on LINEAR sensor data.
-- **`src/raw/detail.ts`** (302 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
+- **`src/raw/detail.ts`** (327 lines) — Detail: capture sharpening (high frequency) + Texture (mid frequency), on LINEAR data, mirroring the denoise pattern (raw/denoise.ts).
 - **`src/raw/dngOpcodes.ts`** (345 lines) — DNG opcode lists (DNG 1.7.1.0, chapter 7): the corrections a DNG says must be applied at three points of decoding.
 - **`src/raw/dngRaw.ts`** (494 lines) — Decode a DNG's raw image into linear camera values.
 - **`src/raw/lj92.ts`** (260 lines) — Lossless JPEG (ITU-T T.81, process 14 / SOF3) decoder — pure TypeScript.

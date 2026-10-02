@@ -58,6 +58,29 @@ const oldRadial = (m, u, v) => {
 const grid = [];
 for (let i = 0; i <= 40; i++) for (let j = 0; j <= 40; j++) grid.push([i / 40, j / 40]);
 
+// MADE TO FAIL. Two things this instrument must reproduce before anything
+// below is trusted. (a) A known weight: a circle of radius 0.2 with feather 0.5
+// weighs exactly 0.5 at three quarters of its radius (smoothstep of 0.5 over
+// 0.5..1 is 0.5), through the function under test and the written-out formula
+// alike. (b) The defect check 2 exists for is VISIBLE to it: the same circle
+// turned in UV, the wrong way, written out here, moves the weight on a 3:2 grid
+// by far more than check 2's 1e-9. If either is absent, nothing below is
+// trustworthy — the old formula or the shape measure is not reading the mask.
+{
+  const c = { ...neutralMask(0), cx: 0.5, cy: 0.5, rx: 0.2, ry: 0.2, feather: 0.5 };
+  const known = maskWeight(c, 0.5 + 0.15, 0.5, A), knownOld = oldRadial(c, 0.5 + 0.15, 0.5);
+  const uvTurn = (m, u, v, ang) => {
+    const du = u - m.cx, dv = v - m.cy, co = Math.cos(ang), si = Math.sin(ang);
+    return oldRadial({ ...m, cx: 0, cy: 0 }, co * du + si * dv, -si * du + co * dv);
+  };
+  const circle = { ...c, rx: 0.2 / A, ry: 0.2, feather: 0.3 };
+  let sheared = 0;
+  for (const [u, v] of grid) sheared = Math.max(sheared, Math.abs(uvTurn(circle, u, v, 0.9) - maskWeight(circle, u, v, A)));
+  const ctl = near(known, 0.5, 1e-12) && near(knownOld, 0.5, 1e-12) && sheared > 0.1;
+  console.log(`MADE TO FAIL control: weight at 3/4 radius ${known} (old formula ${knownOld}, both must be 0.5); a circle turned in uv moves by ${sheared.toFixed(3)} (must exceed 0.1) — ${ctl ? "the instrument holds" : "CONTROL FAILED, nothing below is trustworthy"}`);
+  if (!ctl) process.exit(2);
+}
+
 // 1. Nothing saved before 027 moves.
 {
   const m = { ...neutralMask(0), cx: 0.43, cy: 0.61, rx: 0.21, ry: 0.13, feather: 0.37 };

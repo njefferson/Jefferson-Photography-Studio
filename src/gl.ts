@@ -7,6 +7,7 @@
 // preview and CPU export can never drift apart.
 import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer, toHalf } from "./half";
+import { sharpenSigmaTexels } from "./raw/detail";
 export type { EditParams };
 
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
@@ -189,7 +190,7 @@ uniform int u_flatN;
 uniform vec2 u_flatC;
 uniform float u_flatInvD;
 uniform float u_clarity;     // -1..1 local contrast vs the blurred-luma map
-uniform float u_dehaze;      // -1..1 veil subtraction vs the dark-channel map
+uniform float u_dehaze;      // -1..1 He's dark-channel recovery (I - A)/t + A, t from u_localTex's guided-filter a/b
 uniform sampler2D u_localTex; // RGBA16F (localmap.ts): R sqrt-encoded blurred luma, G/B dehaze guided-filter a/b
 uniform float u_localScale;   // linear decode scale for u_localTex's R
 uniform vec3 u_hazeA;         // the airlight per channel, in the source's own linear space (localmap.ts)
@@ -225,7 +226,7 @@ uniform float u_despeckle; // 0..1 decision-based median on the centre pixel (ra
 uniform float u_sharpen; // 0..1 capture sharpening (high-freq) — see raw/detail.ts
 uniform float u_texture; // -1..1 mid-freq local contrast — see raw/detail.ts
 uniform vec2 u_texel;    // one PROXY texel: tapScale / textureSize (see setTapScale)
-uniform float u_sharpK;  // 1/(2 sigma^2) of the sharpen blur in TEXELS: sigma = 1 native pixel / pitch (raw/detail.ts)
+uniform float u_sharpK;  // 1/(2 sigma^2) of the sharpen blur in TEXELS: sigma from sharpenSigmaTexels (raw/detail.ts)
 uniform sampler2D u_detailTex; // R16F denoised LUMINANCE, one texel per source texel (unit 14) — detail's input
 uniform bool u_detailPre;      // u_detailTex holds the pre-pass for this draw; false = read u_tex itself
 uniform int u_stage;           // 1 = the detail pre-pass: emit the denoised luminance and stop
@@ -2497,7 +2498,7 @@ export class Renderer {
     // that is both sampled and attached is a feedback loop WebGL refuses.
     gl.bindTexture(gl.TEXTURE_2D, pre ? this.detailTex : null);
     gl.activeTexture(gl.TEXTURE0);
-    const sigTex = 1.0 / this.nativePitch; // DETAIL_SIGMA_S (1 native pixel) in texels
+    const sigTex = sharpenSigmaTexels(this.nativePitch); // DETAIL_SIGMA_S (1 native pixel) in texels, the proxy's box kept (raw/detail.ts)
     gl.uniform1f(this.loc.u_sharpK, 1 / (2 * sigTex * sigTex));
     gl.uniform3f(this.loc.u_hazeA, this.hazeA[0], this.hazeA[1], this.hazeA[2]);
     const crop = applyCrop ? p.crop ?? CROP_DEFAULT : CROP_DEFAULT;

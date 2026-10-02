@@ -299,6 +299,8 @@ function laplaceFill(D: Float32Array, dom: Uint8Array, rw: number, rh: number, e
  * @param H    the source's height.
  * @param spots the edit's spots.
  * @param eps  the solve's tolerance (EPS_BYTES or EPS_LINEAR).
+ * @param hi   the top of the buffer's range: 255 for gamma bytes, Infinity for
+ *             linear light, which has no ceiling here.
  * @returns one layer per spot: its rect, holding the composite after it.
  *
  * SOURCES ALWAYS READ THE PRISTINE PICTURE, as they always have; what a spot
@@ -309,11 +311,19 @@ function laplaceFill(D: Float32Array, dom: Uint8Array, rw: number, rh: number, e
  * a heal and zero for a clone; at weight 1 that is exactly the healed patch,
  * and the feather blends it as darktable blends its heal by the mask.
  *
+ * EVERY COMPOSITE IS HELD TO 0..hi. A clone is a convex mix of two values the
+ * buffer already holds and cannot leave its range; a heal adds the correction,
+ * and a source pixel already near either end goes past it — a speck of 250 on
+ * a source 50 darker than the surround wants 300. Unheld, the preview's
+ * Uint8Array WRAPPED it (300 stored as 44, a black speck where the heal meant
+ * white) while the export lifted 300 to linear 1.45, and a linear source went
+ * below zero, a value no sensor records (measured in review, 2026-10-02).
+ *
  * What it holds: the layers (12 bytes a pixel, which healPatchBytes bills as
  * the patches, because they are), and one spot's working set at a time
  * (HEAL_SOLVE_BYTES_PX).
  */
-function healLayers(read: PxReader, W: number, H: number, spots: readonly HealSpot[], eps: number): HealLayer[] {
+function healLayers(read: PxReader, W: number, H: number, spots: readonly HealSpot[], eps: number, hi: number): HealLayer[] {
   const sp = toPx(spots, W, H);
   const layers: HealLayer[] = [];
   const t = new Float64Array(3);
@@ -363,7 +373,10 @@ function healLayers(read: PxReader, W: number, H: number, spots: readonly HealSp
       for (let c = 0; c < 3; c++) {
         const o = i * 3 + c;
         const b = before[o];
-        data[o] = w > 0 ? b + (src[o] + (D ? D[o] : 0) - b) * w : b;
+        if (w > 0) {
+          const v = b + (src[o] + (D ? D[o] : 0) - b) * w;
+          data[o] = v < 0 ? 0 : v > hi ? hi : v;
+        } else data[o] = b;
       }
     }
     layers.push({ ...rect, data });
@@ -396,11 +409,11 @@ export interface HealCache {
   key?: string;
   layers?: unknown;
 }
-function cachedLayers(cache: HealCache | undefined, W: number, H: number, spots: readonly HealSpot[], read: PxReader, eps: number): HealLayer[] {
-  if (!cache) return healLayers(read, W, H, spots, eps);
-  const key = `${W}x${H}|${eps}|${JSON.stringify(spots)}`;
+function cachedLayers(cache: HealCache | undefined, W: number, H: number, spots: readonly HealSpot[], read: PxReader, eps: number, hi: number): HealLayer[] {
+  if (!cache) return healLayers(read, W, H, spots, eps, hi);
+  const key = `${W}x${H}|${eps}|${hi}|${JSON.stringify(spots)}`;
   if (cache.key === key && cache.layers) return cache.layers as HealLayer[];
-  const layers = healLayers(read, W, H, spots, eps);
+  const layers = healLayers(read, W, H, spots, eps, hi);
   cache.key = key;
   cache.layers = layers;
   return layers;
@@ -432,7 +445,7 @@ export function bakeRgba8(
   cache?: HealCache,
 ): Uint8Array {
   const read: PxReader = (x, y, o) => { const i = (y * W + x) * 4; o[0] = src[i]; o[1] = src[i + 1]; o[2] = src[i + 2]; };
-  const layers = cachedLayers(cache, W, H, spots, read, EPS_BYTES);
+  const layers = cachedLayers(cache, W, H, spots, read, EPS_BYTES, 255);
   const out = new Uint8Array(rect.w * rect.h * 4);
   const t = new Float64Array(3);
   for (let y = 0; y < rect.h; y++) {
@@ -481,7 +494,7 @@ export function bakeRgbaF32(
     ? (i) => fromHalf((src as Uint16Array)[i])
     : (i) => (src as Float32Array)[i];
   const read: PxReader = (x, y, o) => { const i = (y * W + x) * 4; o[0] = at(i); o[1] = at(i + 1); o[2] = at(i + 2); };
-  const layers = cachedLayers(cache, W, H, spots, read, EPS_LINEAR);
+  const layers = cachedLayers(cache, W, H, spots, read, EPS_LINEAR, Infinity);
   const out = new Float32Array(rect.w * rect.h * 4);
   const t = new Float64Array(3);
   for (let y = 0; y < rect.h; y++) {
@@ -537,7 +550,7 @@ export function healPatches8(
   toLinear: (v: number) => number,
 ): HealPatch[] {
   const read: PxReader = (x, y, o) => { const i = (y * W + x) * 4; o[0] = pixels[i]; o[1] = pixels[i + 1]; o[2] = pixels[i + 2]; };
-  const layers = healLayers(read, W, H, spots, EPS_BYTES);
+  const layers = healLayers(read, W, H, spots, EPS_BYTES, 255);
   for (const L of layers) {
     const d = L.data;
     for (let o = 0; o < d.length; o++) d[o] = toLinear(Math.round(d[o]));
@@ -566,7 +579,7 @@ export function healPatchesFromSampler(
   spots: readonly HealSpot[],
 ): HealPatch[] {
   const read: PxReader = (x, y, o) => { const q = sample(x, y); o[0] = q[0]; o[1] = q[1]; o[2] = q[2]; };
-  return healLayers(read, W, H, spots, EPS_LINEAR);
+  return healLayers(read, W, H, spots, EPS_LINEAR, Infinity);
 }
 
 /**

@@ -34,8 +34,13 @@
 //    and a stride-2 kernel has no response at the sensor's Nyquist, so the
 //    finest detail was never sharpened. RawTherapee's capture sharpening works
 //    on full-resolution luminance with a radius measured in sensor pixels. The
-//    preview APPROXIMATES it: on a proxy one texel is `pitch` native pixels, so
-//    the same sigma is sigma/pitch texels there.
+//    preview APPROXIMATES it on a proxy whose texel is `pitch` native pixels —
+//    with the sigma `sharpenSigmaTexels` gives, NOT sigma/pitch. A proxy texel
+//    is the BOX MEAN of pitch x pitch sensor pixels, and a box of width p adds
+//    (p^2 - 1)/12 to a blur's variance; sigma/pitch drops it, and seen at the
+//    preview's own scale the preview then showed 0.65-0.72 of the export's
+//    sharpening (NIR_1651 and NIR_3697, Sharpen 1, review 2026-10-02). With the
+//    box's variance kept it shows 0.97-1.02 of it.
 // 4. A PURE RATIO. The gain divided by (Lc + 0.05) on values taken BEFORE
 //    exposure and white balance, so the same edge sharpened differently
 //    depending on how the frame was exposed in camera. It is Lout / Lc now with
@@ -63,6 +68,25 @@ export const DETAIL_THRESH = 0.02; // soft threshold on sharpen's high-pass, as 
 export const DETAIL_EPS = 1e-5; // ratio floor (RawTherapee's) — not a shadow floor
 export const DETAIL_GAIN_MIN = 0.25; // clamp the luminance gain so haloes stay bounded
 export const DETAIL_GAIN_MAX = 3.0;
+
+/** THE SHARPEN BLUR'S SIGMA IN SAMPLER PIXELS, for a sampler whose pixel spans
+ *  `pitch` native sensor pixels.
+ *
+ *  @param pitch native pixels per sampler pixel: 1 at export, 2 on a raw's
+ *               half-size proxy, the scale factor on an 8-bit proxy.
+ *  @returns sqrt(DETAIL_SIGMA_S^2 + (p^2 - 1)/12) / p, p = max(1, pitch) —
+ *           exactly DETAIL_SIGMA_S at pitch 1.
+ *
+ *  What the result must satisfy: the CPU (makeRowDetail) and the shader
+ *  (gl.ts, u_sharpK) both take it from here, so the two sides cannot disagree;
+ *  and on a proxy it is the blur that, applied to the box-averaged texels,
+ *  matches the native-resolution sharpening box-averaged to the same texels —
+ *  the (p^2 - 1)/12 is the variance a width-p box adds, which sigma/pitch
+ *  dropped (header, item 3). */
+export function sharpenSigmaTexels(pitch: number): number {
+  const p = Number.isFinite(pitch) && pitch > 1 ? pitch : 1;
+  return Math.sqrt(DETAIL_SIGMA_S * DETAIL_SIGMA_S + (p * p - 1) / 12) / p;
+}
 
 /** Gaussian weights over a [-r..r]^2 window, row-major, in tap-index units.
  *  @param sigma the blur's sigma in taps.
@@ -132,7 +156,7 @@ export function detailGain(lc: number, blurX: number, blurM: number, blurT: numb
  *                previewed; 1 on the proxy itself.
  * @param pitch   how many NATIVE sensor pixels one sampler pixel spans: 1 at
  *                export, 2 on a raw's half-size proxy. The sharpen sigma is
- *                DETAIL_SIGMA_S / pitch sampler pixels.
+ *                `sharpenSigmaTexels(pitch)` sampler pixels.
  * @returns a sampler giving the detailed colour, or `base` itself when both
  *          sliders are off. Its array is reused by the next call.
  *
@@ -173,8 +197,9 @@ export function makeRowDetail(
   // the one the reader tuned; the weights are in tap-index units and stay put.
   const tapOff = new Int32Array(DETAIL_R * 2 + 1);
   for (let d = -DETAIL_R; d <= DETAIL_R; d++) tapOff[d + DETAIL_R] = Math.round(d * step);
-  // Sharpen taps one sampler pixel apart, sigma in native pixels.
-  const sigX = DETAIL_SIGMA_S / Math.max(1, pitch);
+  // Sharpen taps one sampler pixel apart, sigma in native pixels carried to
+  // this sampler's scale (sharpenSigmaTexels).
+  const sigX = sharpenSigmaTexels(pitch);
   const WX = gauss(sigX, DETAIL_RS);
   const reach = Math.max(texture !== 0 ? tapOff[DETAIL_R * 2] : 0, sharpen > 0 ? DETAIL_RS : 0);
   const rowSpan = reach * 2 + 4; // rows the vertical taps reach + scan margin

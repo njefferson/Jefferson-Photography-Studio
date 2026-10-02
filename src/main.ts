@@ -8082,11 +8082,26 @@ function setMaskScreenTurn(m: MaskLayer, deg: number, keepSide: boolean): void {
     if (Math.abs(off - 360 * Math.round(off / 360)) > 90) want += 180;
   }
   const asp = maskAspect();
-  const [ox, oy] = renderer.imageUvToClient(m.cx, m.cy);
   const t = ((want + renderer.rotation * 90) * Math.PI) / 180;
-  const [u, v] = renderer.clientToImageUv(ox + Math.cos(t) * 100, oy + Math.sin(t) * 100);
-  const dx = (u - m.cx) * asp, dy = v - m.cy;
-  m.angle = Math.hypot(dx, dy) > 1e-9 ? Math.atan2(dy, dx) : (want * Math.PI) / 180;
+  // THE SCREEN DIRECTION INVERTED EXACTLY, through the derivative of
+  // imageUvToClient at the centre. That mapping is affine — flip, quarter turn,
+  // Straighten, crop, zoom — so the client step of one uv unit across and one
+  // down is its whole Jacobian, and solving against it loses nothing. It used
+  // to map a 100 px screen step back through clientToImageUv, which goes
+  // through toImagePixel: ROUNDED to a whole pixel and CLAMPED to the frame. So
+  // a slider set to -30 wrote back -29.9, one +0.1 press moved it by 0.2, and an
+  // oval 20 px from the frame's edge set to -60 landed at -76.9, the clamped
+  // point's angle (measured in review on NIR_1651.dng, 2026-10-02).
+  const [ox, oy] = renderer.imageUvToClient(m.cx, m.cy);
+  const [ax, ay] = renderer.imageUvToClient(m.cx + 1, m.cy);
+  const [bx, by] = renderer.imageUvToClient(m.cx, m.cy + 1);
+  const j00 = ax - ox, j10 = ay - oy, j01 = bx - ox, j11 = by - oy;
+  const det = j00 * j11 - j01 * j10;
+  const sx = Math.cos(t), sy = Math.sin(t);
+  const du = Math.abs(det) > 1e-12 ? (j11 * sx - j01 * sy) / det : 0;
+  const dv = Math.abs(det) > 1e-12 ? (j00 * sy - j10 * sx) / det : 0;
+  const dx = du * asp, dy = dv;
+  m.angle = Math.hypot(dx, dy) > 1e-12 ? Math.atan2(dy, dx) : (want * Math.PI) / 180;
 }
 
 /** Put a radial mask's turn on the panel: the slider, the readout and the
