@@ -188,6 +188,58 @@ function sayPreparing(): void {
   markStartup("graphics-words");
 }
 
+/** THE LONGEST A BUILD THAT WILL HOLD THE PAGE WAITS FOR THE PRACTICE PICTURES
+ *  (decision 086), in milliseconds. Once the offline worker holds them
+ *  (`ips-examples-v1`, kept across releases) they are small files read and
+ *  decoded on the device in tens of milliseconds, so this never binds; it binds
+ *  on a first visit over a slow connection, or for a picture that is missing,
+ *  and then it bounds what the build gives up to two seconds, against the 44 s
+ *  hold on the PC it exists for. A picture that has not come in two seconds was
+ *  going to be missing anyway, and the editor is worth more than it. */
+const TILES_WAIT_MS = 2000;
+/** THE PRACTICE PICTURES THE READER CAN SEE, ON SCREEN BEFORE THE PAGE IS HELD
+ *  (decision 086). In a browser that cannot build off the page (Firefox, which
+ *  offers no KHR_parallel_shader_compile), the build holds the page's own
+ *  thread, and a picture that arrives during the hold cannot be drawn until it
+ *  ends: the start card sat with empty tiles for the whole 44 s.
+ *
+ *  Takes nothing. Switches the practice tiles whose pictures are in the first
+ *  view (inside both the window and the start card's visible box) from lazy to
+ *  eager loading, so their fetch starts now rather than after a layout and an
+ *  observer's task, and returns a promise that resolves once each of them has
+ *  decoded or failed, or once TILES_WAIT_MS has passed, whichever is first. It
+ *  never rejects. Tiles out of view stay lazy, and with none in view (the card
+ *  hidden, a session resuming) it resolves at once.
+ *
+ *  What callers rely on: `beforeBuild` returns this promise to the Renderer,
+ *  which waits for it and then two animation frames before the build starts,
+ *  so the decoded pictures are painted first. Called from inside the Renderer
+ *  constructor while this module is still evaluating, when the tiles do not
+ *  exist yet: its first step waits a microtask, which runs only after the
+ *  module has finished, and it finds the tiles by id, never through a binding
+ *  declared below it. */
+async function practicePicturesPainted(): Promise<void> {
+  await null;
+  const list = document.getElementById("galleryList");
+  const card = document.getElementById("welcome");
+  if (!list || !card) return;
+  const c = card.getBoundingClientRect();
+  const top = Math.max(0, c.top), bottom = Math.min(innerHeight, c.bottom);
+  const left = Math.max(0, c.left), right = Math.min(innerWidth, c.right);
+  const inView = Array.from(list.querySelectorAll("img")).filter((im) => {
+    const r = im.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.bottom > top && r.top < bottom && r.right > left && r.left < right;
+  });
+  if (!inView.length) return;
+  for (const im of inView) im.loading = "eager";
+  let timer = 0;
+  await Promise.race([
+    Promise.allSettled(inView.map((im) => im.decode())),
+    new Promise<void>((resolve) => { timer = window.setTimeout(resolve, TILES_WAIT_MS); }),
+  ]);
+  clearTimeout(timer);
+}
+
 // No WebGL2 -> a clear explanation with options instead of a blank page. The
 // throw halts this module; the static overlay needs no scripting to stay up.
 // A program that fails to BUILD arrives later, in graphicsReady's rejection,
@@ -200,10 +252,13 @@ const renderer = (() => {
       // whether or not the browser offered to build it off the page: offering
       // is not doing, and a browser that holds the page anyway would otherwise
       // hold it in silence. A warm launch says nothing and does not wait.
-      beforeBuild: () => {
+      // AND THE PRACTICE PICTURES IN VIEW, where the browser offers no way to
+      // build off the page, so it will hold it (decision 086); where it offers
+      // one, nothing else waits.
+      beforeBuild: (parallel) => {
         if (!likelyCold) return false;
         sayPreparing();
-        return true;
+        return parallel ? true : practicePicturesPainted();
       },
       onBuildStart: (parallel) => {
         buildStartedAt = performance.now();
@@ -16793,7 +16848,9 @@ const CORE = new Set([
   "NIR_1717", "NIR_1644",
   "NIR_0172", "NIR_0627",
 ]);
-// Build the practice-gallery grid (tutorial set) on the start screen.
+// Build the practice-gallery grid (tutorial set) on the start screen. Every
+// picture starts lazy; where the build will hold the page, the ones in view are
+// switched to eager and waited for before it starts (practicePicturesPainted).
 const galleryList = $("galleryList") as HTMLDivElement;
 const makeTile = (g: GalleryTile) => {
   const b = document.createElement("button");

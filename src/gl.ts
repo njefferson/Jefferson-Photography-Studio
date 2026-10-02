@@ -1364,11 +1364,16 @@ export interface BuildOptions {
    *  page. Returns true when the caller has just put words on screen that must
    *  be PAINTED before the build starts; the build then waits two frames first
    *  (the first frame callback runs before that frame paints, the second after
-   *  it has). Returns false, or is absent, and the build starts at once. */
-  beforeBuild?: (parallel: boolean) => boolean;
-  /** Called once as the build is handed to the driver, after any frames
+   *  it has). Returns a promise when what must be painted arrives later than
+   *  the words (decision 086: the start card's practice pictures, on a browser
+   *  whose build will hold the page): the build waits for it to settle and then
+   *  the same two frames. The promise must settle by itself within a ceiling
+   *  the caller sets, since the build sets none; a rejection counts as settled.
+   *  Returns false, or is absent, and the build starts at once. */
+  beforeBuild?: (parallel: boolean) => boolean | Promise<void>;
+  /** Called once as the build is handed to the driver, after any wait
    *  `beforeBuild` asked for, so a start-up mark taken here times the build and
-   *  not the wait for words to paint. `parallel`: whether the browser offered
+   *  not the wait for words or pictures to paint. `parallel`: whether the browser offered
    *  to build it without holding the page. Whether it actually did is for the
    *  frame monitor to say, not this flag (startup.ts). */
   onBuildStart?: (parallel: boolean) => void;
@@ -1817,7 +1822,12 @@ export class Renderer {
     // never asked until 071; the test page did, so its 42 s was measured on a
     // different thread from the launch it was meant to explain.
     const par = gl.getExtension("KHR_parallel_shader_compile");
-    if (opts.beforeBuild?.(!!par)) {
+    const first = opts.beforeBuild?.(!!par);
+    if (first) {
+      // WHAT HAS TO ARRIVE BEFORE IT CAN BE PAINTED (decision 086), then the
+      // two frames that paint it. A rejection is as good as an arrival: the
+      // build must start either way.
+      if (first !== true) await first.catch(() => undefined);
       await nextFrame();
       await nextFrame();
     }
