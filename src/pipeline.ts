@@ -812,8 +812,24 @@ export interface MaskLayer {
   grade?: number[];
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
-  rx: number; // radial: x radius (uv fraction)
-  ry: number; // radial: y radius (uv fraction)
+  rx: number; // radial: radius along the oval's FIRST axis, as a fraction of the width
+  ry: number; // radial: radius along its SECOND axis, as a fraction of the height
+  /** HOW FAR A RADIAL MASK IS TURNED (027), in radians; absent or 0 is the
+   *  axis-aligned oval every edit saved before this field renders as.
+   *
+   *  The turn happens in PIXELS, not in uv: image uv is a different unit across
+   *  than down on any photograph that is not square, so turning in uv would
+   *  shear the oval rather than turn it. So `rx` is measured along the first
+   *  axis in units of the image's WIDTH and `ry` along the second in units of
+   *  its HEIGHT, exactly as before, and the pair turns rigidly as one shape —
+   *  a circle stays a circle and an oval keeps its length at any angle.
+   *  Positive turns the first axis from +u towards +v, which is clockwise on a
+   *  photograph shown upright and unmirrored. An oval is the same shape half a
+   *  turn on, so any angle is valid and none is wrapped here; the panel shows it
+   *  folded into -90..90. Read only for type 0 — a gradient's two points
+   *  already carry its direction. `radialLocal` is the one place it is
+   *  applied, and the shader's `maskWeight` carries the same arithmetic. */
+  angle?: number;
   feather: number; // radial/colour: 0..1 soft edge
   lx: number; // linear: end x
   ly: number; // linear: end y
@@ -1085,8 +1101,9 @@ export function groupCanAim(group: readonly MaskLayer[]): boolean {
 /** HOW MUCH OF AN AIMED STAGE APPLIES AT THIS PIXEL (decisions 030, 042).
  *
  *  Takes `groups`, the active groups (`maskGroupsForRender`, head first in each,
- *  the same order the shader indexes once flattened), one AIM_* `bit`, and the
- *  pixel's `u`, `v`. Returns 1 when nothing aims at that stage — which is the whole point: an
+ *  the same order the shader indexes once flattened), one AIM_* `bit`, the
+ *  pixel's `u`, `v`, and `aspect`, the image's width over its height, which a
+ *  turned radial mask needs (027; see `maskWeight`). Returns 1 when nothing aims at that stage — which is the whole point: an
  *  unaimed stage is whole-frame and renders exactly as it always has.
  *
  *  Otherwise it returns the UNION (the largest) of the aiming weights, so two
@@ -1110,7 +1127,7 @@ export function groupCanAim(group: readonly MaskLayer[]): boolean {
  *  (`groupCanAim`); a reader who aims either gets no effect rather than a wrong
  *  one, and the panel says why. `src/gl.ts` carries the same arithmetic and
  *  `tools/agreement-walk.mjs` is what holds the two together. */
-export function aimWeight(groups: readonly (readonly MaskLayer[])[], bit: number, u: number, v: number): number {
+export function aimWeight(groups: readonly (readonly MaskLayer[])[], bit: number, u: number, v: number, aspect = 1): number {
   let w = 0, any = false;
   for (const g of groups) {
     for (let k = 0; k < g.length; k++) {
@@ -1119,7 +1136,7 @@ export function aimWeight(groups: readonly (readonly MaskLayer[])[], bit: number
       if (m.type === 3) continue; // no key this early — see MaskLayer.aims
       if (k === 0 && !groupCanAim(g)) continue;
       any = true;
-      const mw = k === 0 ? groupWeight(g, (c) => maskWeight(c, u, v)) : maskWeight(m, u, v);
+      const mw = k === 0 ? groupWeight(g, (c) => maskWeight(c, u, v, aspect)) : maskWeight(m, u, v, aspect);
       if (mw > w) w = mw;
       if (w >= 1) return w;
     }
@@ -1205,8 +1222,9 @@ export function groupHslOffset(group: readonly MaskLayer[]): readonly number[] |
 /** THE FOLIAGE BAND'S VALUE AT ONE PIXEL (042, stage 2): the whole-photo value
  *  plus each group's offsets times that group's joined place weight, summed
  *  where masks overlap, then held to FOL_MIN..FOL_MAX. Takes `base` (the
- *  whole-photo `foliage`), the active groups, image uv and `out`, which it
- *  fills; returns nothing. What the result must satisfy: it is `base` exactly
+ *  whole-photo `foliage`), the active groups, image uv, `out`, which it
+ *  fills, and `aspect`, the image's width over its height, for a turned radial
+ *  mask (027); returns nothing. What the result must satisfy: it is `base` exactly
  *  wherever no offset reaches, so an edit with no offsets renders unchanged,
  *  and it is what the shader's `foliageHere` computes at the same uv. */
 export function foliageAt(
@@ -1215,14 +1233,16 @@ export function foliageAt(
   u: number,
   v: number,
   out: [number, number, number],
+  aspect = 1,
 ): void {
-  bandAt(base, groups, groupFolOffset, u, v, out);
+  bandAt(base, groups, groupFolOffset, u, v, out, aspect);
 }
 
 /** THE SKY BAND'S VALUE AT ONE PIXEL (042, stage 2, beside Foliage), the same
  *  sum as `foliageAt` over each group's `skyBand`, held to the same ranges,
  *  which the Sky band's sliders share with Foliage's. Takes `base` (the
- *  whole-photo `sky`), the active groups, image uv and `out`, which it fills;
+ *  whole-photo `sky`), the active groups, image uv, `out`, which it fills, and
+ *  `aspect`, the image's width over its height, for a turned radial mask (027);
  *  returns nothing. What the result must satisfy: `base` exactly wherever no
  *  offset reaches, and what the shader's `skyBandHere` computes at that uv. */
 export function skyBandAt(
@@ -1231,8 +1251,9 @@ export function skyBandAt(
   u: number,
   v: number,
   out: [number, number, number],
+  aspect = 1,
 ): void {
-  bandAt(base, groups, groupSkyOffset, u, v, out);
+  bandAt(base, groups, groupSkyOffset, u, v, out, aspect);
 }
 
 /** One band's value at one pixel, whichever band `offsetOf` reads; the body of
@@ -1244,13 +1265,14 @@ function bandAt(
   u: number,
   v: number,
   out: [number, number, number],
+  aspect: number,
 ): void {
   out[0] = base[0]; out[1] = base[1]; out[2] = base[2];
   let any = false;
   for (const g of groups) {
     const f = offsetOf(g);
     if (!f) continue;
-    const w = groupWeight(g, (c) => maskWeight(c, u, v));
+    const w = groupWeight(g, (c) => maskWeight(c, u, v, aspect));
     if (w <= 0) continue;
     out[0] += f[0] * w; out[1] += f[1] * w; out[2] += f[2] * w;
     any = true;
@@ -1293,7 +1315,9 @@ type LinearTap = (x: number, y: number) => ArrayLike<number>;
  *
  *  What the caller relies on: the uv here is the texel CENTRE, `(x + 0.5) / w`,
  *  because that is what the shader's interpolated `v_uv` is at the same pixel
- *  and `maskWeight` is the same function on both sides. */
+ *  and `maskWeight` is the same function on both sides; and `w / h` is the
+ *  aspect a turned radial mask is weighed at, so `w` and `h` must be the
+ *  frame's own (027). */
 export function aimedSampler(
   off: LinearTap,
   on: LinearTap,
@@ -1306,7 +1330,7 @@ export function aimedSampler(
   if (!aimsAt(groups, bit)) return on;
   const out = [0, 0, 0];
   return (x, y) => {
-    const k = aimWeight(groups, bit, (x + 0.5) / w, (y + 0.5) / h);
+    const k = aimWeight(groups, bit, (x + 0.5) / w, (y + 0.5) / h, w / h);
     if (k >= 1) return on(x, y);
     // WEIGHT 0 MUST NOT RUN THE FILTER, and the first version of this did.
     // `on` was called before the weight was branched on, so every pixel the
@@ -1333,11 +1357,70 @@ export function aimedSampler(
   };
 }
 
-export function maskWeight(m: MaskLayer, u: number, v: number): number {
+/** A POINT IN A RADIAL MASK'S OWN FRAME (027): the offset of image uv (`u`,
+ *  `v`) from the oval's centre, turned back by the mask's `angle`, so the
+ *  first number runs along the oval's first axis (in units of the image's
+ *  width, the unit `rx` is in) and the second along its second axis (in units
+ *  of the height, the unit of `ry`). Takes the mask `m` (its `cx`, `cy` and
+ *  `angle`), the point, and `aspect`, the image's width over its height.
+ *  Returns `[along rx, along ry]`.
+ *
+ *  THE TURN IS IN PIXELS: the offset is scaled to the height's unit before it
+ *  is turned and back after, which is what keeps a turned oval the same shape
+ *  on a photograph that is not square.
+ *
+ *  What the result has to satisfy: with no angle it is EXACTLY `[u - cx,
+ *  v - cy]` — the cosine is 1, the sine 0, and the arithmetic below adds an
+ *  exact zero — so every mask saved before 027 weighs what it weighed. And
+ *  `radialPoint` is its inverse: `radialLocal(m, ...radialPoint(m, t, a), a)`
+ *  is `[rx cos t, ry sin t]`. `maskWeight` divides it by the radii, the overlay
+ *  in main.ts projects a dragged handle with it, and the shader's `maskWeight`
+ *  in src/gl.ts computes the same two lines. */
+export function radialLocal(m: MaskLayer, u: number, v: number, aspect: number): [number, number] {
+  const ox = u - m.cx, oy = v - m.cy;
+  const a = m.angle ?? 0;
+  if (!a) return [ox, oy];
+  const asp = aspect > 0 ? aspect : 1;
+  const c = Math.cos(a), s = Math.sin(a);
+  return [c * ox + (s * oy) / asp, c * oy - s * ox * asp];
+}
+
+/** WHERE A RADIAL MASK'S EDGE IS, at parameter `t` radians round it (027).
+ *  Takes the mask `m`, `t` (0 is the end of the first axis, `rx`; a quarter
+ *  turn is the end of the second, `ry`) and `aspect`, the image's width over
+ *  its height. Returns that point in image uv as `[u, v]`.
+ *
+ *  What the result has to satisfy: it lies exactly on the edge `maskWeight`
+ *  draws — `radialLocal` maps it back to `[rx cos t, ry sin t]`, radius 1 — so
+ *  the dotted outline and the handles the overlay places with it sit where the
+ *  selection ends, at every angle and on every shape of photograph. */
+export function radialPoint(m: MaskLayer, t: number, aspect: number): [number, number] {
+  const qx = m.rx * Math.cos(t), qy = m.ry * Math.sin(t);
+  const a = m.angle ?? 0;
+  if (!a) return [m.cx + qx, m.cy + qy];
+  const asp = aspect > 0 ? aspect : 1;
+  const c = Math.cos(a), s = Math.sin(a);
+  return [m.cx + c * qx - (s * qy) / asp, m.cy + c * qy + s * qx * asp];
+}
+
+/** HOW MUCH OF A GEOMETRIC OR PAINTED MASK APPLIES AT ONE PIXEL. Takes the
+ *  mask `m`, the pixel's image uv `u`, `v`, and `aspect`, the image's width
+ *  over its height, which only a TURNED radial mask reads (027) and which
+ *  defaults to 1 for callers that hold no turned mask. Returns the weight,
+ *  0..1, with the mask's invert applied.
+ *
+ *  What the result has to satisfy: it is the same number the shader's
+ *  `maskWeight` in src/gl.ts gives at the same uv — `tools/agreement-walk.mjs`
+ *  holds the two together — and a caller that holds a turned radial mask must
+ *  pass the photograph's own aspect, or the oval it weighs is not the one the
+ *  screen draws. A radial mask with no angle weighs exactly what it did before
+ *  `angle` existed. Colour masks (type 3) never reach here. */
+export function maskWeight(m: MaskLayer, u: number, v: number, aspect = 1): number {
   let w: number;
   if (m.type === 0) {
-    const dx = (u - m.cx) / Math.max(1e-4, m.rx);
-    const dy = (v - m.cy) / Math.max(1e-4, m.ry);
+    const [lx, ly] = radialLocal(m, u, v, aspect);
+    const dx = lx / Math.max(1e-4, m.rx);
+    const dy = ly / Math.max(1e-4, m.ry);
     const r = Math.sqrt(dx * dx + dy * dy);
     w = 1 - smooth01(1 - m.feather, 1, r); // 1 in the core, 0 past the edge
   } else if (m.type === 1) {
@@ -2143,7 +2226,8 @@ export function compileEdit(
   p: EditParams,
   cam?: number[],
   /** Image width/height — needed by the lens fixes so the hot-spot stays
-   *  circular in pixels. Callers without uv (LUT bake) can omit it. */
+   *  circular in pixels, and by a turned radial mask so it turns as a shape
+   *  rather than shearing (027). Callers without uv (LUT bake) can omit it. */
   aspect = 1,
   /** Per-image clarity/dehaze reference maps; omit (LUT bake) to skip both. */
   local?: LocalMap,
@@ -2322,8 +2406,8 @@ export function compileEdit(
       // to aim a stage has exactly that: nothing of its own to do. Reading the
       // filtered list would have made the feature silently inert for the most
       // obvious way to use it.
-      const dzA = dz * aimWeight(aimGroups, AIM_DEHAZE, u, v);
-      const clA = cl * aimWeight(aimGroups, AIM_CLARITY, u, v);
+      const dzA = dz * aimWeight(aimGroups, AIM_DEHAZE, u, v, aspect);
+      const clA = cl * aimWeight(aimGroups, AIM_CLARITY, u, v, aspect);
       if (dzA !== 0) {
         // HUE-PRESERVING haze removal: veil-subtract the LUMINANCE only, then
         // scale all channels by the same factor. (Per-channel subtraction in
@@ -2364,7 +2448,7 @@ export function compileEdit(
       // hot-spot AMOUNT, never the combined gain — `vignette` rides the same
       // function and is whole-frame on purpose. gHot is linear in the amount,
       // so this is exactly the hot spot's own gain blended toward 1.
-      const lw = aimWeight(aimGroups, AIM_LENS, u, v);
+      const lw = aimWeight(aimGroups, AIM_LENS, u, v, aspect);
       const gain = radialGain(p.hotspot * lw, p.hotspotSize, p.vignette, u, v, aspect);
       r *= gain; g *= gain; b *= gain;
       // The COLOUR half, on the same circle. Before the swap and the matrix, so
@@ -2389,7 +2473,7 @@ export function compileEdit(
       // scaled strength — `lensGain` is 1/(1+(k-1)s) and is not linear in s,
       // so scaling the strength here and blending in the shader would be two
       // different renderings of the same edit. The shader blends too.
-      const lw = aimWeight(aimGroups, AIM_LENS, u, v);
+      const lw = aimWeight(aimGroups, AIM_LENS, u, v, aspect);
       r *= 1 + (lensGr![i] - 1) * lw;
       b *= 1 + (lensGb![i] - 1) * lw;
       if (lensGg) g *= 1 + (lensGg[i] - 1) * lw;
@@ -2438,12 +2522,12 @@ export function compileEdit(
     // Taken outside the band's block, whose HSV `v` shadows the pixel's uv.
     let f: readonly [number, number, number] = fol;
     if (bandsActive && folGroups.length && u !== undefined && v !== undefined) {
-      foliageAt(fol, folGroups, u, v, folPx);
+      foliageAt(fol, folGroups, u, v, folPx, aspect);
       f = folPx;
     }
     let sk: readonly [number, number, number] = sky;
     if (bandsActive && skyGroups.length && u !== undefined && v !== undefined) {
-      skyBandAt(sky, skyGroups, u, v, skyPx);
+      skyBandAt(sky, skyGroups, u, v, skyPx, aspect);
       sk = skyPx;
     }
     if (bandsActive) {
@@ -2502,8 +2586,8 @@ export function compileEdit(
         // operator. A one-component group is the head's own weight, so every
         // edit made before 026 renders exactly as it did.
         let w = group.length === 1
-          ? (m.type === 3 ? colorMaskWeight(m, kr, kg, kb) : maskWeight(m, u, v))
-          : groupWeight(group, (c) => (c.type === 3 ? colorMaskWeight(c, kr, kg, kb) : maskWeight(c, u, v)));
+          ? (m.type === 3 ? colorMaskWeight(m, kr, kg, kb) : maskWeight(m, u, v, aspect))
+          : groupWeight(group, (c) => (c.type === 3 ? colorMaskWeight(c, kr, kg, kb) : maskWeight(c, u, v, aspect)));
         if (keepW) groupW[gi] = w > 0 ? w : 0;
         if (w <= 0) continue;
         // warmth (linear temp shift)
@@ -2595,7 +2679,7 @@ export function compileEdit(
     // EditParams.shadowSat for why the balance is not shared and what this is
     // for. Before the grade on purpose: any tint the reader adds then lands on
     // a neutral shadow. Same in the shader.
-    const shA = u !== undefined && v !== undefined ? shSat * aimWeight(aimGroups, AIM_SHADOW, u, v) : shSat;
+    const shA = u !== undefined && v !== undefined ? shSat * aimWeight(aimGroups, AIM_SHADOW, u, v, aspect) : shSat;
     if (shA > 0) {
       const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
       const k = 1 - shA * (1 - smooth01(0.05, 0.6, L));

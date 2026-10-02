@@ -494,7 +494,7 @@ function fixMaskLoops(src: string, k: number): { src: string; loops: number; cle
  *  a computed index and are handled on their own. */
 const MASK_FIELDS: [string, number, string, boolean][] = [
   ["u_maskType", 0, "x", true], ["u_maskSlot", 0, "y", true], ["u_maskOp", 0, "z", true], ["u_maskAims", 0, "w", true],
-  ["u_maskGeoA", 1, "", false], ["u_maskGeoB", 2, "xy", false], ["u_maskAdj", 3, "", false],
+  ["u_maskGeoA", 1, "", false], ["u_maskGeoB", 2, "", false], ["u_maskAdj", 3, "", false],
   ["u_maskFol", 4, "xyz", false], ["u_maskSkyBand", 5, "xyz", false], ["u_maskHue", 6, "x", false], ["u_maskGradeBal", 6, "y", false],
 ];
 const MASK_ARRAY_NAMES = [...MASK_FIELDS.map((f) => f[0]), "u_maskHsl", "u_maskGrade"];

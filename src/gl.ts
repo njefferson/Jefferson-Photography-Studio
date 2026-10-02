@@ -126,7 +126,7 @@ uniform float u_lum;         // global luminance: v -> pow(v, 1/u_lum) through r
 uniform int u_maskCount;
 uniform int u_maskType[8];   // 0 = radial, 1 = linear, 2 = brush, 3 = colour, 4 = sky
 uniform vec4 u_maskGeoA[8];  // radial (cx,cy,rx,ry) | linear (cx,cy,lx,ly)
-uniform vec2 u_maskGeoB[8];  // (feather, invert)
+uniform vec4 u_maskGeoB[8];  // (feather, invert, cos, sin of a radial mask's turn; 1, 0 unturned)
 uniform vec4 u_maskAdj[8];   // (brightness, contrast, saturation, warmth)
 uniform float u_maskHue[8];  // degrees
 uniform int u_maskSlot[8];   // brush/sky: which packed channel (0..3); -1 otherwise
@@ -163,7 +163,7 @@ uniform int u_lensN;      // 0 when no measured profile matched this photograph
 uniform float u_lensFix;  // measured colour strength; 0 is off
 uniform float u_lensBump;  // shipped brightness strength; 0 is off
 uniform float u_vignette;    // -1..1 (+ brighten corners, - darken)
-uniform float u_aspect;      // image width/height — keeps the lens fix circular in pixels
+uniform float u_aspect;      // image width/height — keeps the lens fix circular in pixels, and turns a radial mask as a shape
 uniform float u_recover;     // 0..1 highlight recovery strength (pipeline.ts recoverHighlight)
 // The lens flat the SOURCE texture already carries — a raw's decode-time
 // correction (decision 021) — one texel per radial bin, RGB = the gain on red,
@@ -525,8 +525,16 @@ float maskWeight(int i, vec2 uv){
   vec4 gA = u_maskGeoA[i];
   float w;
   if (u_maskType[i] == 0) {
-    float dx = (uv.x - gA.x) / max(1e-4, gA.z);
-    float dy = (uv.y - gA.y) / max(1e-4, gA.w);
+    // A TURNED OVAL (027): the offset is turned back by the mask's angle in
+    // PIXELS (the height's unit), so the oval turns as a shape instead of
+    // shearing on a photograph that is not square. radialLocal() in
+    // pipeline.ts is the same two lines. Unturned, the cosine is 1 and the sine
+    // 0, and both lines reduce exactly to the offset they replaced.
+    float cs = u_maskGeoB[i].z, sn = u_maskGeoB[i].w;
+    float asp = max(1e-4, u_aspect);
+    float ox = uv.x - gA.x, oy = uv.y - gA.y;
+    float dx = (cs * ox + sn * oy / asp) / max(1e-4, gA.z);
+    float dy = (cs * oy - sn * ox * asp) / max(1e-4, gA.w);
     float r = sqrt(dx*dx + dy*dy);
     w = 1.0 - smoothstep(1.0 - u_maskGeoB[i].x, 1.0, r);
   } else {
@@ -2477,7 +2485,7 @@ export class Renderer {
     if (masks.length) {
       const types = new Int32Array(MAX_MASKS);
       const geoA = new Float32Array(MAX_MASKS * 4);
-      const geoB = new Float32Array(MAX_MASKS * 2);
+      const geoB = new Float32Array(MAX_MASKS * 4);
       const adj = new Float32Array(MAX_MASKS * 4);
       const hue = new Float32Array(MAX_MASKS);
       const slot = new Int32Array(MAX_MASKS).fill(-1);
@@ -2494,14 +2502,17 @@ export class Renderer {
           : [m.cx, m.cy, m.lx, m.ly],
           i * 4,
         );
-        geoB.set([m.feather, m.invert ? 1 : 0], i * 2);
+        // A radial mask's turn travels as its cosine and sine (027), worked out
+        // here once rather than per pixel, and 1, 0 for every other mask.
+        const turn = m.type === 0 ? (m.angle ?? 0) : 0;
+        geoB.set([m.feather, m.invert ? 1 : 0, turn ? Math.cos(turn) : 1, turn ? Math.sin(turn) : 0], i * 4);
         adj.set([m.brightness, m.contrast, m.saturation, m.warmth], i * 4);
         hue[i] = m.hue;
         slot[i] = slotOf[i];
       });
       gl.uniform1iv(this.loc.u_maskType, types);
       gl.uniform4fv(this.loc.u_maskGeoA, geoA);
-      gl.uniform2fv(this.loc.u_maskGeoB, geoB);
+      gl.uniform4fv(this.loc.u_maskGeoB, geoB);
       gl.uniform4fv(this.loc.u_maskAdj, adj);
       gl.uniform1fv(this.loc.u_maskHue, hue);
       gl.uniform1iv(this.loc.u_maskSlot, slot);

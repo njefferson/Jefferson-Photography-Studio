@@ -35,7 +35,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
-import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
+import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, applyLensFlat, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, type HealSpot } from "./heal";
@@ -6678,10 +6678,20 @@ const mUI = {
   fixCut: $("mSkyFixCut") as HTMLButtonElement,
   fixClear: $("mSkyFixClear") as HTMLButtonElement,
   fixSize: $("mSkyFixSize") as HTMLInputElement,
+  // A radial mask's turn without a gesture (027): the slider, its readout and
+  // a tenth of a degree either side, the Straighten idiom.
+  turnRow: $("mTurnRow") as HTMLElement,
+  turn: $("mTurn") as HTMLInputElement,
+  turnVal: $("mTurnVal") as HTMLOutputElement,
+  turnDown: $("mTurnDown") as HTMLButtonElement,
+  turnUp: $("mTurnUp") as HTMLButtonElement,
 };
 let selectedMask = -1;
 let overlayHandles: { el: SVGCircleElement; role: string }[] = [];
 let overlayShape: SVGPolygonElement | SVGLineElement | null = null;
+// A radial mask's turn grip (027): the dashed stem from the first axis's handle
+// and the knob at its end. Rebuilt with the rest of the overlay, never mid-drag.
+let overlayTurn: { stem: SVGLineElement; grip: SVGGElement } | null = null;
 // User toggle: show the radial/linear handle outline on the photo. Lets you
 // judge the masked result cleanly while the sliders are open; a fresh geometry
 // mask always turns it back on so its handles are there to place.
@@ -7565,6 +7575,7 @@ function updateMaskUI() {
     mUI.feather.value = String(m.feather);
     // Feather is the soft edge for radial, colour AND sky masks (transition width).
     mUI.featherRow.hidden = m.type !== 0 && m.type !== 3 && m.type !== 4;
+    syncTurnUI(m); // a radial mask's turn (027); hidden for every other kind
     // The overlay toggle governs the coverage tint (all types) + the handle
     // outline (radial/linear), so it's available for every mask.
     mUI.outline.setAttribute("aria-pressed", String(showMaskOutline));
@@ -7813,6 +7824,7 @@ function renderMaskOverlay() {
   maskOverlay.toggleAttribute("hidden", !showable);
   overlayHandles = [];
   overlayShape = null;
+  overlayTurn = null;
   if (!showable || !m) {
     maskOverlay.replaceChildren();
     return;
@@ -7822,6 +7834,8 @@ function renderMaskOverlay() {
     overlayShape = document.createElementNS(SVGNS, "polygon");
     overlayShape.setAttribute("class", "mask-shape");
     kids.push(overlayShape, mkHandle("center"), mkHandle("rx"), mkHandle("ry"));
+    overlayTurn = mkTurnGrip();
+    kids.push(overlayTurn.stem, overlayTurn.grip);
   } else {
     overlayShape = document.createElementNS(SVGNS, "line");
     overlayShape.setAttribute("class", "mask-line");
@@ -7841,14 +7855,34 @@ function positionMaskOverlay() {
     const [x, y] = renderer.imageUvToClient(u, v);
     return [x - rect.left, y - rect.top];
   };
+  // A turned oval's edge and handles come from the same function its weight
+  // does (027), so the outline is where the selection ends at every angle.
+  const asp = maskAspect();
   if (m.type === 0 && overlayShape) {
     const pts: string[] = [];
     for (let a = 0; a <= 48; a++) {
       const t = (a / 48) * Math.PI * 2;
-      const [x, y] = loc(m.cx + m.rx * Math.cos(t), m.cy + m.ry * Math.sin(t));
+      const [x, y] = loc(...radialPoint(m, t, asp));
       pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
     }
     (overlayShape as SVGPolygonElement).setAttribute("points", pts.join(" "));
+    if (overlayTurn) {
+      // The knob sits on a stem past the first axis's handle, pointing the way
+      // that axis points ON SCREEN, so it follows the turn, a Rotate, a flip
+      // and Straighten without knowing about any of them.
+      const [hx, hy] = loc(...radialPoint(m, 0, asp));
+      const [ox, oy] = loc(m.cx, m.cy);
+      let ux = hx - ox, uy = hy - oy;
+      const ul = Math.hypot(ux, uy);
+      if (ul > 1e-6) { ux /= ul; uy /= ul; } else { ux = 1; uy = 0; }
+      const kx = hx + ux * TURN_STEM_PX, ky = hy + uy * TURN_STEM_PX;
+      overlayTurn.stem.setAttribute("x1", hx.toFixed(1));
+      overlayTurn.stem.setAttribute("y1", hy.toFixed(1));
+      overlayTurn.stem.setAttribute("x2", kx.toFixed(1));
+      overlayTurn.stem.setAttribute("y2", ky.toFixed(1));
+      overlayTurn.grip.setAttribute("transform", `translate(${kx.toFixed(1)} ${ky.toFixed(1)})`);
+    }
+    syncTurnUI(m); // the readout is an angle AS SHOWN, so it moves with the view
   } else if (overlayShape) {
     const [x0, y0] = loc(m.cx, m.cy);
     const [x1, y1] = loc(m.lx, m.ly);
@@ -7859,8 +7893,8 @@ function positionMaskOverlay() {
   }
   for (const h of overlayHandles) {
     let u = m.cx, v = m.cy;
-    if (h.role === "rx") { u = m.cx + m.rx; v = m.cy; }
-    else if (h.role === "ry") { u = m.cx; v = m.cy + m.ry; }
+    if (h.role === "rx") [u, v] = radialPoint(m, 0, asp);
+    else if (h.role === "ry") [u, v] = radialPoint(m, Math.PI / 2, asp);
     else if (h.role === "end") { u = m.lx; v = m.ly; }
     const [x, y] = loc(u, v);
     h.el.setAttribute("cx", String(x));
@@ -7886,8 +7920,10 @@ function attachHandleDrag(el: SVGCircleElement, role: string) {
       const [uu, vv] = renderer.clientToImageUv(ev.clientX, ev.clientY);
       const u = clamp(uu, 0, 1), v = clamp(vv, 0, 1);
       if (role === "center" || role === "start") { m.cx = u; m.cy = v; }
-      else if (role === "rx") m.rx = clamp(Math.abs(u - m.cx), 0.02, 1.5);
-      else if (role === "ry") m.ry = clamp(Math.abs(v - m.cy), 0.02, 1.5);
+      // A radius is the finger's distance ALONG its own axis (027), measured in
+      // the oval's own frame; unturned that is exactly |u - cx| and |v - cy|.
+      else if (role === "rx") m.rx = clamp(Math.abs(radialLocal(m, u, v, maskAspect())[0]), 0.02, 1.5);
+      else if (role === "ry") m.ry = clamp(Math.abs(radialLocal(m, u, v, maskAspect())[1]), 0.02, 1.5);
       else if (role === "end") { m.lx = u; m.ly = v; }
       positionMaskOverlay();
       draw();
@@ -7901,6 +7937,175 @@ function attachHandleDrag(el: SVGCircleElement, role: string) {
     el.addEventListener("pointerup", up);
   });
 }
+
+// --- A RADIAL MASK TURNS (027). The angle belongs to the shape and is turned
+// ON the shape, which is Lightroom's and darktable's model; their gestures are
+// not copied, because one is a cursor that changes on hover and the other needs
+// Ctrl, Shift and a scroll wheel, and a finger has none of them. What carries
+// over is a VISIBLE grip — a knob on a stem past the first axis's handle, the
+// sticker's rotate knob in shape — that settles on a coarse step, and the panel
+// route beside it (the Turn slider with Straighten's tenth-degree buttons),
+// because a gesture with no alternative is unreachable for anyone who cannot
+// make it. Decision 027 rejects the outline-drag and the panel-only routes. ---
+
+/** How far past the first axis's handle the turn knob sits, in screen pixels:
+ *  far enough that the knob's 44 px target clears that handle's own. */
+const TURN_STEM_PX = 40;
+/** The coarse step the grip settles on, in degrees as shown, and how close the
+ *  finger has to come to one for it to settle: 15 is Lightroom's snap, and 3
+ *  either side is wide enough to land on without precision and narrow enough
+ *  that every angle between stays reachable by the drag. */
+const TURN_SNAP_DEG = 15;
+const TURN_SNAP_NEAR_DEG = 3;
+
+/** The open photograph's width over its height — the aspect a turned radial
+ *  mask is weighed and drawn at (027), the same number every renderer passes to
+ *  `maskWeight`. 1 with nothing open. */
+function maskAspect(): number {
+  return current && current.height ? current.width / current.height : 1;
+}
+
+/** Fold an angle in degrees into -90..90: an oval is the same shape half a turn
+ *  on, so that range names every orientation once. -90 reads as 90. */
+function foldTurn(deg: number): number {
+  let d = deg - 180 * Math.round(deg / 180);
+  if (d <= -90) d += 180;
+  return d;
+}
+
+/** THE WAY A RADIAL MASK'S FIRST AXIS POINTS ON SCREEN, in degrees, clockwise
+ *  from the screen's horizontal and taken relative to the photograph's own
+ *  quarter turn, NOT folded — so the grip can be placed on the side it is on.
+ *  Measured through the renderer's own uv-to-client mapping, so a flip and a
+ *  Straighten are already in it: after Straighten an unturned oval reads the
+ *  straightened amount, because that is how it is shown. Falls back to the
+ *  stored angle when the view has no size yet. */
+function maskScreenTurnRaw(m: MaskLayer): number {
+  const a = m.angle ?? 0, asp = maskAspect();
+  const [ox, oy] = renderer.imageUvToClient(m.cx, m.cy);
+  const [px, py] = renderer.imageUvToClient(m.cx + (Math.cos(a) * 0.05) / asp, m.cy + Math.sin(a) * 0.05);
+  const dx = px - ox, dy = py - oy;
+  if (!(Math.hypot(dx, dy) > 1e-6)) return (a * 180) / Math.PI;
+  const deg = (Math.atan2(dy, dx) * 180) / Math.PI - renderer.rotation * 90;
+  return deg - 360 * Math.round(deg / 360);
+}
+
+/** Turn a radial mask so its first axis points `deg` degrees clockwise from the
+ *  screen's horizontal (relative to the quarter turn, as `maskScreenTurnRaw`
+ *  reads it), by mapping that screen direction back into the image through the
+ *  renderer and taking its angle in PIXELS. With `keepSide`, of the two
+ *  directions that make the same oval the one nearer where the first axis
+ *  points now is taken, so the slider and the buttons never flip the grip to
+ *  the far side; the grip's own drag passes false, because there the finger
+ *  says which side. Writes `m.angle`; draws nothing. */
+function setMaskScreenTurn(m: MaskLayer, deg: number, keepSide: boolean): void {
+  let want = deg;
+  if (keepSide) {
+    const now = maskScreenTurnRaw(m);
+    const off = want - now;
+    if (Math.abs(off - 360 * Math.round(off / 360)) > 90) want += 180;
+  }
+  const asp = maskAspect();
+  const [ox, oy] = renderer.imageUvToClient(m.cx, m.cy);
+  const t = ((want + renderer.rotation * 90) * Math.PI) / 180;
+  const [u, v] = renderer.clientToImageUv(ox + Math.cos(t) * 100, oy + Math.sin(t) * 100);
+  const dx = (u - m.cx) * asp, dy = v - m.cy;
+  m.angle = Math.hypot(dx, dy) > 1e-9 ? Math.atan2(dy, dx) : (want * Math.PI) / 180;
+}
+
+/** Put a radial mask's turn on the panel: the slider, the readout and the
+ *  slider's spoken value, all folded into -90..90. Hides the row for any other
+ *  kind of mask, whose shape has no angle to set. */
+function syncTurnUI(m: MaskLayer | null): void {
+  const radial = !!m && m.type === 0;
+  mUI.turnRow.hidden = !radial;
+  if (!radial || !m) return;
+  const d = Math.round(foldTurn(maskScreenTurnRaw(m)) * 10) / 10 || 0;
+  // Not under a finger or a key on the slider itself: a value written back
+  // mid-drag, rounded through the view, would fight the thumb.
+  if (document.activeElement !== mUI.turn) mUI.turn.value = String(d);
+  mUI.turnVal.value = `${d.toFixed(1)}\u00b0`;
+  mUI.turn.setAttribute("aria-valuetext", d === 0 ? "level" : `${Math.abs(d).toFixed(1)} degrees ${d > 0 ? "clockwise" : "anticlockwise"}`);
+}
+
+/** Build the turn grip: a dashed stem and a group holding the knob, a turning
+ *  arrow drawn in it so the knob says what it does without a cursor, and an
+ *  invisible 44 px disc that takes the finger. Returns both; the caller adds
+ *  them to the overlay and `positionMaskOverlay` places them. */
+function mkTurnGrip(): { stem: SVGLineElement; grip: SVGGElement } {
+  const stem = document.createElementNS(SVGNS, "line");
+  stem.setAttribute("class", "mask-turn-stem");
+  const grip = document.createElementNS(SVGNS, "g");
+  grip.setAttribute("class", "mask-turn");
+  const knob = document.createElementNS(SVGNS, "circle");
+  knob.setAttribute("r", "11");
+  knob.setAttribute("class", "mask-turn-knob");
+  const arrow = document.createElementNS(SVGNS, "path");
+  // Three quarters of a ring with a head on its end: the turning glyph.
+  arrow.setAttribute("d", "M 5.5 0 A 5.5 5.5 0 1 1 0 -5.5 M -2.5 -8 L 0.5 -5.5 L -2.5 -3");
+  arrow.setAttribute("class", "mask-turn-arrow");
+  const hit = document.createElementNS(SVGNS, "circle");
+  hit.setAttribute("r", "22"); // 44 px across: the target this app is held to
+  hit.setAttribute("class", "mask-turn-hit");
+  hit.setAttribute("aria-label", "Turn the oval: drag this round its centre");
+  attachTurnDrag(hit);
+  grip.append(knob, arrow, hit);
+  return { stem, grip };
+}
+
+/** Drag the turn grip: the oval's first axis follows the finger round its
+ *  centre, and settles on every TURN_SNAP_DEG as shown when the finger passes
+ *  within TURN_SNAP_NEAR_DEG of one. One drag is one undo step. */
+function attachTurnDrag(el: SVGCircleElement): void {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    el.setPointerCapture(e.pointerId);
+    // Grabbing the grip re-engages the tint, as grabbing any handle does.
+    if (maskAdjusting) {
+      maskAdjusting = false;
+      if (renderer.maskViz !== selectedMask) { renderer.maskViz = selectedMask; draw(); }
+    }
+    const move = (ev: PointerEvent) => {
+      const m = currentMask();
+      if (!m || m.type !== 0) return;
+      const [ox, oy] = renderer.imageUvToClient(m.cx, m.cy);
+      const dx = ev.clientX - ox, dy = ev.clientY - oy;
+      if (Math.hypot(dx, dy) < 6) return; // too near the centre to have a direction
+      let deg = (Math.atan2(dy, dx) * 180) / Math.PI - renderer.rotation * 90;
+      const step = Math.round(deg / TURN_SNAP_DEG) * TURN_SNAP_DEG;
+      if (Math.abs(deg - step) <= TURN_SNAP_NEAR_DEG) deg = step;
+      setMaskScreenTurn(m, deg, false);
+      positionMaskOverlay();
+      draw();
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+      flushRecord();
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+  });
+}
+
+/** Turn the picked radial mask to `deg` as shown, keeping its grip's side, and
+ *  redraw. The slider and the tenth-degree buttons both come through here. */
+function turnPickedMask(deg: number): void {
+  const m = currentMask();
+  if (!m || m.type !== 0) return;
+  setMaskScreenTurn(m, deg, true);
+  positionMaskOverlay();
+  syncTurnUI(m);
+  draw();
+}
+mUI.turn.addEventListener("input", () => turnPickedMask(Number(mUI.turn.value)));
+mUI.turn.addEventListener("change", flushRecord); // one drag of the slider = one undo step
+const turnArmed = () => currentMask()?.type === 0;
+wireRepeat(mUI.turnDown, () => { const m = currentMask(); if (m) turnPickedMask(foldTurn(maskScreenTurnRaw(m)) - 0.1); }, turnArmed);
+wireRepeat(mUI.turnUp, () => { const m = currentMask(); if (m) turnPickedMask(foldTurn(maskScreenTurnRaw(m)) + 0.1); }, turnArmed);
 
 // --- CORRECTING A GENERATED SELECTION BY HAND (031). Add by hand / Take out
 // by hand arm the canvas the way Paint does, and a drag records a STROKE on
@@ -10335,10 +10540,19 @@ straightenSlider.addEventListener("change", flushRecord); // one drag of the sli
  *  Hold to repeat, and the whole hold is ONE undo step — the same rule the
  *  slider's own drag follows. */
 function wireNudge(btn: HTMLButtonElement, by: number): void {
+  wireRepeat(btn, () => applyStraighten(params.straighten + by), () => geoMode === "straighten");
+}
+
+/** PRESS ONCE FOR ONE STEP, HOLD TO KEEP GOING — Straighten's tenth-degree
+ *  buttons, and since 027 a radial mask's Turn buttons, which reuse the idiom
+ *  rather than inventing a second one. Takes the button, `step`, which makes one
+ *  step, and `armed`, which says whether the button may act now. A tap is one
+ *  step, always; a hold waits a beat and then repeats; every way a press can
+ *  end stops it; and the whole press or hold is ONE undo step. */
+function wireRepeat(btn: HTMLButtonElement, step: () => void, armed: () => boolean): void {
   let delay = 0;
   let repeat = 0;
   let held = false;
-  const step = () => applyStraighten(params.straighten + by);
   const stop = () => {
     if (!held) return;
     held = false;
@@ -10352,11 +10566,11 @@ function wireNudge(btn: HTMLButtonElement, by: number): void {
     flushRecord(); // one press, or one hold, = one undo step
   };
   btn.addEventListener("pointerdown", (e) => {
-    if (geoMode !== "straighten") return;
+    if (!armed()) return;
     e.preventDefault();
     btn.setPointerCapture?.(e.pointerId);
     held = true;
-    step(); // the tap itself is one tenth, always
+    step(); // the tap itself is one step, always
     // A BEAT BEFORE IT RUNS AWAY. Repeating from the first frame means a tap
     // held a moment too long moves two tenths, which is the opposite of what a
     // control for landing exactly is for.
@@ -10368,7 +10582,7 @@ function wireNudge(btn: HTMLButtonElement, by: number): void {
   btn.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
-    if (geoMode !== "straighten") return;
+    if (!armed()) return;
     step();
   });
   btn.addEventListener("keyup", () => flushRecord());

@@ -2791,6 +2791,33 @@ button.toggletip {
 #maskOverlay .mask-shape { fill: rgba(120, 200, 255, 0.06); stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-line { stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-handle { fill: rgba(12, 12, 16, 0.72); stroke: #82cdff; stroke-width: 2; pointer-events: auto; cursor: grab; touch-action: none; }
+/* A radial mask's turn grip (027): a filled knob carrying a turning arrow, on a
+   dashed stem past the first axis's handle — the sticker's rotate knob in
+   shape, so SHAPE and POSITION say which control turns, not colour (the knob is
+   filled where the resize handles are hollow). The knob is drawn 22 px across;
+   the invisible disc over it is the 44 px target. Over the photograph, so
+   theme-invariant like the handles beside it. */
+#maskOverlay .mask-turn-stem { stroke: #82cdff; stroke-width: 2; stroke-dasharray: 3 3; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85)); }
+#maskOverlay .mask-turn-knob { fill: #82cdff; stroke: rgba(12, 12, 16, 0.85); stroke-width: 2; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); pointer-events: none; }
+#maskOverlay .mask-turn-arrow { fill: none; stroke: rgba(12, 12, 16, 0.95); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+#maskOverlay .mask-turn-hit { fill: transparent; pointer-events: auto; cursor: grab; touch-action: none; }
+/* The Turn row in the mask panel: Straighten's tenth-degree buttons, at the
+   44 px every tapped control here owes a finger. Under #panel, because
+   `#panel label` and `#panel button` are id rules and an id beats a class. */
+.mask-turn-row { margin: 6px 0; }
+.mask-turn-head { display: flex; align-items: center; gap: 8px; }
+#panel .mask-turn-head label { flex: 1; min-height: 0; padding-bottom: 2px; }
+#mTurnVal { margin-left: auto; font-size: 0.75rem; font-variant-numeric: tabular-nums; min-width: 5ch; text-align: right; }
+#panel .mask-turn-row .crop-fine button {
+  flex: none;
+  width: auto;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  touch-action: none; /* it owns the press, like Straighten's */
+}
 .mask-add { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .mask-add button { width: auto; padding: 6px 12px; font-size: 0.8125rem; }
 .color-swatch {

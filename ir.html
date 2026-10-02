@@ -587,6 +587,27 @@
               <label id="mSkyFixSizeRow">Hand size <input id="mSkyFixSize" type="range" min="0" max="1" step="0.01" value="0.59" /></label>
               <small id="mSkyFixNote" class="note">Turn one on and drag on the photo to add the sky it missed or take back what is not sky. Your corrections are kept separately, so Reach, Feather and the colour toggle keep working and your hand work stays where you put it. Turn both off to pan and zoom again.</small>
             </div>
+            <!-- A RADIAL MASK TURNS (027). The grip on the photograph is the
+                 direct route; this is the same angle without a gesture, in
+                 Straighten's idiom (a slider with a tenth of a degree either
+                 side, hold to repeat), because a gesture with no alternative is
+                 unreachable for anyone who cannot make it. Radial only — a
+                 gradient's two points already carry its direction. -->
+            <div id="mTurnRow" class="mask-turn-row" hidden>
+              <!-- The readout sits OUTSIDE the label, so the slider's name stays
+                   "Turn" rather than changing with every step; its value is
+                   spoken through aria-valuetext instead. -->
+              <div class="mask-turn-head">
+                <label for="mTurn">Turn</label>
+                <output id="mTurnVal" for="mTurn" aria-hidden="true">0.0&deg;</output>
+              </div>
+              <div class="crop-fine">
+                <button id="mTurnDown" type="button" aria-label="Turn the oval a tenth of a degree anticlockwise" aria-describedby="mTurnNote">&minus;0.1&deg;</button>
+                <input id="mTurn" type="range" min="-90" max="90" step="0.1" value="0" aria-describedby="mTurnNote" />
+                <button id="mTurnUp" type="button" aria-label="Turn the oval a tenth of a degree clockwise" aria-describedby="mTurnNote">+0.1&deg;</button>
+              </div>
+              <small id="mTurnNote" class="note">Drag the round knob on the stem past the oval&rsquo;s edge to turn it on the photo; it settles on every 15&deg; as you pass, so level is easy to find. The slider and the tenth-degree buttons turn it without a drag. 0&deg; is level as the photo is shown.</small>
+            </div>
             <label id="mFeatherRow">Feather <input id="mFeather" type="range" min="0.02" max="1" step="0.01" value="0.5" /></label>
             <fieldset id="mJoinRow" class="mask-join">
               <legend>How this joins the mask above</legend>

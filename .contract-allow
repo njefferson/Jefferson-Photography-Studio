@@ -112,7 +112,6 @@ src/pipeline.ts:sampleLocalMap
 src/pipeline.ts:neutralMask
 src/pipeline.ts:maskIsActive
 src/pipeline.ts:smooth01
-src/pipeline.ts:maskWeight
 src/pipeline.ts:chromaVec
 src/pipeline.ts:colorMaskWeight
 src/pipeline.ts:toneIsIdentity

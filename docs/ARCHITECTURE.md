@@ -425,6 +425,20 @@ and NO Nikon body can channel-swap in camera. Field guide:
   `positionMaskOverlay()` just repositions existing elements and is called every
   frame, on zoom/pan, resize and rotate. Masks are composition-specific: reset on
   every open, excluded from saved looks (portable), but part of undo/reset.
+  - **A radial mask turns** (027): `MaskLayer.angle`, radians, absent = the
+    axis-aligned oval. The turn is applied in PIXELS — `radialLocal` scales the
+    offset by the image aspect before turning it — so the oval turns as a shape
+    instead of shearing; the shader carries the same two lines and takes the
+    cosine and sine in `u_maskGeoB.zw`. Every CPU caller of `maskWeight` passes
+    the frame's aspect (`aimWeight`, the bands, `aimedSampler`, `compileEdit`).
+    On the photo the turn has its own grip: a round knob on a stem past the
+    first axis's handle, a 44 px target, settling on every 15° of the turn AS
+    SHOWN on screen (so "level" means level after Straighten), and the Turn
+    slider with its ±0.1° buttons in the Selection group is the same angle
+    without a gesture. The panel shows the turn folded into -90..90 relative to
+    the screen's quarter turn; `maskScreenTurn` / `setMaskScreenTurn` in main.ts
+    convert through the renderer's own uv↔client mapping, so a flip or a
+    Straighten is already in it.
   - **Brush masks** (type 2): a painted single-channel bitmap at ≤384px working
     res (`BrushMask`), bilinearly sampled. GLSL can't dynamically index samplers,
     so up to 4 brush masks pack into ONE RGBA texture (`u_maskTex`, one channel
@@ -494,7 +508,8 @@ and NO Nikon body can channel-swap in camera. Field guide:
     panel swatch shows the actual tapped colour. Arming disarms stale-safe via
     updateMaskUI when the mask vanishes (undo/delete/new photo). Geometry
     uniforms are reused: `u_maskGeoA` = `(hueTarget, satTarget, colorRange, -)`
-    for type 3, `u_maskGeoB` stays `(feather, invert)`; no overlay handles
+    for type 3, `u_maskGeoB` stays `(feather, invert, …)` (its last two carry a
+    radial mask's turn and read 1, 0 here); no overlay handles
     (like brush). Verified in headless chromium: GPU==CPU ≤2 LSB across
     solo/inverted/stacked/full-stack configs (the 2-LSB pixels are near-grey
     points from the pre-existing mixer/tone/lum display ops), a controlled
@@ -682,7 +697,7 @@ cannot describe something the code does not say about itself.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (2896 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (2907 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
@@ -711,10 +726,10 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (19623 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (19837 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (2786 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (2870 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
