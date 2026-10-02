@@ -1799,7 +1799,6 @@ export class Renderer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
 
-    // Tone-curve LUT (unit 2); a 256-entry identity ramp until a curve is set.
     // The flat the source pixels carry (unit 15), for the recovery clip test.
     // RGB32F, NEAREST, one texel per bin: the shader reads it with two exact
     // texelFetches and blends them itself (pipeline.ts lensLerp), so it needs
@@ -1830,6 +1829,7 @@ export class Renderer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, 1, 1, 0, gl.RGB, gl.HALF_FLOAT, new Uint16Array([0x3c00, 0x3c00, 0x3c00]));
 
+    // Tone-curve LUT (unit 2); a 256-entry identity ramp until a curve is set.
     this.toneTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);

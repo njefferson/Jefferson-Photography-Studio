@@ -784,7 +784,7 @@ cannot describe something the code does not say about itself.
 - **`src/lensflat.ts`** (237 lines) — The measured lens correction as a flat-field pass on the LINEAR working copy, applied at decode before anything is measured or graded (decision 021; IR-SCIENCE.md §9c — RawPedia, the DNG GainMap, Ligh
 - **`src/lensprofile.ts`** (1103 lines) — Measuring an IR lens's hot-spot ON THE DEVICE, from flat frames, per channel.
 - **`src/lensrig.ts`** (940 lines) — Measuring a lens, as a destination in the app.
-- **`src/lensstore.ts`** (919 lines) — Keeping a lens profile the reader measured, and putting it back to work.
+- **`src/lensstore.ts`** (928 lines) — Keeping a lens profile the reader measured, and putting it back to work.
 - **`src/localmap.ts`** (309 lines) — Per-image reference maps for Clarity and Dehaze (glow-map pattern: built once per image from LINEAR source data, sampled as a texture by the GPU and bilinearly by the CPU export).
 - **`src/look.ts`** (314 lines) — Shareable looks. A look is the CREATIVE grade only (see SavedLook) — small enough (~0.5 KB of JSON) to travel as a link fragment, a paste-able code, or a tiny .ipslook.json file, with no server and no
 - **`src/lookmark.ts`** (75 lines) — The traveling recipe: every exported JPEG can carry the look that made it, as an APP11 segment ("IPSLOOK\0" + the look.ts wire-format JSON, ~600 bytes).
@@ -795,7 +795,7 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (20280 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (20281 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
 - **`src/pipeline.ts`** (3067 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.

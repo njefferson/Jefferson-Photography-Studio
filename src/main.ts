@@ -864,12 +864,13 @@ function renderedColourNote(): string {
 
 /** WHY A LENS THE APP KNOWS IS NOT BEING CORRECTED, in the reader's words.
  *  @param w  from `withheldFor` / `Hotspot.shippedWithheld`: the body the
- *    profiles were measured on and the one this photograph names.
+ *    profiles were measured on and the one this photograph names, either ""
+ *    when it was not recorded.
  *  @returns one sentence for the card, naming both bodies and the reason —
  *    a hot spot depends on the body's infrared conversion as well as the lens,
  *    and the file cannot say which conversion a body has. */
 function lensWithheldSentence(w: { measuredOn: string; frame: string }): string {
-  return `This lens has a profile, but it was measured on a ${w.measuredOn} and this photograph ` +
+  return `This lens has a profile, but it was measured on ${w.measuredOn ? `a ${w.measuredOn}` : "a camera that was not recorded"} and this photograph ` +
     (w.frame ? `is from a ${w.frame}` : "does not say which camera took it") +
     ", so neither its brightness nor its colour is applied: a hot spot depends on the camera's infrared conversion as well as the lens, and a file cannot say which conversion its camera has.";
 }
@@ -1123,7 +1124,7 @@ function lensDiagnostic(): string {
   if (!mine && !shipped) {
     const why = Hotspot.shippedWithheld(currentExif) ?? LensStore.withheldFor(LensStore.listProfiles(), currentExif);
     return why
-      ? `no profile matched this photograph · WITHHELD: profiles for this lens were measured on ${why.measuredOn}, this frame is from ${why.frame || "a camera it does not name"}`
+      ? `no profile matched this photograph · WITHHELD: profiles for this lens were measured on ${why.measuredOn || "a camera that was not recorded"}, this frame is from ${why.frame || "a camera it does not name"}`
       : "no profile matched this photograph";
   }
   const halves = Hotspot.lensHalves(mine, shipped);

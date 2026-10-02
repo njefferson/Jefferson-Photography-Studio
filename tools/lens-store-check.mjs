@@ -30,6 +30,7 @@ const entry = join(dir, "entry.ts");
 writeFileSync(entry, `export { bumpFrom, bumpProblem } from ${JSON.stringify(join(process.cwd(), "src/lensstore.ts"))};
 export { matchIn, withheldFor, centreProblem, saveFromPayload, listProfiles } from ${JSON.stringify(join(process.cwd(), "src/lensstore.ts"))};
 export { lensHalves } from ${JSON.stringify(join(process.cwd(), "src/hotspot.ts"))};
+export { SHIPPED_PROFILES } from ${JSON.stringify(join(process.cwd(), "src/hotspotProfiles.ts"))};
 export { NBINS } from ${JSON.stringify(join(process.cwd(), "src/lensprofile.ts"))};`);
 const out = join(dir, "bundle.mjs");
 await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
@@ -37,11 +38,29 @@ await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, l
 // rather than read about: the same getItem/setItem the browser gives it.
 const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); }, removeItem: (k) => { mem.delete(k); } };
-const { bumpFrom, bumpProblem, NBINS, lensHalves, matchIn, withheldFor, centreProblem, saveFromPayload, listProfiles } = await import(pathToFileURL(out).href);
+const { bumpFrom, bumpProblem, NBINS, lensHalves, matchIn, withheldFor, centreProblem, saveFromPayload, listProfiles, SHIPPED_PROFILES } = await import(pathToFileURL(out).href);
 
 let bad = 0;
 const fail = (s) => { bad++; console.log(`FAIL  ${s}`); };
 const ok = (s) => console.log(`ok    ${s}`);
+
+// ── MADE TO FAIL: the matcher finds a profile it was handed ─────────────────
+// Known before this runs: the shipped table holds a 50-250 profile measured at
+// 50mm f/9 on the camera it names ("50-250@50@f9.0", NIR_1667's own match at
+// reach 0 in the 2026-10-02 review's lens-match run). A frame carrying exactly
+// that lens, body, focal length and aperture must come back as that profile,
+// unblended, reach 0. Every "nothing matched" case below passes just as well
+// against a matcher that matches NOTHING, so if this is absent nothing below
+// about refusals is trustworthy.
+{
+  const at = SHIPPED_PROFILES.find((p) => p.key === "50-250@50@f9.0");
+  const [make, ...rest] = at ? at.camera.split(" CORPORATION ") : [];
+  const ex = at ? { make: `${make} CORPORATION`, model: rest.join(" CORPORATION "), lens: at.model, focalLength: [50, 1], fNumber: [9, 1] } : null;
+  const got = ex ? matchIn(SHIPPED_PROFILES, ex) : null;
+  const good = !!got && got.key === "50-250@50@f9.0" && got.reach === 0 && !got.blend && !got.apBlend;
+  console.log(`MADE TO FAIL control: a ${ex ? `${ex.make} ${ex.model}` : "(no such profile)"} frame at 50mm f/9 matched ${got ? `${got.key} at reach ${got.reach}` : "nothing"} (must be 50-250@50@f9.0 at reach 0). ${good ? "Control holds." : "CONTROL FAILED - nothing below is trustworthy."}`);
+  if (!good) process.exit(2);
+}
 
 // Whatever bumpFrom hands back, the reader must accept — at every falloff
 // length a payload could plausibly carry, not just the current one.
@@ -387,6 +406,16 @@ const shippedBumpOnly = prof({ bump: BUMP });
   why && why.measuredOn === "MAKER BODY ONE" && why.frame === "MAKER BODY TWO"
     ? ok(`the withheld reason names both bodies (${why.measuredOn} / ${why.frame}), for the card`)
     : fail(`withheldFor must name the profile's body and the frame's, got ${JSON.stringify(why)}`);
+  // A profile whose body was NOT recorded — the rig writes "not recorded" when
+  // its frames name no camera, and a payload with no camera stores "" — has no
+  // body to name: the reason says so with "", and the card words it, rather
+  // than handing the card a sentinel to put after "measured on a".
+  for (const camera of ["not recorded", ""]) {
+    const w = withheldFor([p3(25, 8, camera)], at("MAKER", "BODY TWO"));
+    w && w.measuredOn === "" && w.frame === "MAKER BODY TWO"
+      ? ok(`a profile whose body was not recorded (${JSON.stringify(camera)}) is withheld with no body named, for the card to word`)
+      : fail(`a profile stored with camera ${JSON.stringify(camera)} handed the card ${JSON.stringify(w)} — it reads "measured on a ${w?.measuredOn}"`);
+  }
   withheldFor(table, at("MAKER", "BODY ONE")) === null && withheldFor(table, { lens: "SOME OTHER LENS" }) === null
     ? ok("no withheld reason when it matched, or when the lens has no profile at all")
     : fail("withheldFor must be null for a match and for an unknown lens");

@@ -165,12 +165,25 @@ const ifds = new A.Tiff(bytes).allIfds();
 const cam = A.camToSrgbLinear(A.readCameraMatrix(ifds) ?? A.nikonColorMatrix(A.cameraModel(ifds)));
 const cfa = A.readNefCfa(bytes);
 const d = A.demosaicBinned(cfa.cfa, cfa.width, cfa.height, cfa.pattern, cfa.black, cfa.white);
+// ── MADE TO FAIL: the independent side decodes the frame the app decodes ─────
+// Known before this runs: a Nikon Z 50 NEF's raw frame is 5600x3728 (the
+// frame debug.ts sizes its probes and the pool's budget by), so the binned
+// working copy the app balances is 2800x1864, and every number below is a
+// gray-world of that copy. If the node-side decode is not that shape, it is
+// not the copy the app balanced and nothing below is trustworthy.
+{
+  const good = d.width === 2800 && d.height === 1864;
+  console.log(`MADE TO FAIL control: the node-side binned decode of ${RAW.split("/").pop()} is ${d.width}x${d.height} (must be 2800x1864, a Z 50 raw frame binned). ${good ? "Control holds." : "CONTROL FAILED - nothing below is trustworthy."}`);
+  if (!good) process.exit(2);
+}
 const img = { width: d.width, height: d.height, linear: d.linear, camMatrix: cam, isRaw: true };
 const ex = A.readExifSubset(bytes);
 const shipped = A.Hotspot.findShipped(ex);
 const short = A.Hotspot.shortFor(ex?.lens);
-const { colour, bump } = A.Hotspot.lensHalves(null, shipped);
-const curve = colour || bump ? { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined } : null;
+const { colour, bump, brightness } = A.Hotspot.lensHalves(null, shipped);
+// The app's own curve (main.ts currentLensCurve) carries where the hot spot
+// sits — the brightness profile's centre, else the colour's — and so does this.
+const curve = colour || bump ? { kr: colour?.kr, kb: colour?.kb, bump: bump ?? undefined, centre: (brightness ?? colour)?.centre } : null;
 check("the raw's lens matches a shipped profile (the walk needs one)", !!curve, `${ex?.lens ?? "no lens"} → ${shipped ? "matched" : "no match"}`);
 // THE OTHER TWO FRAMES: the same lens, or (b) and (c) say nothing about it.
 const exOf = (f) => A.readExifSubset(new Uint8Array(readFileSync(f)));

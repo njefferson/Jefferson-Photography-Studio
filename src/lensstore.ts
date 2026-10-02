@@ -527,12 +527,20 @@ export function matchIn(list: StoredProfile[], ex: ExifSubset | null, opts?: { a
   return matchAny(list, ex, !!opts?.anyBody);
 }
 
+/** What the rig writes as `camera` when its frames name no make or model —
+ *  a sentinel, not a body. One source: lensrig.ts writes this constant and
+ *  `withheldFor` reads it. */
+export const CAMERA_NOT_RECORDED = "not recorded";
+
 /** WHY NOTHING MATCHED, when a profile of this lens exists for another body.
  *  Takes `list` and `ex`, as `matchIn`.
- *  Returns the body the profiles were measured on and the one the frame names
- *  ("" when it names none), or null when there is no such profile or one
+ *  Returns the body the profiles were measured on ("" when the profile records
+ *  none — stored as "" or as the rig's "not recorded") and the one the frame
+ *  names ("" when it names none), or null when there is no such profile or one
  *  matched. Consumer: the lens cards and the diagnostic, which must say why a
- *  lens the app knows is not being corrected rather than offer to identify it. */
+ *  lens the app knows is not being corrected rather than offer to identify it,
+ *  and which word an empty body themselves — a sentinel or a phrase in this
+ *  field read "measured on a not recorded" on the card. */
 export function withheldFor(list: StoredProfile[], ex: ExifSubset | null): { measuredOn: string; frame: string } | null {
   if (!ex?.lens) return null;
   const model = ex.lens.trim();
@@ -540,7 +548,8 @@ export function withheldFor(list: StoredProfile[], ex: ExifSubset | null): { mea
   if (!lens.length) return null;
   const body = cameraOf(ex);
   if (lens.some((p) => bodyOf(p) === body)) return null;
-  return { measuredOn: bodyOf(lens[0]) || "a camera that was not recorded", frame: body };
+  const on = bodyOf(lens[0]);
+  return { measuredOn: on === CAMERA_NOT_RECORDED ? "" : on, frame: body };
 }
 
 /** One stop of aperture, in reach units: RawTherapee's `2 * log2(a1 / a2)` at a

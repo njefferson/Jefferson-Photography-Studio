@@ -74,6 +74,24 @@ try {
   };
   const own = await exportPair(0);
   const { on, off } = own;
+  // ── MADE TO FAIL: the displacement reads a move it was handed ─────────────
+  // Known before this runs, from Rec. 709 alone: raising ONE pixel's red by d
+  // moves its (r - l, b - l) by d·(1 - 0.2126, -0.2126), a chroma distance of
+  // d·0.8156. Planted on a copy of the stage-off export, with d = 0.1 on one
+  // pixel whose red has room, the instrument must read exactly that move there
+  // and nothing anywhere else; if it does not, the bounds below are not
+  // measuring chroma displacement and nothing below is trustworthy.
+  {
+    const k = off.px.findIndex((v, i) => i % 3 === 0 && v < 50000);
+    const planted = { W: off.W, H: off.H, px: Uint16Array.from(off.px) };
+    const dRed = Math.round(0.1 * 65535);
+    planted.px[k] += dRed;
+    const want = (dRed / 65535) * Math.hypot(1 - REC[0], REC[0]);
+    const got = displacement(planted, off);
+    const good = Math.abs(got.maxMove - want) < 1e-9 && got.p999 === 0;
+    console.log(`MADE TO FAIL control: one red raised by 0.1 reads a move of ${got.maxMove.toFixed(6)} (must be ${want.toFixed(6)}) and none elsewhere (p99.9 ${got.p999}). ${good ? "Control holds." : "CONTROL FAILED - nothing below is trustworthy."}`);
+    if (!good) process.exit(2);
+  }
   check("0 both exports are the same size", [on.W, on.H], [off.W, off.H]);
   const s0 = displacement(on, off);
   const { maxMove, p999, p50 } = s0;

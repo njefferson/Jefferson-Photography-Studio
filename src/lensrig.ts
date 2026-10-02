@@ -21,7 +21,7 @@ import { device } from "./platform";
 import { profileFrame, averageProfiles, round5, NBINS, type FrameProfile } from "./lensprofile";
 import { readZipIndex, readZipEntry, readZipEntryPrefix, imageEntries } from "./zip";
 import { saveBlob } from "./savefile";
-import { saveFromPayload, listProfiles, removeProfile, clearProfiles, coverage, gapsFor, exportAll, importText, type SaveChange } from "./lensstore";
+import { saveFromPayload, listProfiles, removeProfile, clearProfiles, coverage, gapsFor, exportAll, importText, CAMERA_NOT_RECORDED, type SaveChange } from "./lensstore";
 import { markBackedUp, backupState, backupSentence } from "./lensbackup";
 import { requestPersistence } from "./session";
 import { keepAwake, granted as wakeGranted, supported as wakeSupported } from "./wakelock";
@@ -713,7 +713,7 @@ export function wireLensRig(root: ParentNode): void {
         version: 1,
         measured: new Date().toISOString().slice(0, 10),
         app: __APP_VERSION__,
-        camera: camera || "not recorded",
+        camera: camera || CAMERA_NOT_RECORDED,
         nbins: NBINS,
         radius_norm: "diagonal",
         space: "linear",
