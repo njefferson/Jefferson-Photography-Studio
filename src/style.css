@@ -980,6 +980,56 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 #zoomCtl #zoomPct { text-align: center; font: 600 0.6875rem/1 var(--ui); color: var(--glass-txt); padding: 1px 0; }
 #stage.cropping #zoomCtl { display: none; } /* the crop view owns the frame */
 #stage.has-session #zoomCtl { bottom: calc(20px + var(--session-h, 110px)); }
+/* THE WAY BACK TO THE WHOLE PHOTOGRAPH (decision 012). Centred on the STAGE,
+   not stacked with the zoom control, because the zoom control's own position
+   is computed from --session-h — one of the measurements that may be what is
+   wrong when this is needed — and the way out must not depend on it. The
+   centre is also the one place no corner HUD or mode banner is. The wrapper
+   never takes taps; only the button does, and only while it is shown, which is
+   only while the photograph is measured to be cut off at 100%. Glass tokens:
+   theme-invariant because it floats over the picture. The meaning is in the
+   words — the button says what it does and the line under it says why. */
+#viewWay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(90%, 420px);
+  pointer-events: none;
+}
+#viewEscape {
+  pointer-events: auto;
+  width: auto;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--glass-txt-2);
+  border-radius: 999px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--glass-txt);
+  font: 600 0.9375rem/1.2 var(--ui);
+  cursor: pointer;
+}
+#viewEscape:focus-visible { outline: 2px solid var(--glass-txt); outline-offset: 2px; }
+#fitStatus {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--glass-bg);
+  color: var(--glass-txt);
+  font: 0.8125rem/1.35 var(--ui);
+  text-align: center;
+}
+/* Empty, it stays RENDERED (a live region that is display:none when its words
+   arrive is not reliably heard) but takes no room and draws nothing. */
+#fitStatus:empty { padding: 0; background: transparent; }
 #locDlg h2 { margin-top: 0; font-size: 1.0625rem; }
 /* Settings rows in the ⓘ dialog: a toggle with its one-line explanation. */
 .set-row { margin: 10px 0 12px; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
@@ -3582,6 +3632,7 @@ body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1
 /* Every overlay that lives over the photo goes too — the point of the mode is
    nothing over the picture, and each of these is something over the picture. */
 #app[data-full="1"] #zoomCtl,
+#app[data-full="1"] #viewWay,
 #app[data-full="1"] #histogram,
 #app[data-full="1"] #locTip,
 #app[data-full="1"] #healBanner,

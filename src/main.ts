@@ -8873,15 +8873,21 @@ function viewDiagnostic(): string {
  *  the image times the crop) and `stageEl`. Returns the intrinsic size, the
  *  size it is actually drawn at, and the stage's — and says so in words when
  *  the drawn picture is larger than the stage, which is the state that cannot
- *  happen while the contain rules in `#view` are doing their job. Consumed by
+ *  happen while the contain rules in `#view` are doing their job, and when, at
+ *  100%, part of it sits under the session strip, which is the state a stale
+ *  `--session-h` produces. That second reading is `photoCutOff`'s, the same
+ *  measurement that raises the on-screen way back, so the report and the
+ *  screen cannot disagree about whether the photograph was cut off. Consumed by
  *  the diagnostic assembly. */
 function canvasDiagnostic(): string {
   if (!current) return "nothing open";
   const r = canvas.getBoundingClientRect();
   const st = stageEl.getBoundingClientRect();
   const over = r.width > st.width + 1 || r.height > st.height + 1;
+  const under = !over && zoom <= 1.001 && photoCutOff() === CUT_UNDER_STRIP;
   return `${canvas.width}x${canvas.height} pixels, drawn at ${Math.round(r.width)}x${Math.round(r.height)} inside a stage of ${Math.round(st.width)}x${Math.round(st.height)}`
-    + (over ? " — DRAWN LARGER THAN THE STAGE, so part of it is off the edge" : "");
+    + (over ? " — DRAWN LARGER THAN THE STAGE, so part of it is off the edge" : "")
+    + (under ? " — PARTLY UNDER THE SESSION STRIP, so its bottom is hidden" : "");
 }
 
 /** What the session strip is taking off the photograph's height.
@@ -8953,11 +8959,18 @@ function updateZoomCtl() {
   zoomPctEl.textContent = `${Math.round(zoom * 100)}%`;
   zoomInBtn.disabled = zoom >= 8 - 1e-3;
   zoomOutBtn.disabled = zoom <= 1 + 1e-3;
-  zoomFitBtn.disabled = zoom <= 1 + 1e-3;
+  // FIT IS NEVER DISABLED (decision 012). It used to be greyed out at 100%,
+  // which is exactly when a photograph was reported cut off top and bottom with
+  // the zoom reading 100% — the one button that should have got the reader out
+  // was the one that could not be pressed, because it judged "nothing to fit"
+  // from the zoom number and not from what was on screen. It re-measures now
+  // and says what it found, so pressing it is never a no-op in silence.
+  zoomFitBtn.disabled = false;
+  scheduleViewEscape();
 }
 zoomInBtn.addEventListener("click", () => { zoomByCentre(1.5); updateZoomCtl(); });
 zoomOutBtn.addEventListener("click", () => { zoomByCentre(1 / 1.5); updateZoomCtl(); });
-zoomFitBtn.addEventListener("click", () => { resetZoom(); updateZoomCtl(); });
+zoomFitBtn.addEventListener("click", () => fitWholePhoto());
 // Cursor-anchored wheel zoom — the natural desktop gesture, and it works even
 // while a picture tool owns pointer events (wheel isn't a pointer). Ctrl/⌘+wheel
 // (trackpad pinch) lands here too. Passive:false so we can stop the page scroll.
@@ -8968,6 +8981,198 @@ canvas.addEventListener("wheel", (e) => {
   updateZoomCtl();
 }, { passive: false });
 zoomReady = true; // applyZoom may now refresh the control
+
+// --- THE WAY BACK TO THE WHOLE PHOTOGRAPH (decision 012) ---------------------
+//
+// Reported from an iPad: a photograph cut off top and bottom, the zoom reading
+// 100%, Fit beside it, and no way back to the whole picture. The record chose
+// two things and this is the second: whatever put the reader there, the way
+// out must not itself be able to be in the wrong state. So it is built on a
+// MEASUREMENT of what is on screen, never on the zoom number (which read 100%
+// in the report), and it acts on everything this app controls that could be
+// wrong — leftover zoom and pan, and a strip height read before the strip had
+// laid out. What it cannot undo, a zoom of the PAGE by the browser, it says in
+// words rather than pretending.
+//
+// The CAUSE is not decided here. The record's first option — the instrument —
+// is the View/Canvas/Strip reserves/Page zoom lines in the report, and nothing
+// below adjusts the contain rules on a guess; the Rejected section forbids it.
+
+/** The reason `photoCutOff` gives when the stage's own edge clips the picture. */
+const CUT_OFF_EDGE = "part of it is off the edge of the screen";
+/** The reason `photoCutOff` gives when the session strip is drawn over it. */
+const CUT_UNDER_STRIP = "part of it is under the strip of photos";
+
+const viewEscapeBtn = $("viewEscape") as HTMLButtonElement;
+const fitStatusEl = $("fitStatus") as HTMLParagraphElement;
+
+/** Whether part of the photograph is hidden at fit, measured from the boxes on
+ *  screen rather than inferred from the zoom number.
+ *
+ *  Takes nothing; reads the canvas's drawn box, its stage's box and, when a
+ *  session strip is up, the strip's box. Returns `CUT_OFF_EDGE` when the drawn
+ *  picture crosses an edge of the stage (which clips with overflow hidden),
+ *  `CUT_UNDER_STRIP` when the strip is drawn over its bottom, or null when the
+ *  whole picture is visible — and null when nothing is open or the canvas has
+ *  no box, because a state that cannot be measured is not reported as a fault.
+ *
+ *  ONLY MEANINGFUL AT 100%: zoomed in, the transform puts the picture off the
+ *  edge on purpose, so every caller asks this only with `zoom` at fit. The
+ *  invariant the callers rely on: null means every pixel of the drawn
+ *  photograph is inside the stage and clear of the strip, so the escape is
+ *  hidden exactly when there is nothing to escape from. Consumed by
+ *  `updateViewEscape`, `fitWholePhoto` and `canvasDiagnostic`. */
+function photoCutOff(): string | null {
+  const stage = canvas.parentElement;
+  if (!current || !stage) return null;
+  const r = canvas.getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+  const st = stage.getBoundingClientRect();
+  if (r.left < st.left - 1 || r.top < st.top - 1 || r.right > st.right + 1 || r.bottom > st.bottom + 1) return CUT_OFF_EDGE;
+  // Looked up by id rather than through `sessionStrip`: that const is declared
+  // much further down the module, and this runs from callbacks wired here.
+  const strip = document.getElementById("sessionStrip");
+  if (strip && !strip.hidden && stage.classList.contains("has-session")) {
+    const s = strip.getBoundingClientRect();
+    if (s.height && r.bottom > s.top + 1 && r.top < s.bottom - 1) return CUT_UNDER_STRIP;
+  }
+  return null;
+}
+
+let fitStatusTimer = 0;
+/** Say what Fit found, on screen and to a screen reader, then clear it.
+ *
+ *  Takes `text`, the sentence to show (empty clears at once). Writes it into
+ *  `#fitStatus`, the polite live region present from parse, and clears it after
+ *  six seconds unless the way back is still showing, in which case the words
+ *  stay beside the button that needs them. Returns nothing. */
+function sayFit(text: string) {
+  clearTimeout(fitStatusTimer);
+  fitStatusEl.textContent = text;
+  if (!text) return;
+  fitStatusTimer = window.setTimeout(() => {
+    if (viewEscapeBtn.hidden) fitStatusEl.textContent = "";
+  }, 6000);
+}
+
+let escapeShowTimer = 0;
+let escapeFrame = 0;
+/** Show or hide the standing way back, from a fresh measurement.
+ *
+ *  Takes `now`: true shows a measured cut-off at once (after a Fit press, when
+ *  the reader is waiting for an answer); false waits 400 ms and measures again
+ *  before showing, so a strip that is mid-layout for a frame does not flash a
+ *  button over the photograph. Hiding is always immediate. Returns nothing.
+ *
+ *  It is never shown zoomed in (that is the reader's own choice and Fit is
+ *  enabled beside it), while cropping (the crop view owns the frame), over the
+ *  start screen, or in full view (where a tap anywhere is the way out, and CSS
+ *  hides it too). The invariant: shown only while `photoCutOff` reports a
+ *  reason at 100%, with that reason in words beside it. */
+function updateViewEscape(now = false) {
+  const eligible = !!current && welcome.hidden && !cropArmed && zoom <= 1.001
+    && document.getElementById("app")?.dataset.full !== "1";
+  const why = eligible ? photoCutOff() : null;
+  if (!why) {
+    clearTimeout(escapeShowTimer);
+    escapeShowTimer = 0;
+    if (!viewEscapeBtn.hidden) {
+      // Its words leave with it; a Fit press that caused this writes its own
+      // answer straight afterwards (see fitWholePhoto's order).
+      viewEscapeBtn.hidden = true;
+      sayFit("");
+    }
+    return;
+  }
+  if (!viewEscapeBtn.hidden) return;
+  const show = () => {
+    escapeShowTimer = 0;
+    const still = (!!current && welcome.hidden && !cropArmed && zoom <= 1.001) ? photoCutOff() : null;
+    if (!still) return;
+    viewEscapeBtn.hidden = false;
+    clearTimeout(fitStatusTimer);
+    fitStatusEl.textContent = `Part of the photo is hidden: ${still}.`;
+  };
+  if (now) { clearTimeout(escapeShowTimer); show(); return; }
+  if (!escapeShowTimer) escapeShowTimer = window.setTimeout(show, 400);
+}
+
+/** Coalesce the many things that can move the photograph into one measurement
+ *  per frame. Takes nothing, returns nothing; every observer below calls this
+ *  rather than measuring, because the strip writes `--session-h` on every
+ *  thumbnail that lands and each measurement forces a layout. */
+function scheduleViewEscape() {
+  if (escapeFrame) return;
+  escapeFrame = requestAnimationFrame(() => { escapeFrame = 0; updateViewEscape(); });
+}
+
+/** FIT: bring the whole photograph back, whatever hid it, and say what happened.
+ *
+ *  Takes nothing. Resets the view zoom and pan, re-reads the session strip's
+ *  real height into `--session-h` (the fit box is measured against that, and a
+ *  height read before the strip had laid out leaves the box wrong with nothing
+ *  visible moving), then MEASURES the result instead of assuming it. Returns
+ *  nothing; what it found is written to `#fitStatus`:
+ *    - still cut off: says so and where the report is, because this is the
+ *      state the record is waiting for the next paste of;
+ *    - the page itself zoomed by the browser: says so and how to undo it —
+ *      nothing in a page can reset a browser zoom, and page zoom is never
+ *      locked here, so the honest answer is words;
+ *    - it was cut off and is not now: says it is back;
+ *    - it was already whole at 100%: says so, since the button is never
+ *      disabled and a press that changes nothing must not pass in silence.
+ *  Coming back from a zoom the reader chose says nothing: the picture moving
+ *  is the answer. Bound to Fit in the zoom control and to the standing way
+ *  back; both must stay one call to this so they cannot drift apart. */
+function fitWholePhoto() {
+  if (!current) return;
+  const wasZoomed = zoom > 1.001;
+  const wasCut = !wasZoomed && photoCutOff() !== null;
+  resetZoom();
+  const stage = canvas.parentElement;
+  const strip = document.getElementById("sessionStrip");
+  if (stage && strip && !strip.hidden && stage.classList.contains("has-session")) {
+    stage.style.setProperty("--session-h", `${strip.offsetHeight}px`);
+  }
+  const cut = photoCutOff(); // the rect read forces the layout the new height asks for
+  const vv = window.visualViewport;
+  const pageZoomed = !!vv && vv.scale > 1.01;
+  // The control and the standing way back first, THEN the sentence: showing or
+  // hiding the way back rewrites the status line, and the answer to this press
+  // is the line that has to be left standing.
+  updateZoomCtl();
+  updateViewEscape(true);
+  if (cut) {
+    sayFit(`Part of the photo is still hidden: ${cut}. Open ⓘ and choose Something’s wrong for a report to send — it says what is doing this.`);
+  } else if (pageZoomed) {
+    sayFit("The photo fits, but the page itself is zoomed in. Pinch two fingers together outside the photo to zoom the page back out — the app cannot undo a browser zoom.");
+  } else if (wasCut) {
+    sayFit("The whole photo is back on screen.");
+  } else if (!wasZoomed) {
+    sayFit("The whole photo is already on screen.");
+  } else {
+    sayFit("");
+  }
+}
+viewEscapeBtn.addEventListener("click", () => fitWholePhoto());
+
+// What can move the photograph without the zoom changing: the stage or the
+// canvas resizing (a rotation, the window, the panel, a crop), the strip
+// growing as its header wraps or its thumbnails land, and `--session-h` or
+// `.has-session` being written onto the stage — a write that can move the
+// picture down without resizing it, which no ResizeObserver would see.
+{
+  const stage = canvas.parentElement;
+  const strip = document.getElementById("sessionStrip");
+  if (typeof ResizeObserver === "function") {
+    const ro = new ResizeObserver(() => scheduleViewEscape());
+    ro.observe(canvas);
+    if (stage) ro.observe(stage);
+    if (strip) ro.observe(strip);
+  }
+  if (stage) new MutationObserver(() => scheduleViewEscape()).observe(stage, { attributes: true, attributeFilter: ["style", "class"] });
+  if (strip) new MutationObserver(() => scheduleViewEscape()).observe(strip, { attributes: true, attributeFilter: ["hidden"] });
+}
 
 canvas.style.transformOrigin = "center center";
 

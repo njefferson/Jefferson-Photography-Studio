@@ -248,6 +248,14 @@ without better evidence.
 - Zoom: CSS transform (translate+scale) pinch/pan; taps suppressed after
   movement; tap mapping uses client coords + getBoundingClientRect so it works
   under transform and rotation.
+- The way back to the whole photo (decision 012): Fit is never disabled and
+  calls `fitWholePhoto`, which resets zoom/pan, re-reads the strip's height
+  into `--session-h`, then MEASURES the result and says what it found in
+  `#fitStatus` (including a browser page zoom, which nothing in a page can
+  undo). `photoCutOff` measures the drawn canvas against the stage and the
+  strip; when it reports a cut-off at 100%, `#viewEscape` appears centred on
+  the stage, independent of `--session-h`. The report's Canvas line uses the
+  same measurement.
 
 ## Profiles
 
@@ -726,7 +734,7 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (19837 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (20042 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
 - **`src/pipeline.ts`** (2870 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.

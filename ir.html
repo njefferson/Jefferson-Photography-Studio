@@ -250,6 +250,17 @@
           <button id="zoomOut" type="button" aria-label="Zoom out">&minus;</button>
           <button id="zoomFit" type="button" aria-label="Fit the whole photo to the screen">Fit</button>
         </div>
+        <!-- THE WAY BACK TO THE WHOLE PHOTOGRAPH (decision 012). A photograph
+             was reported filling the screen with its top and bottom cut off,
+             the zoom reading 100% and Fit beside it doing nothing. Fit is now
+             never disabled, and when the photograph is MEASURED to be cut off
+             at 100% this button appears in the middle of the stage, where no
+             reserved height can push it out of reach. The status line is
+             present from parse so what Fit found is heard as well as seen. -->
+        <div id="viewWay">
+          <button id="viewEscape" type="button" hidden>Show the whole photo</button>
+          <p id="fitStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+        </div>
         <!-- Location-data tip: shows only when the LOADED FILE carries GPS
              location (src/gps.ts). Tap for ways to save the file without it.
              Hideable in Settings (ⓘ) — the dialog says so. -->
