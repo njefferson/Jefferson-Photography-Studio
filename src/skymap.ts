@@ -122,9 +122,10 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  *   to compileEdit so highlight recovery here reads the clip the way the
  *   rendered pixels do; null for an 8-bit source.
  * @param warp the edit's warp field, when it has one: `local` is built from the
- *             unwarped source, so each sample reads it where its pixel came
- *             from, as the export and the shader do (2026-10-02). Omitted or
- *             empty, the maps are read in place.
+ *             unwarped source and `srcFlat` was laid on it, so each sample
+ *             reads both where its pixel came from — compileEdit's one (mu, mv)
+ *             pair — as the export and the shader do (2026-10-02). Omitted or
+ *             empty, they are read in place.
  * @returns the map, or null when the bitmap selects nothing. Four bytes per
  *   texel: encoded chroma a and b, the bitmap's mean weight, and the depth
  *   key — the PHOTOGRAPH's key (SKY_DEPTH_CHROMA_LO/HI on the sky's mean
@@ -159,7 +160,11 @@ export function buildSkyMap(
   srcFlat: SourceFlat | null = null,
   warp?: WarpField | null,
 ): SkyMap | null {
-  const warpF = local && warp && !warpIsEmpty(warp) ? warp : null;
+  // WHENEVER THERE IS A WARP, not only when there is a clarity/dehaze map: the
+  // same (mu, mv) also tells highlight recovery where to read the source flat,
+  // and gating it on `local` read the flat in the wrong place under a warp —
+  // a pinned white sky reached the map with the balance's cast (2026-10-02).
+  const warpF = warp && !warpIsEmpty(warp) ? warp : null;
   const wd = new Float32Array(2);
   const W = SKY_MAP_W;
   const H = Math.max(8, Math.round((W * srcH) / srcW));

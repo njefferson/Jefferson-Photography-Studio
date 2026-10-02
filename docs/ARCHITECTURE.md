@@ -755,7 +755,7 @@ cannot describe something the code does not say about itself.
 - **`src/chooser.ts`** (65 lines) — Two-door landing page.
 - **`src/color.ts`** (245 lines) — Camera color science.
 - **`src/cubeimport.ts`** (181 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
-- **`src/dcp.ts`** (515 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
+- **`src/dcp.ts`** (543 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 - **`src/debug.ts`** (2128 lines) — The test page behind the version number.
 - **`src/decode.ts`** (806 lines) — Image decoding. Real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (61 lines) — Decoding, off the main thread.
@@ -819,7 +819,7 @@ cannot describe something the code does not say about itself.
 - **`src/skyClient.ts`** (62 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
 - **`src/skyfine.ts`** (676 lines) — The sky selection refined to the picture's own edges.
 - **`src/skyhorizon.ts`** (608 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
-- **`src/skymap.ts`** (281 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
+- **`src/skymap.ts`** (286 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
 - **`src/stamp.ts`** (27 lines) — ONE HASH, BECAUSE THE SECOND COPY IS WHERE THE TWO ANSWERS COME FROM.
 - **`src/startup.ts`** (154 lines) — WHAT THE FIRST SECONDS OF THIS LAUNCH COST, AND WHERE (decision 071).
 - **`src/sticker.ts`** (577 lines) — Sticker compositing — rhymes with heal.ts (src/heal.ts): stickers are baked INTO the linear source (pre-pipeline), so each one inherits the channel swap / WB / looks / grade / grain and lands in the I

@@ -383,18 +383,46 @@ function buildHueSatMap(p: EditParams): number[] {
   return data;
 }
 
-/** ProfileToneCurve: a few (x,y) points of the app's contrast about 18% grey
- *  and its highlight shoulder, as they act on a neutral — the same two
- *  formulas as contrastGain and shoulderGain in pipeline.ts, with the last
- *  point pinned to (1, 1) so a profile's white stays white. */
+/** How many points of the curve sit below TONE_TOP; one more, (1, 1), ends it. */
+const TONE_POINTS = 33;
+/** The last point taken from the app's own curve; above it the curve runs to
+ *  the pinned (1, 1), the one interval the nine-point curve also had there. */
+const TONE_TOP = 0.875;
+
+/**
+ * ProfileToneCurve: the app's contrast about 18% grey and its highlight
+ * shoulder, as they act on a neutral — the same two formulas as contrastGain
+ * and shoulderGain in pipeline.ts — with the last point pinned to (1, 1) so a
+ * profile's white stays white.
+ *
+ * THIRTY-THREE POINTS EVENLY SPACED IN sRGB-ENCODED x up to TONE_TOP, not nine
+ * evenly spaced in linear x. A reader runs a cubic spline through the stored
+ * points (RawTherapee's DCT_Spline over ProfileToneCurve; Adobe's own default
+ * curve is stored as 1,025), and contrast about 18% grey is a power curve whose
+ * bend is in the deep shadows — where nine linear points put one point, at
+ * 0.125. At contrast 1.35 that spline rendered linear 0.011 at 0.0084 against
+ * the app's 0.0041, nine levels of 255 too bright on screen, which is the
+ * crushed-or-lifted shadow the 18% fulcrum was introduced to stop. Spaced in
+ * the encoded value the points follow the bend, and the spline stays within
+ * about one level of the app below TONE_TOP (2026-10-02).
+ * @param contrast  the edit's contrast, 1 = none.
+ * @returns the curve as x, y pairs, x rising from 0 to 1, y from 0 to 1.
+ * What the result must satisfy: below TONE_TOP every point is exactly the app's
+ *   neutral response, and the last point is (1, 1). Consumer: generateDcp.
+ */
 function buildToneCurve(contrast: number): number[] {
-  const pts: number[] = [];
-  for (let i = 0; i <= 8; i++) {
-    const x = i / 8;
+  const response = (x: number): number => {
     let y = x > 0 ? 0.1845 * Math.pow(x / 0.1845, contrast) : 0;
     if (y > 0.8) y = 0.8 + 0.2 * (1 - Math.exp(-(y - 0.8) / 0.2));
-    pts.push(x, i === 8 ? 1 : Math.min(1, Math.max(0, y)));
+    return Math.min(1, Math.max(0, y));
+  };
+  const top = srgbFromLinear(TONE_TOP);
+  const pts: number[] = [];
+  for (let i = 0; i < TONE_POINTS; i++) {
+    const x = i === TONE_POINTS - 1 ? TONE_TOP : srgbToLinear((i / (TONE_POINTS - 1)) * top);
+    pts.push(x, response(x));
   }
+  pts.push(1, 1);
   return pts;
 }
 
