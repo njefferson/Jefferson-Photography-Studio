@@ -16,6 +16,7 @@
 EditParams.wb = whole-frame : a white point is a property of the light, not of a region
 EditParams.exposure = whole-frame : one gain on the whole frame is what exposure means
 EditParams.swapRB = whole-frame : a channel mapping is the frame's colour space, not a region's
+EditParams.hue = whole-frame : a global hue rotation about the luminance axis; the per-band version is hsl, the per-region one a mask's hue
 EditParams.sat = whole-frame : global by definition; per-population saturation is hsl and the masks
 EditParams.contrast = whole-frame : a tone response applies to the whole frame by construction
 EditParams.denoise = selection : aimable at a mask through AIM_NOISE (030). Whole-frame until one aims it, which is what keeps every edit already saved rendering identically

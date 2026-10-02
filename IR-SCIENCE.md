@@ -469,7 +469,12 @@ that tints grey (lime at 180°) rather than a rotation. The +38° merge and the
 +31°/−7° split were both measured through it, so they say what that matrix did,
 not what a hue rotation does. The control is fixed on the session branch
 ("Fixed: Hue no longer tints grey…"); both figures are owed a re-measurement
-through the corrected control before "ruled out" is relied on again.
+through the corrected control before "ruled out" is relied on again. The
+control then changed once more: it turns about the Rec.709 luminance axis now
+(W3C Filter Effects 1, feColorMatrix hueRotate), because YIQ is defined on
+gamma-encoded signals with Rec.601 luma (ITU-R BT.470-6, Table 2) and on this
+app's linear data it moved brightness as it turned — pure red's luminance went
+from 0.213 to 0.350 at +60° and to 0.162 at −60°. The re-measurement is owed through that control.
 
 **WHAT SHIPS INSTEAD: eight band hue shifts on `LOOKS.eir.raw.hsl`.** `hslAt` is
 the only knob in this pipeline that moves two populations differently. Solved

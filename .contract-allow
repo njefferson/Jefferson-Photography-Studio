@@ -11,7 +11,6 @@ src/batchstore.ts:eachFrame
 src/batchstore.ts:frameStore
 src/color.ts:nikonColorMatrix
 src/color.ts:camToSrgbLinear
-src/cubeimport.ts:parseCube
 src/dcp.ts:generateDcp
 src/decode.ts:linearAt
 src/decode.ts:decode
@@ -101,10 +100,6 @@ src/look.ts:sniffLook
 src/look.ts:lookFileName
 src/lookmark.ts:embedLookInJpeg
 src/lookmark.ts:extractLookFromJpeg
-src/lut.ts:generateCube
-src/lut3d.ts:sampleLut3d
-src/luts.ts:putLut
-src/luts.ts:getLut
 src/luts.ts:listLuts
 src/luts.ts:deleteLut
 src/macro/stack.ts:stackFocus

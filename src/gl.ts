@@ -12,21 +12,24 @@ export type { EditParams };
 // A faithful 256-entry identity ramp for the tone LUT. A 2-texel [0,255] ramp
 // is NOT an identity under LINEAR+CLAMP filtering: its texel centres land at
 // u=0.25/0.75, so sampling clamps everything below 25% to black and above 75%
-// to white. 256 texels sample the diagonal to within half an LSB.
+// to white. The tone LUTs are FLOAT (R16F / RGBA16F, filterable in WebGL2)
+// holding f(i/255) in texel i, read by the shader's toneCoord at the texel
+// centres; they were 8-bit until 2026-10-01, which rounded every curve to whole
+// levels before the filter interpolated between them.
 const IDENTITY_LUT = (() => {
-  const a = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) a[i] = i;
+  const a = new Float32Array(256);
+  for (let i = 0; i < 256; i++) a[i] = i / 255;
   return a;
 })();
 
-/** Fresh RGBA identity ramps (r=g=b=i) for the per-channel curve texture. */
-function identityRgbaRamp(): Uint8Array {
-  const a = new Uint8Array(256 * 4);
+/** Fresh RGBA identity ramps (r=g=b=i/255) for the per-channel curve texture. */
+function identityRgbaRamp(): Float32Array {
+  const a = new Float32Array(256 * 4);
   for (let i = 0; i < 256; i++) {
-    a[i * 4] = i;
-    a[i * 4 + 1] = i;
-    a[i * 4 + 2] = i;
-    a[i * 4 + 3] = 255;
+    a[i * 4] = i / 255;
+    a[i * 4 + 1] = i / 255;
+    a[i * 4 + 2] = i / 255;
+    a[i * 4 + 3] = 1;
   }
   return a;
 }
@@ -100,7 +103,7 @@ out vec4 frag;
 uniform sampler2D u_tex;
 uniform vec3 u_wb;
 uniform bool u_swap;
-uniform float u_hue;   // radians
+uniform float u_hue;   // radians; hueRotate about the Rec.709 luminance axis
 uniform float u_sat;
 uniform float u_con;
 uniform float u_exposure;
@@ -114,10 +117,11 @@ uniform vec3 u_sky;      // sky band [hueShiftDeg, satScale, lumScale]
 uniform vec3 u_fol;      // foliage band [hueShiftDeg, satScale, lumScale]
 uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
 uniform float u_glow;        // 0..1 HIE halation strength
-uniform sampler2D u_toneTex; // 256x1 tone-curve LUT (identity when neutral)
-uniform sampler2D u_toneRgbTex; // 256x1 RGBA: per-channel R/G/B curve LUTs
+uniform sampler2D u_toneTex; // 256x1 R16F master tone-curve LUT, texel i = f(i/255)
+uniform bool u_toneOn;          // master curve non-identity (skipped otherwise, as on the CPU)
+uniform sampler2D u_toneRgbTex; // 256x1 RGBA16F: per-channel R/G/B curve LUTs
 uniform bool u_toneRgbOn;       // any per-channel curve non-identity
-uniform float u_lum;         // global luminance: out = pow(out, 1/u_lum) (1 = neutral)
+uniform float u_lum;         // global luminance: v -> pow(v, 1/u_lum) through rgbToneLum (1 = neutral)
 // Local masks (up to MAX_MASKS = 8) — kept identical to pipeline.ts.
 uniform int u_maskCount;
 uniform int u_maskType[8];   // 0 = radial, 1 = linear, 2 = brush, 3 = colour, 4 = sky
@@ -216,32 +220,107 @@ uniform bool u_overlayOn;       // any on-top sticker placed
 uniform sampler2D u_overlayScreenTex; // SCREEN-blend overlay (unit 9): glowing lights
 uniform bool u_overlayScreenOn;        // any screen-blend (glow) sticker placed
 uniform float u_warpScale;   // decode scale = WARP_MAX (warp.ts)
-uniform highp sampler3D u_lutTex; // imported .cube LUT lattice (unit 5, NEAREST — manual trilinear below)
+uniform highp sampler3D u_lutTex; // imported .cube LUT lattice (unit 5, NEAREST — manual tetrahedral below)
 uniform int u_lutSize;            // grid N per axis (>=2; only read when strength > 0)
 uniform float u_lutStrength;      // 0..1; 0.0 = stage entirely off
 
 const vec3 LUMA_W = vec3(0.2126, 0.7152, 0.0722);
 
-// Trilinear sample of the imported LUT — the VERBATIM twin of
-// src/lut3d.ts sampleLut3d (parity harness pins them at <=2 LSB). Manual
-// interpolation on integer texelFetch coords: WebGL2 won't linearly filter
-// 32F textures, and texelFetch sidesteps texel-centre ambiguity entirely.
+// TETRAHEDRAL sample of the imported LUT — the twin of src/lut3d.ts
+// sampleLut3d, branch for branch (parity harness pins them at <=2 LSB). The
+// Cube LUT specification 1.0 (section 7.1) sets a 3D table's values "so that
+// tetrahedral interpolation will generate correct output values", and section
+// 8 says a reader should use it: the six-tetrahedron split on the order of the
+// fractions, with the weights OpenColorIO's Lut3DOpGPU uses (trilinear until
+// 2026-10-01, which mixed the six coloured corners into every grey). Manual,
+// on integer texelFetch coords: WebGL2 won't linearly filter 32F textures, and
+// texelFetch sidesteps texel-centre ambiguity entirely. The table's values are
+// kept as the file has them (section 5.7: unconstrained), and the RESULT is
+// clamped to 0..1 here.
 vec3 sampleLut3d(vec3 c) {
   float n1 = float(u_lutSize - 1);
   vec3 t = clamp(c, 0.0, 1.0) * n1;
   ivec3 i0 = min(ivec3(floor(t)), ivec3(u_lutSize - 2));
   vec3 f = t - vec3(i0);
-  vec3 c000 = texelFetch(u_lutTex, i0,                0).rgb;
-  vec3 c100 = texelFetch(u_lutTex, i0 + ivec3(1,0,0), 0).rgb;
-  vec3 c010 = texelFetch(u_lutTex, i0 + ivec3(0,1,0), 0).rgb;
-  vec3 c110 = texelFetch(u_lutTex, i0 + ivec3(1,1,0), 0).rgb;
-  vec3 c001 = texelFetch(u_lutTex, i0 + ivec3(0,0,1), 0).rgb;
-  vec3 c101 = texelFetch(u_lutTex, i0 + ivec3(1,0,1), 0).rgb;
-  vec3 c011 = texelFetch(u_lutTex, i0 + ivec3(0,1,1), 0).rgb;
-  vec3 c111 = texelFetch(u_lutTex, i0 + ivec3(1,1,1), 0).rgb;
-  vec3 c00 = mix(c000, c100, f.x), c10 = mix(c010, c110, f.x);
-  vec3 c01 = mix(c001, c101, f.x), c11 = mix(c011, c111, f.x);
-  return mix(mix(c00, c10, f.y), mix(c01, c11, f.y), f.z);
+  vec3 v1 = texelFetch(u_lutTex, i0, 0).rgb;
+  vec3 v4 = texelFetch(u_lutTex, i0 + ivec3(1,1,1), 0).rgb;
+  vec3 v2, v3;
+  float f1, f2, f3, f4;
+  if (f.r >= f.g) {
+    if (f.g >= f.b) {        // r >= g >= b
+      v2 = texelFetch(u_lutTex, i0 + ivec3(1,0,0), 0).rgb;
+      v3 = texelFetch(u_lutTex, i0 + ivec3(1,1,0), 0).rgb;
+      f1 = 1.0 - f.r; f2 = f.r - f.g; f3 = f.g - f.b; f4 = f.b;
+    } else if (f.r >= f.b) { // r >= b > g
+      v2 = texelFetch(u_lutTex, i0 + ivec3(1,0,0), 0).rgb;
+      v3 = texelFetch(u_lutTex, i0 + ivec3(1,0,1), 0).rgb;
+      f1 = 1.0 - f.r; f2 = f.r - f.b; f3 = f.b - f.g; f4 = f.g;
+    } else {                 // b > r >= g
+      v2 = texelFetch(u_lutTex, i0 + ivec3(0,0,1), 0).rgb;
+      v3 = texelFetch(u_lutTex, i0 + ivec3(1,0,1), 0).rgb;
+      f1 = 1.0 - f.b; f2 = f.b - f.r; f3 = f.r - f.g; f4 = f.g;
+    }
+  } else {
+    if (f.g <= f.b) {        // b >= g > r
+      v2 = texelFetch(u_lutTex, i0 + ivec3(0,0,1), 0).rgb;
+      v3 = texelFetch(u_lutTex, i0 + ivec3(0,1,1), 0).rgb;
+      f1 = 1.0 - f.b; f2 = f.b - f.g; f3 = f.g - f.r; f4 = f.r;
+    } else if (f.r >= f.b) { // g > r >= b
+      v2 = texelFetch(u_lutTex, i0 + ivec3(0,1,0), 0).rgb;
+      v3 = texelFetch(u_lutTex, i0 + ivec3(1,1,0), 0).rgb;
+      f1 = 1.0 - f.g; f2 = f.g - f.r; f3 = f.r - f.b; f4 = f.b;
+    } else {                 // g > b > r
+      v2 = texelFetch(u_lutTex, i0 + ivec3(0,1,0), 0).rgb;
+      v3 = texelFetch(u_lutTex, i0 + ivec3(0,1,1), 0).rgb;
+      f1 = 1.0 - f.g; f2 = f.g - f.b; f3 = f.b - f.r; f4 = f.r;
+    }
+  }
+  return clamp(f2 * v2 + f3 * v3 + f1 * v1 + f4 * v4, 0.0, 1.0);
+}
+
+// THE HUE ROTATION, about the Rec.709 luminance axis: W3C Filter Effects 1
+// feColorMatrix hueRotate, out = Y + cos(a)(c - Y) + sin(a)S.c, with S built on
+// the Rec.709 weights (the W3C prints it to three decimals on 0.213/0.715/
+// 0.072). Y and grey are kept at every angle and +a raises HSV hue. It was the
+// Rec.601 YIQ matrix until 2026-10-01, which moved brightness on linear data.
+// Mirrored by hueRotate / HUE_S in pipeline.ts.
+const vec3 HUE_S0 = vec3(-0.2126, -0.7152, 1.0 - 0.0722);
+const vec3 HUE_S1 = vec3((0.2126 * 0.2126 + 0.0722 * (1.0 - 0.2126)) / 0.7152, 0.2126 - 0.0722, -(0.2126 * (1.0 - 0.0722) + 0.0722 * 0.0722) / 0.7152);
+const vec3 HUE_S2 = vec3(-(1.0 - 0.2126), 0.7152, 0.0722);
+vec3 hueRotate(vec3 c, float a) {
+  float cs = cos(a), sn = sin(a);
+  float y = dot(c, LUMA_W);
+  vec3 s = vec3(dot(HUE_S0, c), dot(HUE_S1, c), dot(HUE_S2, c));
+  return vec3(y) + cs * (c - vec3(y)) + sn * s;
+}
+
+// WHERE A TONE LUT IS READ. Texel i holds f(i/255) and is CENTRED at
+// (i + 0.5)/256, so v is read at (v*255 + 0.5)/256 — OpenColorIO's
+// Lut1DOpGPU and GPU Gems 2 section 24.2.2. Read at v itself (until
+// 2026-10-01) the preview evaluated f((256v - 0.5)/255), up to 1.42 levels off
+// the export.
+float toneCoord(float v) { return (clamp(v, 0.0, 1.0) * 255.0 + 0.5) / 256.0; }
+// HUE-KEEPING TONE (Adobe's RGBTone, rgbTone in pipeline.ts): the largest and
+// smallest channels go through the curve and the middle one keeps its place
+// between them, so the HSV hue fraction is held. Per channel until 2026-10-01.
+// The span is floored rather than branched on: a grey (mx == mn) has fmx ==
+// fmn, read at the same place, so it comes back as that one value with no
+// 0/0 for a compiler that evaluates both sides of a select.
+vec3 rgbToneSpread(vec3 c, float mx, float mn, float fmx, float fmn) {
+  return vec3(fmn) + (fmx - fmn) * ((c - vec3(mn)) / max(mx - mn, 1e-6));
+}
+vec3 rgbToneMaster(vec3 c) {
+  c = clamp(c, 0.0, 1.0);
+  float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b);
+  float fmx = textureLod(u_toneTex, vec2(toneCoord(mx), 0.5), 0.0).r;
+  float fmn = textureLod(u_toneTex, vec2(toneCoord(mn), 0.5), 0.0).r;
+  return rgbToneSpread(c, mx, mn, fmx, fmn);
+}
+// The same for the global Luminance, v -> pow(v, e).
+vec3 rgbToneLum(vec3 c, float e) {
+  c = clamp(c, 0.0, 1.0);
+  float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b);
+  return rgbToneSpread(c, mx, mn, pow(mx, e), pow(mn, e));
 }
 
 // The sRGB transfer curve, piecewise, both ways: the drawing buffer and every
@@ -952,17 +1031,9 @@ void main() {
   // same output = M * input as pipeline.ts. Identity when off.
   if (u_mix3On) c = u_mix3 * c;
 
-  // Hue rotation in linear space via the standard YIQ-style matrix. The
-  // literals are the matrix ROWS, so it is applied as c * hueMat (GLSL fills
-  // a mat3 by column; hueMat * c applied it transposed and tinted grey), with
-  // the angle negated to keep the slider's direction (pipeline.ts says why).
-  float cosA = cos(-u_hue), sinA = sin(-u_hue);
-  mat3 hueMat = mat3(
-    0.299 + 0.701*cosA + 0.168*sinA, 0.587 - 0.587*cosA + 0.330*sinA, 0.114 - 0.114*cosA - 0.497*sinA,
-    0.299 - 0.299*cosA - 0.328*sinA, 0.587 + 0.413*cosA + 0.035*sinA, 0.114 - 0.114*cosA + 0.292*sinA,
-    0.299 - 0.300*cosA + 1.250*sinA, 0.587 - 0.588*cosA - 1.050*sinA, 0.114 + 0.886*cosA - 0.203*sinA
-  );
-  c = c * hueMat;
+  // Hue: a turn about the Rec.709 luminance axis (hueRotate), brightness and
+  // grey kept. Skipped at 0, as on the CPU.
+  if (u_hue != 0.0) c = hueRotate(c, u_hue);
 
   // Saturation around luma. Boosts (sat > 1) fade out in deep shadows so the
   // look doesn't amplify chroma noise there; reductions apply everywhere.
@@ -1060,16 +1131,7 @@ void main() {
     float ml = dot(c, LUMA_W);
     c = mix(vec3(ml), c, 1.0 + (adj.z - 1.0) * w);
     float hue = u_maskHue[i];
-    if (hue != 0.0) {
-      float a = -radians(hue) * w;
-      float cs = cos(a), sn = sin(a);
-      mat3 hm = mat3(
-        0.299 + 0.701*cs + 0.168*sn, 0.587 - 0.587*cs + 0.330*sn, 0.114 - 0.114*cs - 0.497*sn,
-        0.299 - 0.299*cs - 0.328*sn, 0.587 + 0.413*cs + 0.035*sn, 0.114 - 0.114*cs + 0.292*sn,
-        0.299 - 0.300*cs + 1.250*sn, 0.587 - 0.588*cs - 1.050*sn, 0.114 + 0.886*cs - 0.203*sn
-      );
-      c = c * hm;
-    }
+    if (hue != 0.0) c = hueRotate(c, radians(hue) * w); // the global hue's rotation
     c = contrastMap(c, 1.0 + (adj.y - 1.0) * w);
   }
 
@@ -1077,19 +1139,16 @@ void main() {
   c = shoulderMap(contrastMap(c, u_con));
 
   vec3 g = toGamma(clamp(c, 0.0, 1.0));
-  // Tone curve (blacks/shadows/mids/whites/highlights), display space.
-  g = vec3(
-    texture(u_toneTex, vec2(g.r, 0.5)).r,
-    texture(u_toneTex, vec2(g.g, 0.5)).r,
-    texture(u_toneTex, vec2(g.b, 0.5)).r
-  );
+  // Tone curve (blacks/shadows/mids/whites/highlights), display space,
+  // hue-keeping (rgbToneMaster); skipped at identity, as on the CPU.
+  if (u_toneOn) g = rgbToneMaster(g);
   // Per-channel R/G/B curves ride ON TOP of the master curve, each steering
   // its own channel (display space, before the mixer). Matches pipeline.ts.
   if (u_toneRgbOn) {
     g = vec3(
-      texture(u_toneRgbTex, vec2(g.r, 0.5)).r,
-      texture(u_toneRgbTex, vec2(g.g, 0.5)).g,
-      texture(u_toneRgbTex, vec2(g.b, 0.5)).b
+      texture(u_toneRgbTex, vec2(toneCoord(g.r), 0.5)).r,
+      texture(u_toneRgbTex, vec2(toneCoord(g.g), 0.5)).g,
+      texture(u_toneRgbTex, vec2(toneCoord(g.b), 0.5)).b
     );
   }
   // 8-channel HSL mixer in DISPLAY space (after gamma + tone curve) so the
@@ -1215,8 +1274,9 @@ void main() {
       g *= (1.0 - u_skyDepth * sm.a * texture(u_skyFineTex, v_uv).r);
     }
   }
-  // Global luminance rides on top of the tone curve (endpoints pinned).
-  if (u_lum != 1.0) g = pow(clamp(g, 0.0, 1.0), vec3(1.0 / u_lum));
+  // Global luminance rides on top of the tone curve (endpoints pinned),
+  // hue-keeping like the master curve.
+  if (u_lum != 1.0) g = rgbToneLum(g, 1.0 / u_lum);
 
   // Imported .cube LUT — the LAST colour stage, on the final display colour,
   // so third-party LUTs stack on top of the whole IR grade. Identical math to
@@ -1320,7 +1380,7 @@ export interface BuildOptions {
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensFix", "u_lensBump", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -1616,7 +1676,7 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, IDENTITY_LUT);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, 256, 1, 0, gl.RED, gl.FLOAT, IDENTITY_LUT);
 
     // Per-channel R/G/B curve LUTs (unit 6): one RGBA row, each channel its
     // own curve; identity ramps until set (the stage is branch-gated anyway).
@@ -1626,7 +1686,7 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, identityRgbaRamp());
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 256, 1, 0, gl.RGBA, gl.FLOAT, identityRgbaRamp());
 
     // Brush-mask atlas (unit 3): MAX_BITMAP_MASKS painted/sky masks packed four
     // per RGBA layer of a 2D ARRAY.
@@ -2018,29 +2078,38 @@ export class Renderer {
     gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, fw, fh, layers, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed);
   }
 
-  /** Rebuild the tone LUTs from the five control points (cheap; on change
-   *  only): the master curve, plus the per-channel R/G/B curves packed into
-   *  one RGBA row. */
+  /**
+   * Rebuild the tone LUTs from the five control points (cheap; on change only):
+   * the master curve, plus the per-channel R/G/B curves packed into one RGBA row.
+   * @param tone  the master curve's five outputs (EditParams.tone).
+   * @param toneR,toneG,toneB  the per-channel curves; absent or identity leaves
+   *   that channel's ramp as the identity.
+   * @returns nothing. Texel i of each LUT holds the curve at i/255, unrounded
+   *   (R16F / RGBA16F), so the shader's toneCoord read reconstructs
+   *   toneEvaluator's curve to well under a level — the CPU export evaluates
+   *   that curve exactly and the two must agree. The master LUT is read only
+   *   while bindPipeline's u_toneOn says the curve is not the identity.
+   */
   setToneCurve(tone: readonly number[], toneR?: readonly number[], toneG?: readonly number[], toneB?: readonly number[]) {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.toneTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (toneIsIdentity(tone)) {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, IDENTITY_LUT);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, 256, 1, 0, gl.RED, gl.FLOAT, IDENTITY_LUT);
     } else {
       const fn = toneEvaluator(tone);
-      const lut = new Uint8Array(256);
-      for (let i = 0; i < 256; i++) lut[i] = Math.round(fn(i / 255) * 255);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
+      const lut = new Float32Array(256);
+      for (let i = 0; i < 256; i++) lut[i] = fn(i / 255);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, 256, 1, 0, gl.RED, gl.FLOAT, lut);
     }
     gl.bindTexture(gl.TEXTURE_2D, this.toneRgbTex);
     const rgba = identityRgbaRamp();
     for (const [ch, curve] of [[0, toneR], [1, toneG], [2, toneB]] as const) {
       if (!curve || toneIsIdentity(curve)) continue;
       const fn = toneEvaluator(curve);
-      for (let i = 0; i < 256; i++) rgba[i * 4 + ch] = Math.round(fn(i / 255) * 255);
+      for (let i = 0; i < 256; i++) rgba[i * 4 + ch] = fn(i / 255);
     }
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 256, 1, 0, gl.RGBA, gl.FLOAT, rgba);
   }
 
   /** Display rotation in 90-degree CW steps; swaps the canvas aspect. */
@@ -2458,6 +2527,7 @@ export class Renderer {
     }
     gl.uniform1i(this.loc.u_glowTex, 1);
     gl.uniform1i(this.loc.u_toneTex, 2);
+    gl.uniform1i(this.loc.u_toneOn, toneIsIdentity(p.tone) ? 0 : 1);
     gl.uniform1i(this.loc.u_maskTex, 3);
     gl.uniform1i(this.loc.u_maskFineTex, 13);
     gl.uniform1i(this.loc.u_maskFineOn, this.brushFineOn ? 1 : 0);

@@ -8098,6 +8098,18 @@ read as authoritative, and an invented one is worse than a missing one.
     everywhere, no domain uniforms; log/HDR domains can't be honoured by a
     display-referred pipeline anyway — clamped resample is the honest best
     effort).
+  • CORRECTED 2026-10-01, against the Cube LUT Specification 1.0 itself:
+    the formula is TETRAHEDRAL now, not trilinear (§7.1 sets a 3D table's
+    values for tetrahedral interpolation, §8 says a reader should use it;
+    trilinear moved greys between nodes off the baked edit — 3.6 levels in
+    255 near white on an exported Saturation 2 look, 0.27 tetrahedral). Table
+    values are KEPT
+    as the file gives them (§5.7: unconstrained) and the sampler clamps its
+    RESULT, which is what the TIFF write needed; clamping the nodes first gave
+    0.9875 where a 1.25x LUT means 1.0. Resolve's LUT_3D_INPUT_RANGE is read
+    as DOMAIN_MIN/MAX (it was ignored). Stored LUTs are re-read from their
+    original file on load (`LutRecord.lattice`). Still one formula, three
+    homes, texelFetch on a NEAREST 3D texture — the reasons above stand.
   • Lifecycle: EditParams gained runtime-only `lut` ({id,name,size,data,
     strength}) riding like mask bitmaps. cloneParams clones the WRAPPER,
     shares the immutable lattice by reference; snapSig's replacer now skips
@@ -8721,7 +8733,8 @@ read as authoritative, and an invented one is worse than a missing one.
   model, applied INDEPENDENTLY per channel in display space right AFTER
   the master tone curve (master shapes the light, channels steer the
   colour; the mixer then classifies the steered hue). GPU: one RGBA8
-  256×1 texture (unit 6) holds all three curve LUTs; branch-gated
+  256×1 texture (unit 6) holds all three curve LUTs (RGBA16F since
+  2026-10-01, read at the texel centres — see ARCHITECTURE.md); branch-gated
   u_toneRgbOn; setToneCurve extended (draw()'s tone key covers all four
   curves). clampToneOrder now orders all four (loads can arrive
   unordered). Rides looks/slots/links/codes (coerceLook clamps each

@@ -12,7 +12,9 @@ export interface EditParams {
   wb: [number, number, number];
   exposure: number;
   swapRB: boolean;
-  hue: number; // degrees
+  /** Degrees; a turn of hue about the Rec.709 luminance axis in linear light
+   *  (hueRotate), so brightness and grey are kept. Positive raises HSV hue. */
+  hue: number;
   sat: number;
   contrast: number;
   /** 0..1 bilateral strength, applied to LINEAR data BEFORE everything else
@@ -79,7 +81,9 @@ export interface EditParams {
   foliage: [number, number, number];
   /** Tone curve control-point outputs at inputs [0,.25,.5,.75,1]:
    *  blacks, shadows, midtones, whites, highlights. Identity = TONE_DEFAULT.
-   *  Applied per channel in display (gamma) space, after everything else. */
+   *  Applied in display (gamma) space after gamma, hue-keeping (rgbTone,
+   *  Adobe's RGBTone): the largest and smallest channels go through the curve
+   *  and the middle one keeps its place between them. Skipped at identity. */
   tone: [number, number, number, number, number];
   /** Per-channel R/G/B curves — the same five-point model as `tone`, applied
    *  INDEPENDENTLY per channel in display space right AFTER the master tone
@@ -92,10 +96,11 @@ export interface EditParams {
   toneG: [number, number, number, number, number];
   toneB: [number, number, number, number, number];
   /** Global luminance: one overall lift/drop that rides ON TOP of the tone
-   *  curve. Applied per channel in display (gamma) space as the very last
-   *  step: out = pow(out, 1/lum). >1 brightens the body, <1 darkens; the 0/1
-   *  endpoints stay pinned so it lifts shadows/midtones without clipping.
-   *  Neutral = 1. Same math in the shader (u_lum). */
+   *  curve. Applied in display (gamma) space as the last step of the grade,
+   *  through rgbTone so it keeps hue: v -> pow(v, 1/lum) on the largest and
+   *  smallest channels. >1 brightens the body, <1 darkens; the 0/1 endpoints
+   *  stay pinned so it lifts shadows/midtones without clipping. Neutral = 1.
+   *  Same math in the shader (u_lum). */
   lum: number;
   /** Local masks (radial / linear gradient), each carrying a few local
    *  adjustments applied weighted by the mask, in linear space before global
@@ -1718,6 +1723,80 @@ export function bandWeight(hue: number, center: number, plateau: number, edge: n
 
 const REC709 = [0.2126, 0.7152, 0.0722];
 
+// THE HUE ROTATION'S SINE TERM, AS ROWS. W3C Filter Effects 1, feColorMatrix
+// type="hueRotate": M(a) = L + cos(a)(I - L) + sin(a)S, where every row of L is
+// the luminance weights. The W3C prints the weights and S to three decimals
+// (0.213/0.715/0.072; S rows -0.213 -0.715 0.928 / 0.143 0.140 -0.283 / -0.787
+// 0.715 0.072); these are the same rows built on the Rec.709 weights the
+// saturation stage measures with, with the middle row solved so that every
+// column of S weighs to zero under them. So Y is unchanged at every angle, grey
+// (rows of S sum to zero) stays grey, and S^2 = -(I - L) makes it a true
+// rotation: two turns add. The shader's HUE_S0..HUE_S2 are the same numbers.
+const HUE_S = [
+  -REC709[0], -REC709[1], 1 - REC709[2],
+  (REC709[0] * REC709[0] + REC709[2] * (1 - REC709[0])) / REC709[1], REC709[0] - REC709[2], -(REC709[0] * (1 - REC709[2]) + REC709[2] * REC709[2]) / REC709[1],
+  -(1 - REC709[0]), REC709[1], REC709[2],
+];
+
+/**
+ * Turn a LINEAR sRGB colour's hue about the Rec.709 luminance axis — the W3C
+ * hueRotate matrix (see HUE_S), applied as out = Y + cos(a)(c - Y) + sin(a)S·c.
+ * It replaced the Rec.601 YIQ rotation on 2026-10-01: YIQ is defined on
+ * gamma-encoded signals with luma 0.299/0.587/0.114, so on this linear data
+ * it moved brightness (pure red's Y 0.213 went to 0.350 at +60° and to
+ * 0.162 at -60°).
+ * @param r,g,b  the linear colour (after the matrix, swap and mixer).
+ * @param cs,sn  cos and sin of the angle; a positive angle RAISES HSV hue,
+ *   the direction the Hue slider has always turned.
+ * @param out  receives the turned colour (r, g, b are read first, so out may
+ *   be the array they came from).
+ * @returns nothing. Holds: Rec.709 Y of out equals Y of the input, and a grey
+ *   input comes back unchanged, at every angle. Consumers: compileEdit's global
+ *   hue and each mask's hue, and dcp.ts creativeLinear; the shader's hueRotate
+ *   must give the same numbers or preview and export disagree.
+ */
+export function hueRotate(r: number, g: number, b: number, cs: number, sn: number, out: Float64Array): void {
+  const y = r * REC709[0] + g * REC709[1] + b * REC709[2];
+  const sr = HUE_S[0] * r + HUE_S[1] * g + HUE_S[2] * b;
+  const sg = HUE_S[3] * r + HUE_S[4] * g + HUE_S[5] * b;
+  const sb = HUE_S[6] * r + HUE_S[7] * g + HUE_S[8] * b;
+  out[0] = y + cs * (r - y) + sn * sr;
+  out[1] = y + cs * (g - y) + sn * sg;
+  out[2] = y + cs * (b - y) + sn * sb;
+}
+
+/**
+ * Put a display-space colour through a tone curve WITHOUT turning its hue:
+ * Adobe's RGBTone (DNG SDK dng_reference.cpp RefBaselineRGBTone, the same as
+ * RawTherapee's AdobeToneCurve::RGBTone). The largest and smallest channels go
+ * through the curve and the middle one is placed between them where it sat,
+ * `mid' = min' + (max' - min')(mid - min)/(max - min)`, so the HSV hue fraction
+ * is held exactly. A grey goes through the curve as one value.
+ * @param c  the colour, 0..1 display space, rewritten in place (inputs outside
+ *   0..1 are clamped first, as the curve's own domain is).
+ * @param f  the curve, 0..1 -> 0..1 (toneEvaluator's, or the Luminance power).
+ * @returns nothing. Holds: the order of the channels and the HSV hue of c are
+ *   unchanged by a monotone f; a grey stays grey. Consumers: compileEdit's
+ *   master curve and Luminance; the shader's rgbToneMaster / rgbToneLum must
+ *   give the same numbers.
+ */
+export function rgbTone(c: Float32Array, f: (v: number) => number): void {
+  const r = Math.min(1, Math.max(0, c[0]));
+  const g = Math.min(1, Math.max(0, c[1]));
+  const b = Math.min(1, Math.max(0, c[2]));
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  const fmx = f(mx);
+  if (mx <= mn) {
+    c[0] = fmx; c[1] = fmx; c[2] = fmx;
+    return;
+  }
+  const fmn = f(mn);
+  const d = mx - mn;
+  c[0] = fmn + (fmx - fmn) * ((r - mn) / d);
+  c[1] = fmn + (fmx - fmn) * ((g - mn) / d);
+  c[2] = fmn + (fmx - fmn) * ((b - mn) / d);
+}
+
 /** A wheel hue -> its pure-chroma tint vector: the full-saturation RGB of the
  *  hue with its Rec.709 luma subtracted out, so adding it never moves the
  *  pixel's luminance. Computed ONCE per frame on the CPU and handed to the
@@ -2090,23 +2169,15 @@ export function compileEdit(
    *  source, whose correction is the in-grade stage above. */
   srcFlat?: SourceFlat | null,
 ): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number, fu?: number, fv?: number) => void {
-  // The YIQ hue rotation, written as its ROWS (cRC = weight of input C in
-  // output R) and applied as rows, so grey stays grey. It was applied
-  // transposed until 2026-10-01, which tinted every neutral. Applied as rows,
-  // +angle lowers HSV hue, so the angle is negated to keep the slider turning
-  // the way it always has.
-  const a = (-p.hue * Math.PI) / 180;
-  const cos = Math.cos(a);
-  const sin = Math.sin(a);
-  const c00 = 0.299 + 0.701 * cos + 0.168 * sin;
-  const c01 = 0.587 - 0.587 * cos + 0.33 * sin;
-  const c02 = 0.114 - 0.114 * cos - 0.497 * sin;
-  const c10 = 0.299 - 0.299 * cos - 0.328 * sin;
-  const c11 = 0.587 + 0.413 * cos + 0.035 * sin;
-  const c12 = 0.114 - 0.114 * cos + 0.292 * sin;
-  const c20 = 0.299 - 0.3 * cos + 1.25 * sin;
-  const c21 = 0.587 - 0.588 * cos - 1.05 * sin;
-  const c22 = 0.114 + 0.886 * cos - 0.203 * sin;
+  // The hue rotation about the Rec.709 luminance axis (hueRotate: W3C
+  // feColorMatrix hueRotate), so turning Hue keeps brightness and grey. It
+  // was the Rec.601 YIQ matrix until 2026-10-01 (applied transposed before
+  // that, which tinted grey). +angle raises HSV hue, the slider's direction.
+  const hueA = (p.hue * Math.PI) / 180;
+  const hueCos = Math.cos(hueA);
+  const hueSin = Math.sin(hueA);
+  const hueOn = p.hue !== 0;
+  const hueTmp = new Float64Array(3);
   // Fold exposure into the WB gains (both linear; order commutes). The
   // highlight recovery below carries each clip level through these same
   // folded gains, so folding exposure in is safe.
@@ -2122,8 +2193,10 @@ export function compileEdit(
   const toneGFn = !p.toneG || toneIsIdentity(p.toneG) ? null : toneEvaluator(p.toneG);
   const toneBFn = !p.toneB || toneIsIdentity(p.toneB) ? null : toneEvaluator(p.toneB);
   // Global luminance rides on top of the tone curve: pow in display space,
-  // endpoints pinned. exponent = 1/lum (lum>1 brightens). 1 = neutral.
+  // endpoints pinned, through rgbTone so it keeps hue. exponent = 1/lum
+  // (lum>1 brightens). 1 = neutral.
   const lumExp = p.lum && p.lum !== 1 ? 1 / p.lum : 0;
+  const lumFn = lumExp ? (v: number) => Math.pow(v, lumExp) : null;
   const sky = p.sky;
   const fol = p.foliage;
   // A MASK'S OWN FOLIAGE (042, stage 2) switches the band on too, and is read
@@ -2343,9 +2416,11 @@ export function compileEdit(
       const xb = m6 * r + m7 * g + m8 * b;
       r = xr; g = xg; b = xb;
     }
-    let nr = c00 * r + c01 * g + c02 * b;
-    let ng = c10 * r + c11 * g + c12 * b;
-    let nb = c20 * r + c21 * g + c22 * b;
+    let nr = r, ng = g, nb = b;
+    if (hueOn) {
+      hueRotate(r, g, b, hueCos, hueSin, hueTmp);
+      nr = hueTmp[0]; ng = hueTmp[1]; nb = hueTmp[2];
+    }
     const luma = nr * REC709[0] + ng * REC709[1] + nb * REC709[2];
     // Match the shader: saturation boosts fade out in deep shadows
     // (smoothstep(0.02, 0.20, luma)) so they don't amplify chroma noise.
@@ -2441,17 +2516,11 @@ export function compileEdit(
         const L = nr * REC709[0] + ng * REC709[1] + nb * REC709[2];
         const sf = 1 + (m.saturation - 1) * w;
         nr = L + (nr - L) * sf; ng = L + (ng - L) * sf; nb = L + (nb - L) * sf;
-        // hue rotate by hue*w degrees (same matrix as the global hue)
+        // hue rotate by hue*w degrees (the global hue's rotation, hueRotate)
         if (m.hue !== 0) {
-          const a = (-m.hue * Math.PI) / 180 * w;
-          const cs = Math.cos(a), sn = Math.sin(a);
-          const k00 = 0.299 + 0.701 * cs + 0.168 * sn, k01 = 0.587 - 0.587 * cs + 0.33 * sn, k02 = 0.114 - 0.114 * cs - 0.497 * sn;
-          const k10 = 0.299 - 0.299 * cs - 0.328 * sn, k11 = 0.587 + 0.413 * cs + 0.035 * sn, k12 = 0.114 - 0.114 * cs + 0.292 * sn;
-          const k20 = 0.299 - 0.3 * cs + 1.25 * sn, k21 = 0.587 - 0.588 * cs - 1.05 * sn, k22 = 0.114 + 0.886 * cs - 0.203 * sn;
-          const rr = k00 * nr + k01 * ng + k02 * nb;
-          const gg = k10 * nr + k11 * ng + k12 * nb;
-          const bb = k20 * nr + k21 * ng + k22 * nb;
-          nr = rr; ng = gg; nb = bb;
+          const a = (m.hue * Math.PI) / 180 * w;
+          hueRotate(nr, ng, nb, Math.cos(a), Math.sin(a), hueTmp);
+          nr = hueTmp[0]; ng = hueTmp[1]; nb = hueTmp[2];
         }
         // contrast about 18% grey, colour kept (contrastGain)
         const cf = contrastGain(nr, ng, nb, 1 + (m.contrast - 1) * w);
@@ -2463,11 +2532,11 @@ export function compileEdit(
     out[0] = toGamma(nr * sg);
     out[1] = toGamma(ng * sg);
     out[2] = toGamma(nb * sg);
-    if (toneFn) {
-      out[0] = toneFn(out[0]);
-      out[1] = toneFn(out[1]);
-      out[2] = toneFn(out[2]);
-    }
+    // The master curve keeps hue (rgbTone, Adobe's RGBTone): the largest and
+    // smallest channels go through it and the middle one keeps its place
+    // between them. Per channel until 2026-10-01, which turned hue on any
+    // strong curve (an S-curve took 30 deg to 35.8 deg). Same in the shader.
+    if (toneFn) rgbTone(out, toneFn);
     // Per-channel curves ride ON TOP of the master tone curve, each steering
     // its own channel — display space, before the mixer. Same in the shader.
     if (toneRFn) out[0] = toneRFn(out[0]);
@@ -2644,12 +2713,8 @@ export function compileEdit(
       }
     }
     // Global luminance — the very last step of the app's own grade, matching
-    // the shader's u_lum.
-    if (lumExp) {
-      out[0] = Math.pow(out[0], lumExp);
-      out[1] = Math.pow(out[1], lumExp);
-      out[2] = Math.pow(out[2], lumExp);
-    }
+    // the shader's u_lum. Hue-keeping like the master curve (rgbTone).
+    if (lumFn) rgbTone(out, lumFn);
     // Imported .cube LUT — the LAST colour stage, on the final display
     // colour (mirrors the shader's u_lutTex block; math in lut3d.ts).
     if (lut && lutTmp) {

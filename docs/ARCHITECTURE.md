@@ -61,7 +61,11 @@ decode -> LINEAR camera-native RGB
                        it all IR chroma sits on one magenta axis and swap/sat
                        cannot produce false color. Biggest single discovery.)
   -> CHANNEL SWAP     (r<->b)
-  -> GLOBAL HUE (YIQ) (global rotation CANNOT move sky and foliage apart)
+  -> GLOBAL HUE       (a turn about the Rec.709 luminance axis — W3C
+                       feColorMatrix hueRotate, `hueRotate` in pipeline.ts —
+                       so brightness and grey are kept; the Rec.601 YIQ matrix
+                       until 2026-10-01. A global rotation CANNOT move sky and
+                       foliage apart)
   -> SATURATION       (boost fades below ~0.2 luma to avoid chroma noise)
   -> PER-COLOR BANDS  (complementary halves of the hue circle: sky centred
                        210° plateau 55 edge 105, foliage = 1 - sky. Full
@@ -90,15 +94,19 @@ decode -> LINEAR camera-native RGB
   -> CONTRAST         ((c-0.5)*k+0.5)
   -> GAMMA 2.2
   -> TONE CURVE       (five fixed-x control points blacks/shadows/midtones/
-                       whites/highlights, monotone-cubic Fritsch–Carlson,
-                       per channel in DISPLAY/gamma space (HSL mixer + global
-                       Luminance run after it).
-                       `EditParams.tone`, identity = TONE_DEFAULT. A global
-                       Luminance slider rides on top of it, not a separate set
-                       of range sliders. NOT Lightroom-style (corrected
-                       2026-10-01): the master curve and Luminance run on each
-                       channel separately, which rotates hue on a strong curve
-                       (30° to 35.8° on an S-curve); Adobe's RGBTone keeps hue.)
+                       whites/highlights, monotone-cubic Fritsch–Carlson, in
+                       DISPLAY/gamma space (HSL mixer + global Luminance run
+                       after it). `EditParams.tone`, identity = TONE_DEFAULT
+                       and skipped. HUE-KEEPING since 2026-10-01: Adobe's
+                       RGBTone from the DNG SDK (`rgbTone` in pipeline.ts,
+                       `rgbToneMaster` in the shader) puts the largest and
+                       smallest channels through the curve and places the
+                       middle one between them, so HSV hue is held; per
+                       channel before that, an S-curve took 30° to 35.8°. The
+                       R/G/B curves after it stay per channel — steering the
+                       colour is their job. A global Luminance slider rides on
+                       top, through the same RGBTone, not a separate set of
+                       range sliders.)
   -> HSL MIXER        (moved AFTER gamma+tone 2026-07-05: it ran mid-pipeline
                        in linear space and chips felt "unbound to live colors"
                        — contrast/gamma/tone shifted hues between there and
@@ -370,9 +378,20 @@ and NO Nikon body can channel-swap in camera. Field guide:
   default curve; the histogram re-renders the same pipeline so it agreed and
   never exposed it). Fixed 2026-07-04 — `IDENTITY_LUT` samples the diagonal to
   <½ LSB. Verified GPU==CPU on a full gradient (identity maxErr 0).
+  Corrected 2026-10-01, three ways. Texel i holds f(i/255) but is CENTRED at
+  (i+0.5)/256, so it is read at `toneCoord(g)` = (g·255+0.5)/256 (OpenColorIO's
+  Lut1DOpGPU); read at g it evaluated f((256g−0.5)/255), up to 1.42 levels
+  off the export. The LUTs are R16F / RGBA16F (filterable in WebGL2), not
+  8-bit, so no curve is rounded to whole levels before filtering. And the
+  master LUT is not read at all for an identity curve (`u_toneOn`), as the CPU
+  already skipped it — with no curve on, the preview sat up to 0.96 levels
+  off the CPU's unrounded value, against 0.50 for rounding alone. The
+  CPU evaluates `toneEvaluator` exactly; GPU and CPU agree to the 8-bit
+  rounding (≤0.55 levels against the CPU's unrounded value).
 - Global **Luminance** (`u_lum`, `EditParams.lum`) is the last display-space op,
-  after the tone LUT: `pow(g, 1/lum)`, endpoints pinned so it lifts the body
-  without clipping. Same math in `compileEdit` (so `.cube` bakes it). Log-scale
+  after the tone LUT: v → `pow(v, 1/lum)` through RGBTone (on the largest and
+  smallest channels, the middle one placed between them, so hue is kept),
+  endpoints pinned so it lifts the body without clipping. Same math in `compileEdit` (so `.cube` bakes it). Log-scale
   slider 0.5–2× (`LUM_LO/HI`), neutral 1.0 mid-track, in the Tone curve panel.
 - Edit history (Undo / Reset / saved looks) is built on **snapshots** in
   `main.ts`. A `Snapshot` = the full editor state: the `EditParams` plus
@@ -453,7 +472,8 @@ and NO Nikon body can channel-swap in camera. Field guide:
     upstream rounding can't cascade into the steep key; (3) tone/mixer/lum are
     EXCLUDED both for TAT-style stability (steering tools you tweak after
     masking must not move the mask) and because the tone curve is a filtered
-    8-bit LUT texture on the GPU — routing the key through it broke GPU==CPU to
+    LUT texture on the GPU (8-bit when this was measured; R16F since
+    2026-10-01) — routing the key through it broke GPU==CPU to
     15 LSB (quantisation amplified by the selection edge, and real Apple-GPU
     filtering wouldn't deterministically match a CPU emulation anyway). The key
     stays pure ALU. SECOND parity lesson: do NOT build the chroma vector from
@@ -650,8 +670,8 @@ cannot describe something the code does not say about itself.
 - **`src/batchstore.ts`** (174 lines) — Crash-safe store for finished batch frames.
 - **`src/chooser.ts`** (65 lines) — Two-door landing page.
 - **`src/color.ts`** (110 lines) — Camera color science.
-- **`src/cubeimport.ts`** (136 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
-- **`src/dcp.ts`** (259 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
+- **`src/cubeimport.ts`** (181 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
+- **`src/dcp.ts`** (255 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 - **`src/debug.ts`** (2115 lines) — The test page behind the version number.
 - **`src/decode.ts`** (730 lines) — Image decoding. Three real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (60 lines) — Decoding, off the main thread.
@@ -662,7 +682,7 @@ cannot describe something the code does not say about itself.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (343 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (2816 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (2886 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
@@ -684,17 +704,17 @@ cannot describe something the code does not say about itself.
 - **`src/localmap.ts`** (100 lines) — Per-image reference maps for Clarity and Dehaze (glow-map pattern: built once per image from LINEAR source data, sampled as a texture by the GPU and bilinearly by the CPU export).
 - **`src/look.ts`** (294 lines) — Shareable looks. A look is the CREATIVE grade only (see SavedLook) — small enough (~0.5 KB of JSON) to travel as a link fragment, a paste-able code, or a tiny .ipslook file, with no server and no acco
 - **`src/lookmark.ts`** (75 lines) — The traveling recipe: every exported JPEG can carry the look that made it, as an APP11 segment ("IPSLOOK\0" + the look.ts wire-format JSON, ~600 bytes).
-- **`src/lut.ts`** (51 lines) — 3D LUT (.cube) export.
-- **`src/lut3d.ts`** (60 lines) — The trilinear formula for imported .cube 3D LUTs.
+- **`src/lut.ts`** (84 lines) — 3D LUT (.cube) export.
+- **`src/lut3d.ts`** (119 lines) — The sample formula for imported .cube 3D LUTs: TETRAHEDRAL interpolation.
 - **`src/lutpack.ts`** (146 lines) — LUT PACKS ARRIVE AS ZIPS — reading the .cube files out of one, without inflating anything the caller is going to refuse.
-- **`src/luts.ts`** (108 lines) — On-device store for imported .cube LUTs (IndexedDB "ips-luts").
+- **`src/luts.ts`** (153 lines) — On-device store for imported .cube LUTs (IndexedDB "ips-luts").
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
 - **`src/main.ts`** (19566 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (2721 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (2786 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
