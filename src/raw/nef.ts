@@ -115,7 +115,85 @@ export function readNefCfa(bytes: Uint8Array): RawCfa {
   const white =
     raw.num(50717)[0] ??
     (params.hasCurve && curveWhite > black ? curveWhite : (1 << bps) - 1);
+  const model = ifds.map((d) => d.str(272)).find(Boolean) ?? "";
+  if (Z50_PDAF.test(model)) equalisePdafRows(cfa, width, height, pattern, black, white);
   return { cfa, width, height, pattern, black, white };
+}
+
+/** Bodies whose phase-detect rows are known: the Z 50 and the Z fc share a
+ *  sensor, and RawTherapee's camconst.json lists the same rows for both. */
+const Z50_PDAF = /\bZ (50|fc)\b/i;
+
+/**
+ * THE Z 50'S AUTOFOCUS ROWS, PUT BACK IN LINE WITH THEIR NEIGHBOURS.
+ *
+ * Every 12th sensor row from 285 to 3441 carries the phase-detect pixels, and
+ * RawTherapee's camconst.json records that their blue sites behave differently
+ * ("a lower standard deviation on a black frame"). Measured 2026-10-02 on six
+ * of the owner's Z 50 NEFs (NIR_1376, 3716, 1651, 1667, 1688, 2920), in smooth,
+ * well-exposed areas against the same-colour rows two above and two below:
+ * those blue sites read 0.36-0.53% LOWER than rows without phase-detect pixels
+ * read by the same measure, and their noise is about half the control rows'. The looks multiply blue several
+ * times over, which is what turns half a percent into a stripe every 12 rows.
+ *
+ * So the offset is measured on each photograph, the same way, and divided out
+ * of those sites only. RawTherapee's own PDAF filter is built for the green
+ * phase-detect pixels of other makers (it marks bright greens as bad pixels and
+ * blends its line denoise toward the rows); for this body it names the rows and
+ * nothing more, which is why the correction here is the measured level and
+ * nothing else. The lower noise is left alone: nothing can put back noise that
+ * was never recorded, and adding some would be inventing it.
+ *
+ * @param cfa  the Bayer frame, corrected in place.
+ * @param W,H  its size in photosites.
+ * @param pattern  the 2x2 CFA colours (0 R, 1 G, 2 B), row-major.
+ * @param black,white  the frame's levels; a site at or above white is left
+ *   alone, so a clipped highlight stays clipped.
+ * @returns the ratio divided out, or 1 when nothing was changed — when the
+ *   frame has no blue site on those rows, too few smooth well-exposed samples
+ *   (under 2000 on either set of rows), or a ratio outside 0.97-1.0, which this defect never
+ *   produced, so a scene that happens to have structure along those rows is
+ *   never "corrected". The decode, the export and every tile read the frame
+ *   through readNefCfa, so all of them agree.
+ */
+export function equalisePdafRows(cfa: Uint16Array, W: number, H: number, pattern: number[], black: number, white: number): number {
+  let bRow = -1, bCol = -1;
+  for (let i = 0; i < 4; i++) if (pattern[i] === 2) { bRow = i >> 1; bCol = i & 1; }
+  if (bRow < 0) return 1;
+  const rows: number[] = [];
+  for (let r = 285; r <= 3441 && r < H - 2; r += 12) if ((r & 1) === bRow) rows.push(r);
+  if (!rows.length) return 1;
+  const x0 = 200 + ((bCol - 200) & 1);
+  // The same reading on rows that carry no phase-detect pixels (4, 6 and 8
+  // below each), because the smooth-area selection itself reads about 0.2% low
+  // on a sky's curvature; the offset is the AF rows' reading over theirs.
+  const reading = (list: number[]): number => {
+    const ratios: number[] = [];
+    for (const r of list) {
+      if (r < 2 || r >= H - 2) continue;
+      for (let x = x0; x < W - 200; x += 8) {
+        const a = cfa[(r - 2) * W + x] - black, b = cfa[(r + 2) * W + x] - black, v = cfa[r * W + x] - black;
+        const m = (a + b) / 2;
+        if (m < 200 || cfa[r * W + x] >= white || Math.abs(a - b) > 0.04 * m) continue;
+        ratios.push(v / m);
+      }
+    }
+    if (ratios.length < 2000) return NaN;
+    ratios.sort((p, q) => p - q);
+    return ratios[ratios.length >> 1];
+  };
+  const ratio = reading(rows) / reading(rows.flatMap((r) => [r + 4, r + 6, r + 8]));
+  if (!(ratio >= 0.97 && ratio < 1)) return 1;
+  const gain = 1 / ratio;
+  for (const r of rows) {
+    for (let x = bCol; x < W; x += 2) {
+      const o = r * W + x;
+      const v = cfa[o];
+      if (v <= black || v >= white) continue;
+      cfa[o] = Math.min(white, Math.round(black + (v - black) * gain));
+    }
+  }
+  return ratio;
 }
 
 interface NikonParams {
