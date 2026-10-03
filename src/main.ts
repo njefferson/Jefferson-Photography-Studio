@@ -40,8 +40,8 @@ import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, applyLensFlat, lensPlanStamp, lensCurveForSource, turnOfOrientation, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
-import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
-import type { Sticker, BrushMask, LensCurve, SourceFlat } from "./pipeline";
+import { makeWarpField, encodeWarp, paintWarp, warpSampler, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
+import type { Sticker, BrushMask, LensCurve, SourceFlat, LocalMap } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -2202,15 +2202,32 @@ let skyMapKey = "";
  *  and the chroma the key was read from are the two numbers that say whether
  *  the Sky depth slider can do anything on this photograph. */
 let lastSkyMap: SkyMap | null = null;
+/** The warp field the current sky map was built through. Compared by IDENTITY
+ *  beside its `rev` in the key: a stroke paints a fresh copy of the field
+ *  (startWarpStroke), so an Undo followed by a new stroke can reach a `rev`
+ *  an earlier, different field had. */
+let skyMapWarp: WarpField | null = null;
+/** The clarity/dehaze map the renderer holds for the open photograph, built
+ *  once at open from its working copy. The sky map reads it as the shader does. */
+let localMapNow: LocalMap | null = null;
 
 /** Keep the renderer's sky chroma map matching the live edit.
  *  Takes nothing; reads `params`, `current` and `skyBitmap`; uploads a fresh
  *  map when the amount is on and the edit moved, clears it when it is off.
  *  What it must satisfy: the map handed to the GPU was built from THESE params
  *  with `skySmooth` zeroed (buildSkyMap does that), so preview and export blend
- *  toward the same target — the agreement walk is what checks it. Rebuilds are
- *  keyed on the params minus this field and minus the spatial-only ones the
- *  map does not read, so dragging the amount itself costs nothing. */
+ *  toward the same target — the agreement walk is what checks it. It is built
+ *  the way the export builds its own (export.ts): through the WARPED source,
+ *  with the clarity/dehaze map when either is on, the source flat, and the warp
+ *  field itself, so each sample reads the map and the flat where its pixel came
+ *  from. Built from the unwarped picture without the map, as it was until
+ *  2026-10-02, the screen's sky selection sat where the pixels had been before
+ *  a Warp moved them, and lost what Clarity and Dehaze did to them, while the
+ *  saved file had both. Rebuilds are keyed on the params minus this field and
+ *  minus the spatial-only ones the map does not read, plus the warp's field and
+ *  `rev`, so dragging the amount itself costs nothing; and NOT DURING A WARP
+ *  STROKE, which changes the field every frame — the map follows when the
+ *  stroke ends (endWarpStroke draws once more). */
 function syncSkyMap(): void {
   if (current && skyBitmap && !skyFine && ((params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0)) {
     // First edit with a depth on this photograph: the coarse bitmap's feather
@@ -2236,17 +2253,26 @@ function syncSkyMap(): void {
   // Undo there came back to a different sky. A stroke or a regenerated sky
   // changes a bitmap in place, and bumps `rev`, which the key does carry.
   const maskKey = (params.masks ?? []).map(({ brush: _b, fine: _f, eff: _e, effFine: _ef, ...m }) => m);
-  const key = JSON.stringify([rest, maskKey]);
-  if (key === skyMapKey) return;
+  const warp = params.warp && !warpFieldEmpty(params.warp) ? params.warp : null;
+  const key = JSON.stringify([rest, maskKey, warp ? warp.rev : -1]);
+  if (key === skyMapKey && warp === skyMapWarp) return;
+  // A live warp stroke moves the field every frame; the map waits for the end.
+  if (warpStroke && skyMapKey) return;
   skyMapKey = key;
+  skyMapWarp = warp;
   const img = current;
   // THE SAME PRE-PASS THE PIXELS COME THROUGH. The open image IS the preview's
   // proxy (a half-res bin for a raw), so step 1 here is what the shader taps.
   // Built from the raw decode instead, the map targeted a sky 16% more
   // saturated than the rendered one — skymap.ts has the measurement.
-  const raw = (x: number, y: number) => linearAt(img, x, y);
+  // And through the warp FIRST, as the export's chain runs it (export.ts: the
+  // warp remaps the source at the very top, before denoise).
+  const unwarped = (x: number, y: number) => linearAt(img, x, y);
+  const raw = warp ? warpSampler(unwarped, warp, img.width, img.height) : unwarped;
   const pre = makeRowDetail(makeRowDenoiser(raw, img.width, img.height, params.denoise, 1, params.chroma ?? 0, params.despeckle ?? 0), img.width, img.height, params.sharpen ?? 0, params.texture ?? 0, 1, decodePitch);
-  lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), undefined, lensForEdit(img), skyBitmap, srcFlatOf(img));
+  // The clarity/dehaze map exactly when the export builds one.
+  const local = (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0 ? localMapNow ?? undefined : undefined;
+  lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), local, lensForEdit(img), skyBitmap, srcFlatOf(img), warp);
   renderer.setSkyMap(lastSkyMap);
 }
 
@@ -6412,7 +6438,10 @@ function endWarpStroke() {
   if (!warpStroke) return;
   const started = warpStroke.started;
   warpStroke = null;
-  if (started) flushRecord(); // one stroke = one undo step
+  if (started) {
+    flushRecord(); // one stroke = one undo step
+    draw(); // the sky map waited for the stroke to end (syncSkyMap)
+  }
 }
 
 $("warpReset").addEventListener("click", () => {
@@ -11700,7 +11729,8 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   const __d = performance.now();
   renderer.setGlowMap(buildGlowMap((x, y) => linearAt(img, x, y), img.width, img.height));
   const __e = performance.now();
-  renderer.setLocalMap(buildLocalMap((x, y) => linearAt(img, x, y), img.width, img.height));
+  localMapNow = buildLocalMap((x, y) => linearAt(img, x, y), img.width, img.height);
+  renderer.setLocalMap(localMapNow);
   // THE SKY BITMAP FOR skySmooth, built once per photograph from the gray-world
   // render so it never drifts as the photo is graded — the same rule the Sky
   // mask follows (regenerateSkyMask). Separate from any mask the reader adds:

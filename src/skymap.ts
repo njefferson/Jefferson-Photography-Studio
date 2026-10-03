@@ -121,9 +121,12 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  * @param srcFlat  the lens flat already in a raw's source pixels, passed through
  *   to compileEdit so highlight recovery here reads the clip the way the
  *   rendered pixels do; null for an 8-bit source.
- * @param warp the warp field `sample` already reads through, when it does (the
- *             export's sampler is warped; the preview's is not and passes
- *             none). `local` is built from the unwarped source and `srcFlat`
+ * @param warp the warp field `sample` already reads through, when it does:
+ *             the export's sampler is warped, and so is the open photograph's
+ *             (main.ts syncSkyMap, since 2026-10-02 — it passed none and built
+ *             the screen's map from the unwarped picture, so the selection on
+ *             screen and in the saved file differed under a Warp); a strip
+ *             tile's is not and passes none. `local` is built from the unwarped source and `srcFlat`
  *             lies on the unwarped pixels, so each sample reads BOTH where its
  *             pixel came from — compileEdit's (mu, mv) — as the export and the
  *             shader do (2026-10-02). Omitted or empty, both are read in place.
