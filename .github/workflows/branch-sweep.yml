@@ -1,0 +1,35 @@
+name: Branch sweep
+
+# THE HUB'S BRANCH SWEEP, CALLED RATHER THAN COPIED.
+#
+# Removes this repo's claude/* branches whose work is already in main: a branch
+# goes only when merging it into main changes nothing, every other branch is
+# printed and never touched, and a dispatch is a dry run unless `delete` is
+# set. The rules live in the hub's branch-sweep.yml, where the session
+# dispatches the same workflow for the hub itself.
+#
+# This file has to be on main to run, because a dispatched workflow has to be
+# on the default branch; it reaches main with a promotion of staging. The job grants `contents: write` because a called workflow can never
+# hold more than its caller gave it, and that is the one scope that deletes a
+# ref. The pin is a full commit, for the same reason hub-gates.yml's is.
+
+on:
+  workflow_dispatch:
+    inputs:
+      delete:
+        description: >-
+          Delete the removable claude/* branches. Off, the run only prints what
+          it would remove.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    permissions:
+      contents: write
+    uses: njefferson/noahjefferson/.github/workflows/branch-sweep.yml@a21e2824445630ea6c26e1af3dbf07b13e036805
+    with:
+      delete: ${{ inputs.delete }}
