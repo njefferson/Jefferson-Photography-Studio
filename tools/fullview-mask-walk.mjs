@@ -11,10 +11,16 @@
 //
 // IT READS BOTH HALVES SEPARATELY, because they live in different places and a
 // fix to one is not a fix to the other. The outline is a DOM element and is
-// asked directly. The TINT is in the canvas, so it is read as a share of the
-// frame carrying the overlay's own colour — the same measurement mask-fix-walk
-// uses, and for the same reason: the photograph's own colours cannot be
-// mistaken for it.
+// asked directly. The TINT is in the canvas, so it is read as the share of the
+// frame that differs from the BARE PHOTOGRAPH, captured before any mask exists.
+//
+// IT USED TO COUNT THE OVERLAY'S OWN COLOUR — blue at or above green above red —
+// on the grounds that the photograph's colours could not be mistaken for it.
+// From 2.65 they can: the re-tuned colour renders this frame's dark sky a
+// blue-grey that passes that test, and the walk read 44.2% "tinted" in full
+// view while the saved render showed no overlay anywhere on it. A difference
+// from the bare frame does not depend on what colour the photograph happens to
+// be, so the same failure cannot come back with the next look change.
 //
 // THE MASK STAYS SELECTED THROUGHOUT. A walk that found the overlay gone
 // because the mask had been deselected would pass while reporting nothing, so
@@ -37,24 +43,40 @@ let failed = 0;
 const check = (n, ok, d = "") => { console.log(`${ok ? "ok  " : "FAIL"}  ${n}${d ? " — " + d : ""}`); if (!ok) failed++; };
 const settle = async (p) => { await p.waitForTimeout(700); await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); };
 
+/** The canvas resampled to a fixed 128 x 128, as RGB bytes, so two states can
+ *  be compared pixel for pixel even if the preview is drawn at another size.
+ *  @param p the page. @returns an array of 128*128*3 numbers 0..255, the
+ *  baseline `overlay` measures every later state against. */
+const SIDE = 128;
+const pixels = (p) => p.evaluate((S) => {
+  const c = document.getElementById("view");
+  const oc = document.createElement("canvas"); oc.width = S; oc.height = S;
+  oc.getContext("2d").drawImage(c, 0, 0, S, S);
+  const d = oc.getContext("2d").getImageData(0, 0, S, S).data;
+  const out = [];
+  for (let i = 0; i < d.length; i += 4) out.push(d[i], d[i + 1], d[i + 2]);
+  return out;
+}, SIDE);
+
 /** The overlay, read from both places it lives. `tint` is the share of the
- *  canvas carrying the cool overlay colour; `outline` is whether the dotted
- *  handle layer is showing at all. */
-const overlay = (p) => p.evaluate(() => {
+ *  canvas that differs from `bare` (the photograph before any mask existed) by
+ *  more than 16 levels in some channel; `outline` is whether the dotted handle
+ *  layer is showing at all. @param p the page. @param bare the result of
+ *  `pixels` on the bare photograph. */
+const overlay = async (p, bare) => {
+  const now = await pixels(p);
+  let moved = 0;
+  for (let i = 0; i < now.length; i += 3) {
+    if (Math.max(Math.abs(now[i] - bare[i]), Math.abs(now[i + 1] - bare[i + 1]), Math.abs(now[i + 2] - bare[i + 2])) > 16) moved++;
+  }
+  return { tint: moved / (now.length / 3), ...(await dom(p)) };
+};
+const dom = (p) => p.evaluate(() => {
   const c = document.getElementById("view");
   const oc = document.createElement("canvas"); oc.width = c.width; oc.height = c.height;
   oc.getContext("2d").drawImage(c, 0, 0);
-  const d = oc.getContext("2d").getImageData(0, 0, oc.width, oc.height).data;
-  let n = 0, cool = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
-    const V = Math.max(r, g, b), m = Math.min(r, g, b);
-    n++;
-    if (V > 1e-4 && (V - m) / V > 0.06 && b >= g && g > r) cool++;
-  }
   const ov = document.getElementById("maskOverlay");
   return {
-    tint: cool / n,
     outline: !!ov && !ov.hasAttribute("hidden"),
     // THE SELECTION, not a row count. This read `#maskList .mask-row`.length,
     // which is "a mask exists" — it would have passed on a build that dropped
@@ -77,17 +99,19 @@ try {
   await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
   await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
   await settle(p);
+  // THE BARE PHOTOGRAPH, before any mask exists: what full view must look like.
+  const bare = await pixels(p);
   // A RADIAL, not the sky — it is the only kind with a dotted handle outline,
   // so it is the one frame where both halves can be read at once.
   await openMasks(p); await p.click("#addRadial"); await settle(p);
 
-  const before = await overlay(p);
+  const before = await overlay(p, bare);
   writeFileSync(join(OUT, "1-editing.png"), Buffer.from(before.png.split(",")[1], "base64"));
   check("the overlay is up while editing the mask", before.tint > 0.02 && before.outline,
     `${(100 * before.tint).toFixed(1)}% of the frame tinted, outline ${before.outline ? "showing" : "HIDDEN"}`);
 
   if (!PLANT) { await p.click("#fullViewBtn"); await settle(p); }
-  const full = await overlay(p);
+  const full = await overlay(p, bare);
   writeFileSync(join(OUT, "2-full.png"), Buffer.from(full.png.split(",")[1], "base64"));
   check("full view is on", PLANT || full.full);
   check("full view drops the coverage tint", full.tint < before.tint / 3,
@@ -105,7 +129,7 @@ try {
     // invisible element. Escape and a tap on the photograph are the two ways
     // out, and Escape is the one a harness can be sure of.
     await p.keyboard.press("Escape"); await settle(p);
-    const back = await overlay(p);
+    const back = await overlay(p, bare);
     writeFileSync(join(OUT, "3-back.png"), Buffer.from(back.png.split(",")[1], "base64"));
     check("leaving brings the overlay back", back.tint > 0.02 && back.outline,
       `${(100 * back.tint).toFixed(1)}% tinted, outline ${back.outline ? "showing" : "HIDDEN"}`);

@@ -56,6 +56,17 @@
 // would be one where the re-solve had stopped happening, which is the
 // regression this check exists to catch.
 //
+// FROM 2.65 THE HASHES MATCH AND THE RE-SOLVE STILL RUNS. The re-fit put the
+// look's own Sky saturation at 2, the slider's ceiling, and its Foliage band at
+// 1.96 of 2, so the lift has nothing left to top up: on NIR_0063, NIR_0627,
+// NIR_0102, NIR_1651, NIR_1688 and NIR_1811 the button read the same pixels
+// with the lift on and off, and the app said so in words. A hash cannot tell
+// "re-solved and found nothing" from "never re-solved", so the check now also
+// accepts the lift's own statement under the look — the sentence only a solve
+// WITH the colour half writes — provided it is not what the lift said at open,
+// which is the tonal-only solve. A build that stopped re-solving keeps the
+// at-open state and fails either way.
+//
 // Check 9 asserts that leaving the look on a photograph you have come back to
 // hands back THAT photograph's measurement, not the one before it -- with 9a as
 // the control that the two frames measure differently enough (0.46 and 0.22,
@@ -362,10 +373,19 @@ try {
   // The two arms differ by ONE act: one presses the button, the other presses
   // Pink IR and writes the nine numbers into the mixer by hand, which is
   // exactly how the sheets were made.
+  // What the lift says about the photograph: "applied" when it wrote
+  // something (the statement is hidden), else the statement itself.
+  const liftSays = (p) => p.evaluate(() => {
+    const el = document.getElementById("liftState");
+    return !el ? "(no #liftState)" : el.hidden ? "applied" : (el.textContent || "").trim();
+  });
+  let liftWords = null; // check 8's second reading, from the lift-on button arm
   const armShipped = async (liftOn) => {
     const { p, ctx } = await open();
     if (!liftOn) await press(p, "irLift");
+    const atOpen = await liftSays(p);
     await press(p, "lookEir");
+    if (liftOn) liftWords = { atOpen, onLook: await liftSays(p) };
     await setDn(p, Math.max(measured, FLOOR));
     const h = await hash(p);
     await ctx.close();
@@ -576,9 +596,10 @@ try {
 
   const liftShipped = await armShipped(true);
   const liftRecipe = await armRecipe(true);
-  check("8   ...and with it on they differ, because the look re-solves the lift",
-    liftShipped !== liftRecipe, true);
-  console.log(`        (button ${liftShipped}, recipe ${liftRecipe})`);
+  const colourSolve = /^This photo already measures where it should be/.test(liftWords.onLook) && liftWords.onLook !== liftWords.atOpen;
+  check("8   ...and with it on the look re-solves the lift: the two differ, or the lift says it solved with the colour and found nothing",
+    liftShipped !== liftRecipe || colourSolve, true);
+  console.log(`        (button ${liftShipped}, recipe ${liftRecipe}; the lift at open: "${liftWords.atOpen.slice(0, 60)}"; under the look: "${liftWords.onLook.slice(0, 60)}")`);
 
   // ---- 9. THE MEASUREMENT FOLLOWS THE PHOTOGRAPH, not the session.
   const two = await b.newContext({ viewport: { width: 1280, height: 950 } });
