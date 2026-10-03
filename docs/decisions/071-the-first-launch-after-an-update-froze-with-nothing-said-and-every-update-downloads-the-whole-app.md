@@ -587,6 +587,17 @@ GitHub copies instead, and WebKit's storage policy only as search snippets.
        fresh context, so its reason says whether the program or the context
        failed. Each part was planted headless: red on the build before, green
        after. The next PC run of the test page answers which it is.
+     - **Each row builds in a graphics context of its own, for staging,
+       2026-10-02.** The PC's run of v2.64.56 put the build at 56.5 s as
+       shipped and 0.78 s with the mask loops taken out, and three of its
+       rows never ran: the first row that failed lost the one context all
+       eight shared, and every row after it read "not run". Each row is now
+       built in a fresh context after a tiny program has started the graphics
+       there, the context is given up after the row, and a row that fails is
+       still built once more in another. Planted headless, a context lost while
+       the second row builds leaves the six rows after it reading "not run" on
+       the build before and timed on this one; with nothing planted all eight
+       are timed.
      - The options that follow are 8 to 12. Option 8 was measured short on
        2026-09-30 (under 8), and 9 to 12 were added from outside research the
        same day; none is chosen.
