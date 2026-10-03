@@ -38,7 +38,7 @@ import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMa
 import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, applyLensFlat, lensPlanStamp, lensCurveForSource, turnOfOrientation, type LensPlan } from "./lensflat";
-import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache } from "./heal";
+import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache, type HealSolves } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpSampler, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
 import type { Sticker, BrushMask, LensCurve, SourceFlat, LocalMap } from "./pipeline";
@@ -9525,6 +9525,10 @@ const healStatus = $("healStatus") as HTMLElement;
  *  texture — so keep the reference in sync with every setImage call. */
 let previewSrc: { width: number; height: number; pixels?: Uint8ClampedArray; linear?: Float32Array; linear16?: Uint16Array } | null = null;
 let bakedSpots: HealSpot[] = []; // what the texture currently has baked in
+/** Every heal spot's solved correction, kept from one bake pass to the next
+ *  (heal.ts HealSolves) so a change re-solves only the spots whose inputs moved.
+ *  Emptied wherever the texture is replaced, beside `bakedSpots`. */
+let healSolves: HealSolves = {};
 let bakedStickers: Sticker[] = []; // IN-LOOK stickers baked INTO the source texture
 let bakedNormal: Sticker[] = []; // ON-TOP (over-blend) stickers in the overlay texture
 let bakedScreen: Sticker[] = []; // SCREEN-blend (glow) stickers in the screen overlay
@@ -9597,6 +9601,7 @@ function uploadPreview() {
   renderer.setSourceFlat(srcFlatOf(current));
   renderer.setOverlaySize(previewSrc.width, previewSrc.height); // on-top overlays track the source size
   bakedSpots = [];
+  healSolves = {};
   bakedStickers = [];
   bakedNormal = [];
   bakedScreen = [];
@@ -9950,6 +9955,7 @@ async function upgradeToNativeResolution(gen: number): Promise<void> {
     // reset uploadPreview does — a stale "already baked" flag here would leave
     // a reader's heals and stickers silently missing from the sharper picture.
     bakedSpots = [];
+    healSolves = {};
     bakedStickers = [];
     bakedNormal = [];
     bakedScreen = [];
@@ -10024,9 +10030,10 @@ function syncSpotsToTexture() {
       const a = stickerAssets[s.asset];
       if (a) rects.push(stickerRect(s, W, H, a, dispRot));
     }
-    // One heal solve for every rect of this pass (heal.ts HealCache) — and
-    // only this pass: the pristine buffer can be rewritten between passes.
-    const healCache: HealCache = {};
+    // One composite for every rect of this pass (heal.ts HealCache) — and
+    // only this pass: the pristine buffer can be rewritten between passes. The
+    // solves inside it are kept across passes, keyed by what each one reads.
+    const healCache: HealCache = { solves: healSolves };
     for (const rect of rects) {
       if (rect.w <= 0 || rect.h <= 0) continue;
       if (previewSrc.linear || previewSrc.linear16) {

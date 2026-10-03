@@ -301,6 +301,10 @@ function laplaceFill(D: Float32Array, dom: Uint8Array, rw: number, rh: number, e
  * @param eps  the solve's tolerance (EPS_BYTES or EPS_LINEAR).
  * @param hi   the top of the buffer's range: 255 for gamma bytes, Infinity for
  *             linear light, which has no ceiling here.
+ * @param solves optional store of corrections kept across passes (HealSolves);
+ *             with it, a heal whose solve inputs match a stored one bit for bit
+ *             takes that answer instead of solving again. The layers are the
+ *             same bytes either way.
  * @returns one layer per spot: its rect, holding the composite after it.
  *
  * SOURCES ALWAYS READ THE PRISTINE PICTURE, as they always have; what a spot
@@ -323,10 +327,12 @@ function laplaceFill(D: Float32Array, dom: Uint8Array, rw: number, rh: number, e
  * the patches, because they are), and one spot's working set at a time
  * (HEAL_SOLVE_BYTES_PX).
  */
-function healLayers(read: PxReader, W: number, H: number, spots: readonly HealSpot[], eps: number, hi: number): HealLayer[] {
+function healLayers(read: PxReader, W: number, H: number, spots: readonly HealSpot[], eps: number, hi: number, solves?: HealSolves): HealLayer[] {
   const sp = toPx(spots, W, H);
   const layers: HealLayer[] = [];
   const t = new Float64Array(3);
+  const pass = solves ? (solves.pass = (solves.pass ?? 0) + 1) : 0;
+  const store = solves ? (solves.map ??= new Map<string, SolveEntry[]>()) : null;
   for (let k = 0; k < spots.length; k++) {
     const s = sp[k];
     const rect = spotRect(spots[k], W, H);
@@ -361,12 +367,38 @@ function healLayers(read: PxReader, W: number, H: number, spots: readonly HealSp
       // Boundary: destination minus source wherever the spot does not reach.
       D = new Float32Array(n * 3);
       const dom = new Uint8Array(n);
+      let nb = 0;
       for (let i = 0; i < n; i++) {
         if (wgt[i] > 0) { dom[i] = 1; continue; }
         const o = i * 3;
         D[o] = before[o] - src[o]; D[o + 1] = before[o + 1] - src[o + 1]; D[o + 2] = before[o + 2] - src[o + 2];
+        nb++;
       }
-      laplaceFill(D, dom, rw, rh, eps);
+      if (store) {
+        // THE SOLVE READS EXACTLY THIS: the domain (the spot's geometry at this
+        // size) and the boundary values just written, and nothing else — every
+        // unknown is overwritten by laplaceFill's own starting guess. So a
+        // stored correction whose boundary matches BIT FOR BIT is the answer
+        // this solve would give, and is used in its place.
+        const bnd = new Float32Array(nb * 3);
+        for (let i = 0, j = 0; i < n; i++) {
+          if (dom[i]) continue;
+          const o = i * 3;
+          bnd[j++] = D[o]; bnd[j++] = D[o + 1]; bnd[j++] = D[o + 2];
+        }
+        const g = spots[k];
+        const gkey = `${W}x${H}|${eps}|${g.x}|${g.y}|${g.r}`;
+        const list = store.get(gkey) ?? [];
+        const hit = list.find((e) => sameBits(e.bnd, bnd));
+        if (hit) {
+          hit.pass = pass;
+          D = hit.D;
+        } else {
+          laplaceFill(D, dom, rw, rh, eps);
+          list.push({ bnd, D, pass });
+          store.set(gkey, list);
+        }
+      } else laplaceFill(D, dom, rw, rh, eps);
     }
     for (let i = 0; i < n; i++) {
       const w = wgt[i];
@@ -381,7 +413,32 @@ function healLayers(read: PxReader, W: number, H: number, spots: readonly HealSp
     }
     layers.push({ ...rect, data });
   }
+  // What this pass did not use is a spot that moved, went, or now sits on
+  // different pixels: dropped, so the store holds the current list and no more.
+  if (store) {
+    for (const [gkey, list] of store) {
+      const live = list.filter((e) => e.pass === pass);
+      if (live.length) store.set(gkey, live); else store.delete(gkey);
+    }
+  }
   return layers;
+}
+
+/** One stored correction: the boundary it was solved for and its answer. */
+interface SolveEntry {
+  bnd: Float32Array;
+  D: Float32Array;
+  pass: number;
+}
+
+/** Two float arrays hold the same BITS — not merely equal numbers, so -0 and 0,
+ *  or two NaNs, are told apart exactly as the solve's arithmetic would see them. */
+function sameBits(a: Float32Array, b: Float32Array): boolean {
+  if (a.length !== b.length) return false;
+  const ua = new Uint32Array(a.buffer, a.byteOffset, a.length);
+  const ub = new Uint32Array(b.buffer, b.byteOffset, b.length);
+  for (let i = 0; i < ua.length; i++) if (ua[i] !== ub[i]) return false;
+  return true;
 }
 
 /** The final composite at one pixel: the latest layer holding it, else the
@@ -398,22 +455,53 @@ function finalAt(layers: readonly HealLayer[], read: PxReader, px: number, py: n
   read(px, py, out);
 }
 
-/** ONE SOLVE PER CHANGE, NOT PER RECT. The preview re-bakes every rect a change
- *  touched (main.ts), each through the same spot list, and the layers are the
- *  same for all of them — so the caller may hand every bake of one pass the same
- *  cache. It belongs to that pass and no longer: the pristine buffer is
- *  rewritten in place when the lens correction moves (main.ts bringLensTo), so
- *  a cache kept across passes against the buffer would heal from old pixels. */
+/** ONE SOLVE PER SPOT THAT CHANGED, NOT PER SPOT AND NOT PER RECT.
+ *
+ *  Two stores, with two lifetimes. `key` and `layers` hold the composite for
+ *  ONE PASS: the preview re-bakes every rect a change touched (main.ts), each
+ *  through the same spot list, and the layers are the same for all of them —
+ *  so every bake of one pass is handed the same cache. They must not outlive
+ *  the pass: the pristine buffer is rewritten in place when the lens correction
+ *  moves (main.ts bringLensTo), and layers keyed on the spot list alone would
+ *  heal from old pixels.
+ *
+ *  `solves` OUTLIVES THE PASS, and may, because it is keyed by everything the
+ *  solve reads rather than by the spot list: the spot's geometry at this size,
+ *  the tolerance, and the boundary values themselves — the composite so far
+ *  minus the source, around the spot, which carries the spot's source offset
+ *  and every earlier spot that reaches it, since spots composite in list order.
+ *  A rewritten buffer changes those values and misses. Without it, adding a
+ *  tenth spot re-solved nine unchanged ones on the main thread, each up to
+ *  darktable's 2000 sweeps. */
 export interface HealCache {
   /** What the layers were solved for; private to heal.ts. */
   key?: string;
   layers?: unknown;
+  /** Solved corrections kept across passes; see HealSolves. */
+  solves?: HealSolves;
 }
+
+/** A store of solved Laplace corrections that a caller keeps ACROSS bake
+ *  passes, handed in through HealCache.solves. Its fields are private to
+ *  heal.ts; a caller creates it as `{}` and keeps the object.
+ *
+ *  What it guarantees: a bake handed it produces the SAME BYTES as one handed
+ *  none — a stored correction is used only when the geometry, the tolerance
+ *  and every boundary value it was solved for match bit for bit. Each pass
+ *  drops every correction that pass did not use, so it holds the current
+ *  spot list's corrections (about one patch's worth a heal spot) and no more.
+ *  Consumer: main.ts syncSpotsToTexture; main.ts starts a fresh one wherever
+ *  the texture is replaced (uploadPreview, upgradeToNativeResolution). */
+export interface HealSolves {
+  map?: Map<string, SolveEntry[]>;
+  pass?: number;
+}
+
 function cachedLayers(cache: HealCache | undefined, W: number, H: number, spots: readonly HealSpot[], read: PxReader, eps: number, hi: number): HealLayer[] {
   if (!cache) return healLayers(read, W, H, spots, eps, hi);
   const key = `${W}x${H}|${eps}|${hi}|${JSON.stringify(spots)}`;
   if (cache.key === key && cache.layers) return cache.layers as HealLayer[];
-  const layers = healLayers(read, W, H, spots, eps, hi);
+  const layers = healLayers(read, W, H, spots, eps, hi, cache.solves);
   cache.key = key;
   cache.layers = layers;
   return layers;
