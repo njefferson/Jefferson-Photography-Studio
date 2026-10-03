@@ -136,32 +136,47 @@ it: a gate that only counts says a filing cabinet is full.
 ## Release flow (the owner's hard gate)
 - `main` == production (jefferson-photo-studio.pages.dev, deployed on push).
 - The `staging` branch deploys to staging.jefferson-photo-studio.pages.dev.
-  Every product change goes: designated `claude/*` branch → push to `staging`
-  → the owner's on-device pass → the owner's explicit go → PR + merge to `main`.
-  Never merge a product change to main without that go. Docs-only changes
-  (NOTES.md, this file) may merge without the gate.
-- **Docs-only commits go STRAIGHT TO MAIN, by a fast-forward push, with no pull
-  request (owner, 2026-09-29).** The pull request tool appends a link to the
-  chat, and an edit removes it only from the current text: the first revision
-  stays in the edit history, which only the owner can delete (hub LESSONS 373).
-  So: check that main is an ancestor of the working branch and that nothing
-  outside docs differs, `git push origin HEAD:main`, then read the remote's
-  main head, the Gates and deploy runs for that SHA, and the live offline copy.
-  A branch carrying any product change still goes through staging and the go.
+  **Every commit is made on `staging`** (2026-10-02). `.branch-guard` says
+  `work=staging, promote=main`, and the pre-commit hook it generates refuses a
+  commit on any other branch. Every product change goes: commit on `staging` →
+  push `staging` → the owner's on-device pass → the owner's explicit go →
+  `main` moved to that same commit by a fast-forward push,
+  `git push origin staging:main`. Never move a product change to main without
+  that go.
+- **Only `staging` and `main` reach the remote** (hub Doctrine §11; the hub's
+  push gate refuses any other destination). The harness may name a `claude/*`
+  branch for the session; it does not apply here, and no work branch of that
+  kind is created or pushed. Until 2026-10-02 the flow was a session branch
+  pushed to `staging` and merged to `main` by pull request, and every one of
+  those branches stayed on the remote. The hub's branch-sweep workflow
+  (`.github/workflows/branch-sweep.yml`) removes such a branch once merging it
+  into `main` changes nothing.
+- **No pull request, ever (owner, 2026-09-29).** The pull request tool appends
+  a link to the chat, and an edit removes it only from the current text: the
+  first revision stays in the edit history, which only the owner can delete
+  (hub LESSONS 373). The hub's push gate refuses the connector's merge tools.
+- **Docs-only commits may reach main without the go**, by the same
+  fast-forward, when `staging` holds nothing else `main` lacks: check that main
+  is an ancestor of `staging` and that nothing outside docs differs,
+  `git push origin staging:main`, then read the remote's main head, the Gates
+  and deploy runs for that SHA, and the live offline copy. Otherwise they ride
+  to main with the next promotion.
 - Push to `staging` UNPROMPTED whenever work reaches a point the owner needs
-  to test AND no other branch is already waiting for a go to `main` — being
-  asked for it is the signal this rule was broken (owner rule, 2026-07-13). Staging
-  may be force-pushed: its history is disposable, but check first that every
-  staging-only commit is already contained in `main` — BY CONTENT (a diff of the
-  shipped paths between the two), never by `git cherry`, which answers by patch
-  identity and so reads every rebase-merged commit as missing (hub LESSONS §352).
-- Parallel sessions happen. Before pushing anywhere, fetch and check what
-  `main` and `staging` actually contain — a roadmap item may have shipped
-  from another session mid-work (it happened 2026-07-13: two sessions built
-  the same icon probe; one had already merged the full picker).
-- Merge PRs with **rebase** — main's history is linear, and the in-app patch
-  notes are the last 5 commits; a merge commit would show up in them.
-- A branch whose PR merged must be restarted from `origin/main` (same name).
+  to test — being asked for it is the signal this rule was broken (owner rule,
+  2026-07-13). `staging` is the work branch now, so its history is not
+  disposable: a push to it is a fast-forward. Before any push that would drop a
+  commit from `staging`, check that the commit is already contained in what
+  replaces it — BY CONTENT (a diff of the shipped paths between the two), never
+  by `git cherry`, which answers by patch identity and so reads every
+  rebase-merged commit as missing (hub LESSONS §352).
+- Parallel sessions happen, and they all commit on `staging` now. Before
+  pushing anywhere, fetch and check what `main` and `staging` actually contain,
+  and put local work on top of `origin/staging` — a roadmap item may have
+  shipped from another session mid-work (it happened 2026-07-13: two sessions
+  built the same icon probe; one had already merged the full picker).
+- main's history is linear: it only ever fast-forwards to `staging`, and the
+  in-app patch notes are the last 5 commits; a merge commit would show up in
+  them.
 - The `public/sw.js` CACHE name stamps itself at build time from the app
   version (vite.config.ts precache plugin) — every deploy is a commit, so
   every deploy refreshes the cache automatically. NEVER hand-number it, never

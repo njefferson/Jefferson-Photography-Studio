@@ -1,15 +1,17 @@
-# WHERE WORK COMMITS IN THIS REPO, and it is a family rather than one name:
-# every session is given its own `claude/*` branch, so no single branch name
-# could be written here. That is why this file did not exist until now — and
-# its absence failed the shared gates workflow at step one, which meant every
-# gate after it never ran on a runner at all.
+# WHERE WORK COMMITS IN THIS REPO: `staging`, and nowhere else.
 #
-# The flow this states: commit on the session branch, push that same history to
-# `staging` for the on-device pass, merge to `main` by pull request. Nothing
-# commits on `staging` (it is pushed to), and `main` is reached by a rebase
-# merge on GitHub, which no local hook sees — JPS_PROMOTE is the door for the
-# rare local commit there, said out loud.
-work=claude/*
+# The flow this states: commit on `staging`, push it for the on-device pass,
+# and after the owner's go move `main` to the same commit by a fast-forward
+# push. Only `staging` and `main` reach the remote, in every repo of the family
+# (hub Doctrine §11). A session's own `claude/*` branch is never pushed; the
+# hub's branch-sweep workflow removes the ones a session left once `main`
+# carries their work.
+#
+# Until 2026-10-02 this said `work=claude/*`: every session was given its own
+# branch, and that history was pushed to `staging` and merged to `main` by pull
+# request, and every session's branch stayed on the remote afterwards.
+# JPS_PROMOTE is the door for the rare local commit on `main`, said out loud.
+work=staging
 promote=main
 escape=JPS_PROMOTE
 
