@@ -98,8 +98,17 @@ const RAW = EX + "NIR_0063.dng";
 // 0.46 that a stepTo which had not actually moved yet looked like agreement.
 const PAIR = [EX + "NIR_0063.dng", EX + "NIR_0627.dng"];
 
-// The approved arm, exactly as it was driven on the sheets.
-const MATRIX = [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65];
+// The approved arm, exactly as it was driven on the sheets, RE-FITTED
+// 2026-10-02 to the colour and contrast fixes (see LOOKS.eir): the solved
+// matrix times 0.8, snapped to 0.01, so its shape is the approved one and only
+// its level moved. The re-fit also gave the look a hue, a contrast and a
+// Foliage band hue and luminance that differ from Pink IR's, which the recipe
+// arm now writes as well, because Pink IR's own numbers moved in the same
+// re-fit and pressing it no longer leaves them where Aerochrome wants them.
+const MATRIX = [0.79, -0.05, 0.06, -1.15, 1.10, 0.82, -0.38, 0.65, 0.52];
+const HUE = 4;
+const CONTRAST = 1.28;
+const FOL_HUE = -2, FOL_LUM = 1.05;
 // The denoise floor and the local contrast that gives back what the floor
 // costs. Two halves of one decision, so they are read as a pair: 0.80 flattened
 // the canopy (texture 30.78 against 40.15 with the denoiser off) and 0.45 with
@@ -161,9 +170,10 @@ const HUE_LIMIT = 60, SAT_RANGE = [0, 2], LUM_RANGE = [0.3, 1.7];
 // Nothing without colour gains any. The amounts were chosen from rendered
 // sheets (IR-SCIENCE 4b-vi). Sliders: Saturation 0..3, Foliage band 0..2,
 // Sky saturation 0..2.
+// Re-fitted 2026-10-02: the foliage band 1.6 to 1.96, the sky 1.8 to 2.
 const GLOBAL_SAT = 1.0;
-const FOL_SAT = 1.6;
-const SKY_SAT = 1.8;
+const FOL_SAT = 1.96;
+const SKY_SAT = 2;
 const GLOBAL_SAT_RANGE = [0, 3], BAND_SAT_RANGE = [0, 2];
 // 10d: the sky's saturation on RAW after the Look press, mean HSV saturation of
 // the same population 10b measures the angle of, READ WITH RESTORE DEPTH OFF.
@@ -397,6 +407,13 @@ try {
     await setSlider(p, "sat", GLOBAL_SAT);
     await setSlider(p, "folSat", FOL_SAT);
     await setSlider(p, "skySatSel", SKY_SAT);
+    // AND WHAT THE 2026-10-02 RE-FIT MOVED APART FROM PINK IR, through the
+    // reader's own sliders: the hue, the contrast, and the Foliage band's hue
+    // and luminance.
+    await setSlider(p, "hue", HUE);
+    await setSlider(p, "con", CONTRAST);
+    await setSlider(p, "folHue", FOL_HUE);
+    await setSlider(p, "folLum", FOL_LUM);
     await setDn(p, Math.max(measured, FLOOR));
     const h = await hash(p);
     await ctx.close();

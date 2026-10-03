@@ -1887,9 +1887,27 @@ const LOOKS: Record<string, Look> = {
   // raw side carries nothing. Shifts are Blue -45, Purple +20, Magenta +60 at
   // HSL_CENTERS [240, 280, 320], the medians from refining against the target
   // on the real renderer frame by frame.
-  aero: { swapRB: true, toggleSwap: true, hue: 0, raw: { sat: 3.0, contrast: 1.15 },
-          jpeg: { sat: 1.35, contrast: 1.12,
-                  hsl: [0,1,1, 0,1,1, 0,1,1, 0,1,1, 0,1,1, -45,1,1, 20,1,1, 60,1,1] } },
+  //
+  // RE-FITTED 2026-10-02, AND THE TWO PARAGRAPHS ABOVE ARE NOW HISTORY. The
+  // camera matrix built as dcraw builds it, Adobe's Z 50 matrix, and Contrast
+  // about mid grey with a shoulder into white changed how every look renders,
+  // so each look's numbers were fitted back toward its render of the build
+  // before them (v2.64.56), scored as mean CIEDE2000 on six of the owner's
+  // raws and one camera JPEG. Here the raws took a look-level hue of -21
+  // (that alone took the six-raw mean from 9.51 to 6.42; 5.65 with Contrast
+  // 1.0), so the raw side no longer carries nothing. At that hue the shipped
+  // JPEG bands pushed the camera JPEG's foliage and sky onto one hue (a gamut
+  // clip, scored 46.65), so the JPEG side was fitted again: Saturation 0.49,
+  // Contrast 0.9, Aqua -59 at saturation 2 and luminance 0.94, Blue +60 at
+  // 1.13 and 1.13, Purple and Magenta as before (18.56 to 8.44, on 12% of one
+  // frame). Aqua's hue and saturation and Blue's hue sit at their sliders'
+  // limits. What it cannot match: the shade of NIR_1688 and NIR_2920 stays
+  // about 10 L lighter than before, because Restore depth's tone pull is near
+  // zero on those two frames and this look's Contrast pivots at 18% grey. If
+  // the hue ever moves back toward 0, the JPEG numbers need fitting with it.
+  aero: { swapRB: true, toggleSwap: true, hue: -21, raw: { sat: 3.0, contrast: 1.0 },
+          jpeg: { sat: 0.49, contrast: 0.9,
+                  hsl: [0,1,1, 0,1,1, 0,1,1, 0,1,1, -59,2,0.94, 60,1.13,1.13, 20,1,1, 60,1,1] } },
   // AEROCHROME, AS IT WAS CHOSEN OFF RENDERED SHEETS RATHER THAN ARGUED FOR.
   //
   // The film's three layers were sensitive to GREEN, RED and INFRARED, with a
@@ -2001,8 +2019,25 @@ const LOOKS: Record<string, Look> = {
   // lands 1-4deg wide. That range is not in the data to recover -- it is the
   // same 1-3% residual section 4c-iv is about -- so this moves the population,
   // it does not enrich it.
-  eir: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 1.8, finish: EIR_FINISH,
-         mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
+  //
+  // RE-FITTED 2026-10-02 to the colour and contrast fixes (see aero above):
+  // the mixer is the solved matrix times 0.8, snapped to 0.01, so its shape and
+  // the mapping above are unchanged and only its level moves, standing in for
+  // the exposure this look does not have against white-balance gains now
+  // scaled so the smallest is 1. With it: hue 4, Sky saturation 2, Contrast
+  // 1.28, the Foliage band at -2, 1.96, 1.05, and the camera JPEG at 1.49 and
+  // 0.96. Six-raw mean 6.82 to 4.92, camera JPEG 5.98 to 2.99.
+  // THE FIT ALSO MOVED FOUR OF THE EIGHT BANDS' SATURATION AND LUMINANCE, and
+  // those moves are NOT here: band 3 at saturation 2 carries most of the sky
+  // in this mapping, which is the sky's amount on a hue band, the option
+  // decision 019 rejected ("a hue band is not a place") when it put the chips
+  // back to 1. With them the six-raw mean is 3.47; without, 4.92. Whether to
+  // cross 019 for that is the owner's call. What it cannot match either way:
+  // a dark blue sky does not get back the old render's deep cerulean, and dark
+  // foliage is short of colour, because the old Contrast added chroma in
+  // proportion to darkness and the new one, on luminance, adds none.
+  eir: { swapRB: true, hue: 4, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 2, finish: EIR_FINISH,
+         mix3: [0.79, -0.05, 0.06, -1.15, 1.10, 0.82, -0.38, 0.65, 0.52],
          // THE COLOUR GOES WHERE THE COLOUR IS, and to what is a PORTION of the
          // photograph. Global saturation 1: the 3.0 that used to be here coloured
          // everything — bare ground, grey walls, an overcast sky — with the
@@ -2014,27 +2049,56 @@ const LOOKS: Record<string, Look> = {
          // built at open, gated the same way, because the sky is a place in the
          // picture and not a hue. Numbers from the 2026-09-18 population
          // measurement (IR-SCIENCE.md 4b-vi), chosen from pictures.
-         raw: { sat: 1.0, contrast: 1.15, foliage: [0, 1.6, 1],
+         raw: { sat: 1.0, contrast: 1.28, foliage: [-2, 1.96, 1.05],
                 hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
-         jpeg: { sat: 1.35, contrast: 1.12 } },
+         jpeg: { sat: 1.49, contrast: 0.96 } },
   // BOLD PINK (decision 078): Aerochrome stopped before its colour mix turns
   // the foliage red and, with the two sky stages, the sky blue -- the picture at
-  // the tone-curve step of 069's trace. Aerochrome's numbers of 2026-09-29
+  // the tone-curve step of 069's trace. Aerochrome's numbers of 2026-09-29 were
   // COPIED, not referenced: 066 replaces how Aerochrome renders, and a look
   // chosen for how it looks must not move under the reader when that lands.
   // No `hsl` (applyLook resets the mixer to neutral), both sky stages at 0,
   // Restore depth's sky top-up off, no finishing panel (its steps give the
   // film's references, which this look does not claim).
+  // RE-FITTED 2026-10-02 to the colour and contrast fixes (see aero above), on
+  // its own and toward its own picture, so the mixer below is no longer
+  // Aerochrome's: six-raw mean 6.79 to 3.79, camera JPEG 6.65 to 5.12. Hue,
+  // Saturation and the sky stages stay as they were. What it cannot match:
+  // shaded foliage and trunks on NIR_1688 and NIR_2920 come out plum where
+  // they were deep crimson, because the old per-channel Contrast drove blue
+  // toward 0 in the darks and the new one keeps one hue at every lightness.
   boldPink: { swapRB: true, hue: 0, denoise: 0.45, texture: 0.25, skySmooth: 0, skyDepth: 0, skySat: 0, liftSky: false,
-              mix3: [0.99, -0.06, 0.07, -1.44, 1.37, 1.02, -0.47, 0.81, 0.65],
-              raw: { sat: 1.0, contrast: 1.15, foliage: [0, 1.6, 1] },
-              jpeg: { sat: 1.35, contrast: 1.12 } },
-  red: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.02, 1.35], raw: { sat: 1.8, contrast: 1.4 }, jpeg: { sat: 1.3, contrast: 1.2 } },
-  goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.78, 1.22, 1.4], raw: { sat: 1.7, contrast: 1.35 }, jpeg: { sat: 1.2, contrast: 1.2 } },
-  natural: { swapRB: false, toggleSwap: true, hue: 0, raw: { sat: 1.2, contrast: 1.15 }, jpeg: { sat: 1.1, contrast: 1.15 } },
-  mono: { swapRB: false, hue: 0, raw: { sat: 0, contrast: 1.5 }, jpeg: { sat: 0, contrast: 1.5 } },
-  sepia: { swapRB: false, hue: 0, tint: [1.12, 1.0, 0.78], raw: { sat: 0, contrast: 1.35 }, jpeg: { sat: 0, contrast: 1.35 } },
-  hie: { swapRB: false, hue: 0, glow: 0.6, raw: { sat: 0, contrast: 1.45 }, jpeg: { sat: 0, contrast: 1.45 } },
+              mix3: [1.56, -0.46, -0.25, -1.26, 1.22, 0.84, 0.05, 0.52, 0.29],
+              raw: { sat: 1.0, contrast: 1.24, foliage: [10, 1.74, 0.99] },
+              jpeg: { sat: 0.82, contrast: 1.04 } },
+  // THE FIVE BELOW WERE RE-FITTED 2026-10-02 the same way (see aero above).
+  // What each still cannot match, measured on the fit's renders:
+  // - Red is coral where it was crimson, its darks brown-grey where they were
+  //   maroon, and its highlights salmon where they were pale pink: the old
+  //   Contrast pushed green and blue to 0 in the darks and clipped red in the
+  //   lights, and the new one keeps each pixel's hue. Contrast is at its
+  //   slider's top; Saturation is 2.89 of 3. The raws want hue -15 and the
+  //   camera JPEG about 0, and the raws set it.
+  // - Goldie's shadowed foliage and trunks render gold where they went
+  //   orange-red, for the same reason; raw Saturation is 2.88 of 3.
+  // - Natural keeps hue 0 and its old camera-JPEG numbers: its raws were fitted
+  //   at hue 18, which a camera JPEG has no matrix to want, and which took the
+  //   JPEG from 8.40 to 27.12 with these numbers. Its raw numbers alone, at hue
+  //   0, take the six-raw mean from 7.90 to 6.90. Its skies stay amber where
+  //   they were chartreuse until the hue can be set per kind.
+  // - Mono and Hie lose their dark half: the old Contrast set a black point and
+  //   darkened every tone under linear 0.5, and the new one only brightens
+  //   above 18% grey, with no darkening field in either look. Fitted, both are
+  //   flatter and lighter than before; black skies are mid grey.
+  // - Sepia's tint now does exposure work as well (its luma is 0.65): the old
+  //   colour was strongest in the dark mid-tones, and this one grows with
+  //   brightness.
+  red: { swapRB: true, toggleSwap: true, hue: -15, wbBias: [0.48, 0.64, 0.89], raw: { sat: 2.89, contrast: 2 }, jpeg: { sat: 2.84, contrast: 2 } },
+  goldie: { swapRB: true, toggleSwap: true, hue: 0, wbBias: [0.48, 0.78, 0.86], raw: { sat: 2.88, contrast: 1.72 }, jpeg: { sat: 2.34, contrast: 2 } },
+  natural: { swapRB: false, toggleSwap: true, hue: 0, raw: { sat: 1.55, contrast: 1.01 }, jpeg: { sat: 1.1, contrast: 1.15 } },
+  mono: { swapRB: false, hue: 0, raw: { sat: 0, contrast: 1.0 }, jpeg: { sat: 0, contrast: 0.86 } },
+  sepia: { swapRB: false, hue: 0, tint: [0.7515, 0.6416, 0.4355], raw: { sat: 0, contrast: 1.74 }, jpeg: { sat: 0, contrast: 1.24 } },
+  hie: { swapRB: false, hue: 0, glow: 0.21, raw: { sat: 0, contrast: 1.10 }, jpeg: { sat: 0, contrast: 0.92 } },
 };
 
 // The bias currently baked into params.wb, so switching looks replaces the
