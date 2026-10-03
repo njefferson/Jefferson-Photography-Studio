@@ -37,9 +37,18 @@ import { requireFreshDist } from "./fresh-dist.mjs";
 requireFreshDist();
 const PORT=(process.argv.find(a=>a.startsWith("--port="))||"--port=8131").split("=")[1];
 const BASE=`http://127.0.0.1:${PORT}`;
-const D="/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/real";
 const EX="/home/user/Jefferson-Photography-Studio/public/examples";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { resolve as ownerImage } from "./owner-images.mjs";
+// THE CAMERA JPEGS ARE THE OWNER'S, TAKEN BY NAME through tools/owner-images.mjs
+// (hub LESSONS 369). They used to be read from an earlier session's scratchpad,
+// and a filter dropped every set whose files were missing — so once that
+// scratchpad was gone, the camera-JPEG and mixed sets were skipped without a
+// word and the walk passed on the raw set alone, which cannot show this defect.
+// A frame that cannot be fetched now stops the walk instead.
+let J1, J2;
+try { J1 = await ownerImage("NIR_2821.JPG"); J2 = await ownerImage("NIR_2813.JPG"); }
+catch (e) { console.log(`\ncould not fetch the owner's camera JPEGs (${e.message}) — the camera-JPEG and mixed sets are the ones this walk exists for\n`); process.exit(2); }
 // TWO FILES, because a lone photo has no strip and the walk then compares
 // against nothing and passes. The first run of this did exactly that.
 // THE MIXED SET IS THE ONE THAT EXERCISES THE INHERITED SWAP, and it is the
@@ -48,9 +57,9 @@ import { existsSync, readFileSync } from "node:fs";
 // the open photograph is itself unswapped, so the tile inherits the right answer
 // by accident and the walk passes against the defect. Measured on a plant of the
 // old code: two JPEGs 14deg apart, the mixed set far more.
-const SET=[[[`${D}/NIR_2821.JPG`,`${D}/NIR_2813.JPG`],"camera JPEG"],
-           [[`${EX}/NIR_0063.dng`,`${D}/NIR_2821.JPG`],"mixed"],
-           [[`${EX}/NIR_0063.dng`,`${EX}/NIR_0102.dng`],"raw"]].filter(([fs])=>fs.every(existsSync));
+const SET=[[[J1,J2],"camera JPEG"],
+           [[`${EX}/NIR_0063.dng`,J1],"mixed"],
+           [[`${EX}/NIR_0063.dng`,`${EX}/NIR_0102.dng`],"raw"]];
 const hue=a=>{const[r,g,b]=a;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);if(mx-mn<1e-6)return null;
   let h;if(mx===r)h=((g-b)/(mx-mn))%6;else if(mx===g)h=(b-r)/(mx-mn)+2;else h=(r-g)/(mx-mn)+4;
   return ((h*60)%360+360)%360;};

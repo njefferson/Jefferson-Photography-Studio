@@ -62,18 +62,27 @@ import { requireFreshDist } from "./fresh-dist.mjs";
 requireFreshDist();
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const BASE = `http://127.0.0.1:${PORT}`;
-const D = "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/real";
 const EX = "/home/user/Jefferson-Photography-Studio/public/examples";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { resolve as ownerImage } from "./owner-images.mjs";
+// THE CAMERA JPEGS ARE THE OWNER'S, TAKEN BY NAME through tools/owner-images.mjs
+// (hub LESSONS 369). They used to be read from an earlier session's scratchpad,
+// and a filter dropped every set whose files were missing — so once that
+// scratchpad was gone, the camera-JPEG set was skipped without a word and only
+// the raw set was ever compared. A frame that cannot be fetched now stops the
+// walk instead.
+let J1, J2;
+try { J1 = await ownerImage("NIR_2821.JPG"); J2 = await ownerImage("NIR_2813.JPG"); }
+catch (e) { console.log(`\ncould not fetch the owner's camera JPEGs (${e.message}) — the camera-JPEG set cannot be compared without them\n`); process.exit(2); }
 // The frame arm 4 aims a mask on: a conifer against a deep teal sky, which is
 // the one decision 030's own render was opened on, so a reader comparing the
 // two is looking at the same picture.
 const AIM_FILE = `${EX}/NIR_1651.dng`;
 
 const SETS = [
-  [[`${D}/NIR_2821.JPG`, `${D}/NIR_2813.JPG`], "camera JPEG"],
+  [[J1, J2], "camera JPEG"],
   [[`${EX}/NIR_0063.dng`, `${EX}/NIR_0102.dng`], "raw"],
-].filter(([fs]) => fs.every(existsSync));
+];
 
 let bad = 0;
 const fail = (s) => { bad++; console.log(`FAIL  ${s}`); };
