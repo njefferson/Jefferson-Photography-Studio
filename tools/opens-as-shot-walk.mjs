@@ -147,7 +147,23 @@ try{
     });
     if(!tile){ fail(`${label}: no second tile to read — the walk cannot see its own case`); continue; }
     await page.evaluate(()=>document.querySelectorAll("#sessionThumbs img")[1].closest("button,[role=button],li,div").click());
-    await page.waitForTimeout(2500);
+    // WAITED ON THE SWITCH, NOT A CLOCK. This was a 2500 ms sleep, and with the
+    // owner's 7 MB camera JPEG as the second file the canvas was read before
+    // the switch had landed: the mixed set read "opens to 15", the RAW's own
+    // open hue, and failed on the first photograph rather than the second.
+    // Now: the second tile is the active one, nothing is busy, and two reads of
+    // the canvas 300 ms apart agree.
+    const switched=await page.waitForFunction(()=>document.querySelectorAll("#sessionThumbs .session-thumb")[1]?.classList.contains("active")
+      && !document.getElementById("busy")?.hasAttribute("open"),null,{timeout:120000,polling:250}).then(()=>true).catch(()=>false);
+    if(!switched){ fail(`${label}: the second photograph never became the open one — nothing below would be about it`); continue; }
+    let prev="";
+    for(let i=0;i<40;i++){
+      const h=await page.evaluate(()=>{const c=document.querySelector("#view");const g=c.getContext("webgl2")||c.getContext("webgl");
+        const b=new Uint8Array(c.width*c.height*4);g.readPixels(0,0,c.width,c.height,g.RGBA,g.UNSIGNED_BYTE,b);
+        let x=2166136261;for(let k=0;k<b.length;k+=4*9){x^=b[k];x=Math.imul(x,16777619);x^=b[k+2];x=Math.imul(x,16777619);}return `${c.width}x${c.height}:${x>>>0}`;});
+      if(h===prev) break;
+      prev=h; await page.waitForTimeout(300);
+    }
     const after=await page.evaluate(()=>{
       const c=document.querySelector("#view");
       const g=c.getContext("webgl2")||c.getContext("webgl");

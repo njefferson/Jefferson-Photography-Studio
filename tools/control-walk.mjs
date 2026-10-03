@@ -390,6 +390,28 @@ try {
     }
     await page.close();
   }
+  // AND THE WAY BACK TO THE WHOLE PHOTOGRAPH (053), which exists only on a
+  // phone-sized screen where the strip of photos leaves the photograph no
+  // room. #viewEscape is `hidden` in every state the 900px sweep above reaches,
+  // so 2.65 added it and the coverage check below refused it, correctly. The
+  // state is the one tools/stage-share-walk.mjs measures: two practice frames
+  // open at 302x656, an iPhone at 1.33x page zoom. Waited on by the button
+  // itself, bounded, and said out loud when it does not come.
+  {
+    const ctx = await br.newContext({ viewport: { width: 302, height: 656 }, hasTouch: true, serviceWorkers: "block" });
+    const page = await ctx.newPage();
+    page.on("dialog", (d) => d.accept());
+    await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+    await page.setInputFiles("#file", [OPEN_WITH, "NIR_0102.dng"].map((f) => join(repo, "dist", "examples", f))).catch(() => {});
+    const up = await page.waitForFunction(() => !document.getElementById("viewEscape")?.hidden, null, { timeout: 180000 })
+      .then(() => true).catch(() => false);
+    if (!up) console.log("  (ir.html: Show the whole photo never appeared at 302x656 with two photographs open, so it stays unreached in this run)");
+    else {
+      rows.push(...(await controlsOn(page, "ir.html · a phone, the strip leaving the photograph no room")));
+      ctlRows.push(...(await explainedOn(page, "ir.html · a phone, the strip leaving the photograph no room")));
+    }
+    await ctx.close();
+  }
 } finally { await br.close(); }
 
 // ONE ROW PER CONTROL, and the dedup key is the CONTROL rather than the place

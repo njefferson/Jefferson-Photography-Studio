@@ -368,6 +368,16 @@ try {
   //
   //    Pressed by ID. A label is product copy and moves; `Aerochrome` named a
   //    different button the day a second look shipped under that name.
+  //
+  //    LOOK_WAIT bounds every wait after the look is pressed, and it is not
+  //    the thing under test. With the owner's camera JPEGs in software GL (the
+  //    first run that had them, 2026-10-03), the second tile took 230 s to
+  //    re-render under Aerochrome and opening it held the page's main thread
+  //    for about 360 s, past the 300 s these waits had, so the arm died on a
+  //    timeout before it compared anything. Where that time goes is not
+  //    measured here (the editor's 56.5 s shader build is the open suspect, and
+  //    its own item); this arm is about agreement, not speed.
+  const LOOK_WAIT = 900000;
   for (const [files, label] of SETS) {
     if (files.length < 2) { console.log(`  ${label.padEnd(12)} tile arm skipped — needs two files`); continue; }
     const page = await br.newPage({ viewport: { width: 1000, height: 820 } });
@@ -392,7 +402,7 @@ try {
         const im = document.querySelectorAll("#sessionThumbs .session-thumb img")[1];
         const src = im?.getAttribute("src") || "";
         return src.startsWith("blob:") && src !== prev;
-      }, was, { timeout: 300000 });
+      }, was, { timeout: LOOK_WAIT });
       await page.waitForTimeout(1200);
 
       // A TILE SHOWS THE CAMERA'S OWN PREVIEW UNTIL THIS APP HAS RENDERED ITS
@@ -409,7 +419,7 @@ try {
             return !!el && !el.className.includes("provisional");
           },
           null,
-          { timeout: 300000 },
+          { timeout: LOOK_WAIT },
         )
         .then(() => true)
         .catch(() => false);
@@ -443,8 +453,8 @@ try {
 
       // NOW OPEN THE PHOTOGRAPH THE TILE WAS CLAIMING ABOUT.
       await page.evaluate(() => document.querySelectorAll("#sessionThumbs .session-thumb")[1].click());
-      await page.waitForFunction(() => document.querySelectorAll("#sessionThumbs .session-thumb")[1]?.classList.contains("active"), null, { timeout: 300000 });
-      await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+      await page.waitForFunction(() => document.querySelectorAll("#sessionThumbs .session-thumb")[1]?.classList.contains("active"), null, { timeout: LOOK_WAIT });
+      await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: LOOK_WAIT });
       await page.waitForTimeout(2500);
       const openName = await page.evaluate(
         () => document.querySelector(".session-thumb.active")?.getAttribute("title") || "",
