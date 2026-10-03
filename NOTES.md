@@ -140,7 +140,17 @@ release on, and `main` is reached by a fast-forward to it.
   and src/gl.ts (2), and `.third-person-allow` declares that citation for other
   files but not these three. The remedy is three declarations there, with the
   reason src/skyfine.ts's already gives. Not made in this run: that file is
-  outside the approved plan's list of files.
+  outside the approved plan's list of files. The steps after it in that job,
+  from the examples gate to the workflow audit, did not run.
+- **Found in the comparison pictures, and not fixed.** Aerochrome on the camera
+  JPEG NIR_1597.JPG shows a soft dark blue blob in the sky left of centre. The
+  v2.64.56 render of the same frame has none, and neither does this build's
+  B&W IR of it. Not diagnosed. The pictures' second control also failed in a
+  way that does not touch them: setting Natural IR's Hue shift to its own 0
+  moved six of seven frames by at most 2 levels in 255 (mean under 0.42),
+  against 75 to 127 levels for the Hue 18 candidate. The cause is not
+  measured; the suspect is a slider press rounding the lift's full-precision
+  values to their sliders' steps. NIR_2920 did not move at all.
 
 **v2.64.56 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-10-02 (fab0ec7).** Production's code (v2.64.46) plus eight fixes from
