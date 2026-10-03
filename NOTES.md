@@ -54,6 +54,85 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**v2.65.3 at https://staging.jefferson-photo-studio.pages.dev, pushed
+2026-10-03 (b769ccf).** Everything in v2.64.56 below, plus the three colour
+changes that entry held back, the built-in looks re-fitted to them, the second
+fix pass and the test page's fresh contexts. Work commits on `staging` from this
+release on, and `main` is reached by a fast-forward to it.
+- **Colour and tone.** Raw colour is converted the way dcraw and LibRaw convert
+  it, with Adobe's matrix for the Z 50. Contrast keeps shadows and mid grey in
+  place and rolls highlights into white; a strong curve or Luminance no longer
+  shifts colour; blown raw highlights come out clean white and auto white
+  balance ignores them; noise reduction measures grain the way the sensor makes
+  it; Dehaze clears the haze's colour too and no longer crushes shadows inside
+  bright foliage.
+- **The looks are re-fitted to that colour and come out close to before.** Red
+  is coral rather than crimson, and B&W IR and HIE B&W are lighter in the
+  shadows. The looks whose fit cannot reach the earlier render are shown side by
+  side with the build before them, with the two open look questions: one Hue
+  shift per file kind for Natural IR, and Aerochrome's colour-mixer band moves,
+  which decision 019 rejects and the build ships without.
+- **Files.** Lossy-compressed raws from the Z 5, Z 6, Z 7, Z 6II, Z 7II, D780 and
+  D6 decode with their real tones; DNGs with masked borders or a default crop
+  open without dark edges; a .dcp profile turns the colours the app turns, in
+  Lightroom too; a camera JPEG no longer gets a lens profile's colour
+  correction; a look sent as a file opens on an iPad.
+- **The screen matches the saved file** for a straightened photograph's edges
+  and its denoised edges, for healed spots on very bright or dark patches, for
+  the preview's sharpening on a lossy DNG or a very large photo, for a blown sky
+  in a reshaped area, and for Sky colour smoothing after a reshape, Dehaze or
+  Clarity. Adding a healed spot no longer redoes every earlier one.
+- **New: an oval mask turns to any angle.** Fit always works, and on a small
+  phone, when the strip of photos leaves the photograph no room, Show the whole
+  photo appears and says the photo is hidden.
+- **The test page builds every variant of the picture code in its own fresh
+  graphics context**, so one that loses its context no longer stops the rest
+  being timed.
+- **Checked headless.** Every commit gate on each commit. All 51 walks, run in
+  parts under the two-hour limit on builds of this release whose app code is
+  identical (the last three commits change only walks): 49 pass. The ten never
+  reached by the first sweep all pass. The axe walks pass with axe-core read
+  from a scratch copy; conversion and keep pass on the shared NIR_1376.NEF and
+  NIR_1737.NEF; offline-shell passes on its own port against a clean rebuild.
+- **Six walks were wrong, and are fixed in the three walk commits.**
+  opens-as-shot and agreement read their camera JPEGs from a scratchpad that no
+  longer exists and dropped those sets without a word; they take NIR_2821.JPG
+  and NIR_2813.JPG by name now, and both pass with them. opens-as-shot then
+  read the mixed set before the second photograph had opened (a 2.5 s sleep);
+  it waits for the switch now and reads 343 against 343. fullview-mask counted
+  the overlay's blue, which the re-fitted sky now carries (44.2% "tinted" in
+  full view with no overlay on screen); it compares with the bare photograph
+  now, 99.6% with the overlay and 0.0% in full view, and its plant goes red.
+  aerochrome's check 8 took matching hashes as the lift's re-solve having
+  stopped; it also reads the lift's own words under the look now. agreement's
+  look-tile arm timed out in software GL (below) and waits up to 15 minutes
+  after the look. The control sweep now reaches Show the whole photo at 302x656.
+- **Two walks stay red, and neither is this release.** bar-fit fails its four
+  checks, as it says it will until decision 060's first product change. The
+  control sweep has 61 to answer for: 56 controls declared in the markup and
+  never reached, every one of them in production's markup too (this release
+  adds three ids and all three are reached), and five on the session strip,
+  which the sweep reaches for the first time. Pick, Reject and Done carry their
+  keyboard key and "free its storage" only in a tooltip; a tile showing its
+  picture carries its file name only in its tooltip, and the sweep calls that
+  tile nameless because it does not read the picture's alt text, which is the
+  tile's accessible name.
+- **fix-brush failed once in the first sweep and passed alone.** That sweep was
+  stopped at two hours before it printed failure details, so which check failed
+  is not known.
+- **Found, and not fixed.** Restore depth has nothing to do under Aerochrome:
+  the re-fit put its Sky saturation at 2, the slider's ceiling, and its Foliage
+  band at 1.96 of 2. On NIR_0063, NIR_0627, NIR_0102, NIR_1651, NIR_1688 and
+  NIR_1811 the lift re-solved, found nothing to top up, and said so in words.
+  In software GL, NIR_2813.JPG's tile took 230 s to re-render under Aerochrome
+  and opening it held the page for about 360 s; where that time goes is not
+  measured, and the editor's 56.5 s shader build is the open suspect.
+- **The device pass it needs:** on the iPad, open a Z 50 raw with a bright sky
+  and a camera JPEG, try Aerochrome, Red and B&W IR on each, turn an oval mask,
+  and export one JPEG; on a phone, open two photos and press Show the whole
+  photo if it appears. On the PC in Firefox, the test page's "What makes the
+  picture code slow to build" and "Copy the results".
+
 **v2.64.56 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-10-02 (fab0ec7).** Production's code (v2.64.46) plus eight fixes from
 the audit of 2026-10-01 that leave every look as it was at open. Three more
