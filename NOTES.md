@@ -132,6 +132,15 @@ release on, and `main` is reached by a fast-forward to it.
   and export one JPEG; on a phone, open two photos and press Show the whole
   photo if it appears. On the PC in Firefox, the test page's "What makes the
   picture code slow to build" and "Copy the results".
+- **Deployed, and Gates is red.** Pushed as 123b292..8c438b4, with the note
+  above on top. Deploy run 975 for 8c438b4 passed, and staging's offline worker
+  reads `ips-2.65.4` naming 8c438b4 (the count includes the note). Gates run
+  1056 failed at its third-person step: d86fdae's Dehaze cites He, Sun and
+  Tang's dark-channel paper in src/localmap.ts (15 lines), src/pipeline.ts (3)
+  and src/gl.ts (2), and `.third-person-allow` declares that citation for other
+  files but not these three. The remedy is three declarations there, with the
+  reason src/skyfine.ts's already gives. Not made in this run: that file is
+  outside the approved plan's list of files.
 
 **v2.64.56 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-10-02 (fab0ec7).** Production's code (v2.64.46) plus eight fixes from
