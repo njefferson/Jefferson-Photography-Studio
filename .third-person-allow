@@ -31,3 +31,10 @@ src/skyfine.ts | cited author's surname, He, Sun and Tang 2010 (guided filter) |
 IR-SCIENCE.md | cited author's surname, He, Sun and Tang 2010 (guided filter) | He
 docs/decisions/017-aerochrome-sky-depth-against-the-film.md | cited author's surname, He, Sun and Tang 2010 (guided filter) | He
 docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md | cited author's surname, He, Sun and Tang 2010 (guided filter) | He
+
+# Kaiming He, first author of Single Image Haze Removal Using Dark Channel
+# Prior (CVPR 2009 / TPAMI 2011), which Dehaze is built on, with the guided
+# filter's authors for the refinement. Citations, not a person in this project.
+src/localmap.ts | cited author's surname, He, Sun and Tang (dark-channel dehaze) | He
+src/pipeline.ts | cited author's surname, He, Sun and Tang (dark-channel dehaze) | He
+src/gl.ts | cited author's surname, He, Sun and Tang (dark-channel dehaze) | He

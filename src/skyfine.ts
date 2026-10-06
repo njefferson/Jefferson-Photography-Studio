@@ -268,8 +268,18 @@ export interface SkySource {
   /** 1 where the cell's source block holds a sensor-clipped pixel (decode.ts
    *  pinTest, read before the lens flat), 0 elsewhere; w*h. The gray-world
    *  balance the selection is built at leaves those cells out, as LibRaw's
-   *  auto white balance drops any block holding a clipped photosite. Absent on
-   *  a copy taken before this existed, which then counts every cell. */
+   *  auto white balance drops any block holding a clipped photosite.
+   *
+   *  ABSENT FOR AN 8-BIT SOURCE, which then counts every cell, and that is
+   *  deliberate rather than a gap: a pin is a fact about a SENSOR, and a camera
+   *  JPEG's 255 is the camera's own rendering of a bright area, not a recording
+   *  that stopped. Leaving those cells out of an infrared JPEG's balance (10.5%
+   *  of NIR_1597's cells, its blown foliage) raised the balance's green and blue
+   *  gains by 69% and 55%, and the lens hotspot's pale centre, the sky's least
+   *  coloured part, fell out of the selection: under Aerochrome a dark blob in
+   *  the sky, from 95d8ea7 (which began treating an 8-bit 255 as clipped) until
+   *  this copy stopped flagging it. Also absent on a copy taken before this
+   *  existed. */
   clip?: Uint8Array;
   srcW: number;
   srcH: number;
@@ -286,22 +296,27 @@ export interface SkySource {
  *   file's own turn (`img.rotate`), which is how a photograph opens.
  * @returns a SkySource at SKY_FINE_EDGE on the long edge, each pixel the box
  *   mean of its source block, read straight from the linear buffer when there
- *   is one and through `linearAt` otherwise, carrying `turn`, and a `clip`
- *   flag on every cell whose block holds a pixel `pinTest` calls clipped.
+ *   is one and through `linearAt` otherwise, carrying `turn`, and, for a
+ *   source with a linear copy (a raw's sensor values) only, a `clip` flag on
+ *   every cell whose block holds a pixel `pinTest` calls clipped. An 8-bit
+ *   source gets none (see `SkySource.clip` for why) and is not tested at all,
+ *   which also spares a 20-megapixel JPEG a closure call per pixel.
  * What the result must satisfy: it is complete before the decode's buffer is
  * transferred — the worker calls this first and posts the picture second —
  * and it carries enough for `buildSkySelectionFrom` to need nothing else,
- * including the turn: a copy taken at one turn builds that turn's sky.
+ * including the turn: a copy taken at one turn builds that turn's sky. A raw's
+ * copy is unchanged by the 8-bit rule (same cells, same `clip`); a source with
+ * no linear copy carries none.
  */
 export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): SkySource {
   const { width: srcW, height: srcH } = img;
   const sc = Math.min(1, SKY_FINE_EDGE / Math.max(srcW, srcH));
   const w = Math.max(1, Math.round(srcW * sc)), h = Math.max(1, Math.round(srcH * sc));
   const rgb = new Float32Array(w * h * 3);
-  const clip = new Uint8Array(w * h);
+  const lin = img.linear;
+  const clip = lin ? new Uint8Array(w * h) : null;
   const pinned = pinTest(img);
   const fl = pinFloor(img); // below it on every channel, pinTest is known to say no
-  const lin = img.linear;
   for (let y = 0; y < h; y++) {
     const y0 = Math.floor((y * srcH) / h), y1 = Math.max(y0 + 1, Math.floor(((y + 1) * srcH) / h));
     for (let x = 0; x < w; x++) {
@@ -310,14 +325,16 @@ export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): Sky
       if (lin) {
         for (let sy = y0; sy < y1; sy++) { let o = (sy * srcW + x0) * 4; for (let sx = x0; sx < x1; sx++, o += 4) { const pr = lin[o], pg = lin[o + 1], pb = lin[o + 2]; if (pr === pr && pg === pg && pb === pb) { r += pr; g += pg; b += pb; n++; if (!c && (pr >= fl || pg >= fl || pb >= fl) && pinned(sx, sy)) c = 1; } } }
       } else {
-        for (let sy = y0; sy < y1; sy++) for (let sx = x0; sx < x1; sx++) { const q = linearAt(img, sx, sy); r += q[0]; g += q[1]; b += q[2]; n++; if (!c && pinned(sx, sy)) c = 1; }
+        for (let sy = y0; sy < y1; sy++) for (let sx = x0; sx < x1; sx++) { const q = linearAt(img, sx, sy); r += q[0]; g += q[1]; b += q[2]; n++; }
       }
       const o = (y * w + x) * 3;
       if (n) { rgb[o] = r / n; rgb[o + 1] = g / n; rgb[o + 2] = b / n; }
-      clip[y * w + x] = c;
+      if (clip) clip[y * w + x] = c;
     }
   }
-  return { w, h, rgb, clip, srcW, srcH, cam: img.camMatrix ?? null, turn: skyTurn(turn) };
+  return clip
+    ? { w, h, rgb, clip, srcW, srcH, cam: img.camMatrix ?? null, turn: skyTurn(turn) }
+    : { w, h, rgb, srcW, srcH, cam: img.camMatrix ?? null, turn: skyTurn(turn) };
 }
 
 /**
@@ -327,8 +344,14 @@ export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): Sky
  * @returns the coarse bitmap (null when buildSkyMask finds no clear sky), its
  *   refinement (null with it, and null when `refine` is false), and the turn
  *   both were found at, which is `src.turn`. Gray-world gains are taken from
- *   the copy itself, its clipped cells left out, by the same rule the main
- *   thread's grayWorldWB applies over the full frame (grayWorldFromMeans).
+ *   the copy itself, a raw's clipped cells left out, by the same rule the main
+ *   thread's grayWorldWB applies over the full frame (grayWorldFromMeans); an
+ *   8-bit copy carries no `clip` and counts every cell (`SkySource.clip`),
+ *   which grayWorldWB (decode.ts) does NOT do for an 8-bit frame: its `pinTest`
+ *   still tests the 255s as decoded. So for an 8-bit source this balance and
+ *   grayWorldWB are two rules, and the Masks tab's sky layer
+ *   (`regenerateSkyMask`, `skyGuideFor`, `skyPrepFor` in main.ts) takes
+ *   grayWorldWB.
  * What the result must satisfy: it is the selection `DecodedImage.skySel`
  * carries and every sky-aware stage reads — built at gray-world balance and
  * nothing else, so it never moves as the photograph is graded; and seeded from
@@ -338,8 +361,9 @@ export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): Sky
  */
 export function buildSkySelectionFrom(src: SkySource, refine = true): SkySelection {
   const { w, h, rgb, clip } = src;
-  // CLIPPED CELLS LEFT OUT, as grayWorldMeans leaves clipped samples out; a
-  // frame where every cell clipped has nothing else to read and counts them all.
+  // A RAW'S CLIPPED CELLS LEFT OUT, as grayWorldMeans leaves clipped samples
+  // out; a frame where every cell clipped has nothing else to read and counts
+  // them all. An 8-bit copy has no `clip` and counts every cell.
   let r = 0, g = 0, b = 0, n = 0;
   for (let i = 0; i < w * h; i++) { if (clip && clip[i]) continue; r += rgb[i * 3]; g += rgb[i * 3 + 1]; b += rgb[i * 3 + 2]; n++; }
   if (!n) { for (let i = 0; i < w * h; i++) { r += rgb[i * 3]; g += rgb[i * 3 + 1]; b += rgb[i * 3 + 2]; } n = w * h; }

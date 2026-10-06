@@ -16,8 +16,39 @@
 import { startupLine } from "./startup";
 import { adoptAnswer, type AdoptAnswer } from "./swupdate";
 import { device } from "./platform";
+import type { TileTimings } from "./tile";
 
 export interface DiagLine { k: string; v: string }
+
+/** The last strip tile that finished, as the editor keeps it for the report:
+ *  which thread drew it, and where its time went (null when the lane sent no
+ *  timings). Nothing about the photograph it was of. */
+export interface LastTile { where: "worker" | "page"; ms: TileTimings | null }
+
+/** WHERE THE LAST STRIP TILE'S TIME WENT, in one line a reader can paste
+ *  (the open-and-strip plan, step 4).
+ *  @param last  the last strip tile that finished (`LastTile`), or null when none
+ *  has this session.
+ *  @returns "none this session" when there is none (never a zero), else which
+ *  thread drew it (a decode worker, or the page — the path a device with no
+ *  worker, or no worker JPEG encode, takes) and its whole, then the six parts:
+ *  decode, selection, lift, pixels, encode, and `rest`, the baseline the tile
+ *  starts from and the glue between the parts. What the line must satisfy: the
+ *  six parts are disjoint and add up to the whole (`rest` is the whole less the
+ *  other five, read off one monotone clock, so it is never negative), and it
+ *  names no file, no edit value and nothing the reader wrote — the session walk
+ *  greps the built report for a practice file's name. */
+export function tileLine(last: LastTile | null): string {
+  if (!last) return "none this session";
+  const where = last.where === "worker" ? "in a decode worker" : "on the page";
+  const m = last.ms;
+  if (!m) return `drawn ${where} — its timings were not reported`;
+  // Milliseconds below a second, as the other lines print them: rounding 340 ms
+  // to "0.3s" throws away the digit that separates a cost worth chasing.
+  const t = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)}s`);
+  const rest = m.total - (m.decode + m.selection + m.lift + m.pixels + m.encode);
+  return `drawn ${where}, ${t(m.total)} in all — decode ${t(m.decode)}, selection ${t(m.selection)}, lift ${t(m.lift)}, pixels ${t(m.pixels)}, encode ${t(m.encode)}, rest ${t(rest)}`;
+}
 
 const yes = (b: boolean) => (b ? "yes" : "no");
 

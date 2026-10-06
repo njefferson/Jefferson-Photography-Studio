@@ -28,10 +28,21 @@
 // spends and was measured against. Safari reports no memory at all, so a device
 // that does not say gets the conservative number rather than the optimistic one.
 import { prepareSkySource, type SkySource } from "./skyfine";
+import { skyTurn } from "./sky";
 import { applyLensPlan, type LensPlan } from "./lensflat";
 import { requestSkySelection } from "./skyClient";
-import { decode as decodeHere, type DecodedImage } from "./decode";
+import { decode as decodeHere, type DecodedImage, type SkySelection } from "./decode";
+import type { TileInputs, TileTimings } from "./tile";
 import type { ImportedFile } from "./import";
+
+/** A strip tile a decode lane drew: its JPEG bytes and where its time went. */
+export interface TileDrawn {
+  /** The tile, encoded (`TILE_QUALITY`). */
+  bytes: ArrayBuffer;
+  /** The lane's own clock for this tile (tile.ts `TileTimings`), or null when
+   *  the lane sent none. */
+  ms: TileTimings | null;
+}
 
 /** WHERE A DECODE'S TIME ACTUALLY WENT. Waiting for a free lane and decoding
  *  are different problems with different fixes — a queue is the app's own doing,
@@ -85,6 +96,10 @@ type Pending = {
   startedAt: number;
   depth: number;
   sky?: boolean;
+  /** Set on a strip-tile job: settle it with the JPEG bytes and their timings,
+   *  or null when the tile must be drawn by the page instead (see
+   *  `tileOffThread`). */
+  tileDone?: (drawn: TileDrawn | null) => void;
 };
 interface Lane {
   worker: Worker;
@@ -95,6 +110,13 @@ const lanes: Lane[] = [];
 let started = false;
 let allDead = false; // every lane failed — stay on the main thread
 let nextJob = 1;
+/** False once a lane has reported that this browser will not encode a JPEG in a
+ *  worker, after which `tileOffThread` answers null at once and the page draws
+ *  every tile (the path the app had before tiles moved). Safari 16.4 and later
+ *  encode JPEG through OffscreenCanvas.convertToBlob in a worker (caniuse
+ *  "mdn-api_offscreencanvas_converttoblob", read 2026-10-05); this is the
+ *  answer for anything older or stricter. */
+let workerEncodes = true;
 /** Jobs waiting for a free lane, oldest first. */
 const queue: {
   file: ImportedFile;
@@ -102,7 +124,9 @@ const queue: {
   reject: (e: Error) => void;
   onTiming?: (t: DecodeTiming) => void;
   queuedAt: number;
-  depth: number; sky?: boolean; lens?: LensPlan | null }[] = [];
+  depth: number; sky?: boolean; lens?: LensPlan | null;
+  /** A strip tile: the inputs, and how to settle it (see `Pending.tileDone`). */
+  tile?: TileInputs; tileDone?: (drawn: TileDrawn | null) => void }[] = [];
 
 function laneCount(): number {
   const nav = typeof navigator !== "undefined" ? navigator : undefined;
@@ -120,10 +144,27 @@ function spawn(): Lane | null {
     return null;
   }
   const lane: Lane = { worker, pending: new Map() };
-  worker.onmessage = (e: MessageEvent<{ id: number; ok?: boolean; img?: DecodedImage; message?: string; skySrc?: SkySource | null }>) => {
+  worker.onmessage = (e: MessageEvent<{ id: number; ok?: boolean; img?: DecodedImage; message?: string; skySrc?: SkySource | null; tile?: ArrayBuffer | null; ms?: TileTimings }>) => {
     const p = lane.pending.get(e.data.id);
     if (!p) return;
     lane.pending.delete(e.data.id);
+    if (p.tileDone) {
+      // A strip tile: bytes, or null for a tile the lane could not finish
+      // (a damaged file, a browser that will not encode a JPEG off the page)
+      // — the page then draws it itself and any damage reaches the reader
+      // through the path that always reported it.
+      // A lane that decoded fine but would not encode (`ok` with no bytes) will
+      // not encode the next one either: remember it, so a set of ninety does not
+      // decode every photograph twice, once here and once on the page.
+      if (e.data.ok && !e.data.tile) workerEncodes = false;
+      // The timings come with the bytes. A lane that sent bytes and no timings
+      // would be a lane from another build; its tile is still a good tile, so it
+      // is kept, with null where the numbers would be — never zeros, which would
+      // be read as measurements.
+      p.tileDone(e.data.ok && e.data.tile ? { bytes: e.data.tile, ms: e.data.ms ?? null } : null);
+      pump();
+      return;
+    }
     // Reported win or lose: a decode that failed still spent the time, and a
     // report that only covers the successful ones flatters the app.
     p.onTiming?.({ queued: p.startedAt - p.queuedAt, run: performance.now() - p.startedAt, depth: p.depth, offThread: true });
@@ -131,7 +172,7 @@ function spawn(): Lane | null {
       const img = e.data.img;
       // The copy the selection is built from came back beside the picture;
       // the sky worker builds it while the picture is already on screen.
-      if (e.data.skySrc) img.skySelReady = requestSkySelection(e.data.skySrc).then((sel) => { if (sel) img.skySel = sel; return sel; });
+      if (e.data.skySrc) img.skySelReady = askFirstSelection(img, e.data.skySrc);
       p.resolve(img);
     } else p.reject(new Error(e.data.message ?? "decode failed"));
     pump();
@@ -180,20 +221,22 @@ function pump(): void {
     const job = queue.shift()!;
     const id = nextJob++;
     lane.pending.set(id, {
-      resolve: job.resolve, reject: job.reject, onTiming: job.onTiming, sky: job.sky,
+      resolve: job.resolve, reject: job.reject, onTiming: job.onTiming, sky: job.sky, tileDone: job.tileDone,
       queuedAt: job.queuedAt, startedAt: performance.now(), depth: job.depth,
     });
     try {
       // Bytes are COPIED, not transferred: the caller still needs them to write
       // the photo into storage.
-      lane.worker.postMessage({ id, file: job.file, sky: !!job.sky, lens: job.lens ?? null });
+      lane.worker.postMessage({ id, file: job.file, sky: !!job.sky, lens: job.lens ?? null, tile: job.tile ?? null });
     } catch {
       lane.pending.delete(id);
       const i = lanes.indexOf(lane);
       if (i >= 0) lanes.splice(i, 1);
       if (!lanes.length) allDead = true;
-      // Could not even post — this decode falls back, and the lane is gone.
-      decodeOnThisThread(job.file, job.onTiming, job.queuedAt, job.depth, job.sky, job.lens).then(job.resolve, job.reject);
+      // Could not even post — this decode falls back, and the lane is gone. A
+      // tile has no decode to fall back to here: it goes back to the page.
+      if (job.tileDone) job.tileDone(null);
+      else decodeOnThisThread(job.file, job.onTiming, job.queuedAt, job.depth, job.sky, job.lens).then(job.resolve, job.reject);
     }
   }
 }
@@ -218,6 +261,125 @@ export function decodeOffThread(file: ImportedFile, opts?: DecodeOptions): Promi
   });
 }
 
+/** DRAW A STRIP TILE IN A DECODE LANE, and get back only its JPEG bytes
+ *  (tile.ts `renderTile`, decode.worker.ts). The picture never crosses to the
+ *  page: the lane decodes, lays the lens flat, builds the sky selection from its
+ *  own copy, solves the lift, draws and encodes.
+ *  @param file  the photograph's bytes (copied, as a decode's are).
+ *  @param tile  everything the tile reads from the editor (`tileInputsFor`).
+ *  @param lens  the lens flat to lay on the linear copy first (`lensPlanFor`).
+ *  @returns the JPEG bytes with the lane's own timings for them (`TileDrawn`),
+ *  or null when the page must draw the tile itself:
+ *  no lane could be started, the lane died, the file would not decode in it, or
+ *  this browser will not encode a JPEG in a worker. Null is never an error —
+ *  it is the path the app had before the tile moved, and it reports a damaged
+ *  file the way it always did. What the result must satisfy: when non-null its
+ *  bytes are the tile the page would have drawn from the same inputs, and its
+ *  timings are the lane's own clock for them (the report's "Last strip tile").
+ *  Shares the decode lanes and their one-job-per-lane rule, so a set of ninety
+ *  never holds more than a lane's worth of frames in memory. */
+export function tileOffThread(file: ImportedFile, tile: TileInputs, lens: LensPlan | null): Promise<TileDrawn | null> {
+  ensureLanes();
+  if (allDead || !lanes.length || !workerEncodes) return Promise.resolve(null);
+  return new Promise<TileDrawn | null>((done) => {
+    queue.push({
+      file, resolve: () => {}, reject: () => done(null), queuedAt: performance.now(), depth: queue.length,
+      lens, tile, tileDone: done,
+    });
+    pump();
+  });
+}
+
+/** WHAT A DECODED PHOTOGRAPH KEEPS OF ITS SKY SELECTION, so the page never has
+ *  to build one for it (the open-and-strip plan, step 3).
+ *
+ *  The 1024 px copy the decode took does not depend on which edge is up: every
+ *  cell is the box mean of its source block, and `turn` is only the edge the
+ *  selection is SEEDED from (skyfine.ts `prepareSkySource`). So a photograph
+ *  shown at another turn than the file's — a Rotate, a mirror, a stored edit's
+ *  turn, a gallery example's — needs the same copy and a different `turn`, and
+ *  the sky worker can build it, where the page used to take the full-size
+ *  buffer through `prepareSkySource` again and build it itself. */
+interface SkyHold {
+  /** The copy, whole, kept on this side: the sky worker is sent a duplicate of
+   *  it each time, because a transferred buffer is gone from the sender. */
+  src: SkySource;
+  /** The selections that have landed, by turn (sky.ts `skyTurn`). */
+  byTurn: Map<number, SkySelection>;
+  /** The asks in flight or answered, by turn, so two asks for one turn are one
+   *  build. An ask the worker could not answer is taken off again. */
+  asked: Map<number, Promise<SkySelection | null>>;
+}
+const skyHeld = new WeakMap<DecodedImage, SkyHold>();
+
+/** Ask the sky worker for a decode's first selection and keep what is needed to
+ *  ask again at another turn.
+ *  @param img  the decoded photograph; its `skySel` is set when the answer lands.
+ *  @param src  the copy the decode took, at the file's own turn; its buffers go
+ *    to the sky worker, so a duplicate is taken first and kept.
+ *  @returns the selection, or null when the sky worker could not answer. What it
+ *  must satisfy: the answer is `buildSkySelectionFrom(src)`, byte for byte, and
+ *  it is also what `skySelectionAt(img, src.turn)` returns afterwards. */
+function askFirstSelection(img: DecodedImage, src: SkySource): Promise<SkySelection | null> {
+  const hold: SkyHold = { src: { ...src, rgb: src.rgb.slice(), clip: src.clip ? src.clip.slice() : undefined }, byTurn: new Map(), asked: new Map() };
+  skyHeld.set(img, hold);
+  const t = skyTurn(src.turn);
+  const p = requestSkySelection(src).then((sel) => {
+    if (sel) { img.skySel = sel; hold.byTurn.set(sel.turn, sel); } else hold.asked.delete(t);
+    return sel;
+  });
+  hold.asked.set(t, p);
+  return p;
+}
+
+/** The selection of a decoded photograph at a turn, when the sky worker has
+ *  already answered for that turn.
+ *  @param img  a photograph decoded with `sky: true`.
+ *  @param turn  which edge is up, as sky.ts `skyTurn` gives it.
+ *  @returns the selection built at that turn, or null when none has landed (or
+ *  the decode was never asked for one). What it must satisfy: a non-null answer
+ *  has `turn` equal to `skyTurn(turn)`, so the caller may show it as it is. */
+export function skySelectionAt(img: DecodedImage, turn: number): SkySelection | null {
+  return skyHeld.get(img)?.byTurn.get(skyTurn(turn)) ?? null;
+}
+
+/** Whether `requestSkySelectionAt` can answer for this photograph at all: it was
+ *  decoded with `sky: true` and its copy is still held.
+ *  @param img  a decoded photograph.
+ *  @returns true when an ask can be made; false when the page has to build the
+ *  selection itself, which is the only case it should. */
+export function canAskSkyAt(img: DecodedImage): boolean {
+  return skyHeld.has(img);
+}
+
+/** Ask the sky worker for a photograph's selection at a turn, building nothing
+ *  on this thread: the held copy is duplicated, given the turn, and sent.
+ *  @param img  a photograph decoded with `sky: true`.
+ *  @param turn  which edge is up, as sky.ts `skyTurn` gives it.
+ *  @returns the selection at that turn (the mask and its refinement), or null
+ *  when the photograph has no held copy or the sky worker could not answer —
+ *  the caller then builds the coarse bitmap itself, as it did before the sky
+ *  worker took the other turns. What it must satisfy: a non-null answer has
+ *  `turn` equal to `skyTurn(turn)`; the same turn asked twice is one build; and
+ *  on a device with no sky worker `requestSkySelection` builds it here, which
+ *  is the one place this thread still does. */
+export function requestSkySelectionAt(img: DecodedImage, turn: number): Promise<SkySelection | null> {
+  const hold = skyHeld.get(img);
+  if (!hold) return Promise.resolve(null);
+  const t = skyTurn(turn);
+  const have = hold.byTurn.get(t);
+  if (have) return Promise.resolve(have);
+  const pending = hold.asked.get(t);
+  if (pending) return pending;
+  const src: SkySource = { ...hold.src, rgb: hold.src.rgb.slice(), clip: hold.src.clip ? hold.src.clip.slice() : undefined, turn: t };
+  const p = requestSkySelection(src).then((sel) => {
+    if (sel) hold.byTurn.set(sel.turn, sel); else hold.asked.delete(t);
+    return sel;
+  });
+  hold.asked.set(t, p);
+  return p;
+}
+
 /** The main-thread fallback, timed the same way a lane is so the report does not
  *  go quiet on the devices that need it most. Nothing waited for a lane here, so
  *  the queued half is zero by definition rather than by omission. */
@@ -225,7 +387,7 @@ function decodeOnThisThread(
   file: ImportedFile, onTiming: ((t: DecodeTiming) => void) | undefined, queuedAt: number, depth: number, sky?: boolean, lens?: LensPlan | null,
 ): Promise<DecodedImage> {
   const startedAt = performance.now();
-  const p = decodeHere(file).then((img) => { applyLensPlan(img, lens ?? null); return img; }).then((img) => { if (sky) img.skySelReady = requestSkySelection(prepareSkySource(img, img.rotate ?? 0)).then((sel) => { if (sel) img.skySel = sel; return sel; }); return img; });
+  const p = decodeHere(file).then((img) => { applyLensPlan(img, lens ?? null); return img; }).then((img) => { if (sky) img.skySelReady = askFirstSelection(img, prepareSkySource(img, img.rotate ?? 0)); return img; });
   if (onTiming) {
     const done = () => onTiming({ queued: startedAt - queuedAt, run: performance.now() - startedAt, depth, offThread: false });
     p.then(done, done);

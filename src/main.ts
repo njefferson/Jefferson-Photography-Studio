@@ -21,8 +21,9 @@ import "./style.css";
 import "./verdlg.css";
 import { importFile, sniff, refineKind, isZip, readLimitMs, type ImportedFile, type ImageKind } from "./import";
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
-import { type DecodedImage, pickLargestPreview, linearAt, grayWorldWB, grayWorldMeans, unitMinGains, exposureHoldingNeutral, autoExposure, autoRecover, sampleForWb, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS } from "./decode";
-import { decodeOffThread, decodeLanes, decodeLaneTarget, type DecodeTiming } from "./decodeClient";
+import { type DecodedImage, type SkySelection, pickLargestPreview, linearAt, grayWorldWB, grayWorldMeans, unitMinGains, exposureHoldingNeutral, autoExposure, autoRecover, sampleForWb, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS } from "./decode";
+import { decodeOffThread, tileOffThread, decodeLanes, decodeLaneTarget, skySelectionAt, canAskSkyAt, requestSkySelectionAt, type DecodeTiming } from "./decodeClient";
+import { renderTile, TILE_QUALITY, solveLift, scaleLift, liftBaseNeutral, BAND_NEUTRAL, isOneBand, freshBaseline, bringLensTo, lensForSource, srcFlatOf, trackPos, trackVal, snapGain, snapExposure, EXPOSURE_LO, EXPOSURE_HI, type LiftBase, type TileInputs, type TileTimings } from "./tile";
 import { sourceIsMosaiced, type ExportOptions } from "./export";
 import { Renderer, VERT, FRAG, type EditParams } from "./gl";
 import { exportImage, saveBlob, lastExportProfile, exportThreadsNow, exportFallbackReason, getSource, proxyFactorFor, type ExportFormat } from "./export";
@@ -35,13 +36,13 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
-import { sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, bandWeight, rgb2hsv, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, compileEdit, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
+import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
-import { lensGains, lensCentreLine, applyLensFlat, lensPlanStamp, lensCurveForSource, turnOfOrientation, type LensPlan } from "./lensflat";
+import { lensGains, lensCentreLine, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache, type HealSolves } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
 import { makeWarpField, encodeWarp, paintWarp, warpSampler, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
-import type { Sticker, BrushMask, LensCurve, SourceFlat, LocalMap } from "./pipeline";
+import type { Sticker, BrushMask, LensCurve, LocalMap } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
@@ -52,7 +53,7 @@ import { makeRowDenoiser, measuredStrength } from "./raw/denoise";
 import { makeRowDetail } from "./raw/detail";
 import { buildSkyMask, skyPrepare, skyTurn, SKY_MIN_COVERAGE, type SkyPrep } from "./sky";
 import { measureShadowCast, type ShadowCast } from "./shadowcast";
-import { buildDiagnostic } from "./diagnostic";
+import { buildDiagnostic, tileLine, type LastTile } from "./diagnostic";
 import { Tiff } from "./raw/tiff";
 import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
@@ -1198,11 +1199,10 @@ function lensCentreDiagnostic(): string {
  *  pixels already hold the flat (decision 021); the matched curve for an 8-bit
  *  source. Every compileEdit and buildSkyMap call for a picture asks this. */
 function lensForEdit(img: { linear?: Float32Array; isRaw?: boolean } | null | undefined, curve: LensCurve | null = currentLensCurve(), ex: ExifSubset | null = currentExif): LensCurve | null {
-  if (img?.linear) return null;
-  // A camera-rendered source takes the brightness half alone (LN1), and a
-  // camera JPEG arrives turned upright by the browser, so the hot spot's
-  // centre turns with it. Raw data is never turned at decode.
-  return lensCurveForSource(curve, { isRaw: !!img?.isRaw, turn: img?.isRaw ? 0 : turnOfOrientation(ex?.orientation) });
+  // The rule itself is tile.ts `lensForSource`, so the decode worker's tile
+  // asks the same question; this keeps the editor's defaults (the open
+  // photograph's curve and EXIF).
+  return lensForSource(img, curve, ex?.orientation);
 }
 
 /** THE CURVE THAT LANDS ON THE OPEN PHOTOGRAPH, wherever it lands: the whole
@@ -1215,14 +1215,8 @@ function landingLensCurve(): LensCurve | null {
   return current?.linear ? currentLensCurve() : lensForEdit(current, currentLensCurve(), currentExif);
 }
 
-/** The other half of the same fact: the flat a raw's pixels DO carry, which
- *  highlight recovery divides back out so it tests the value the sensor
- *  recorded. Null for an 8-bit source, whose pixels carry none. Every
- *  compileEdit and buildSkyMap call for a picture passes this beside
- *  `lensForEdit`, as the export passes its own `flat`. */
-function srcFlatOf(img: DecodedImage | null | undefined): SourceFlat | null {
-  return img?.linear ? img.lensApplied?.gains ?? null : null;
-}
+// `srcFlatOf` (the flat a raw's pixels DO carry, which highlight recovery divides
+// back out) is imported from ./tile: the decode worker's tile asks it too.
 
 function currentLensCurve(): LensCurve | null {
   const { colour, bump, brightness } = Hotspot.lensHalves(myLens?.p ?? null, hotspotState?.p ?? null);
@@ -1516,15 +1510,17 @@ updateHistVisibility(); // reflect the stored preference on the toggle at startu
 // 16x (below) but a dark frame must stay PUSHABLE past where auto gives up —
 // the owner's twilight D5300 frame opened with auto railed at the old 16x
 // ceiling and nowhere left to go (IMG_1253, 2026-07-25).
-const WB_LO = WB_GAIN_LO, WB_HI = WB_GAIN_HI, WB_STEPS = WB_GAIN_STEPS, EX_LO = 0.05, EX_HI = 64;
+const WB_LO = WB_GAIN_LO, WB_HI = WB_GAIN_HI, WB_STEPS = WB_GAIN_STEPS, EX_LO = EXPOSURE_LO, EX_HI = EXPOSURE_HI;
 // Global luminance spans 0.5–2x on the same kind of log track; 1.0 (neutral)
 // lands dead centre so brighten/darken are symmetric around it.
 const LUM_LO = 0.5, LUM_HI = 2;
+// ONE COPY OF THE TRACK, in ./tile, because the decode worker's tile writes the same
+// values the sliders hold (snapGain, snapExposure, snapLift) and the two must agree.
 function toPos(v: number, lo: number, hi: number, steps = 1000): number {
-  return Math.round((steps * Math.log(clamp(v, lo, hi) / lo)) / Math.log(hi / lo));
+  return trackPos(v, lo, hi, steps);
 }
 function fromPos(p: number, lo: number, hi: number, steps = 1000): number {
-  return lo * Math.pow(hi / lo, clamp(p, 0, steps) / steps);
+  return trackVal(p, lo, hi, steps);
 }
 
 function syncFromUI() {
@@ -2166,19 +2162,28 @@ const skyMaskOf = new WeakMap<DecodedImage, Map<number, BrushMask | null>>();
  *  regeneration always allocates new ones, so the bitmap is the one thing that
  *  still says which turn it belongs to after a snapshot has been put back. */
 const skyMaskTurnOf = new WeakMap<BrushMask, number>();
-/** The look's coarse sky for `img` as a picture shown at `turn`.
+/** The look's coarse sky for `img` as a picture shown at `turn`, BUILT ON THIS
+ *  THREAD when the sky worker has not answered for that turn.
  *  Takes the photograph and the turn its picture is shown at: the open
  *  photograph's `shownSkyTurn()`, a tile's or a batch frame's `img.rotate`,
  *  which is the turn `makeThumb` lays a tile out at and `runBatch` exports at.
  *  Returns the 384 px bitmap, or null when no clear sky was found there.
- *  What the caller relies on: `img.skySel` is handed back only when it was
- *  found at that same turn, so no path reads a sky seeded from a side of the
- *  picture it shows (decision 070); anything else is built here from the same
- *  1024 px copy the decode worker uses, so the bytes match what the worker
- *  would have built at that turn. The lift and the shadow cast read this. */
+ *  What the caller relies on: a selection the sky worker has built is handed
+ *  back only when it was found at that same turn, so no path reads a sky seeded
+ *  from a side of the picture it shows (decision 070); anything else is built
+ *  here from the same 1024 px copy the decode worker uses, so the bytes match
+ *  what the worker would have built at that turn.
+ *
+ *  THE OPEN PHOTOGRAPH NO LONGER COMES HERE for its look. It takes the sky
+ *  worker's pair (`seekSky`), and its lift waits for that pair (`liftSkyMask`);
+ *  this is its fallback only, for a worker that answered null. What still comes
+ *  here by design is a tile the page draws itself (`drawTileHere`), the shadow
+ *  cast's report line, and that fallback. */
 function skyMaskFor(img: DecodedImage, turn: number): BrushMask | null {
   const t = skyTurn(turn);
   if (img.skySel && img.skySel.turn === t) return img.skySel.mask;
+  const landed = skySelectionAt(img, t);
+  if (landed) return landed.mask;
   let held = skyMaskOf.get(img);
   if (!held) skyMaskOf.set(img, (held = new Map()));
   if (held.has(t)) return held.get(t) ?? null;
@@ -2188,6 +2193,373 @@ function skyMaskFor(img: DecodedImage, turn: number): BrushMask | null {
   held.set(t, m);
   return m;
 }
+
+// --- The open photograph's sky: the sky worker's pair, never this thread's -------------------------
+// (the open-and-strip plan, step 3). What used to run here at every open and
+// every turn: `skyMaskFor` took the full-size buffer through `prepareSkySource`
+// and grew the coarse bitmap, `syncSkyMap` did it again and added the guided
+// filter, all on the page, while the sky worker built the same pair beside it.
+
+/** THE PHOTOGRAPH WHOSE PAIR THE SKY WORKER IS STILL BUILDING, or null. While it
+ *  is `current`, `skyBitmap` and `skyFine` are null and every sky stage is inert,
+ *  and `liftSkyMask` tells the lift to go on without the sky and come back. */
+let skyPending: DecodedImage | null = null;
+/** Bumped by every ask and every adoption, so an answer for an ask the reader
+ *  has since moved past (another photograph, another turn) is dropped. */
+let skyEpoch = 0;
+/** THE FOUR VALUES THE LIFT WROTE, as `liftApplied` keeps them, taken when it
+ *  was solved WITHOUT the sky because the sky was still on its way. */
+interface LiftWrote { tone: string; foliage: string; sky: string; skySat: string }
+/** WHAT A LIFT THAT WAS SOLVED WITHOUT ITS SKY NEEDS TO BE SOLVED AGAIN WITH IT:
+ *  what it wrote, the edit it measured (`at`, a copy taken before it wrote), the
+ *  look's own amounts (`base`) and the Strength it scaled by (`amount`). The last
+ *  three are what let the answer be made in isolation, for the Reset target,
+ *  when the live edit has moved on and must be left alone (`holdBaselineSky`). */
+interface LiftOwed { wrote: LiftWrote; at: EditParams; base: LiftBase; amount: number }
+/** The lift of `img` that was solved while the sky was pending, and what it
+ *  wrote — so the arrival can tell whether the reader has moved any of it since
+ *  and, if not, solve it again with the sky (`resolveLiftWithSky`). */
+let liftWait: (LiftOwed & { img: DecodedImage }) | null = null;
+/** THE SAME DEBT, KEPT BY PHOTOGRAPH, so that it outlives leaving the photograph:
+ *  `liftWait` is dropped by every open, and a photograph left before its sky
+ *  arrived came back with the first answer as its Reset target for good. Set and
+ *  cleared by `applyLiftNow`, paid by `resolveLiftWithSky`, and cleared with the
+ *  live edits. Keyed by the strip's photograph id. */
+const liftOwed = new Map<string, LiftOwed>();
+/** Record, or clear, the sky debt of the open photograph's lift.
+ *  Takes the debt `applyLiftNow` has just made (the open photograph's `liftWait`),
+ *  or null when the lift was solved with its sky or not at all. Returns nothing.
+ *  What it must satisfy: after it, `liftOwed` holds an entry for the active
+ *  photograph exactly when the lift last solved for it was solved without its
+ *  sky, so `resolveLiftWithSky` and the return to a photograph agree on who is
+ *  owed what. */
+function oweLift(w: (LiftOwed & { img: DecodedImage }) | null): void {
+  if (!activePhotoId) return;
+  if (w) liftOwed.set(activePhotoId, { wrote: w.wrote, at: w.at, base: w.base, amount: w.amount });
+  else liftOwed.delete(activePhotoId);
+}
+
+/** WHERE THE LOOK'S SKY WENT, for the photograph opened last — the part of the
+ *  switch that comes AFTER the picture, which the switch's own parts could not
+ *  carry because it runs beside them and past their end (the open-and-strip
+ *  plan, step 4). `switchSplit` prints it after the parts of the switch.
+ *
+ *  Three things, each measured on its own clock and each recorded ONCE, the first
+ *  time it happens for this open: how the selection arrived and what it cost,
+ *  the second solve of the lift, and the first sky map build. A later turn of the
+ *  picture, a drag of Sky depth or a Restore depth press builds again and is not
+ *  this open's, so it does not overwrite what the open measured.
+ *
+ *  REPORTING ONLY. Nothing here may change what is asked, built or drawn. */
+interface SkyProfile {
+  /** The photograph this is about; a later open makes a new record. */
+  img: DecodedImage;
+  /** `performance.now()` when `showDecoded` asked for the selection. */
+  at: number;
+  /** Whether an ask went to the sky worker (as against none being possible). */
+  asked: boolean;
+  /** How the selection came: still on its way; already in hand when asked for;
+   *  from the sky worker; built on the page because nothing could be asked;
+   *  built on the page after the worker answered none; or never came because
+   *  another photograph was opened first (`showDecoded` closes the record). */
+  how: "waiting" | "held" | "worker" | "page" | "none" | "left";
+  /** ms from the ask to the selection being in hand (0 when it already was);
+   *  null while waiting, and where no ask could be made. */
+  wait: number | null;
+  /** ms this page spent building the coarse bitmap itself, or null when it built none. */
+  built: number | null;
+  /** ms of the second solve of the lift, the one made with the sky in hand
+   *  (`resolveLiftWithSky`); null when none was made for this open. */
+  lift: number | null;
+  /** ms of the first sky map build once the selection was in hand; null when none yet. */
+  map: number | null;
+}
+let skyProfile: SkyProfile | null = null;
+
+/** The solves of the lift the page has made, summed, so a caller can read the
+ *  clock before and after a stretch of work and know what the lift took of it
+ *  (the switch's settling, which solves it once on a first visit). `applyLift`
+ *  is the only writer. */
+const liftClock = { ms: 0, runs: 0 };
+
+/** Record, once, that this open's selection is in hand.
+ *  @param img  the photograph it is for; ignored unless it is the one profiled.
+ *  @param via  "worker" (the sky worker's pair is in hand), "none" (the worker
+ *  answered none and the page built the bitmap) or "page" (nothing could be
+ *  asked, the page built it).
+ *  @param built  the page's own build time in ms, or null when it built none.
+ *  @param arrivedAt  the clock when the answer was taken up, read BEFORE the page
+ *  builds or adopts anything, so the wait is the worker's and the page's own
+ *  build is not counted in it; defaults to now.
+ *  @returns nothing. What it must satisfy: the first call for a profile wins, so
+ *  a rotate that asks again does not turn the open's wait into a second one, and
+ *  `wait` is 0 only for a pair that was already in hand when `showDecoded` asked. */
+function noteSkyArrived(img: DecodedImage, via: "worker" | "none" | "page", built: number | null, arrivedAt = performance.now()): void {
+  const p = skyProfile;
+  if (!p || p.img !== img || p.how !== "waiting") return;
+  p.built = built;
+  if (via === "page") { p.how = "page"; return; }
+  p.how = via === "worker" && !p.asked ? "held" : via;
+  p.wait = p.asked ? arrivedAt - p.at : 0;
+}
+
+/** Make `sel` the pair the open photograph's look reads.
+ *  Takes the photograph and a selection built at the turn shown (the caller
+ *  checks); sets `skyBitmap`, `skyFine` and `lookSkyTurn`, hands the refinement
+ *  to the renderer and clears the sky map's key so the next draw builds it.
+ *  Returns nothing; draws nothing — the caller decides whether a redraw has
+ *  anything new to show. */
+function adoptSky(img: DecodedImage, sel: SkySelection): void {
+  img.skySel = sel;
+  skyBitmap = sel.mask;
+  skyFine = sel.fine;
+  lookSkyTurn = sel.turn;
+  renderer.setSkyFine(skyFine);
+  skyMapKey = "";
+}
+
+/** THE PAGE'S OWN BUILD, for the one case that is left: the sky worker answered
+ *  null (it died, or could not be asked). Takes the photograph and the turn
+ *  shown; sets the coarse bitmap from `skyMaskFor` and leaves the refinement
+ *  null, which `syncSkyMap` then builds on the first edit that needs it, as it
+ *  always did. Returns nothing. */
+function adoptSkyHere(img: DecodedImage, turn: number): void {
+  skyBitmap = skyMaskFor(img, turn);
+  skyFine = null;
+  lookSkyTurn = turn;
+  renderer.setSkyFine(null);
+  skyMapKey = "";
+}
+
+/** POINT THE OPEN PHOTOGRAPH'S LOOK AT THE SKY WORKER'S PAIR FOR THE TURN SHOWN.
+ *  Takes the open photograph. When that pair has already landed it is adopted at
+ *  once; when it can be asked for (the decode kept its copy) the stages go inert
+ *  and the worker's answer is waited for; and only when it cannot be asked for
+ *  does the page build the coarse bitmap itself. When the answer lands for the
+ *  turn shown it is adopted and `skyLanded` runs; when the reader has turned the
+ *  picture meanwhile it is asked for again at the turn shown now.
+ *  What the caller relies on: afterwards `skyBitmap`, `skyFine` and the sky map
+ *  key agree with each other and with `lookSkyTurn`, or are all null with
+ *  `skyPending` set to the photograph. Returns nothing; draws nothing until an
+ *  answer lands. */
+function seekSky(img: DecodedImage): void {
+  const turn = shownSkyTurn();
+  const here = skySelectionAt(img, turn);
+  if (here) { skyPending = null; skyEpoch++; adoptSky(img, here); noteSkyArrived(img, "worker", null); return; }
+  if (!canAskSkyAt(img)) {
+    skyPending = null; skyEpoch++;
+    const b0 = performance.now();
+    adoptSkyHere(img, turn);
+    noteSkyArrived(img, "page", performance.now() - b0);
+    return;
+  }
+  const mine = ++skyEpoch;
+  skyPending = img;
+  skyBitmap = null;
+  skyFine = null;
+  lookSkyTurn = null;
+  skyMapKey = "";
+  renderer.setSkyFine(null);
+  if (skyProfile?.img === img) skyProfile.asked = true;
+  void requestSkySelectionAt(img, turn).then((sel) => {
+    const arrived = performance.now(); // the wait ends here, before the page does anything with the answer
+    if (mine !== skyEpoch || current !== img) return;
+    const now = shownSkyTurn();
+    if (sel && sel.turn !== now) { seekSky(img); return; }
+    skyPending = null;
+    if (sel) {
+      adoptSky(img, sel);
+      noteSkyArrived(img, "worker", null, arrived);
+    } else {
+      adoptSkyHere(img, now);
+      noteSkyArrived(img, "none", performance.now() - arrived, arrived);
+    }
+    skyLanded(img);
+  });
+}
+
+/** THE LOOK'S SKY HAS ARRIVED FOR THE OPEN PHOTOGRAPH: do what waited for it.
+ *  Takes the open photograph. Solves the lift again where it was solved without
+ *  the sky (`resolveLiftWithSky`), then builds the sky map and draws — but only
+ *  when something on screen uses either, because a full redraw a second and a
+ *  half after every open is a main-thread task the reader did not ask for: a
+ *  verdict pressed as the page went away landed behind it and was lost
+ *  (verdict-durability-walk check 4, red with the redraw, 2026-09-18). Returns
+ *  nothing. */
+function skyLanded(img: DecodedImage): void {
+  const lifted = resolveLiftWithSky(img);
+  if (lifted || (params.skySmooth ?? 0) > 0 || (params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0) {
+    syncSkyMap();
+    draw();
+  }
+}
+
+/** THE SKY THE LIFT MEASURES, for the open photograph.
+ *  Takes the photograph the lift is about to solve for. Returns `mask`, the
+ *  coarse bitmap at the turn shown when the sky worker has built it (or the
+ *  page's own where no answer is coming), and `waiting`, true when it is still
+ *  on its way — in which case the mask is null and the lift is solved without
+ *  the sky and solved again when it lands. */
+function liftSkyMask(img: DecodedImage): { mask: BrushMask | null; waiting: boolean } {
+  const turn = shownSkyTurn();
+  const here = skySelectionAt(img, turn);
+  if (here) return { mask: here.mask, waiting: false };
+  if (skyPending === img) return { mask: null, waiting: true };
+  return { mask: skyMaskFor(img, turn), waiting: false };
+}
+
+/** The lift's four values off an edit, as plain numbers.
+ *  Takes an edit's parameters; returns copies of its tone curve, foliage band,
+ *  sky band and sky saturation, which is every field the lift writes. */
+function liftFieldsOf(p: EditParams): { tone: number[]; foliage: number[]; sky: number[]; skySat: number } {
+  return { tone: [...p.tone], foliage: [...p.foliage], sky: [...p.sky], skySat: p.skySat ?? 0 };
+}
+/** Whether two readings of the lift's fields are the same numbers exactly. */
+function sameLiftFields(a: ReturnType<typeof liftFieldsOf>, b: ReturnType<typeof liftFieldsOf>): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+/** Whether two number lists agree to within half a slider step, which is how far
+ *  a value the open wrote at full precision sits from the slider's copy of it
+ *  (the same tolerance `untouched` uses). */
+function nearLift(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 0.005);
+}
+
+/** SOLVE THE LIFT AGAIN, NOW THAT ITS SKY HAS ARRIVED — and leave every place
+ *  that recorded the first answer holding the second.
+ *
+ *  Takes the photograph whose sky has just been adopted. Returns true when the
+ *  edit changed, so the caller draws. Does nothing, and returns false, unless
+ *  the lift was solved WITHOUT this photograph's sky (`liftWait`), a look is on
+ *  it, Restore depth is on, none of the four values has been moved by the
+ *  reader since, and nothing is waiting to be recorded as an undo step.
+ *
+ *  Why it exists: the open used to build the sky on this thread so that the lift
+ *  could measure the sky by place at once. It now solves without it and comes
+ *  back, which is the plan's two stages, and the answer after must be the one
+ *  the open used to give — the same bitmap, the same solve.
+ *
+ *  What it must satisfy, and why it touches more than `params`: the first
+ *  answer was recorded as how the photograph OPENED, in six places, and a
+ *  second answer written only to `params` would leave Reset, Hold: Before, the
+ *  double-tap defaults and the look's "untouched since" test describing a lift
+ *  that no longer exists. So where a record holds the first answer exactly it
+ *  is given the second: the Reset target (`baseline`), the last recorded state
+ *  (`settled`, so this is not an undo step — nothing the reader did produced
+ *  it), the as-opened copy `origParams`, the slider defaults, and the look's
+ *  mark. A record that holds something else — an undo step from before the
+ *  look, a photograph the reader has since graded — is left as it is. */
+function resolveLiftWithSky(img: DecodedImage): boolean {
+  const w = liftWait;
+  if (!w || w.img !== img) return false;
+  liftWait = null;
+  if (activePhotoId) liftOwed.delete(activePhotoId);
+  if (current !== img) return false;
+  // THE LIVE EDIT IS LEFT ALONE where the reader or a stored edit has moved it
+  // on, and the Reset target is not: it is how the photograph OPENS, and the open
+  // used to have the sky (`holdBaselineSky`).
+  if (!autoLift || !activeLook) { holdBaselineSky(img, w); return false; }
+  const ours = untouched(params.tone, w.wrote.tone) && untouched(params.foliage, w.wrote.foliage)
+    && untouched(params.sky, w.wrote.sky) && untouched([params.skySat ?? 0], w.wrote.skySat);
+  if (!ours || !settled || snapSig(snapshot()) !== snapSig(settled)) { holdBaselineSky(img, w); return false; }
+  const marked = looksUntouched(lookMark);
+  const old = liftFieldsOf(params);
+  const l0 = performance.now();
+  applyLift(true); // the sky is adopted now, so this one measures it
+  // THE SECOND SOLVE'S OWN COST, for the report (`SkyProfile.lift`): the solve
+  // alone, not the bookkeeping that follows it, so a slow solve and a slow
+  // record of its answer are not one number.
+  if (skyProfile?.img === img && skyProfile.lift === null) skyProfile.lift = performance.now() - l0;
+  // THE ROUND TRIP THE OPEN MAKES (see takeLookOff): the slider holds the value
+  // at its step, and the record has to hold what the slider holds.
+  syncToUI();
+  syncFromUI();
+  const now = liftFieldsOf(params);
+  if (sameLiftFields(old, now)) return false;
+  const set = (p: EditParams) => {
+    p.tone = [...now.tone] as typeof p.tone;
+    p.foliage = [...now.foliage] as typeof p.foliage;
+    p.sky = [...now.sky] as typeof p.sky;
+    p.skySat = now.skySat;
+  };
+  const baseHeldIt = !!baseline && sameLiftFields(liftFieldsOf(baseline.params), old);
+  if (baseHeldIt) set(baseline!.params);
+  settled = snapshot();
+  if (origParams && nearLift(origParams.tone, old.tone) && nearLift(origParams.foliage, old.foliage) && nearLift(origParams.sky, old.sky)) {
+    origParams.tone = [...now.tone] as typeof origParams.tone;
+    origParams.foliage = [...now.foliage] as typeof origParams.foliage;
+    origParams.sky = [...now.sky] as typeof origParams.sky;
+  }
+  if (baseHeldIt && baseline && snapSig(baseline) === snapSig(settled)) captureSliderDefaults();
+  if (marked) markLook();
+  persistOpenEditSoon();
+  restripOpen(); // this photograph's own tile is a claim about the edit that just moved
+  return true;
+}
+
+/** GIVE THE RESET TARGET THE SKY, WHERE THE LIVE EDIT CANNOT TAKE IT.
+ *
+ *  Takes the open photograph and the debt of its lift (solved without the sky
+ *  while the sky was on its way), the sky being in hand now. Returns nothing.
+ *  Solves the lift again in isolation — the edit it measured (`w.at`), the look's
+ *  own amounts and the Strength it used — and writes the answer to the records of
+ *  how the photograph OPENED that still hold the first answer: the Reset target
+ *  (`baseline`), the as-opened copy and the double-tap defaults of the lift's
+ *  sliders. It never touches `params`, `settled` or the undo history, so neither
+ *  what the reader did nor an edit restored from storage is changed by it.
+ *
+ *  Why it exists: a stored edit is laid over the fresh one, so a photograph that
+ *  comes back, or a session that resumes, shows its own lift and
+ *  `resolveLiftWithSky` rightly leaves it. But the Reset target was solved before
+ *  the sky and, left alone, stayed the first answer for good: Reset then gave a
+ *  lift without the sky's saturation (rotation-walk check 17, probed 2026-10-06:
+ *  `[0,1.03,1]` against `[0.51,1.03,1]`, unchanged after 150 s).
+ *
+ *  What it must satisfy: after it, a record that held the first answer holds the
+ *  answer the open gave at once before the sky moved off the page, and a record
+ *  that held anything else is exactly as it was. */
+function holdBaselineSky(img: DecodedImage, w: LiftOwed): void {
+  const b = baseline;
+  if (!b) return;
+  const held = (p: EditParams) => untouched(p.tone, w.wrote.tone) && untouched(p.foliage, w.wrote.foliage)
+    && untouched(p.sky, w.wrote.sky) && untouched([p.skySat ?? 0], w.wrote.skySat);
+  if (!held(b.params)) return;
+  const sky = liftSkyMask(img);
+  if (sky.waiting) return;
+  const solved = solveLift(true, img, w.at, sky.mask, w.base, lensForEdit(img));
+  if (!solved) return;
+  const r = scaleLift(solved, w.amount, w.base);
+  const set = (p: EditParams) => {
+    p.tone = [...r.tone] as typeof p.tone;
+    p.foliage = [...r.foliage] as typeof p.foliage;
+    p.sky = [...r.sky] as typeof p.sky;
+    p.skySat = r.skySat;
+  };
+  set(b.params);
+  if (origParams && untouched(origParams.tone, w.wrote.tone) && untouched(origParams.foliage, w.wrote.foliage) && untouched(origParams.sky, w.wrote.sky)) {
+    origParams.tone = [...r.tone] as typeof origParams.tone;
+    origParams.foliage = [...r.foliage] as typeof origParams.foliage;
+    origParams.sky = [...r.sky] as typeof origParams.sky;
+  }
+  // WHERE A DOUBLE TAP SENDS EACH LIFT SLIDER is captured with the baseline, so it
+  // held the first answer too. The value is put through a copy of the slider so
+  // it lands on the slider's own step, as the DOM capture would have read it.
+  const put = (id: string, v: number) => {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (!el || !sliderDefaults.has(id)) return;
+    const probe = el.cloneNode() as HTMLInputElement;
+    probe.value = String(v);
+    sliderDefaults.set(id, probe.value);
+  };
+  put("skySatSel", r.skySat);
+  ["skyHue", "skySat", "skyLum"].forEach((id, i) => put(id, r.sky[i]));
+  ["folHue", "folSat", "folLum"].forEach((id, i) => put(id, r.foliage[i]));
+  if (activeTone() === params.tone) {
+    r.tone.forEach((v, i) => put(`tone${i}`, (v - TONE_DEFAULT[i]) * 100));
+    if (toneDefaults[0]) toneDefaults[0] = [...r.tone];
+  }
+}
+
 /** WHAT THIS PHOTOGRAPH'S OWN SHADOWS ARE LIT BY (decision 034), measured once
  *  per turn and kept for the photograph's life.
  *
@@ -2294,9 +2666,15 @@ let localMapNow: LocalMap | null = null;
  *  stroke ends (endWarpStroke draws once more). */
 function syncSkyMap(): void {
   if (current && skyBitmap && !skyFine && ((params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0)) {
-    // First edit with a depth on this photograph: the coarse bitmap's feather
-    // is fine under a chroma blend and a pale rim under a luma multiplier.
+    // THE PAGE'S OWN REFINEMENT, FOR THE ONE CASE THAT IS LEFT. The sky worker's
+    // pair carries the refinement (`seekSky`), so this runs only for a photograph
+    // whose pair the worker answered null for and the page built coarse
+    // (`adoptSkyHere`); while a pair is on its way `skyBitmap` is null and the
+    // first `if` is not entered. First edit with a depth on this photograph:
+    // the coarse bitmap's feather is fine under a chroma blend and a pale rim
+    // under a luma multiplier.
     const img = current;
+    const r0 = performance.now();
     // AT THE TURN SHOWN (070), the turn the reader's Sky mask is built at.
     const sel = buildSkySelectionFrom(prepareSkySource(img, shownSkyTurn()));
     img.skySel = sel;
@@ -2304,6 +2682,9 @@ function syncSkyMap(): void {
     skyFine = sel.fine;
     lookSkyTurn = sel.turn;
     renderer.setSkyFine(skyFine);
+    // THIS IS THE PAGE BUILDING THE SELECTION TOO, so the report counts it in
+    // what the page spent on it (`SkyProfile.built`), beside the coarse bitmap.
+    if (skyProfile?.img === img && (skyProfile.how === "page" || skyProfile.how === "none")) skyProfile.built = (skyProfile.built ?? 0) + (performance.now() - r0);
   }
   if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0)) {
     if (skyMapKey) { renderer.setSkyMap(null); skyMapKey = ""; lastSkyMap = null; }
@@ -2325,6 +2706,7 @@ function syncSkyMap(): void {
   skyMapKey = key;
   skyMapWarp = warp;
   const img = current;
+  const mapFrom = performance.now();
   // THE SAME PRE-PASS THE PIXELS COME THROUGH. The open image IS the preview's
   // proxy (a half-res bin for a raw), so step 1 here is what the shader taps.
   // Built from the raw decode instead, the map targeted a sky 16% more
@@ -2338,6 +2720,10 @@ function syncSkyMap(): void {
   const local = (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0 ? localMapNow ?? undefined : undefined;
   lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), local, lensForEdit(img), skyBitmap, srcFlatOf(img), warp);
   renderer.setSkyMap(lastSkyMap);
+  // THE FIRST BUILD AFTER THIS OPEN'S SELECTION WAS IN HAND, for the report
+  // (`SkyProfile.map`): the sampler chain, the build and the hand-over to the
+  // renderer, from the key being taken to the map being on its way to the GPU.
+  if (skyProfile?.img === img && skyProfile.how !== "waiting" && skyProfile.map === null) skyProfile.map = performance.now() - mapFrom;
 }
 
 /** What `applyLook` last wrote onto `params.texture`, so leaving a look that
@@ -2455,10 +2841,18 @@ function applyLook(name: keyof typeof LOOKS) {
     if (origParams) params.exposure = origParams.exposure;
     lookWb = null;
   }
+  // THE BALANCE AND THE EXPOSURE ARE WRITTEN ON THEIR SLIDERS' GRID (snapGain,
+  // snapExposure in ./tile). A gray-world balance times a look's bias, and an auto
+  // exposure, are continuous; the sliders they land on step, and `syncFromUI` reads
+  // the stepped value back the first time ANY slider is touched. On a camera JPEG
+  // that was the whole of it: Natural IR, Hue shift pressed with the value it
+  // already held, moved a quarter of the frame by one level in 255 through the
+  // exposure alone (measured 2026-10-06). The lift does the same with its tone and
+  // band values, and is put on the grid where it is solved (tile.ts snapLift).
   params.wb = [
-    clamp(base[0] * bias[0], WB_LO, WB_HI),
-    clamp(base[1] * bias[1], WB_LO, WB_HI),
-    clamp(base[2] * bias[2], WB_LO, WB_HI),
+    snapGain(clamp(base[0] * bias[0], WB_LO, WB_HI)),
+    snapGain(clamp(base[1] * bias[1], WB_LO, WB_HI)),
+    snapGain(clamp(base[2] * bias[2], WB_LO, WB_HI)),
   ];
   // AND THE EXPOSURE THAT GOES WITH IT. A camera-rendered file opens at
   // exposure 1 because it opens as the camera made it; gray-world balancing an
@@ -2471,7 +2865,7 @@ function applyLook(name: keyof typeof LOOKS) {
   // while the photo did not. This is the second half of the same fix, and a
   // synthetic single-hue test frame could never have shown it: gray-world makes
   // one flat hue neutral, so there was nothing to darken.
-  if (balancing && current) params.exposure = autoExposure(current, params.wb);
+  if (balancing && current) params.exposure = snapExposure(autoExposure(current, params.wb));
   lookBias = bias;
   params.swapRB = look.swapRB;
   params.hue = look.hue;
@@ -2797,81 +3191,9 @@ type Snapshot = { params: EditParams; activeLook: string | null; lookBias: [numb
   // either keep a 0.25 nobody asked for or discard one somebody dragged.
   lookTexture?: number | null };
 
-function cloneParams(p: EditParams): EditParams {
-  return {
-    wb: [...p.wb] as [number, number, number],
-    exposure: p.exposure,
-    swapRB: p.swapRB,
-    hue: p.hue,
-    sat: p.sat,
-    contrast: p.contrast,
-    denoise: p.denoise,
-    chroma: p.chroma ?? 0,
-    despeckle: p.despeckle ?? 0,
-    tint: [...p.tint] as [number, number, number],
-    glow: p.glow,
-    sky: [...p.sky] as [number, number, number],
-    foliage: [...p.foliage] as [number, number, number],
-    tone: [...p.tone] as [number, number, number, number, number],
-    toneR: [...(p.toneR ?? TONE_DEFAULT)] as [number, number, number, number, number],
-    toneG: [...(p.toneG ?? TONE_DEFAULT)] as [number, number, number, number, number],
-    toneB: [...(p.toneB ?? TONE_DEFAULT)] as [number, number, number, number, number],
-    lum: p.lum,
-    recover: p.recover ?? 0,
-    // Brush bitmaps are SHARED between snapshots, not copied (copy-on-write):
-    // a stroke clones the live buffer before mutating (startPaint/Clear), so a
-    // history entry's pixels can never change under it. Without this, every
-    // snapshot duplicated up to 4 x ~100KB bitmaps — tens of MB of undo history
-    // in a heavy brush session on the iPad.
-    masks: (p.masks ?? []).map((m) => ({ ...m })),
-    hotspot: p.hotspot,
-    hotspotSize: p.hotspotSize,
-    hotspotColor: p.hotspotColor ?? 0,
-    lensFix: p.lensFix ?? 0,
-    lensBypass: p.lensBypass ?? false,
-    forceBalance: p.forceBalance ?? false,
-    hsFix: p.hsFix ?? 0,
-    hsBypass: p.hsBypass ?? false,
-    lensPick: p.lensPick ? { ...p.lensPick } : null,
-    vignette: p.vignette,
-    clarity: p.clarity,
-    dehaze: p.dehaze,
-    sharpen: p.sharpen,
-    texture: p.texture,
-    hsl: [...(p.hsl ?? hslDefault())],
-    bwOn: !!p.bwOn,
-    bwMix: [...(p.bwMix ?? [1, 1, 1])] as [number, number, number],
-    grade: [...(p.grade ?? GRADE_DEFAULT)],
-    shadowSat: p.shadowSat ?? 0,
-    skySmooth: p.skySmooth ?? 0,
-    skyDepth: p.skyDepth ?? 0,
-    skySat: p.skySat ?? 0,
-    grainAmt: p.grainAmt ?? 0,
-    grainSize: p.grainSize ?? 1.5,
-    vigAmt: p.vigAmt ?? 0,
-    vigMid: p.vigMid ?? 0.5,
-    mix3: [...(p.mix3 ?? MIX3_DEFAULT)],
-    spots: (p.spots ?? []).map((s) => ({ ...s })),
-    // corners + match arrays are nested — deep-copy so an undo snapshot doesn't
-    // share the live sticker's perspective/transfer (the mask rides by ref,
-    // copy-on-write).
-    stickers: (p.stickers ?? []).map((s) => ({
-      ...s,
-      corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners,
-      matchGain: s.matchGain ? ([...s.matchGain] as [number, number, number]) : s.matchGain,
-      matchScene: s.matchScene ? ([...s.matchScene] as [number, number, number]) : s.matchScene,
-    })),
-    // The warp field is SHARED by reference (copy-on-write per stroke, like the
-    // brush bitmaps) — a snapshot's field is immutable once a new stroke clones.
-    warp: p.warp ?? null,
-    crop: { ...(p.crop ?? CROP_DEFAULT) },
-    straighten: p.straighten ?? 0,
-    // The LUT wrapper is cloned (a strength drag must not mutate history) but
-    // its lattice `data` is SHARED by reference — immutable once imported,
-    // same copy-on-write rationale as the brush bitmaps above.
-    lut: p.lut ? { ...p.lut } : null,
-  };
-}
+// cloneParams is imported from ./pipeline (beside EditParams): the decode
+// worker's tile job clones an edit too and cannot import this file. It is still
+// the first of the five places an EditParams field must be added.
 
 // Snapshot signature for undo equality — cheap: skips the brush pixel buffers
 // (a stroke bumps the mask's `rev`, which IS compared) and the imported LUT's
@@ -3331,28 +3653,9 @@ function ensureLensApplied(): void {
   if (bringLensTo(img, currentLensCurve(), params)) uploadPreview();
 }
 
-/** Bring a decode's linear copy to the correction an edit asks for, by ratio
- *  against what is already in it (decision 021).
- *  @param img  a decode; one with no `linear` copy is left alone.
- *  @param curve  the curve matched to that file, or null for none.
- *  @param p  the edit's `lensFix` and `lensBypass`.
- *  @returns true when the pixels changed, so the caller re-uploads or re-reads.
- *  What the result must satisfy: afterwards `img.lensApplied` names exactly the
- *  gains in `img.linear`. Consumers: `ensureLensApplied` for the open
- *  photograph, and `makeThumb` for a tile drawn from a photograph's own edit,
- *  whose decode laid the opening strength (decision 085), so the strip and the
- *  photograph show one correction. */
-function bringLensTo(img: DecodedImage, curve: LensCurve | null, p: Pick<EditParams, "lensFix" | "lensBypass">): boolean {
-  if (!img.linear) return false;
-  const strength = curve && !p.lensBypass ? (p.lensFix ?? 0) : 0;
-  const stamp = curve ? lensPlanStamp(curve) : "";
-  const have = img.lensApplied ?? { stamp: "", strength: 0, gains: null };
-  if (have.stamp === stamp && have.strength === strength) return false;
-  const next = lensGains(curve, strength);
-  applyLensFlat(img.linear, img.width, img.height, next, have.gains);
-  img.lensApplied = { stamp, strength, gains: next };
-  return true;
-}
+// `bringLensTo` (a decode's linear copy brought to an edit's lens strength, by
+// ratio) is imported from ./tile: a tile drawn from a photograph's own edit
+// does the same in the decode worker.
 
 function draw() {
   recordSoon();
@@ -3900,6 +4203,10 @@ function wireVersionMenu() {
       // between photos slow and nothing in the app could say which part of it
       // was slow — the parts are disjoint and add up to the whole.
       { k: "Last switch", v: switchSplit() },
+      // WHERE THE LAST STRIP TILE'S SECONDS WENT, and which thread drew it: the
+      // decode lane the strip is drawn in, or the page where the lane cannot
+      // (the open-and-strip plan, step 4). Timings only, nothing of the photograph.
+      { k: "Last strip tile", v: tileLine(lastStripTile) },
       // THE TWO WAITS ON THE PATH EVERY READER MEETS FIRST (decision 033).
       // "A long delay before thumbnails begin showing" is a symptom with five
       // stages behind it and "a long delay before the screen changes" has
@@ -3992,44 +4299,10 @@ function wireVersionMenu() {
 }
 
 // --- Restore depth ------------------------------------------------------
-// The complaint this answers: an infrared frame with no open sky in it opens
-// pale and grey however it is graded. Measured across the 44 bundled practice
-// frames at their open baseline with Aerochrome on — the ones WITH sky land at
-// a median luminance near 0.44, warm-half (foliage, ground, bark) saturation
-// near 0.35 and cool-half near 0.50; the ones WITHOUT land at 0.50–0.67 median
-// luminance and 0.16–0.24 warm saturation. That gap is what "drab" is, and it
-// is a full stop of lift and half the colour.
-//
-// Neither automatic is wrong. Auto exposure anchors the 97th percentile of the
-// frame's unclipped channel values at 0.85 (decode.ts autoExposure), so a
-// histogram with no dark region gets lifted whole. Gray-world balance makes the frame's own average neutral —
-// and in an infrared frame that is nine tenths foliage, the average IS the
-// foliage, so the balance neutralises the one material the false-colour looks
-// need a cast on. There is no white balance that both neutralises the dominant
-// material and leaves it coloured, so the colour has to come from the creative
-// layer. That is what this is: an explicit press, landing on the tone points
-// and the two band sliders, one undo step, and a no-op on a frame that already
-// measures where it should be.
-const FLAT_LUM_REF = 0.44;
-const FLAT_WARM_REF = 0.35;
-const FLAT_COOL_REF = 0.5;
-// SINCE 019 THE COLOUR HALF COMPOSES WITH THE LOOK AND AIMS AT PORTIONS. It
-// used to start from neutral bands and write its own answer over whatever the
-// look had set, and its cool half pushed the Sky HUE band — teals and blues
-// wherever they are. Now it starts from the look's own amounts (the Foliage
-// band and the Sky saturation of the look, or neutral with no look) and only
-// TOPS UP: the warm half through the Foliage band, gated by bandGain so a
-// grey stays grey, and the sky through `skySat` — where the sky IS, read
-// through the sky bitmap — so a frame with no sky, or an overcast one, gets
-// no sky boost at all. The references are the same numbers; what they are
-// measured on changed: FLAT_COOL_REF is now the SKY's mean saturation by
-// place, not the cool hue half's.
-const FLAT_TONE_MAX = 0.22; // the tone points clamp at ±0.25 of their default
-// "Shadows alive", as a measurement rather than a taste guess: the pull may not
-// take the frame's lower quartile below half of where it started. Relative on
-// purpose — an absolute floor stops dead on a frame that already contains real
-// black (a shaded wood at midday: its 5th percentile is 0.000 before anything
-// is done to it) and would refuse the pull its midtones plainly need.
+// The lift's references, constants and solve (FLAT_*, LIFT_*, measureFrame,
+// solveLift, scaleLift) live in ./tile with the complaint they answer: the
+// decode worker's tile job solves the lift too and cannot import this file.
+// What stays here is the session's state and the editor's use of the answer.
 // On by default, and remembered — the point of it is that a photo opens the
 // best it can without anyone having to press anything. It is a STATE, not an
 // action, so it reads and behaves like the R<->B swap: pressed means the frame
@@ -4053,53 +4326,18 @@ let autoLift = localStorage.getItem("ips-autolift") !== "0";
  *  strength — the automatic switched on, visibly on, and doing nothing.) */
 let liftAmount = 1;
 
-/** Take a solved lift part of the way. Scaling the ANSWER rather than the
- *  targets keeps the solve idempotent and keeps every intermediate value on the
- *  same sliders — half strength is half the tone pull and half the extra
- *  saturation, not a different correction. */
-function scaleLift<T extends { tone: number[]; foliage: number[]; sky: number[]; skySat: number; pull: number }>(r: T, amt: number, base: LiftBase = liftBaseNeutral()): T {
-  if (amt >= 1) return r;
-  const mix = (from: number, to: number) => from + (to - from) * amt;
-  return {
-    ...r,
-    tone: r.tone.map((v, i) => mix(TONE_DEFAULT[i], v)),
-    foliage: [r.foliage[0], mix(base.foliage[1], r.foliage[1]), r.foliage[2]],
-    sky: [r.sky[0], mix(base.sky[1], r.sky[1]), r.sky[2]],
-    skySat: mix(base.skySat, r.skySat),
-    pull: r.pull * amt,
-  };
-}
-const FLAT_SHADOW_KEEP = 0.5;
-const FLAT_SHADOW_FLOOR = 0.02;
-// Divisions along the short edge of the sampling grid. It runs on every open
-// now, not on a button press, so its cost is paid on every photo — and it is
-// resolution-independent (a fixed grid, not a fraction of the pixels), so this
-// number IS the cost. 64 was checked against 128 across the practice set before
-// it was lowered: see the calibration note in NOTES.
-const LIFT_GRID = 64;
-const LIFT_BISECT = 6;
-const FLAT_BAND_MAX = 2; // the sky/foliage saturation sliders' own ceiling
-const SKY_SAT_MAX = 2;   // the Sky saturation slider's own ceiling (EditParams.skySat)
-/** A band with nothing done to it: hue shift 0, saturation 1, lightness 1 —
- *  the same triple `pcReset` writes and the same one `makeThumb` starts from.
- *  Named because three places were spelling it out and a fourth needed it. */
-const BAND_NEUTRAL: [number, number, number] = [0, 1, 1];
-/** Where the lift starts from: the look's own per-population amounts, so the
- *  lift tops up rather than overwrites. Neutral with no look. */
-interface LiftBase { foliage: [number, number, number]; sky: [number, number, number]; skySat: number; liftSky: boolean }
-const liftBaseNeutral = (): LiftBase => ({ foliage: [...BAND_NEUTRAL], sky: [...BAND_NEUTRAL], skySat: 0, liftSky: true });
-/** The lift's starting point for `img` under the built-in look `name` (null:
- *  no look). Takes the photograph (for its kind: raw or camera-rendered, the
- *  look's per-kind block) and the look's key. Returns the look's Foliage and
- *  Sky bands, its Sky saturation and whether the lift may top that up
- *  (`Look.liftSky`), or neutral. What the result must
- *  satisfy: it equals what applyLook writes onto params for that look, or
- *  the lift would top up from the wrong place and the tile, the batch and the
- *  screen would disagree. */
-function liftBaseFor(img: DecodedImage, name: string | null): LiftBase {
+/** The lift's starting point under the built-in look `name` (null: no look),
+ *  for a raw (`hasCam`, a camera matrix present) or a camera-rendered file —
+ *  the look's per-kind block. Returns the look's Foliage and Sky bands, its Sky
+ *  saturation and whether the lift may top that up (`Look.liftSky`), or neutral.
+ *  What the result must satisfy: it equals what applyLook writes onto params for
+ *  that look, or the lift would top up from the wrong place and the tile, the
+ *  batch and the screen would disagree. Split from `liftBaseFor` so the page can
+ *  hand BOTH kinds to the decode worker before the photograph is decoded. */
+function liftBaseForKind(name: string | null, hasCam: boolean): LiftBase {
   const l = name ? LOOKS[name] : null;
   if (!l) return liftBaseNeutral();
-  const strength = img.camMatrix ? l.raw : l.jpeg;
+  const strength = hasCam ? l.raw : l.jpeg;
   return {
     foliage: strength.foliage ? [...strength.foliage] : [...BAND_NEUTRAL],
     sky: strength.sky ? [...strength.sky] : [...BAND_NEUTRAL],
@@ -4107,186 +4345,54 @@ function liftBaseFor(img: DecodedImage, name: string | null): LiftBase {
     liftSky: l.liftSky !== false,
   };
 }
-
-/** Median luminance and per-band saturation of the frame as the given params
- *  render it — sampled on a coarse grid through the SAME compileEdit the
- *  preview and the export use, so what is measured is what is shown. Bands are
- *  weighted by the pipeline's own bandWeight, never a second definition of
- *  "cool". */
-/** MEASURED, NOT CHOSEN. Fifteen frames that carry a false-colour look sit at
- *  0.0606 to 0.1729; the one that cannot sits at exactly 0.0000. This is three
- *  times below the lowest frame that works, and everything above zero. */
-const COOL_BAND_FLOOR = 0.02;
-
-/** How much cool-band colour the frame has BEFORE anything is done to it —
- *  bands neutral, so a boost left over from the last photo is not counted as
- *  this one's. The same quantity, from the same function, that the lift solves
- *  against. */
-function coolContent(img: DecodedImage, p: EditParams, swapRB = p.swapRB): number {
-  const neutral = cloneParams(p);
-  neutral.sky = [...BAND_NEUTRAL] as typeof neutral.sky;
-  neutral.foliage = [...BAND_NEUTRAL] as typeof neutral.foliage;
-  // WHICH SWAP TO MEASURE UNDER IS THE CALLER'S TO SAY. measureFrame picks the
-  // cool band's hue from `swapRB` — 30 degrees with the swap on, 210 with it off
-  // — so the two states measure DIFFERENT bands, and asking about a look means
-  // asking under that look's swap rather than under the one still on screen.
-  neutral.swapRB = swapRB;
-  return measureFrame(neutral, img, 96).coolSat;
+/** The lift's starting point for `img` under the built-in look `name` (null:
+ *  no look). Takes the photograph (for its kind: raw or camera-rendered) and the
+ *  look's key; returns `liftBaseForKind`'s answer for that kind. */
+function liftBaseFor(img: DecodedImage, name: string | null): LiftBase {
+  return liftBaseForKind(name, !!img.camMatrix);
 }
 
-function measureFrame(p: EditParams, img: DecodedImage, divisions = LIFT_GRID, skyMask: BrushMask | null = null): { lumP50: number; lumP25: number; warmSat: number; coolSat: number; skySat: number } {
-  const step = Math.max(1, Math.floor(Math.min(img.width, img.height) / divisions));
-  // The lens curve too: this measures what the pipeline produces, and the
-  // correction is part of it. With a sky bitmap the edit runs with a position,
-  // so the sky's own saturation stage (skySat) is in what is measured — the
-  // lift solves that stage against the SKY population, by place, below.
-  const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height), undefined, lensForEdit(img), null, skyMask, srcFlatOf(img));
-  const px = new Float32Array(3);
-  const lums: number[] = [];
-  let warmW = 0, warmS = 0, coolW = 0, coolS = 0, skyW = 0, skyS = 0;
-  for (let y = 0; y < img.height; y += step) {
-    for (let x = 0; x < img.width; x += step) {
-      const [r, g, b] = linearAt(img, x, y);
-      const u = (x + 0.5) / img.width, v = (y + 0.5) / img.height;
-      // The position always goes in as mu/mv: recovery reads the flat there,
-      // whether or not the spatial stages run.
-      edit(r, g, b, px, 0, skyMask ? u : undefined, skyMask ? v : undefined, u, v);
-      const cr = clamp(px[0], 0, 1), cg = clamp(px[1], 0, 1), cb = clamp(px[2], 0, 1);
-      lums.push(0.2126 * cr + 0.7152 * cg + 0.0722 * cb);
-      const [h, sat] = rgb2hsv(cr, cg, cb);
-      const wS = bandWeight(h, skyBandCentre(p.swapRB, p.mix3), 55, 105);
-      coolW += wS; coolS += sat * wS;
-      warmW += 1 - wS; warmS += sat * (1 - wS);
-      if (skyMask && sampleBrush(skyMask, u, v) > 0.5) { skyW++; skyS += sat; }
-    }
-  }
-  lums.sort((a, b) => a - b);
-  return {
-    lumP50: lums[lums.length >> 1] ?? 0,
-    lumP25: lums[Math.floor(lums.length * 0.25)] ?? 0,
-    warmSat: warmW > 0 ? warmS / warmW : 0,
-    coolSat: coolW > 0 ? coolS / coolW : 0,
-    skySat: skyW > 0 ? skyS / skyW : 0,
-  };
-}
-
-/** The tone curve for a black-point pull of `k`: the shadow point moves the
- *  full distance, the mid and three-quarter points progressively less, so the
- *  highlights stay where the exposure put them. k = 0 is the identity. */
-function flatTone(k: number): [number, number, number, number, number] {
-  return [0, TONE_DEFAULT[1] - k, TONE_DEFAULT[2] - k * 0.55, TONE_DEFAULT[3] - k * 0.2, 1];
-}
-
-/** Solve the lift for the CURRENT photo as it is currently rendered, and return
- *  the values to apply — or null when the frame already measures where a frame
- *  with open sky lands, which is the no-op case and must stay one. Pure: it
- *  changes nothing, so open, applyLook and the toggle can all use it. */
-function solveLift(withColour: boolean, img: DecodedImage, params: EditParams, skyMask: BrushMask | null = null, base0: LiftBase = liftBaseNeutral()): { tone: [number, number, number, number, number]; foliage: [number, number, number]; sky: [number, number, number]; skySat: number; pull: number } | null {
-  // Measure the frame WITHOUT a lift on it. The creative grade — tone included
-  // — carries across opens by design, so `params.tone` on a fresh open is
-  // whatever the last photo ended with; measuring that and then deciding
-  // "already dark enough" left the previous photo's curve sitting on this one,
-  // and a chain of opens ratcheted the whole set down (measured: medians
-  // reaching 0.167 against a 0.44 target). Solving from the default curve every
-  // time makes it idempotent: the same frame gives the same answer however many
-  // times this runs, and pressing the toggle twice is a round trip.
-  const base = cloneParams(params);
-  base.tone = [...TONE_DEFAULT] as typeof base.tone;
-  // THE SAME ARGUMENT, FOR THE OTHER TWO. The paragraph above was written about
-  // tone and the fix was applied to tone alone, while sky and foliage carry
-  // across opens exactly as tone does — so the frame being MEASURED still wore
-  // the previous photo's band boost. Two consequences, both reported: the
-  // saturation tests could read as already satisfied and the lift did nothing
-  // at open, and where it did fire it solved against a boosted measurement, so
-  // pressing the toggle off and on (which restores the bands first) produced a
-  // different answer from the one the photo opened with. A toggle whose two
-  // states disagree is the bug; making all three start from neutral is what
-  // makes the solve idempotent.
-  base.sky = [...base0.sky] as typeof base.sky;
-  base.foliage = [...base0.foliage] as typeof base.foliage;
-  base.skySat = base0.skySat;
-  const before = measureFrame(base, img, LIFT_GRID, skyMask);
-  // Only ever pull DOWN and push UP: a frame already at or past the reference
-  // is left exactly as it is rather than being dragged to the average.
-  //
-  // The COLOUR half runs only when a look is on the frame. The sky and foliage
-  // bands are defined by hue, and it is a look — the channel swap above all —
-  // that puts a frame's materials into those bands in the first place; the
-  // references were measured on frames wearing one. Solved against a bare
-  // opened frame instead, nothing clears them and the boost fires on
-  // everything: measured, 44 of 44 practice frames "adapted" at open with no
-  // look, which is not a correction, it is a new default. The tonal half has no
-  // such dependency — a frame opens too bright or it does not.
-  const needsTone = before.lumP50 > FLAT_LUM_REF + 0.01;
-  const needsWarm = withColour && before.warmSat < FLAT_WARM_REF - 0.01;
-  // The sky by PLACE: only with a bitmap, only where one found a sky, and
-  // only when that sky has some colour to scale (an overcast reads near 0 and
-  // is left alone — the gate in the stage would leave it anyway).
-  // And only when the look allows it: Bold Pink's sky stages are off on
-  // purpose, and a top-up from 0 deepens its sky past the look (078).
-  const needsSky = withColour && base0.liftSky && !!skyMask && before.skySat > 1e-4 && before.skySat < FLAT_COOL_REF - 0.01;
-  if (!needsTone && !needsWarm && !needsSky) {
-    // Nothing to do for THIS frame — but the tone it inherited may be a lift
-    // solved for a different one, so hand back the neutral curve rather than
-    // leaving that in place. The bands and the sky's amount go back to the
-    // look's own.
-    return { tone: [...TONE_DEFAULT] as [number, number, number, number, number], foliage: [...base.foliage] as [number, number, number], sky: [...base.sky] as [number, number, number], skySat: base0.skySat, pull: 0 };
-  }
-  const trial = cloneParams(base);
-  const shadowFloor = Math.max(FLAT_SHADOW_FLOOR, before.lumP25 * FLAT_SHADOW_KEEP);
-  let k = 0;
-  if (needsTone) {
-    let lo = 0, hi = FLAT_TONE_MAX;
-    for (let i = 0; i < LIFT_BISECT; i++) {
-      const mid = (lo + hi) / 2;
-      trial.tone = flatTone(mid);
-      const m = measureFrame(trial, img, LIFT_GRID, skyMask);
-      // Two stopping conditions: the median reaching the reference, and the
-      // shadows not being crushed to get there — whichever binds first.
-      if (m.lumP50 > FLAT_LUM_REF && m.lumP25 > shadowFloor) lo = mid;
-      else hi = mid;
-    }
-    k = lo;
-  }
-  trial.tone = flatTone(k);
-  const after = measureFrame(trial, img, LIFT_GRID, skyMask);
-  const solve = (measured: number, ref: number) => (measured > 1e-4 ? clamp(ref / measured, 1, FLAT_BAND_MAX) : 1);
-  // The sky's amount scales chroma by (1 + skySat), so the top-up that reaches
-  // the reference from a measured mean is a ratio on (1 + skySat), never below
-  // the look's own amount and never past the slider's ceiling.
-  const solveSky = (from: number, measured: number) => (measured > 1e-4 ? clamp((1 + from) * FLAT_COOL_REF / measured - 1, base0.skySat, SKY_SAT_MAX) : from);
-  if (withColour) {
-    trial.foliage = [base.foliage[0], clamp(base.foliage[1] * solve(after.warmSat, FLAT_WARM_REF), 1, FLAT_BAND_MAX), base.foliage[2]];
-    trial.sky = [...base.sky] as typeof trial.sky; // the Sky HUE band is the look's and the reader's; the lift no longer writes it
-    if (needsSky) trial.skySat = solveSky(base.skySat, after.skySat);
-    const check = measureFrame(trial, img, LIFT_GRID, skyMask);
-    trial.foliage[1] = clamp(trial.foliage[1] * solve(check.warmSat, FLAT_WARM_REF), 1, FLAT_BAND_MAX);
-    if (needsSky) trial.skySat = solveSky(trial.skySat ?? base0.skySat, check.skySat);
-  }
-  return {
-    tone: trial.tone as [number, number, number, number, number],
-    foliage: trial.foliage as [number, number, number],
-    sky: trial.sky as [number, number, number],
-    skySat: trial.skySat ?? base0.skySat,
-    pull: k,
-  };
-}
+// coolContent, measureFrame, flatTone and solveLift moved to ./tile with the
+// constants they use. Both measure through a lens curve the CALLER names; here
+// the editor's callers pass `lensForEdit(img)`, which is what measureFrame
+// used to read for itself (the open photograph's curve and EXIF).
 
 /** What the lift last wrote, so turning it off can put back what it replaced —
  *  and so a value the reader has since changed BY HAND is left alone. */
 let liftApplied: { tone: string; foliage: string; sky: string; skySat: string; prevTone: number[]; prevFoliage: number[]; prevSky: number[]; prevSkySat: number } | null = null;
 
 /** Run the lift on the current photo. Returns what it did, for the caller to
- *  report (or not — at open it is silent; the sliders show it). */
+ *  report (or not — at open it is silent; the sliders show it).
+ *  TIMED, for the report: every call adds its own duration to `liftClock`, so
+ *  the switch can read what the lift took of its settling without the lift
+ *  knowing a switch is running. The clock reads nothing the solve reads. */
 function applyLift(withColour: boolean): { pull: number; foliage: number; sky: number } | null {
+  const t0 = performance.now();
+  try {
+    return applyLiftNow(withColour);
+  } finally {
+    liftClock.ms += performance.now() - t0;
+    liftClock.runs++;
+  }
+}
+
+/** `applyLift`'s work, untimed: solve, scale, write the four values and the
+ *  record of what was written. Same contract as `applyLift`. */
+function applyLiftNow(withColour: boolean): { pull: number; foliage: number; sky: number } | null {
   if (!current) return null;
-  // From the look's own amounts, and with the sky by place: the coarse bitmap
-  // is built here if the worker's selection has not landed yet, so the answer
-  // at open is the same answer a moment later.
+  // From the look's own amounts, and with the sky by place: the sky worker's
+  // coarse bitmap at the turn shown. WHEN IT IS STILL ON ITS WAY the lift is
+  // solved without it and solved again when it lands (`resolveLiftWithSky`),
+  // rather than the page building the same bitmap beside the worker's — so the
+  // answer a moment after the open is the answer the open used to give at once.
   const base = liftBaseFor(current, withColour ? activeLook : null);
-  const solved = solveLift(withColour, current, params, withColour ? skyMaskFor(current, shownSkyTurn()) : null, base);
-  if (!solved) { liftApplied = null; liftState(false, withColour); return null; }
+  const sky = withColour ? liftSkyMask(current) : { mask: null, waiting: false };
+  const at = sky.waiting ? cloneParams(params) : null; // what this solve measures, kept for the second one
+  const solved = solveLift(withColour, current, params, sky.mask, base, lensForEdit(current));
+  if (!solved) { liftApplied = null; liftWait = null; oweLift(null); liftState(false, withColour); return null; }
   const r = scaleLift(solved, liftAmount, base);
+  liftWait = sky.waiting && at ? { img: current, wrote: { tone: r.tone.join(","), foliage: r.foliage.join(","), sky: r.sky.join(","), skySat: String(r.skySat) }, at, base, amount: liftAmount } : null;
+  oweLift(liftWait);
   const noop = r.pull === 0 && r.foliage[1] === base.foliage[1] && r.skySat === base.skySat;
   liftApplied = {
     // What the frame is WITHOUT a lift, which is what turning it off should
@@ -4388,7 +4494,7 @@ function oneBandFile(img: DecodedImage | null, baseline: EditParams | null): boo
   if (!baseline) return false;
   // Under the swap, because that is the state a colour look puts the frame in
   // and the cool band's hue is 30 degrees with it on and 210 with it off.
-  const v = coolContent(img, baseline, true) < COOL_BAND_FLOOR;
+  const v = isOneBand(img, baseline, lensForEdit(img));
   oneBandCache.set(img, v);
   return v;
 }
@@ -8894,26 +9000,20 @@ function refindTurnedSkyMasks(): boolean {
  *  (`rebuildSkyMasks`); the look's own pair was built once, at the file's
  *  turn, and kept — so after a quarter-turn, a stored edit's turn or a gallery
  *  example's fixed one, the look deepened a side of the picture as its sky.
- *  This is the rebuild beside that one: the coarse half now, from the cache
- *  `skyMaskFor` keeps per turn, and the refined half on the next draw that
- *  needs it (`syncSkyMap`), exactly as a photograph opened without a worker
- *  gets it.
+ *  This is the rebuild beside that one: the pair the sky worker has built at
+ *  that turn if it has, and otherwise the sky worker is asked for it (from the
+ *  1024 px copy the decode kept) and the sky stages wait for the answer — the
+ *  page builds neither half itself any more (`seekSky`).
  *
  *  What the caller relies on: afterwards `skyBitmap`, `skyFine` and the sky
- *  map were all found at `shownSkyTurn()`, or the worker's pair is still on its
- *  way and will read the turn itself when it lands. It changes no edit value,
- *  so it adds no undo step. */
+ *  map were all found at `shownSkyTurn()`, or the worker's pair is on its way
+ *  and will be adopted, and the stages drawn, when it lands (it reads the turn
+ *  shown then, not the one it was asked at). It changes no edit value, so it
+ *  adds no undo step. */
 function followSkyTurn(): boolean {
   if (!current || lookSkyTurn === null) return false;
-  const turn = shownSkyTurn();
-  if (turn === lookSkyTurn) return false;
-  const img = current;
-  const sel = img.skySel && img.skySel.turn === turn ? img.skySel : null;
-  skyBitmap = sel ? sel.mask : skyMaskFor(img, turn);
-  skyFine = sel ? sel.fine : null;
-  lookSkyTurn = turn;
-  renderer.setSkyFine(skyFine);
-  skyMapKey = "";
+  if (shownSkyTurn() === lookSkyTurn) return false;
+  seekSky(current);
   return true;
 }
 
@@ -11809,56 +11909,29 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
   // tab has been opened.
   {
     // THE SKY SELECTION — the bitmap and its refinement to the picture's
-    // edges (skyfine.ts) — is built by the decode worker on the lane that
-    // decoded this photograph, from the undegraded decode, a moment after
-    // the picture itself. When it has already landed it is taken here; when
-    // it is still on its way the sky stages stay inert until it arrives and
-    // the frame is drawn again; when the decode was never asked for one
-    // (a path that does not open the photograph for editing) the bitmap is
-    // built here as before and the refinement on the first edit that needs
+    // edges (skyfine.ts) — is built by the sky worker from the copy the decode
+    // worker took, a moment after the picture itself, and THE PAGE BUILDS NONE
+    // OF IT (`seekSky`). When it has already landed it is taken here; when it
+    // is still on its way the sky stages stay inert, and so does the lift's
+    // measure of the sky, until it arrives — then the lift is solved again, the
+    // sky map built and the frame drawn again (`skyLanded`); only when the worker
+    // cannot be asked (the decode kept no copy) or answers null is the bitmap
+    // built here, as before, and the refinement on the first edit that needs
     // it (syncSkyMap).
     //
     // EVERY BRANCH TAKES THE TURN SHOWN (070). Here that is the file's own,
     // which is what the worker built at; a stored edit's turn or a gallery
     // example's arrives afterwards through `applyView`, and a pair still on its
-    // way reads the turn shown when it lands rather than the one it left at.
-    const turn = shownSkyTurn();
-    if (img.skySel && img.skySel.turn === turn) {
-      skyBitmap = img.skySel.mask;
-      skyFine = img.skySel.fine;
-      lookSkyTurn = turn;
-    } else if (!img.skySel && img.skySelReady) {
-      skyBitmap = null;
-      skyFine = null;
-      lookSkyTurn = null;
-      const waited = img;
-      void img.skySelReady.then((sel) => {
-        if (current !== waited) return;
-        const now = shownSkyTurn();
-        const fits = !!sel && sel.turn === now;
-        skyBitmap = fits ? sel!.mask : skyMaskFor(waited, now);
-        skyFine = fits ? sel!.fine : null;
-        lookSkyTurn = now;
-        renderer.setSkyFine(skyFine);
-        skyMapKey = "";
-        // DRAWN AGAIN ONLY WHEN SOMETHING ON SCREEN USES IT. With no sky stage
-        // in the edit the frame already showing is the frame this would draw,
-        // and a full redraw a second and a half after every open is a
-        // main-thread task the reader did not ask for: a verdict pressed as
-        // the page went away landed behind it and was lost
-        // (verdict-durability-walk check 4, red with the redraw, 2026-09-18).
-        if ((params.skySmooth ?? 0) > 0 || (params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0) {
-          syncSkyMap();
-          draw();
-        }
-      });
-    } else {
-      skyBitmap = skyMaskFor(img, turn);
-      skyFine = null;
-      lookSkyTurn = turn;
-    }
-    renderer.setSkyFine(skyFine);
-    skyMapKey = "";
+    // way reads the turn shown when it lands rather than the one it left at —
+    // asking the sky worker again at that turn when they differ.
+    liftWait = null;
+    // THE REPORT'S RECORD OF THIS OPEN'S SKY starts at the ask (`SkyProfile`);
+    // `switchToPhoto` takes hold of it when this returns.
+    // A record still waiting belongs to a photograph being left: say so, so its
+    // line never claims an answer is on its way for a picture that is gone.
+    if (skyProfile?.how === "waiting") skyProfile.how = "left";
+    skyProfile = { img, at: performance.now(), asked: false, how: "waiting", wait: null, built: null, lift: null, map: null };
+    seekSky(img);
   }
   const __f = performance.now();
   // (recorded at the end of this function, so `rest` can carry the tail too)
@@ -11902,51 +11975,9 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
  *  denoise — the LIGHTER TOUCH. Pixel data is never mutated; every value
  *  lands on a slider, and the true untouched state is one press away
  *  (Hold: Untouched) or reachable by zeroing the sliders. */
-/** WHAT OPENING A PHOTOGRAPH APPLIES BEFORE ANYBODY TOUCHES ANYTHING.
- *
- *  Takes `img`, a decoded photograph.
- *  Returns the four values the standing ruling fixes per file kind — white
- *  balance, exposure, highlight recovery and the channel swap. Denoise is NOT
- *  here: both callers want it and they measure it differently on purpose (a
- *  260px tile is not denoised at all), which is a difference by decision rather
- *  than by drift.
- *
- *  BOTH CALLERS MUST USE IT, and that is the whole point. `establishFreshEdit`
- *  applies this to the open photograph and `makeThumb` renders a tile for a
- *  photograph nobody has opened — and a tile is a CLAIM about what opening will
- *  do. They were two copies of one ruling, and the moment the ruling changed for
- *  camera-rendered files only one copy heard about it: the tile kept rendering a
- *  JPEG at gray-world balance, with the channel swap inherited from whichever
- *  photograph happened to be open, while opening the same file gave wb [1,1,1]
- *  and no swap. Thumbnail and photograph stopped matching, which is the exact
- *  defect the tile walk already exists for.
- *
- *  RAW measures itself: gray-world balance, auto exposure, and recovery only
- *  where a camera matrix says the numbers are sensor values. CAMERA-RENDERED
- *  opens as the camera made it — no balance, no exposure move, no recovery —
- *  because it was already developed through the camera's own preset. */
-function freshBaseline(img: DecodedImage): {
-  wb: [number, number, number];
-  exposure: number;
-  recover: number;
-  swapRB: boolean;
-} {
-  const wb: [number, number, number] = img.isRaw ? grayWorldWB(img) : [1, 1, 1];
-  return {
-    wb,
-    exposure: img.isRaw ? autoExposure(img, wb) : 1,
-    recover: img.isRaw ? (img.camMatrix ? autoRecover(img) : 0) : 0,
-    // THE CHANNEL SWAP IS A CHOICE, NOT A STARTING STATE. `EditParams` defaults
-    // it true, so every photograph opened with red and blue already exchanged.
-    // A raw absorbs that — it arrives unbalanced, gray-world balances it first,
-    // and the swap lands on channels something has pulled apart. A
-    // camera-rendered file has no balance by design, so the swap is performed on
-    // a finished rendering with nothing before it and no cast correction after:
-    // step 2 of the channel-swap route with steps 1 and 3 missing, and the flat
-    // purple this file's own look table already names.
-    swapRB: img.isRaw,
-  };
-}
+// `freshBaseline` (what opening a photograph applies before anybody touches
+// anything: balance, exposure, recovery, swap) is imported from ./tile, because
+// the decode worker's tile must apply the same ruling the open does.
 
 function establishFreshEdit() {
   const src = current!;
@@ -12681,6 +12712,15 @@ function activateCurrent(id: string) {
   if (st) {
     restoreLiveEdit(st);
     carryLook(); // the session's look reaches a photo you have not graded yourself
+    // A LIFT THIS PHOTOGRAPH WAS LEFT WITH, SOLVED WITHOUT ITS SKY, comes back
+    // owing it: `showDecoded` has dropped `liftWait` for this open, so it is
+    // taken up again from `liftOwed`, and paid now if the sky is already in hand
+    // or when it lands if not.
+    const owed = liftOwed.get(id);
+    if (owed && current) {
+      liftWait = { img: current, ...owed };
+      if (skyPending !== current) skyLanded(current);
+    }
   } else {
     const view = sessionPhotos.find((p) => p.id === id);
     type StoredEdit = Snapshot & { lookMark?: LookMark | null; rot?: number; flip?: number; lutRef?: { id?: unknown; strength?: unknown } | null };
@@ -12813,7 +12853,17 @@ interface SwitchProfile {
   glow: number;
   local: number;
   activate: number;
+  /** ms of `activate` that the lift's solves took (a first visit solves it
+   *  once, without the sky if the sky is still on its way), and how many
+   *  solves that was; `activate` less this is what settling spent otherwise. */
+  liftFirst: number;
+  liftRuns: number;
   strip: number;
+  /** What came after the picture: the look's sky, which runs beside the parts
+   *  above and past their end (`SkyProfile`). The record is the one the open's
+   *  `showDecoded` made, and it fills in as the answers land, so a report taken
+   *  while the sky is still on its way says so. Null where nothing was asked. */
+  sky: SkyProfile | null;
   fresh: boolean;
   /** ms the main thread was held by work that is NOT this switch, while this
    *  switch was waiting on storage or a decode. null where the browser cannot
@@ -12906,8 +12956,11 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
     const t2 = performance.now();
     showDecoded(img, imported);
     const t3 = performance.now();
+    const skyOfThis = skyProfile?.img === img ? skyProfile : null; // made by the showDecoded above
+    const liftMs0 = liftClock.ms, liftRuns0 = liftClock.runs;
     activateCurrent(id);
     const t4 = performance.now();
+    const liftFirst = liftClock.ms - liftMs0, liftRuns = liftClock.runs - liftRuns0;
     // LET GO OF THE PHOTO WE LEFT, once its saved copy is really on the disk.
     //
     // ATTACHED HERE rather than beside the capture, because the durable write is
@@ -12970,7 +13023,10 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
       // The strip reconcile runs INSIDE activateCurrent, so it is taken out of
       // that number rather than added beside it.
       activate: t4 - t3 - lastStripMs,
+      liftFirst,
+      liftRuns,
       strip: lastStripMs,
+      sky: skyOfThis,
       fresh: lastActivateFresh,
       otherWork: watch.heldDuring(t0, t2), // the two await windows, end to end
       megapixels: (img.width * img.height) / 1e6,
@@ -12999,245 +13055,101 @@ async function switchToPhoto(id: string, opts?: { quiet?: boolean }) {
  *    given: that edit carries its own strength. REQUIRED, with no default, so
  *    a new caller cannot render a tile at a strength the open will not use. */
 async function makeThumb(img: DecodedImage, MAX = 260, lens: LensCurve | null, own: Snapshot | null, ex: ExifSubset | null): Promise<ArrayBuffer> {
-  const s = Math.min(1, MAX / Math.max(img.width, img.height));
-  const w = Math.max(1, Math.round(img.width * s));
-  const h = Math.max(1, Math.round(img.height * s));
-  // Render the thumb through the REAL pipeline with the photo's own auto
-  // baseline PLUS the live creative state (swap/looks/grade persist across
-  // opens), so a thumbnail matches what tapping it will show — a bare
-  // WB+matrix render diverged the moment a look was active (caught on the
-  // device, IMG_1256: yellow/blue thumb vs the teal/orange it opened into).
-  // Spatial/per-image extras (masks, glow, clarity, LUT, grain) are cleared —
-  // they need maps or textures a thumb doesn't have.
-  // THE LOOK'S WB BIAS HAS TO COME WITH IT. applyLook bakes the bias INTO
-  // params.wb (dividing the previous one out), and this line replaced params.wb
-  // wholesale with the photo's own gray-world balance — so the bias was dropped
-  // and every look's tiles shared one neutral white balance.
-  //
-  // That is invisible for some looks and total for others. aero, goldie and red
-  // have IDENTICAL swapRB and hue; they differ almost only by wbBias. Strip the
-  // bias and all three render as Aerochrome, whichever one is selected, while
-  // mono/sepia/natural still change because their difference is swap, sat or
-  // tint. Same multiply batchParamsFor already does for a built-in look.
-  // WITH `own`, EVERY VALUE COMES FROM THAT PHOTO'S OWN EDIT — balance,
-  // exposure and grade alike — because it has all of them already measured and
-  // there is nothing to guess. Without it the photo has never been opened, so
-  // the tile is a claim about what opening it WILL do: its own measured balance
-  // and exposure, under the live look, which is what establishFreshEdit
-  // applies.
-  // THE SAME BASELINE THE OPEN APPLIES, not a second copy of the ruling. This
-  // line used to be `grayWorldWB(img)` unconditionally — correct for a raw and
-  // wrong for a camera-rendered file, which opens at wb [1,1,1] as the camera
-  // made it. See freshBaseline.
-  const base = own ? null : freshBaseline(img);
-  // AND THE LOOK THE SET IS WEARING, because the baseline is only half the
-  // claim. establishFreshEdit applies `freshBaseline` and then, in the next two
-  // lines, applies the SESSION LOOK -- and applyLook overwrites both the channel
-  // swap and the mixer. This function stopped at the baseline, so a tile for a
-  // photograph nobody has opened stated the mapping of an open that will not
-  // happen.
-  //
-  // It was nearly invisible while every look that clears the swap also has
-  // sat 0 (B&W IR, Sepia IR, HIE B&W) -- Natural IR on a raw was already wrong
-  // and nobody could see 1.2 saturation of the other swap. The rotation makes it
-  // total: swap AND rotation compose to a G<->B exchange, so the tile would be a
-  // different picture from the one tapping it opens. `lookBias` below is the
-  // same fact about white balance, and it is taken from the look rather than the
-  // baseline for exactly this reason.
-  const sessLook = own || !sessionLook ? null : LOOKS[sessionLook] ?? null;
-  const gw = own ? own.params.wb : base!.wb;
-  const bias = own ? ([1, 1, 1] as [number, number, number]) : lookBias;
-  const wb: [number, number, number] = [
-    clamp(gw[0] * bias[0], WB_LO, WB_HI),
-    clamp(gw[1] * bias[1], WB_LO, WB_HI),
-    clamp(gw[2] * bias[2], WB_LO, WB_HI),
-  ];
-  const p: EditParams = {
-    ...cloneParams(own ? own.params : params),
-    // An own edit carries its own correction strength. Without one, the tile
-    // claims what opening the photo will do, and that is `lensStrengthAtOpen`
-    // — full with a matched lens, 0 with no match — asked of THIS file's
-    // EXIF, the same question the open asks
-    // (decision 015, reversed; see initHotspot). A tile that corrected
-    // differently from the open photograph would be the exact
-    // strip-against-photo disagreement `lensHalves` exists to make impossible.
-    // A raw's tile carries the flat in its pixels already (the decode laid the
-    // opening strength, lensPlanFor, and an own edit's strength is brought to
-    // it below, after the sky mask); this is what an 8-bit source's grade
-    // reads. `hsFix` is the shipped card's own control and set beside it so
-    // the tile does not carry the OPEN photograph's, which the clone above
-    // would otherwise hand it.
-    lensFix: own ? (own.params.lensFix ?? lensStrengthAtOpen(ex)) : lensStrengthAtOpen(ex),
-    lensBypass: own ? own.params.lensBypass : false,
-    hsFix: own ? own.params.hsFix : lensStrengthAtOpen(ex, "shipped"),
-    hsBypass: own ? own.params.hsBypass : false,
-    forceBalance: own ? (own.params.forceBalance ?? false) : false,
-    wb,
-    exposure: own ? own.params.exposure : base!.exposure,
-    denoise: 0,
-    // Nor colour-smoothed, for the same reason: a 260px tile has already thrown
-    // away the high-frequency colour this removes, so running it would cost a
-    // neighbourhood pass per tile to change nothing anybody can see.
-    chroma: 0,
-    // Nor despeckled: a stray pixel in the full frame is a fraction of one tile
-    // pixel, and the downscale has already averaged it away.
-    despeckle: 0,
-    recover: own ? (own.params.recover ?? 0) : base!.recover,
-    // INHERITED FROM WHICHEVER PHOTOGRAPH WAS OPEN, WHICH IS A DIFFERENT FRAME'S
-    // ANSWER. `cloneParams(params)` above carries the live swap onto a tile for a
-    // file nobody has opened, so a camera JPEG's tile was swapped whenever a raw
-    // was on screen and the same file opened unswapped. The tile is a claim about
-    // what opening WILL do, so it takes the claim from the same place the open
-    // does. A photograph with its own edit keeps its own answer.
-    swapRB: own ? own.params.swapRB : sessLook ? sessLook.swapRB : base!.swapRB,
-    // With a session look the mapping is the LOOK's; with none, the live mixer
-    // rides into the next open untouched (establishFreshEdit does not clear it),
-    // so the clone above is already the right answer and this leaves it alone.
-    ...(sessLook ? { mix3: sessLook.mix3 ? [...sessLook.mix3] : [...MIX3_DEFAULT] } : {}),
-    masks: [],
-    spots: [],
-    glow: 0,
-    clarity: 0,
-    dehaze: 0,
-    sharpen: 0,
-    // ZERO EVEN WHEN THE LOOK CARRIES ONE, and that is the same fact as
-    // `denoise: 0` above rather than a second decision. Aerochrome brings
-    // `texture` to give back the modelling its denoise floor costs (Look.texture)
-    // -- and a 260px tile is not denoised at all, so it never paid that cost.
-    // Running the mid-frequency high-pass here would be adding structure to a
-    // downscale that has already averaged the band it works in away. Change one
-    // of these two lines and the other stops being true.
-    texture: 0,
-    grainAmt: 0,
-    vigAmt: 0,
-    lut: null,
-    crop: { ...CROP_DEFAULT },
-    straighten: 0,
-    // Solved for THIS photo, not inherited from whichever one happens to be
-    // open. Tone, sky and foliage stopped being a shared creative choice the
-    // moment Restore depth started writing them per frame — so cloning the live
-    // params handed every tile another frame's correction, and tapping it
-    // re-solved and showed something different. That is exactly the defect the
-    // thumbnails were fixed for once before (a thumb must match its open).
-    //
-    // CONDITIONAL ON `own`, WHICH IT WAS NOT. Clearing these three
-    // unconditionally fixed the `!own` case and broke the other one in the same
-    // line: a photo that HAS been opened carries its own solved curve in
-    // own.params, and this threw it away — while the re-solve below is gated on
-    // `!own` and could not put it back. Restore depth is on by default, so that
-    // was every opened photo: the tile went flat the moment the photo was
-    // tapped, which reads as the app quietly undoing something. The values here
-    // are this frame's own answer; only the live ones were ever another
-    // frame's.
-    tone: own ? [...own.params.tone] : [...TONE_DEFAULT],
-    sky: own ? [...own.params.sky] : [0, 1, 1],
-    foliage: own ? [...own.params.foliage] : [0, 1, 1],
-  };
-  // A LOOK NEEDS A WHITE BALANCE TO WORK ON, AND A CAMERA-RENDERED FILE OPENS
-  // WITHOUT ONE — and this function is the half of that rule that stopped doing
-  // it. `applyLook` gray-world balances a non-raw before applying a look and
-  // re-derives exposure to go with it, because a false-colour look on a JPEG
-  // otherwise applies its swap to channels nothing has pulled apart; the comment
-  // there still says "makeThumb has always done both together, which is why the
-  // tile looked right while the photo did not". That stopped being true when
-  // this function started taking its baseline from `freshBaseline`, which gives
-  // a camera-rendered file [1,1,1] — correct for a tile with no look on it, and
-  // the removal of the balance a look needs.
-  //
-  // MEASURED, under Aerochrome on a camera JPEG nobody had opened: the tile came
-  // out at wb [1,1,1] and exposure 1 while opening the same file gave wb
-  // [0.209, 1.270, 0.638] and exposure 2.49, and the tile's largest hue band sat
-  // 150 degrees from the photograph's — 39 of 46 fields identical and the
-  // balance carrying all of it. The raw arm of the same test was 0 degrees
-  // throughout, because a raw is gray-world balanced by `freshBaseline` anyway
-  // and there was nothing for this to remove.
-  //
-  // The one-band test and the exposure re-derive both come with it, for the
-  // reasons `applyLook` states at length: a camera JPEG can arrive with nothing
-  // in the cool band, where balancing manufactures a second band by crushing red
-  // sixfold; and a balance without a matching exposure just makes the picture
-  // dark. `forceBalance` is false on a tile because nobody has opened the photo
-  // to set it, which is the same state `applyLook` calls untouched.
-  if (sessLook && !own && !img.isRaw && !oneBandFile(img, p)) {
-    const gw = grayWorldWB(img);
-    p.wb = [
-      clamp(gw[0] * bias[0], WB_LO, WB_HI),
-      clamp(gw[1] * bias[1], WB_LO, WB_HI),
-      clamp(gw[2] * bias[2], WB_LO, WB_HI),
-    ];
-    p.exposure = autoExposure(img, p.wb);
-  }
-  if (autoLift && !own) {
-    const base = liftBaseFor(img, activeLook);
-    // A TILE IS LAID OUT AT THE FILE'S OWN TURN (below), so its sky is found
-    // at that turn too (070) — the lift's sky population with it.
-    const solved = solveLift(activeLook !== null, img, p, activeLook !== null ? skyMaskFor(img, img.rotate ?? 0) : null, base);
-    const lift = solved && scaleLift(solved, liftAmount, base);
-    if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; p.skySat = lift.skySat; }
-  }
-  // THE PHOTO'S DISPLAY ROTATION, which this never applied. `img.rotate` is the
-  // EXIF Orientation tag as 90-degree CW steps, and the main view has always
-  // honoured it — so a frame shot in portrait opened upright and its THUMBNAIL
-  // lay on its side, in the strip and in the Quick look grid alike, both of
-  // which are built from here. Nineteen of the forty-four practice files carry
-  // Orientation 8, so it was not a corner case; measured before this, a
-  // portrait frame's tile came out 512x341 while the photo itself opened
-  // 932x1400.
-  //
-  // Applied by mapping DESTINATION pixels back to source, so there is still one
-  // pass and no second buffer. The aspect handed to compileEdit stays the
-  // SOURCE aspect: the edit is computed in the photo's own space, and only the
-  // laying-out of the result turns.
-  const rot = ((((img.rotate ?? 0) % 4) + 4) % 4) as 0 | 1 | 2 | 3;
-  const turned = rot === 1 || rot === 3;
-  const ow = turned ? h : w;
-  const oh = turned ? w : h;
-  // THE SKY STAGES REACH THE TILE when the look carries them: the map is built
-  // from the tile's own sampler at the tile's size (cheap at 128 texels), and
-  // the coarse bitmap stands in for the refined one — at 260 px it is the
-  // finer of the two. Without this a tile under Aerochrome would show a sky
-  // half again as bright as the photograph's, and the agreement walk would
-  // say so.
-  const tileSky = ((p.skySmooth ?? 0) > 0 || (p.skyDepth ?? 0) > 0 || (p.skySat ?? 0) > 0) ? skyMaskFor(img, rot) : null;
-  // A RAW'S DECODE LAID THE OPENING STRENGTH, 1 with a matched lens (lensPlanFor,
-  // decision 085), and an own edit may carry another. Nothing downstream
-  // re-applies it for a raw — `lensForEdit` hands the grade no curve when the
-  // flat is in the pixels — so the pixels are brought to the edit's strength
-  // here, as the open photograph's are, or the tile shows a correction the
-  // photograph does not. AFTER the sky mask, not before: the open photograph's
-  // selection was built at decode, at the opening strength, and a later
-  // strength does not rebuild it, so the tile's is built from the same pixels.
-  // Nothing above reads pixels for an own edit. An edit saved before `lensFix`
-  // existed carries none, and opening it keeps the fresh open's strength
-  // (applySnapshot merges over it), so the tile does the same.
-  if (own) bringLensTo(img, lens, { lensFix: own.params.lensFix ?? lensStrengthAtOpen(ex), lensBypass: own.params.lensBypass });
-  const tileSample = (x: number, y: number) => linearAt(img, Math.min(img.width - 1, Math.floor(x / s)), Math.min(img.height - 1, Math.floor(y / s)));
-  const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null, ex), tileSky, srcFlatOf(img)) : null;
-  const edit = compileEdit(p, img.camMatrix, w / h, undefined, lensForEdit(img, lens ?? null, ex), tileMap, tileSky, srcFlatOf(img));
-  const px = new Float32Array(3);
-  const out = new Uint8ClampedArray(ow * oh * 4);
-  for (let oy = 0; oy < oh; oy++) {
-    for (let ox = 0; ox < ow; ox++) {
-      // (x, y) in the un-turned thumbnail grid that lands at (ox, oy).
-      const x = rot === 0 ? ox : rot === 1 ? oy : rot === 2 ? w - 1 - ox : w - 1 - oy;
-      const y = rot === 0 ? oy : rot === 1 ? h - 1 - ox : rot === 2 ? h - 1 - oy : ox;
-      const sx = Math.min(img.width - 1, Math.floor(x / s));
-      const sy = Math.min(img.height - 1, Math.floor(y / s));
-      const [r, g, b] = linearAt(img, sx, sy);
-      edit(r, g, b, px, 0, tileMap ? (x + 0.5) / w : undefined, tileMap ? (y + 0.5) / h : undefined, (x + 0.5) / w, (y + 0.5) / h);
-      const i = (oy * ow + ox) * 4;
-      out[i] = Math.round(255 * clamp(px[0], 0, 1));
-      out[i + 1] = Math.round(255 * clamp(px[1], 0, 1));
-      out[i + 2] = Math.round(255 * clamp(px[2], 0, 1));
-      out[i + 3] = 255;
-    }
-  }
-  const cv = document.createElement("canvas");
-  cv.width = ow; cv.height = oh;
-  cv.getContext("2d")!.putImageData(new ImageData(out, ow, oh), 0, 0);
-  const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), "image/jpeg", 0.72));
-  return blob.arrayBuffer();
+  // The drawing is tile.ts `renderTile`, the same function the decode worker
+  // runs for the strip; this is the page's path: the quick look, which decodes
+  // its own copy of each file, and a device whose worker cannot draw or encode
+  // (the strip's fallback in `oneThumbnail`). No caller passes the open
+  // photograph's own decode. The page-state reads moved into `tileInputsFor`.
+  return drawTileHere(img, tileInputsFor(MAX, lens, own, ex));
 }
+
+/** EVERYTHING A TILE READS FROM THE EDITOR, taken at one moment.
+ *  @param maxEdge  the tile's longest edge in pixels (260 for the strip).
+ *  @param lens  the curve matched to the tile's file (`lensCurveFor`; every
+ *    caller passes that, with the photograph's own pick when it has one).
+ *  @param own  the photograph's own edit, or null for one never opened.
+ *  @param ex  the file's own EXIF (`exifOf`), for the lens strength a
+ *    photograph with no edit of its own will OPEN at.
+ *  @returns plain, structured-cloneable `TileInputs`: what `makeThumb` used to
+ *  read off module state while drawing, so the decode worker can draw the same
+ *  tile. What the result must satisfy: `renderTile` of it is the picture
+ *  `makeThumb` drew from the same state before the tile moved (the byte
+ *  comparison over the practice set holds it), and it is taken at the same
+ *  moment as the stamp it is stored under, so the picture and its claim agree.
+ *  The edit rides through `cloneParams` with masks, spots, stickers, warp and
+ *  LUT emptied: the tile clears the first, second and last itself and neither
+ *  stickers nor warp is read by `compileEdit` or `buildSkyMap`; keeping their
+ *  bitmaps would copy megabytes into the worker for nothing. */
+function tileInputsFor(maxEdge: number, lens: LensCurve | null, own: Snapshot | null, ex: ExifSubset | null): TileInputs {
+  const base = cloneParams(own ? own.params : params);
+  base.masks = [];
+  base.spots = [];
+  base.stickers = [];
+  base.warp = null;
+  base.lut = null;
+  const op = own?.params;
+  const look = own || !sessionLook ? null : LOOKS[sessionLook] ?? null;
+  return {
+    maxEdge,
+    lens,
+    orientation: ex?.orientation,
+    liftCurve: currentLensCurve(),
+    liftOrientation: currentExif?.orientation,
+    base,
+    own: op ? {
+      wb: [...op.wb] as [number, number, number], exposure: op.exposure, recover: op.recover, swapRB: op.swapRB,
+      tone: [...op.tone] as typeof op.tone, sky: [...op.sky] as typeof op.sky, foliage: [...op.foliage] as typeof op.foliage,
+      lensFix: op.lensFix, lensBypass: op.lensBypass, hsFix: op.hsFix, hsBypass: op.hsBypass, forceBalance: op.forceBalance,
+    } : null,
+    lookBias: [...lookBias] as [number, number, number],
+    sessLook: look ? { swapRB: look.swapRB, mix3: look.mix3 ? [...look.mix3] : null } : null,
+    autoLift,
+    liftAmount,
+    withColour: activeLook !== null,
+    liftBase: { raw: liftBaseForKind(activeLook, true), jpeg: liftBaseForKind(activeLook, false) },
+    lensOpen: lensStrengthAtOpen(ex),
+    hsShipped: lensStrengthAtOpen(ex, "shipped"),
+  };
+}
+
+/** Draw a tile on THIS thread and encode it: the page's path, for the quick look
+ *  and for a device where the decode worker cannot draw or encode a tile.
+ *  @param img  the decoded photograph (the lens flat laid).
+ *  @param inp  the tile's inputs (`tileInputsFor`).
+ *  @returns the JPEG bytes at `TILE_QUALITY`. The pixels come from
+ *  `renderTile`, which the decode worker runs too. */
+async function drawTileHere(img: DecodedImage, inp: TileInputs): Promise<ArrayBuffer> {
+  return (await drawTileTimed(img, inp)).bytes;
+}
+
+/** `drawTileHere` with the clock read: the page's path for a strip tile, which
+ *  `oneThumbnail` reports as "Last strip tile … on the page".
+ *  @param img  the decoded photograph (the lens flat laid).
+ *  @param inp  the tile's inputs (`tileInputsFor`).
+ *  @returns `bytes`, the JPEG at `TILE_QUALITY`, and `ms`, the parts of the time
+ *  it took on this thread — selection, lift, pixels, encode, and `total`, which
+ *  is the draw and the encode with nothing before them: the caller's decode is
+ *  its own and is added by the caller. What the result must satisfy: the bytes
+ *  are `drawTileHere`'s, unchanged, and the four parts are disjoint and sum to no
+ *  more than `total`. */
+async function drawTileTimed(img: DecodedImage, inp: TileInputs): Promise<{ bytes: ArrayBuffer; ms: Omit<TileTimings, "decode"> }> {
+  const t0 = performance.now();
+  const t = renderTile(img, inp, skyMaskFor);
+  const e0 = performance.now();
+  const cv = document.createElement("canvas");
+  cv.width = t.width; cv.height = t.height;
+  cv.getContext("2d")!.putImageData(new ImageData(t.rgba, t.width, t.height), 0, 0);
+  const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), "image/jpeg", TILE_QUALITY));
+  const bytes = await blob.arrayBuffer();
+  const done = performance.now();
+  return { bytes, ms: { selection: t.ms.selection, lift: t.ms.lift, pixels: t.ms.pixels, encode: done - e0, total: done - t0 } };
+}
+
+/** THE LAST STRIP TILE THAT FINISHED, for the report's "Last strip tile" line:
+ *  which thread drew it and where its time went. Set by `oneThumbnail` only —
+ *  the quick look draws its own tiles through `makeThumb` and has its own line —
+ *  and holds nothing about the photograph it was of. */
+let lastStripTile: LastTile | null = null;
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -13709,7 +13621,7 @@ async function openSingle(file: File) {
   const id = "lone";
   sessionPhotos = [{ id, name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "", thumbState: "real" }];
   nextOrder = 0;
-  liveEdits.clear();
+  liveEdits.clear(); liftOwed.clear();
   activateCurrent(id);
   updateSessionStrip();
   // A JPEG exported by this app can carry its own look (the traveling
@@ -13760,7 +13672,7 @@ async function resetSessionState(clearStorage: boolean): Promise<{ ok: true; rea
   sessionPhotos = [];
   activePhotoId = null;
   nextOrder = 0;
-  liveEdits.clear();
+  liveEdits.clear(); liftOwed.clear();
   pendingStore.clear();
   // A NEW SET STARTS ON THE STANDING DEFAULT — and only when there is one. With
   // no preference set this leaves the session look exactly where it was, which
@@ -14754,7 +14666,6 @@ async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
   try {
     const bytes = await Session.getBytes(view.id);
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
-    const img = await decodeWithLens(imported);
     const own = ownEdit(view);
     // THE CLAIM IS TAKEN WITH THE EDIT IT IS DRAWN FROM, not after the render:
     // a lens move made while the tile renders and saves would otherwise stamp
@@ -14768,7 +14679,33 @@ async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
     // exactly this (its own comment says "every path that renders a frame
     // other than the one the reader has open") and the quick-look grid has
     // always passed it; this path never did.
-    const thumb = await makeThumb(img, 260, lensCurveFor(imported, own?.params.lensPick), own, exifOf(imported));
+    // THE TILE IS DRAWN IN A DECODE LANE (tile.ts, decode.worker.ts): the lane
+    // decodes, builds the sky selection from its own copy, solves the lift,
+    // draws and encodes, and hands back JPEG bytes — so the page does nothing
+    // per tile but store and show them. The inputs are taken now, with the
+    // stamp above, so the picture and the claim it is stored under agree.
+    const ex = exifOf(imported);
+    const tileLens = lensCurveFor(imported, own?.params.lensPick);
+    const inputs = tileInputsFor(260, tileLens, own, ex);
+    const drawn = await tileOffThread(imported, inputs, lensPlanFor(imported));
+    let thumb: ArrayBuffer;
+    let drawnBy: LastTile;
+    if (drawn) {
+      thumb = drawn.bytes;
+      drawnBy = { where: "worker", ms: drawn.ms };
+    } else {
+      // No lane could be started, the lane died, or this browser would not
+      // encode a JPEG off the page: the page draws it, as it always did.
+      const d0 = performance.now();
+      const img = await decodeWithLens(imported);
+      const decodeMs = performance.now() - d0;
+      const here = await drawTileTimed(img, inputs);
+      thumb = here.bytes;
+      drawnBy = { where: "page", ms: { decode: decodeMs, ...here.ms, total: decodeMs + here.ms.total } };
+    }
+    // DRAWN IS DRAWN: a tile the pass has moved past, or whose photograph was
+    // dropped meanwhile, still cost what it cost, so it is the last one drawn.
+    lastStripTile = drawnBy;
     if (gen !== thumbPass) return;
     if (!sessionPhotos.some((p) => p.id === view.id)) return; // dropped while we worked
     if (thumb.byteLength) {
@@ -15659,7 +15596,18 @@ async function endSession(): Promise<Awaited<ReturnType<typeof resetSessionState
 /** WHERE THE LAST PHOTO SWITCH WENT, in one line that can be copied out of the
  *  report. Every part was measured on this device inside the same switch, and
  *  they add up to the whole — SwitchProfile says why "held by other work" cannot
- *  overlap the rest. */
+ *  overlap the rest.
+ *
+ *  Takes nothing; reads the last switch. Returns "none this session" before the
+ *  first, else the line. After the parts of the switch it carries what came
+ *  AFTER the picture — the look's sky: how the selection arrived and what it
+ *  cost, the second solve of the lift, the first sky map build — which runs
+ *  beside the switch and past its end and so is NOT in the whole above; and
+ *  inside settling, what the lift's first solve took of it. What the line must
+ *  satisfy: the switch's parts add up to its whole; settling's two parts add up
+ *  to settling; and each sky part is something the page measured on its own
+ *  clock, said as "none made" or "none built yet" where nothing ran, never as a
+ *  zero. It names no file and nothing the reader wrote. */
 function switchSplit(): string {
   const p = lastSwitchProfile;
   if (!p) return "none this session";
@@ -15670,14 +15618,33 @@ function switchSplit(): string {
     p.otherWork === null
       ? "this browser cannot report what else held the main thread"
       : `other work held the main thread ${t(p.otherWork)} of the wait`;
+  // THE LOOK'S SKY, after the picture. Read live: the answers land after the
+  // switch ends, so a report taken early says "still on its way" and a later one
+  // says what it cost.
+  const s = p.sky;
+  const arrival = ((): string => {
+    if (!s) return "none recorded";
+    switch (s.how) {
+      case "waiting": return `selection still on its way, asked ${t(performance.now() - s.at)} ago`;
+      case "left": return "selection had not arrived when another photograph was opened";
+      case "held": return "selection already in hand when asked for";
+      case "worker": return `selection from the worker, waited ${t(s.wait ?? 0)}`;
+      case "page": return `selection built on the page, ${t(s.built ?? 0)}`;
+      case "none": return `the worker gave no selection after waiting ${t(s.wait ?? 0)}, built on the page, ${t(s.built ?? 0)}`;
+    }
+  })();
+  const afterwards = s && s.how !== "waiting" && s.how !== "left"
+    ? `, second lift solve ${s.lift === null ? "none made" : t(s.lift)}, sky map ${s.map === null ? "none built yet" : t(s.map)}`
+    : "";
   return (
     `${p.megapixels.toFixed(1)} MP in ${t(p.total)} — reading ${t(p.getBytes)} over ${p.chunkRows} stored pieces` +
     `, decode waited ${t(p.decodeQueued)} then ran ${t(p.decodeRun)} ${p.decodeOffThread ? "on a worker" : "on the main thread"}` +
     `, showing ${t(p.show)} (hot spot ${t(p.hotspot)}, upload ${t(p.upload)}, zoom ${t(p.zoom)}, glow ${t(p.glow)}, local ${t(p.local)}, rest ${t(p.rest)})` +
-    `, settling ${t(p.activate)}, strip ${t(p.strip)}` +
+    `, settling ${t(p.activate)} (${p.liftRuns ? `first lift solve ${t(p.liftFirst)}` : "no lift solve"}, otherwise ${t(p.activate - p.liftFirst)}), strip ${t(p.strip)}` +
     ` — ${p.fresh ? "first visit" : "been here before"}, ${other}` +
     `; ${p.sessionSize} photos, ${p.thumbsInFlight} thumbnail${p.thumbsInFlight === 1 ? "" : "s"} being built` +
-    `, ${p.lanes || "no"} decoder${p.lanes === 1 ? "" : "s"} running, ${p.queueDepth} decode${p.queueDepth === 1 ? "" : "s"} already waiting`
+    `, ${p.lanes || "no"} decoder${p.lanes === 1 ? "" : "s"} running, ${p.queueDepth} decode${p.queueDepth === 1 ? "" : "s"} already waiting` +
+    `; after the picture, the look's sky: ${arrival}${afterwards}`
   );
 }
 
@@ -15837,7 +15804,7 @@ async function resumeSession() {
       thumbUrl: m.thumb.byteLength ? URL.createObjectURL(new Blob([m.thumb], { type: "image/jpeg" })) : "",
     }));
     nextOrder = Math.max(...metas.map((m) => m.order)) + 1;
-    liveEdits.clear();
+    liveEdits.clear(); liftOwed.clear();
     activePhotoId = null;
     resumeBtn.hidden = true;
     // Open the first photo (its stored edit, if any, is applied on activate).
@@ -16236,7 +16203,7 @@ function showLoneWithEdit(srcName: string, kind: ImageKind, size: number, edit: 
   // strip to resume, with its stored edit riding in beside it.
   sessionPhotos = [{ id: "lone", name: srcName, kind, size, edit, thumbUrl: "", thumbState: "real" }];
   nextOrder = 0;
-  liveEdits.clear();
+  liveEdits.clear(); liftOwed.clear();
   activateCurrent("lone");
   reviveFixStrokes();
   if (rebuildSkyMasks()) updateSkyStatus();
@@ -17773,7 +17740,7 @@ async function loadGalleryPhoto(key: string, tile: GalleryTile) {
     // later multi-pick can ask sensibly. activateCurrent runs establishFreshEdit.
     sessionPhotos = [{ id: "lone", name: imported.name, kind: imported.kind, size: imported.bytes.length, edit: null, thumbUrl: "", thumbState: "real" }];
     nextOrder = 0;
-    liveEdits.clear();
+    liveEdits.clear(); liftOwed.clear();
     // Some RAW examples need a fixed display rotation (the decoder can't infer
     // it). BEFORE the edit is established (070), not after: establishing it
     // solves the lift under the session's look, which measures the sky by
@@ -18598,7 +18565,7 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     const liftSky = grade.kind !== "builtin" || LOOKS[grade.key].liftSky !== false;
     const base: LiftBase = hasLook ? { foliage: [...look.foliage] as [number, number, number], sky: [...look.sky] as [number, number, number], skySat: look.skySat ?? 0, liftSky } : liftBaseNeutral();
     // At the file's own turn, which is the turn `runBatch` exports at (070).
-    const solved = solveLift(hasLook, img, p, hasLook ? skyMaskFor(img, img.rotate ?? 0) : null, base);
+    const solved = solveLift(hasLook, img, p, hasLook ? skyMaskFor(img, img.rotate ?? 0) : null, base, lensForEdit(img));
     const lift = solved && scaleLift(solved, liftAmount, base);
     if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; p.skySat = lift.skySat; }
   }

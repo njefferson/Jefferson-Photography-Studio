@@ -54,6 +54,150 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**The open and the strip, off the page: built 2026-10-06 on staging's v2.65.7
+(91987d7), not pushed yet.** Everything below it on staging, plus this release,
+for the device pass. It is the open-and-strip plan's work and its leftovers
+from v2.65.3 below.
+- **A strip tile is drawn in a decode worker, and the page only stores and
+  shows it.** Where the browser will encode a JPEG in a worker, the whole tile
+  is made there (decode, the look's sky from the worker's own copy, the lift,
+  the pixels, the encode); where it will not, or there is no worker, the page
+  draws it as before. A tile from the worker is byte for byte the page's tile
+  for the same inputs on all 47 practice files (188 tiles, 0 different), and
+  with workers refused the strip and the sky still draw.
+- **The open photograph no longer builds or refines its sky selection on the
+  page.** The picture draws first. The look's sky, the lift's second solve and
+  the sky map follow when the sky worker answers, which is two steps by design,
+  not one; the page builds the selection itself only where the worker cannot
+  be asked.
+- **The report says where the seconds go.** A new "Last strip tile" line names
+  the thread that drew the last tile and its decode, selection, lift, pixels,
+  encode and rest (they add up to the whole); the "Last switch" line gains the
+  look's sky: the wait for the selection, the second lift solve and the sky
+  map. Neither carries anything the reader wrote.
+- **Fixed: Aerochrome on a camera JPEG no longer shows a soft dark blob in the
+  sky.** The first commit that showed it is 95d8ea7, which made the sky
+  selection's balance leave out areas read as clipped. A camera JPEG's own
+  brightest areas read as clipped too, which dropped the pale centre of the
+  lens hot spot out of the sky; an 8-bit source counts every area now. A raw
+  is unchanged.
+- **Fixed: a slider pressed at the value it already held moved the picture.**
+  By up to 3 levels in 255 on six of seven frames, because the balance, the
+  exposure and the lift were written at full precision and the first press of
+  any slider rounded them to its step. They are written on the steps now, so
+  that press moves 0 pixels on all seven frames, and the picture a photograph
+  opens to is at most 3 levels in 255 from the build before.
+- **Fixed: Reset after coming back to a photograph gave a lift without the
+  sky.** Found by this release's own check, rotation-walk 17. A stored edit is
+  laid over the fresh one, so the Reset target had been solved before the sky
+  arrived and stayed that way; the lift read `[0,1.03,1]` against
+  `[0.5,1.03,1]` for the whole of a 150 s probe, and after a second Reset. The
+  Reset target, the as-opened copy and the lift sliders' double-tap defaults
+  take the lift solved with the sky now, and a lift left before its sky
+  arrived is owed it when the photograph comes back. Probed on the walk's own
+  twins: Reset pressed after the sky landed reads `[0.5,1.03,1]` against the
+  upright copy's `[0.51,1.03,1]`.
+- **Cached previews are rebuilt once** (the preview pipeline moves from 92 to
+  93).
+- **Numbers, in the container (software graphics, a server's cores — not the
+  device).** One session of 44 practice photographs under Aerochrome, the same
+  harness before and after, page errors 0. What the strip cost the page: 88
+  tiles took a median 374 ms and 38.5 s in all on the page, now a median 8 ms
+  and 4.1 s. Over the session, pauses over 250 ms went from 52 to 8, long
+  tasks from 138 to 64 and the page's own frames from 3324 to 4318. Pressing
+  Aerochrome and waiting for the strip to redraw: pauses over 250 ms from 45 to
+  1, which is the press itself. **The longest pause did not go down: 18.7 s,
+  now 19.7 s.** It is the press of Aerochrome on the open photograph, and the
+  profile puts it in the histogram's readback waiting on the software
+  rasteriser (11.7 to 18.5 s of each window) and in the sky map's build on the
+  page (3.9 to 8.1 s), neither a tile nor the selection. Opening photographs 2
+  to 4, the wait for the look's sky read 12.2 s and now reads 13.9 s, and the
+  sky map 16.0 to 21.8 s, now 18.1 to 24.7 s; that is not explained, and only
+  the new report lines on the iPad say what it is there.
+- **Checked headless.** Every commit tool that can run from an agent's start
+  directory, on the final tree: type check, preview version (93), contract
+  (379 of 379), architecture, stamp, scope, decisions, openable, keep file,
+  pool budget, token, palette spec, patch note, hub pin, and the hub's surface
+  gates; the third-person check passes with the three declarations below. Walks
+  on the final build, all passing: tile-truth, agreement, opens-as-shot,
+  aerochrome, sky-stage, switch-instrument (21 checks, the new ones made to
+  fail on planted defects), double-tap, journey, look-roundtrip, mask-slots,
+  mask-truth, conversion (on NIR_1376), shell-grid, stage-share,
+  verdict-durability, verdicts, waiting-export, and 30 of 31 checks of
+  offline-shell (4b reads git from the start directory). On the build before
+  the Reset fix, passing: aim, class-width, collect, export-bytes,
+  export-report, export-wire, heal-source, lens-order, lutpack, oneband, picker,
+  quicklook-keys, release. Rotation passes checks 1 to 16; check 17 reads the
+  lift 800 ms after Reset, before the sky lands in the container, so it reads
+  `[0,1.03,1]` whatever the app does.
+- **Not run, and why.** An agent may not change directory, and 15 walks read
+  `public/examples` or a git repository from the start directory: bar-fit,
+  fix-brush, fullview-mask, grade-controls, mask-fix-export, mask-fix,
+  mask-panel, tiff-threads, quicklook-waiting-pick, quicklook-speed,
+  straighten-line, scroll-cue, start-screen, build-wait, and the keep walk's
+  arms after its first (its file arm passes on NIR_1376). Three need axe-core,
+  which is not installed: a11y, a11y-verdicts, export-ui. The control sweep reads 61 to answer for, the
+  figure v2.65.3 recorded. Five commit tools build from the start directory and
+  were not run: mask-turn, join-fold, lens-store, lens-diagnostic and
+  shadow-cast; one-pool-check reads its source the same way.
+- **The device pass it needs:** on the iPad, open a Z 50 raw with a bright sky
+  and a camera JPEG and see whether the picture draws, then the look's sky;
+  press Aerochrome and see whether the controls answer while the strip redraws;
+  copy the report and read the "Last strip tile" line (whether the tile was
+  drawn in a worker, and what its encode cost) and the look's sky in the "Last
+  switch" line; open the strip on a long set. Whether the iPad encodes a JPEG
+  in a worker at all is only read there.
+- **Left from v2.65.3, done here:** the three third-person declarations for the
+  dark-channel paper's citations in `src/localmap.ts`, `src/pipeline.ts` and
+  `src/gl.ts`; the blob; the slider press that moved the picture. The five
+  picture sheets were drawn again with both controls passing and go to the
+  owner with the two look questions.
+- **Found, and not fixed.**
+  - Pressing Reset in the first seconds after a photograph comes back leaves
+    the live lift at the first answer until Reset is pressed again; the
+    Reset target is right once the sky lands (the second press reads it).
+  - The open photograph is still opened in two steps (picture, then the look's
+    sky), by design, where the plan's first goal says one; the sky map and the
+    histogram's readback still run on the page.
+  - `batchParamsFor` and `shadowCastFor` still call `skyMaskFor`, which builds
+    the coarse selection on the page when the worker's has not landed.
+  - A tile's encode took 10.3 to 12.0 s in a decode worker while the page was
+    busy with the sky landing, and 3 to 4 ms when it was idle; read as the
+    worker's encode waiting on the page, which is an inference, not a
+    measurement.
+  - In the container, pressing Aerochrome on the 20-megapixel camera JPEG held
+    the page for 212 s on the fixed tree against about 15 s at v2.64.56, whose
+    open canvas was 2800 by 1867 against 5568 by 3712 now; which commit moved
+    the canvas to the file's full size was not read.
+  - `grayWorldWB` still reads an 8-bit frame's 255s as clipped, so for a camera
+    JPEG the selection's balance and that one are two rules; the Masks tab's
+    sky layer and the IR tab's Auto WB still leave the blown foliage out. Not
+    looked at in a picture.
+  - The preview-version check hashes neither `src/tile.ts` nor
+    `src/skyfine.ts`, so a change to the tile's or the selection's logic moves
+    no number.
+  - No committed test holds "a slider pressed at its own value moves
+    nothing" or "a camera JPEG's selection keeps the lens hot spot in the sky";
+    both probes are scratch. Only Hue shift was pressed for the first, so the
+    other full-precision writers are not shown clean.
+  - `tools/mask-turn-check.mjs`, `one-pool-check.mjs` and the three other commit
+    tools above build from the start directory, and `walk-all.mjs` passes its
+    walks the start directory: spawning them with the repository as their
+    directory would run 13 of the walks above, and those tools could take
+    `--repo` as `contract-check` does. A check that reads nothing can pass:
+    `token-check` run bare printed `0 defined, 0 referenced` and `ok`.
+  - The first server task of this run was stopped by the harness at its
+    two-hour limit, which killed one walk mid-run; a longer verification needs
+    its server restarted, not left.
+  - The picture sheets are the canvas reduced 3 times (6 times for the camera
+    JPEG), so they show colour and where it changes, not pixel detail; the
+    Aerochrome pairs on NIR_1688 and NIR_2920 differ so little that the Green
+    band question may read as no effect on frames without a sky; the camera
+    JPEG's Aerochrome is green and cyan, not red and blue, as decision 019's
+    text says is still unsolved. `tools/look-sheet.mjs` was not used (its list
+    is the closed six-frame question), so the sheets came from scratch
+    harnesses that read the owner-shared frames from the cache directly.
+
 **v2.65.3 at https://staging.jefferson-photo-studio.pages.dev, pushed
 2026-10-03 (b769ccf).** Everything in v2.64.56 below, plus the three colour
 changes that entry held back, the built-in looks re-fitted to them, the second

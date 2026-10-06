@@ -27,11 +27,21 @@
 // does not tell every walk the build is stale.
 import { statSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
-import { join } from "node:path";
+import { join, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// THE REPOSITORY THIS FILE SITS IN, found from the file's own location and never
+// from the directory the process was started in. Both functions below used to
+// default to "." — the start directory — so a walk run by its absolute path from
+// anywhere but the repository root looked for dist/ir.html in the wrong place and
+// refused a current build ("there is no dist/ir.html"). Nothing may `cd` in the
+// sessions that run these walks, so the start directory is not the repository.
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** THE NEWEST SOURCE FILE AGAINST THE BUILD, as two timestamps and a verdict.
  *
- *  Takes `repo`, the repository root (default: the current directory). Reads
+ *  Takes `repo`, the repository root (default: the repository this file sits in,
+ *  whatever directory the process started in). Reads
  *  the mtime of `dist/ir.html` — the page every walk opens, rewritten by every
  *  build — and of every tracked file the build is made FROM, and returns
  *  `{ ok, builtAt, newest, newestFile, reason }`. `ok` is false when there is
@@ -39,7 +49,7 @@ import { join } from "node:path";
  *
  *  What the caller relies on: `ok === false` is never a reason to carry on. A
  *  walk that ignores it is measuring a build nobody can name. */
-export function distFreshness(repo = ".") {
+export function distFreshness(repo = REPO_ROOT) {
   const built = join(repo, "dist", "ir.html");
   if (!existsSync(built)) return { ok: false, builtAt: 0, newest: 0, newestFile: "", reason: "there is no dist/ir.html — nothing has been built" };
   const builtAt = statSync(built).mtimeMs;
@@ -61,7 +71,8 @@ export function distFreshness(repo = ".") {
 
 /** REFUSE THE WALK RATHER THAN MEASURE THE WRONG BUILD.
  *
- *  Takes `repo`, the repository root (default: the current directory). Prints
+ *  Takes `repo`, the repository root (default: the repository this file sits in,
+ *  whatever directory the process started in). Prints
  *  nothing and returns nothing when the build is current; otherwise prints what
  *  is stale and the command that fixes it, and exits the process with code 2 —
  *  the same code the walks already use for "this did not run", so a sweep
@@ -70,7 +81,7 @@ export function distFreshness(repo = ".") {
  *  What the caller relies on: it either returns or does not come back. A walk
  *  calls it before launching a browser, so a stale build costs a second rather
  *  than a full run. */
-export function requireFreshDist(repo = ".") {
+export function requireFreshDist(repo = REPO_ROOT) {
   const f = distFreshness(repo);
   if (f.ok) return;
   console.error(`\n  THE BUILD IS STALE — ${f.reason}.`);
@@ -81,7 +92,7 @@ export function requireFreshDist(repo = ".") {
 
 // Run directly: say which it is, and exit 0/2 so a shell can branch on it.
 if (process.argv[1] && process.argv[1].endsWith("fresh-dist.mjs")) {
-  const f = distFreshness(process.argv.find((a) => a.startsWith("--repo="))?.split("=")[1] ?? ".");
+  const f = distFreshness(process.argv.find((a) => a.startsWith("--repo="))?.split("=")[1] ?? REPO_ROOT);
   console.log(f.ok ? "  the build is current" : `  STALE — ${f.reason}`);
   process.exit(f.ok ? 0 : 2);
 }

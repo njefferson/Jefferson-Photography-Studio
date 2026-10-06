@@ -1,6 +1,26 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
-plan=/root/.claude/plans/read-noahjefferson-handoff-md-then-do-harmonic-hickey.md
-planhash=5f18d5948ae4941a
-diffhash=8a9c5aa0e5d5156d
-verdict=IN-SCOPE: the NOTES staging entry for v2.64.39 (plan step 7), facts checked, two corrections confirmed
-# IN-SCOPE: the NOTES staging entry for v2.64.39 (plan step 7), every fact checked against the remote, the runs, the code at fcbf876 and the harness logs; after two corrections the old page's context-loss clause and the device-run sentence say no more than the code.
+plan=/root/.claude/plans/rippling-hugging-frog.md
+planhash=46b52d9ce700e04e
+diffhash=4bb9a33abeed0318
+verdict=IN-SCOPE: every change in the tree is the open-and-strip work this plan lists, in the fourteen listed files plus the new src/tile.ts, and nothing else.
+# IN-SCOPE: every change in the tree is the open-and-strip work this plan lists, in the fourteen listed files plus the new src/tile.ts, and nothing else.
+# 
+# Judged by an agent that made none of the diff, 2026-10-06, reading this plan by its path, the scope tool's print of the owner's messages, git status, git diff --stat, and every hunk of the staged diff (the unstaged diff is empty) for all fifteen paths, including all 882 added lines of src/tile.ts and the whole of the main.ts diff.
+# 
+# The tree matches the Files list exactly. git status shows fifteen paths, all staged: fourteen modified files, which are the fourteen the plan lists, and the new src/tile.ts, which is the plan's new file. Nothing else is modified, staged or untracked. The stat is 15 files, 2364 insertions and 786 deletions; NOTES.md is additions only (144 lines, none removed), and the .plan-scope share of those figures is the record this finding replaces.
+# 
+# What each part of the tree is:
+# - Tiles drawn in the decode worker through src/tile.ts: tile.ts holds renderTile, solveLift, scaleLift, measureFrame, coolContent, isOneBand, freshBaseline, bringLensTo, lensForSource and srcFlatOf, all moved out of main.ts so the worker can import them. decode.worker.ts takes a tile job and encodes the JPEG with OffscreenCanvas. decodeClient.ts adds tileOffThread and the flag that sends tiles back to the page where the browser will not encode in a worker. main.ts replaces makeThumb's body with tileInputsFor, drawTileHere and drawTileTimed, and oneThumbnail asks the decode lane first and draws on the page only when the lane returns null. pipeline.ts gains cloneParams (89 lines added, none removed), moved from main.ts because a worker cannot import main.ts.
+# - The open photograph taking the worker's selection: decodeClient.ts keeps the 1024 px copy and answers per turn (askFirstSelection, skySelectionAt, canAskSkyAt, requestSkySelectionAt). main.ts seekSky, adoptSky, adoptSkyHere, skyLanded, liftSkyMask and resolveLiftWithSky replace the page-side build in showDecoded and followSkyTurn, with the page's own build kept only where the worker answers null or cannot be asked.
+# - The report's new parts: diagnostic.ts tileLine and LastTile; main.ts SkyProfile, liftClock, the Last strip tile line and the sky part of switchSplit; tools/switch-instrument-walk.mjs checks 10 to 21 and the --plant-sky arm, which hold those lines to a clock other than their own.
+# - The camera-JPEG selection fix: skyfine.ts stops flagging an 8-bit source's 255s as clipped when it builds the selection's balance, and the comments say why. A raw's copy is unchanged.
+# - The slider-at-its-own-value fix: tile.ts snapGain, snapExposure, snapLift and the shared track (trackPos, trackVal) put written values on the sliders' grid; main.ts applyLook writes the balance and exposure through them, and toPos and fromPos delegate to the shared track.
+# - The Reset lift fix: main.ts liftOwed, oweLift, holdBaselineSky and the hook in activateCurrent give the Reset target the lift solved with the sky, and the five places that clear liveEdits (openSingle, resetSessionState, resumeSession, showLoneWithEdit, loadGalleryPhoto) also clear liftOwed.
+# - The three .third-person-allow lines (src/localmap.ts, src/pipeline.ts, src/gl.ts) for the dark-channel paper's cited authors, with their comment.
+# - The regenerated docs/ARCHITECTURE.md (82 modules, src/tile.ts added, line counts moved) and the NOTES.md staging entry, which is an addition only.
+# 
+# Four files are in the Files list but not in the step's parenthetical, and each is supporting rather than extra: src/previewcache.ts and tools/.preview-pipeline move the preview pipeline number from 92 to 93, which the commit gate demands once a picture's pixels change and which the NOTES entry states; tools/fresh-dist.mjs makes the walks' default repository the one the file sits in, so a walk run by its absolute path with no directory change does not look for dist in the wrong place; .plan-scope is the file this record writes.
+# 
+# Nothing in the tree is a new gate, a new committed walk, a decision record, a rewritten scope declaration, or an edit to anything outside the listed files. Changed files were searched for a session link, a trailer, a model name as author and a generated-with line: none. No owner message is quoted in any changed file or in this finding, and no added line attributes a report or a statement to the owner. One comment in src/tile.ts and one NOTES line say a measurement was taken on the owner's frames; they name whose photographs were used, as tools/owner-images.json does, and quote and attribute nothing.
+# 
+# Limit of this reading: the owner's printed messages direct the work to proceed and be saved; they name no individual feature, so each feature's authority is the previous plan as this plan describes it. This reading judges scope, not correctness: nothing was built or run.

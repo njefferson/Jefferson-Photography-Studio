@@ -1715,6 +1715,95 @@ export function hslDefault(): number[] {
   return a;
 }
 
+/** A copy of an edit that nothing done to the copy can reach back into the
+ *  original through — the one clone every undo snapshot, tile and lift solve
+ *  starts from. It lives HERE, beside `EditParams`, because the decode worker's
+ *  tile job (tile.ts) clones an edit too and a worker cannot import main.ts;
+ *  it was in main.ts until the tile moved off the page.
+ *  @param p  an edit, as stored, as parsed from JSON, or as live: any field an
+ *    older save lacks falls back to neutral here.
+ *  @returns a complete `EditParams` with every array and wrapper copied. What the
+ *  result must satisfy: it carries EVERY field of `EditParams` — a field added
+ *  to the interface and not here is silently dropped by Undo, Reset and every
+ *  tile (CLAUDE.md, "Adding an EditParams field", names the five places: this
+ *  is the first). Brush bitmaps, the warp field and a LUT's lattice are SHARED
+ *  by reference (copy-on-write), never copied. */
+export function cloneParams(p: EditParams): EditParams {
+  return {
+    wb: [...p.wb] as [number, number, number],
+    exposure: p.exposure,
+    swapRB: p.swapRB,
+    hue: p.hue,
+    sat: p.sat,
+    contrast: p.contrast,
+    denoise: p.denoise,
+    chroma: p.chroma ?? 0,
+    despeckle: p.despeckle ?? 0,
+    tint: [...p.tint] as [number, number, number],
+    glow: p.glow,
+    sky: [...p.sky] as [number, number, number],
+    foliage: [...p.foliage] as [number, number, number],
+    tone: [...p.tone] as [number, number, number, number, number],
+    toneR: [...(p.toneR ?? TONE_DEFAULT)] as [number, number, number, number, number],
+    toneG: [...(p.toneG ?? TONE_DEFAULT)] as [number, number, number, number, number],
+    toneB: [...(p.toneB ?? TONE_DEFAULT)] as [number, number, number, number, number],
+    lum: p.lum,
+    recover: p.recover ?? 0,
+    // Brush bitmaps are SHARED between snapshots, not copied (copy-on-write):
+    // a stroke clones the live buffer before mutating (startPaint/Clear), so a
+    // history entry's pixels can never change under it. Without this, every
+    // snapshot duplicated up to 4 x ~100KB bitmaps — tens of MB of undo history
+    // in a heavy brush session on the iPad.
+    masks: (p.masks ?? []).map((m) => ({ ...m })),
+    hotspot: p.hotspot,
+    hotspotSize: p.hotspotSize,
+    hotspotColor: p.hotspotColor ?? 0,
+    lensFix: p.lensFix ?? 0,
+    lensBypass: p.lensBypass ?? false,
+    forceBalance: p.forceBalance ?? false,
+    hsFix: p.hsFix ?? 0,
+    hsBypass: p.hsBypass ?? false,
+    lensPick: p.lensPick ? { ...p.lensPick } : null,
+    vignette: p.vignette,
+    clarity: p.clarity,
+    dehaze: p.dehaze,
+    sharpen: p.sharpen,
+    texture: p.texture,
+    hsl: [...(p.hsl ?? hslDefault())],
+    bwOn: !!p.bwOn,
+    bwMix: [...(p.bwMix ?? [1, 1, 1])] as [number, number, number],
+    grade: [...(p.grade ?? GRADE_DEFAULT)],
+    shadowSat: p.shadowSat ?? 0,
+    skySmooth: p.skySmooth ?? 0,
+    skyDepth: p.skyDepth ?? 0,
+    skySat: p.skySat ?? 0,
+    grainAmt: p.grainAmt ?? 0,
+    grainSize: p.grainSize ?? 1.5,
+    vigAmt: p.vigAmt ?? 0,
+    vigMid: p.vigMid ?? 0.5,
+    mix3: [...(p.mix3 ?? MIX3_DEFAULT)],
+    spots: (p.spots ?? []).map((s) => ({ ...s })),
+    // corners + match arrays are nested — deep-copy so an undo snapshot doesn't
+    // share the live sticker's perspective/transfer (the mask rides by ref,
+    // copy-on-write).
+    stickers: (p.stickers ?? []).map((s) => ({
+      ...s,
+      corners: s.corners ? s.corners.map((c) => [c[0], c[1]] as [number, number]) : s.corners,
+      matchGain: s.matchGain ? ([...s.matchGain] as [number, number, number]) : s.matchGain,
+      matchScene: s.matchScene ? ([...s.matchScene] as [number, number, number]) : s.matchScene,
+    })),
+    // The warp field is SHARED by reference (copy-on-write per stroke, like the
+    // brush bitmaps) — a snapshot's field is immutable once a new stroke clones.
+    warp: p.warp ?? null,
+    crop: { ...(p.crop ?? CROP_DEFAULT) },
+    straighten: p.straighten ?? 0,
+    // The LUT wrapper is cloned (a strength drag must not mutate history) but
+    // its lattice `data` is SHARED by reference — immutable once imported,
+    // same copy-on-write rationale as the brush bitmaps above.
+    lut: p.lut ? { ...p.lut } : null,
+  };
+}
+
 export function hslIsNeutral(hsl: readonly number[] | undefined): boolean {
   if (!hsl || hsl.length !== 24) return true;
   for (let i = 0; i < 8; i++) {
