@@ -1,21 +1,26 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/rippling-hugging-frog.md
-planhash=586309cfa1976ae0
-diffhash=dadba809f1c6a31d
-verdict=IN-SCOPE: the app's diff is NOTES.md and IR-SCIENCE.md only, both on the plan's Files list, carrying step 19's white-balance measurement and nothing else; nothing under src/ changed and no worktree is left.
-# IN-SCOPE: the app's diff is NOTES.md and IR-SCIENCE.md only, both on the plan's Files list, carrying step 19's white-balance measurement and nothing else; nothing under src/ changed and no worktree is left.
+planhash=2d1142af74921630
+diffhash=b7b3f40a907c6cbd
+verdict=IN-SCOPE: the app's diff is one new NOTES.md section recording step 25's measurement and the .plan-scope record, both on the plan's Files list; nothing under src/ or ir.html changed and no look's numbers moved.
+# IN-SCOPE: the app's diff is one new NOTES.md section recording step 25's measurement and the .plan-scope record, both on the plan's Files list; nothing under src/ or ir.html changed and no look's numbers moved.
 # 
-# Read for this verdict: the plan by its path (/root/.claude/plans/rippling-hugging-frog.md, steps 19 and 21, Files, Branches and Leaves open), the scope check's printed output with the owner's messages it lists, `git status`, `git diff --stat` and the whole `git diff` of /home/user/Jefferson-Photography-Studio at a54f622 on staging.
+# Read for this verdict, this run, by an agent that made none of the diff: the plan by its path (/root/.claude/plans/rippling-hugging-frog.md, steps 25, 27 and 28, Rules, Branches, Leaves open and Files), the scope check's printed output with the owner's messages it lists, git status and the whole git diff of /home/user/Jefferson-Photography-Studio on staging. A scope-verdict file and a recorded verdict from an earlier send of this step were already present; they were read, then the diff was judged again from the diff itself and this file replaces that one.
 # 
-# What the diff holds:
-# - NOTES.md, 107 lines added: one new section placed at the top of "On staging, waiting on a device pass", above the open-and-strip entry, as step 19 says. It carries what was asked, the order of operations read from both builds, how it was measured with the made-to-fail checks, the gains and means and hue turn per frame, what each opened render shows frame by frame, which account fits, what is not known, and where the sheet and the per-frame files are in the scratchpad. That is the shape step 19 names (what was wrong, what it measured, the numbers, the sheet's path, what is not known).
-# - IR-SCIENCE.md, 17 lines added: one paragraph at the end of section 3, the white-point section, naming the measurement and pointing to the NOTES section. Step 19 permits exactly this, a standing fact about the white point written into the section it belongs to with the measurement named.
+# State of the app: on staging, up to date with origin/staging; two modified files, NOTES.md and .plan-scope, nothing staged, nothing untracked.
+# 
+# The diff:
+# - NOTES.md: one hunk, 134 lines added and none removed, placed at the top of the part headed "On staging, waiting on a device pass", above the white-balance entry, which is where step 25 says the measurement goes. It is a new entry headed "Aerochrome's sky by three routes, with decision 019's route re-fitted to a raised cap". It carries what was asked, where the cap of 2 lives and the seven places that enforce it, how the four arms were made on the seven named frames, the checks made to fail first, the sky saturation in force per arm, what each opened picture shows frame by frame, whether the route stays inside the sky where the band does not, what is not known, and the sheets' paths in the session scratchpad. It says the worktree was removed and that no file under src/ or ir.html changed, and the diff agrees.
+# - .plan-scope: the verdict line and its comment lines replaced by the plan-scope tool's record form for this plan's hash; the plan lists this file as changed.
 # 
 # Checked against the plan's limits:
-# - No file under src/ is changed, no look's numbers moved, and no fix is made: the section states the balance is right and records no change. Matches the plan's "no pixel code is changed".
-# - Nothing under docs/decisions/ is touched and the white-balance adjustment is not researched, recorded or built, as the deferral says; the Aerochrome band question is not answered or edited. The Natural IR hue shift is mentioned only as what the measured turn agrees with, which is step 19's "which account fits".
-# - `git status` shows only those two files modified, nothing staged, nothing untracked; `git worktree list` shows the main checkout only, so the fab0ec7 worktree was removed.
-# - The owner's messages printed by the scope check ask for the measurement, the Aerochrome hold, and no spending on the adjustment's record; the diff does only the first and touches neither of the others.
-# - No quotation of an owner message, no owner named as a source, no session link, trailer or model name appears in the added lines, and there is no table or set-apart quotation.
+# - No file under src/ and not ir.html is changed, no look's numbers moved, no slider range moved: the plan's "no pixel code is changed in the repository" holds.
+# - Nothing under docs/decisions/ is touched, the white-balance adjustment is not researched, recorded or built, and the roadmap's records are not edited; step 26's brief and step 30's timer are scratchpad files and are not in the diff.
+# - No raising of the cap and no moving of the band is made in the repository; the entry says that choice is not settled there, matching Leaves open.
+# - Step 27's condition (nothing changed but NOTES.md) held when it ran; the one later change is the .plan-scope record, which step 28 exists to write.
+# - The added lines hold no quotation of an owner message, no report attributed to the owner by name or as its source, no session link, no trailer, no model's name, no table and no set-apart quotation; a search of NOTES.md for those strings and for the owner's name found nothing inside the added lines.
+# - The scope check's printed owner messages are one message, an approval, and the diff does what the plan it approved asked and nothing beyond it.
 # 
-# Not a scope matter, noted for the record: the scratchpad also holds wb/hue-turn.json and wb/matrix.json, which are not named in the Files list but are scratch outputs of step 19's own arithmetic (the "from the constants alone" paragraph) and are not part of the diff.
+# Not read by this agent, because step 28's command line does not name them: git worktree list and the scratchpad's files other than this one's predecessor and the plan's step reports; step 27's report records the worktree list as one line, the repository itself.
+# 
+# Nothing outside the plan was found in the diff.

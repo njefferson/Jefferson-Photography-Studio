@@ -54,6 +54,140 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**Aerochrome's sky by three routes, with decision 019's route re-fitted to a
+raised cap: measured 2026-10-06 and 2026-10-07 on staging's d27cc3c, nothing
+changed in the app.** Raising the Sky saturation slider's cap does reach the
+sky: it deepens it, leaves cloud, ground, water and trunk alone, and puts the
+same gain on red foliage wherever the sky selection holds some. The band move
+is gentler on the sky and tints cloud and ground instead. No look's numbers
+moved, and which of the three pictures is wanted is a question about how a
+photograph looks, so it is not settled here.
+- **Why it was asked.** v2.65.3's re-fit left Aerochrome's declared Sky
+  saturation at 2, which is the slider's ceiling, so decision 019's chosen
+  control had nowhere further to go, and the amounts 019 measured were taken
+  under the colour conversion the matrix has since turned. The question was
+  whether the band move is the only lever left, or whether 019's own route
+  reaches the sky once the cap is raised.
+- **Where the cap of 2 lives, and every place that enforces it.** Seven
+  places, each a separate number: the slider's `max="2"` in `ir.html` (line
+  718, id `skySatSel`; its value is what `syncFromUI` reads); `SKY_SAT_MAX` in
+  `src/tile.ts` (line 286), which is the top of the clamp in `solveLift`'s
+  `solveSky` (line 502), where the Restore-depth lift tops the amount up; the
+  range of `snapLift` in the same file (line 129), which every lift answer and
+  every part-way `scaleLift` answer passes through; `clamped(o.skySat, 0, 0,
+  2)` in `src/look.ts` (line 147), which reads a saved or imported look; and
+  three renderers that each clamp the amount again, `Math.min(2, ...)` in
+  `src/pipeline.ts` (line 2634), in `src/gl.ts` (line 2736, the shader's
+  uniform) and in `src/skymap.ts` (line 245). Aerochrome's own declared amount,
+  `skySat: 2` in `LOOKS.eir` (`src/main.ts`, line 2035), sits exactly on it.
+  `FLAT_BAND_MAX = 2` (`src/tile.ts`, line 285) is a different cap, the Colour
+  tab's band sliders, and was left alone. Every one of the seven was read from
+  the source and raised to 4 in the scratch build; the app was not edited.
+- **How the arms were made.** The same seven frames in every arm: the six raws
+  NIR_1376, NIR_3716, NIR_1651, NIR_1667, NIR_1688 and NIR_2920, and the camera
+  JPEG NIR_1597. Shipped is the repository's own build with Aerochrome pressed
+  and nothing else. Band is the same build with the Colour tab's band 3 (the
+  Green band) at Saturation 2, as the earlier sheets did it. The two routes
+  above the cap are two builds of a worktree of staging's head in which the
+  seven places read 4 and `LOOKS.eir`'s `skySat` is 3 for one build and 4 for
+  the other. The foliage band, the band sliders and Recover read the same in
+  every arm (Foliage Saturation 1.96, and 1 on the JPEG; Recover 0), so the
+  difference between arms is the sky's amount and what the lift does with it.
+  Each frame was opened in a fresh browser, Aerochrome pressed, and the full
+  canvas read once it had not changed for 20 s, in software graphics.
+- **The reading was made to fail first.** For every arm the build's own
+  scripts were read for the declared amount (2, 2, 3 and 4 as named) and the
+  served page's slider maximum (2, 2, 4 and 4) before a photograph was opened;
+  a planted red multiplier of 2 moved the printed saturation; each frame was
+  checked to open as a 3:2 frame and the look button to read Aerochrome; and
+  the sheet's difference map was drawn from planted pictures that differ by one
+  level in one channel in a square, and read that square back at its place,
+  and read 0 with the gain taken out.
+- **What the lift did: the Sky saturation in force.** Shipped and band: 2 on
+  all seven, because the declared amount is the cap and the lift has nothing to
+  add. The 4.0 build: 4 on all seven. The 3.0 build: 3.79 on NIR_1376; 4 on
+  NIR_3716, NIR_1651 and NIR_1667; 3 on NIR_1688, NIR_2920 and the JPEG. On the
+  three frames the lift took to 4 from a declared 3.0, the two builds draw the
+  same picture (the canvas hashes are equal). So with the cap at 4 the pin
+  moves from 2 to 4 on the weak skies, and the lift does not stop short of it.
+  Decision 019's own three pinned frames (NIR_3406, NIR_0063, NIR_2082) are not
+  in this set and were not rendered.
+- **Sky saturation, the top 45 percent of the frame, cool hues, a pointer to
+  where to look and not a verdict.** Shipped, band, 3.0, 4.0: NIR_1376 0.36,
+  0.49, 0.52, 0.54; NIR_3716 0.29, 0.41, 0.43, 0.43; NIR_1651 0.19, 0.31, 0.26,
+  0.26; NIR_1667 0.22, 0.29, 0.30, 0.30; the JPEG 0.97, 0.98, 0.98, 0.99.
+  NIR_1688 and NIR_2920 have no sky (0.11 and 0.11 shipped), and read 0.13 and
+  0.14 on the band and 0.11 to 0.12 on the others. Against the film's 0.66 to
+  0.92, none of the arms reaches it on NIR_3716, NIR_1651 or NIR_1667. The band
+  reads higher than the route on NIR_1651 because it also brings more pixels
+  into the cool population (1.78 million against 1.60 million), and the picture
+  shows what they are: cloud.
+- **What each opened picture shows** (all 28 renders and the three sheets
+  opened). NIR_1376: shipped is a dark slate-teal sky. The band leaves the sky
+  about the same, a little bluer, and the ground a little pinker, the tree
+  unchanged. 3.0 and 4.0 give a deeper blue sky, smooth, with ground, tree and
+  wires exactly unchanged; the pale grey halo hugging the crown, which every
+  arm carries (decision 023's), reads more against the deeper blue, and the map
+  shows a thin bright outline round the crown. NIR_3716: the band makes the sky
+  a little more cyan and lighter. 3.0 and 4.0, the same picture, give a deeper
+  cyan-blue sky with the glare at upper left keeping its pale centre and the
+  cloud staying white; but the orange-red patch in the haze at left, a little
+  over half way down, turns a vivid orange-red, which is outside the sky.
+  NIR_1651: the band tints the cloud blue-grey and the dark sky a little bluer.
+  3.0 and 4.0 deepen the dark sky to a bluer teal, the cloud stays grey with
+  brighter cyan edges, and the orange tip of the tree turns more vivid.
+  NIR_1667: the band makes the sky and the grey smudge across its middle bluer
+  and tints the cloud's edge. 3.0 and 4.0 make the sky bluer and deeper toward
+  the lower right and the cyan streak under the cloud brighter, and the grey
+  smudge stays grey, so it reads as a grey patch on bluer sky; the red branches
+  at right turn a vivid pure red and the left tree's edge a more orange one.
+  NIR_1688 (no sky): the band changes 26 percent of the pixels by up to 20
+  levels and the picture looks the same. 3.0 and 4.0 change only the red
+  foliage in the two top corners (6.5 and 6.9 percent of pixels, up to 75
+  levels), which turns brighter orange-red; water, rock, trunk and snow are
+  exactly unchanged. NIR_2920 (no sky): the band looks the same. 3.0 turns the
+  red mass brighter and flatter, and 4.0 turns it into a flat saturated red
+  with the leaf structure gone and the red shadow strip at right brighter, in
+  33 percent of the pixels by up to 96 levels. NIR_1597, the camera JPEG:
+  shipped is a smooth emerald-green sky with soft darker corners and a brighter
+  glow low in the centre, and mint trees. The band leaves the sky as it is and
+  lands on the trees (up to 20 levels). 3.0 darkens the top corners to a deeper
+  green and makes the glow more vivid, and 4.0 takes the top corners close to
+  black-green and the glow to a neon green; every pixel changes (up to 51 and
+  68 levels), and the map shows stepped rings round the glow.
+- **Does the route stay inside the sky where the band does not.** It stays out
+  of cloud, ground, water and trunk on every frame, which the band does not
+  (the band tints cloud on NIR_1651 and NIR_1667 and moves the ground on
+  NIR_1376). It does not stay inside the sky: on five of the six raws the same
+  gain lands on red the sky selection holds some of (foliage, and on NIR_3716
+  an orange-red patch in the haze), because the gain is gated on the pixel's
+  own colour and a saturated red passes that gate. The worst is NIR_2920, which
+  has no sky at all, where the red mass loses its structure at 4. The same gate
+  is in force at the shipped cap of 2, so some of this is probably there at a
+  smaller scale already; no arm here has the sky's amount at 0 to say how much.
+- **What is not known.** Whether the foliage change comes only from the sky
+  stage: the foliage band, the band sliders and Recover are equal across arms,
+  but the lift's tone points were not read, so a re-solved tone is not
+  excluded, and the pattern (a mass at a time, never global) is what points at
+  the sky stage. Whether the JPEG's stepped rings are a visible step in tone:
+  the pictures are a 4 by 4 block mean, opened at 700 pixels across (1392 for
+  the JPEG), nothing stepped was seen there, and no full-size crop was opened. What the 3.0 and
+  4.0 builds do on the frames decision 019 found pinned. The readings are of an
+  8-bit canvas in software graphics, one camera, seven frames. A cross-check of
+  NIR_1688's shipped and band pair against the earlier plan's pictures could not
+  be made like for like, because those were drawn at another scale. Raising the
+  cap, and the 3.0 against the 4.0, are product changes that owe the walks and
+  were not tried in the app.
+- **Where.** The three sheets are `aero/sheet-raws-a.jpg`,
+  `aero/sheet-raws-b.jpg` and `aero/sheet-jpeg.jpg` in the session scratchpad
+  (/tmp/claude-0/-home-user/f78fc882-ad98-50ed-a15a-cad059e38c59/scratchpad):
+  each frame a row of the four arms in the order shipped, band, 3.0, 4.0, the
+  sky saturation in force above each and, under the three right-hand pictures,
+  where each differs from the shipped one drawn ten times stronger. The 28
+  pictures are `aero/<arm>-<frame>.png` and the numbers `aero/<arm>-<frame>.json`
+  there, with `aero/render.mjs` and `aero/compose.mjs`. The worktree was
+  removed. No file under `src/` or `ir.html` changed.
+
 **Is a raw still white-balanced right when it opens, under v2.65.3's colour
 conversion: measured 2026-10-06, nothing changed in the app.** The balance is
 right and did not move. The colour matrix turned every opened raw by one angle,
