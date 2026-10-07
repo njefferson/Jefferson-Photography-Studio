@@ -134,6 +134,23 @@ develop raws at `0x000C`, shipped it, and took it back out the same day.
 deliberately not read, so the next session finds the reason at the place it
 would write the code.
 
+**The white point does not depend on the colour matrix — measured 2026-10-06.**
+The balance is found from the channel means of the camera's own values and is
+applied in camera space, before the matrix: the order dcraw and LibRaw use. The
+matrix then sees balanced data, and every construction of it this app has had
+keeps a balanced neutral at neutral. Six raws were opened under the old
+construction (v2.64.56: invert, then normalise the output rows) and the
+reference one (dcraw's `cam_xyz_coeff`: normalise the camera side, then
+invert): the gray-world gains over the smallest agreed to within a slider step
+(NIR_1376 1.00/1.89/3.03 then 1.00/1.89/3.05), the whole-frame mean was neutral
+in both (smallest channel over largest 0.966 to 0.996), saturation did not
+move, and every frame's hue turned by the same +19.5 to +20.9 degrees on the
+opened state, whose red-blue swap mirrors the matrix's own turn. So a hue turn
+shared by every frame after a change of matrix is the matrix's, and is not a
+wrong white point; read the balance's gains before suspecting it. The figures
+and the sheet are in NOTES.md, "Is a raw still white-balanced right when it
+opens".
+
 ---
 
 ## 4. The three routes, and which one the app implements

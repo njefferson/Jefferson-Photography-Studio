@@ -54,6 +54,113 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**Is a raw still white-balanced right when it opens, under v2.65.3's colour
+conversion: measured 2026-10-06, nothing changed in the app.** The balance is
+right and did not move. The colour matrix turned every opened raw by one angle,
+about 20 degrees, and the old conversion is the one that turned the picture.
+- **Why it was asked.** Natural IR's re-fit to the new colour needed a Hue shift
+  of 18 that was a fit to a residual nobody had diagnosed, and one hue turn on
+  six different raws is the shape a wrong white point takes in infrared. So the
+  question was whether the conversion change moved where the balance is
+  measured or applied.
+- **The order of operations, read from both builds' code (fab0ec7, v2.64.56,
+  and a54f622).** The same in both. The balance is the gray-world mean of the
+  camera's own linear values (`grayWorldWB`, `src/decode.ts`), applied in the
+  shader as exposure and the three gains in camera space (`u_wb`, `src/gl.ts`)
+  before the lens correction, before the camera matrix (`u_cam`) and before the
+  channel swap. That is the reference order: dcraw and LibRaw apply their
+  white-balance multipliers in camera space, then the matrix. What did change:
+  the matrix's construction (before, invert and then normalise the rows of the
+  output; now dcraw's `cam_xyz_coeff`, normalise the camera side and then
+  invert) and its constants; the gray-world mean now leaves out sensor-clipped
+  samples and the gains are scaled so the smallest is 1, where they were
+  scaled to unit luma over every sample; highlight recovery moved into camera
+  space. All four matrices (old and new constants, old and new construction)
+  keep (1,1,1) at (1,1,1), so a camera-space neutral stays neutral through
+  every one of them.
+- **How it was measured.** The six raws NIR_1376, NIR_3716, NIR_1651, NIR_1667,
+  NIR_1688 and NIR_2920, each opened in a fresh browser (the start screen, the
+  file, no look pressed) in v2.64.56's build and in the build now, with the
+  canvas read at full size once the picture had not changed for 20 s, so the
+  automatics and the sky's second stage had landed. Software graphics. The
+  reading was made to fail first: a planted red multiplier of 2 moved the
+  printed chroma, a canvas of known values read its known means, and the page
+  served for each build was checked to be that build.
+- **The balance did not move.** Gains over the smallest, before then now:
+  NIR_1376 1.00/1.89/3.03 then 1.00/1.89/3.05; NIR_3716 1.00/1.91/3.22 both;
+  NIR_1651 1.00/1.87/3.01 both; NIR_1667 1.00/1.89/3.07 then 1.00/1.89/3.09;
+  NIR_1688 1.00/1.83/2.78 both; NIR_2920 1.00/1.83/2.76 then 1.00/1.84/2.76.
+  Gain times exposure, which is the multiplier a camera value actually meets,
+  agrees to between 0.3 and 4.2 percent on each frame, by the same factor on
+  all three channels to within 0.7 percent (NIR_1376: red 2.72 then 2.74, green
+  5.13 then 5.18, blue 8.24 then 8.38). Highlight recovery opened at 0 on all six in
+  both builds, so the new clip exclusion changed nothing on these frames.
+- **The frame's mean is neutral in both.** Smallest channel over largest of the
+  whole canvas's mean, before then now, in the order above: 0.980 then 0.991,
+  0.994 then 0.995, 0.995 then 0.996, 0.987 then 0.995, 0.971 then 0.972, 0.966
+  then 0.972 (1 is neutral). In linear light, 0.984 to 0.996 before and 0.987
+  to 0.999 now. The hue of a mean that near to neutral is noise and is not
+  used.
+- **One turn on all six.** The chroma-weighted circular mean of each pixel's hue
+  now against before, over the pixels that have a hue to read (6 to 27 percent of
+  a frame): +19.5, +20.9, +20.2, +19.6, +19.6 and +20.2 degrees in the order
+  above. The middle 80 percent of pixels span 6 to 15 degrees (+14.5 to +23.5
+  on NIR_1376, +12.5 to +27.5 on NIR_2920), and the pixels are turned alike to
+  0.99 to 1.00 on a scale where 1 is every pixel turned the same. Saturation did not
+  move (0.11 then 0.10, 0.07 then 0.06, 0.13 then 0.13, 0.09 then 0.09, 0.06
+  then 0.07, 0.08 then 0.08). The two pictures differ by a mean of 2.5 to 4.5
+  levels in 255 (largest 16 to 38), which is a small difference carrying one
+  consistent hue turn. This is the opened state, which has the red-blue swap on,
+  and a swap mirrors a hue, so the same matrix turn reads the other way round
+  on a look with no swap.
+- **From the constants alone** (the matrices recomputed from the two builds'
+  numbers, no browser): the hue turn of the new matrix against the old, by
+  direction of the camera-space chroma, runs from -19.3 to +13.3 degrees, and
+  scales the chroma by 0.60 to 1.05. The construction alone gives -16.1 to
+  +11.1 and the constants alone -9.9 to +4.8, so most of it is the
+  construction, which the new `camToSrgbLinear` comment already names as
+  bending every colour that is not grey. The -19.3 sits at input directions 60
+  and 240 degrees about the grey axis; mirrored by the swap it is the +19 to +21
+  measured on the opened frames.
+- **What each opened render shows** (every one opened, before and now). NIR_1376:
+  the sky is a dark teal-green before and a dark slate grey-blue now; the tree
+  and the ground are pale pink before and a paler, less pink warm grey now.
+  NIR_3716: a mint-teal sky before, a pale grey-blue one now; the pink ground
+  and the rust fence posts stay. NIR_1651: a dark teal-green sky with mint
+  cloud before, a dark slate sky with blue-grey cloud now; the tree is pink in
+  both, a little redder before. NIR_1667: a green-teal sky and cloud before, a
+  blue-grey sky and a nearly neutral cloud now. NIR_1688: the trunk, rock and
+  lake carry a mauve tint before and are close to neutral grey with a faint
+  cool cast now. NIR_2920: the shadowed foliage is mauve before
+  and neutral slate now. In none of them is anything misplaced, clipped or
+  patchy: the picture is the same picture with its colour turned.
+- **Which account fits.** The balance is applied to the right data and lands
+  where the record says; the old conversion was the one that turned the
+  picture, and the colour now is the reference conversion's. The Hue shift of
+  18 the re-fit wanted for Natural IR agrees in size and sign with undoing this
+  turn (Natural IR carries no swap, so the matrix's own turn, about -20 degrees
+  now against before, shows unmirrored there): it compensated for the
+  conversion, not for the balance. That is an agreement of size and sign, not a
+  test; no build with the matrix changed and nothing else was made.
+- **Not known.** Whether the turn is the matrix alone: the contrast change in
+  the same release keeps one hue at every lightness, and no build isolates the
+  three colour commits (45647e9, 758a4ba, 47bf77e) at the pixels; only the
+  arithmetic above separates the matrix's construction from its constants. The
+  camera-space direction of each frame's chroma was not read (the page has no
+  way to ask for it), so that the six turn alike because they share the
+  extreme of the table is an inference from agreement. The readings are of an
+  8-bit canvas after the open's tone and lift, in software graphics, of one
+  camera and six frames. Which hue the open should have is a question about how
+  a photograph looks and is not settled by a measurement. Nothing was measured
+  on the D5300 matrix, nor on a DNG that carries its own.
+- **Where.** The pictures: `wb/sheet-open.jpg` in the session scratchpad
+  (/tmp/claude-0/-home-user/f78fc882-ad98-50ed-a15a-cad059e38c59/scratchpad),
+  each raw's open before beside its open now, with where they differ drawn ten
+  times stronger and at true scale, and the hue turn beside each pair; the
+  twelve single pictures are `wb/before-NIR_xxxx.png` and `wb/after-NIR_xxxx.png`
+  there, the numbers `wb/before-NIR_xxxx.json`, `wb/after-NIR_xxxx.json`,
+  `wb/hue-turn.json` and `wb/matrix.json`. No file under `src/` changed.
+
 **The open and the strip, off the page: built 2026-10-06 on staging's v2.65.7
 (91987d7), not pushed yet.** Everything below it on staging, plus this release,
 for the device pass. It is the open-and-strip plan's work and its leftovers
