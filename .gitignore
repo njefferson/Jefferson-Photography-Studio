@@ -20,3 +20,9 @@ asset-factory/review/
 # the build stamp (vite.config.ts buildId) reads git status in that window; a
 # visible copy stamped every clean build as modified. offline-shell-walk 4b.
 vite.config.ts.timestamp-*
+
+# A worktree of an earlier head, built to compare a red walk or a measurement
+# against the build before the one being checked. It is made inside the
+# repository so a build there resolves node_modules from the repository above
+# it, and it is removed when the comparison is done.
+.worktrees/

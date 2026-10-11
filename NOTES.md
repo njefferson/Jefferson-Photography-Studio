@@ -54,6 +54,242 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**The open and the strip, finished: built 2026-10-10 and 2026-10-11 on staging's
+v2.65.10 (412052f), not committed yet.** Everything on staging below, plus this
+release, for the device pass. It finishes the 2026-10-06 entry's open list on
+the same tree, checks the integrated result once, and leaves the two look
+questions open.
+- **Faster: the open photograph's sky map is built off the page.** A second
+  instance of the sky worker holds one copy of the open photograph's pixels,
+  sent once in pieces of 8 MiB, and builds the sky map of each edit from it with
+  the page's own function (`buildOpenSkyMap`, `src/skymap.ts`). The lift and
+  the sky arrive in one draw. In the probe the page spent about 20 ms of a first
+  map that took 19 s from the ask; the report's "Last switch" line now says
+  where the map was built and what the page spent. With the lane refused the
+  page builds the map itself and the sky still draws. The picture still draws
+  first and the look's sky follows, so the open is still two steps by design;
+  the gap between them is the number the device pass judges.
+- **Faster: the histogram no longer waits for the graphics.** The readback is
+  started into a buffer behind a fence and collected when the graphics say it is
+  done. From a look press to 15 s after the sky landed the page made 2 pixel
+  reads and 2 buffer reads, 0 ms in all, and the histogram still paints and
+  follows an exposure edit.
+- **Faster: a strip tile's encode no longer waits for the page.** The first
+  picture a worker encodes waits synchronously for the page's main thread (3.8 s
+  under a 4 s page hold, 2.1 to 2.4 s under software-graphics stalls, 0 to 3 ms
+  on an idle page; every later one 2 ms). Each worker now makes that first
+  encode when it starts, while the page has nothing to hold it. Over the paired
+  session the longest encode on the lane's own clock went from 13.2 s to 60 ms,
+  and tiles whose encode took over 1 s from 1 to 0.
+- **Faster: a batch frame's lift and the report's "Shadow light" line take the
+  sky worker's bitmap**, waited for (the report's wait is bounded at 20 s), and
+  build one on the page only where the worker answered none.
+- **Fixed: pressing a look on a camera JPEG held the page for minutes.** The
+  commit f822aa6 of 2026-10-02 opened every 8-bit photograph over 2800 px at its
+  full size (5568 by 3712 for a Z 50 JPEG). No decision record and no entry
+  asked for it: decision 009 puts the native-resolution working copy in 3.0.
+  The open canvas is back at the 2800 px copy; `OPEN_8BIT_AT_FULL_SIZE` in
+  `src/main.ts` holds the full-size path, off, for 3.0 to turn on once 009's
+  test is met. Sampling and export still read the full decode. On the same file
+  (NIR_2813.JPG), back to back in one window: opening held the page 106.6 s and
+  now 36.1 s; the look press 241.9 s and now 67.0 s; the canvas 5568 by 3712
+  and now 2800 by 1867. The pictures before and after were opened: the same
+  road sign, the same colours under Natural IR and under Aerochrome, no blob,
+  the after pair a hair softer in the fine grass (mean block difference 1.25
+  and 1.62 in 255).
+- **Fixed: Reset in the first seconds after a photograph came back left the
+  lift without its sky.** Reset puts its target on screen at once and its undo
+  step is written 350 ms later; a sky landing inside those 350 ms found the live
+  edit ahead of the record, gave the second lift up, and the debt was spent. The
+  debt is now kept and the solve is tried again once the record has been
+  written. Probed on an edit made and recorded, then Reset and the sky's
+  arrival in one task: the lift read `[0,1.03,1]` for 23 s and only a second
+  Reset gave `[0.5,1.03,1]`; now it reads `[0.5,1.03,1]` with no second press.
+  Rotation-walk check 17 holds it (see the walks below): red on staging's head,
+  green here.
+- **The checks the release lacked.** The preview-version check hashes
+  `src/tile.ts` and `src/skyfine.ts` beside the 22 sources it hashed (24); the
+  number stays 93, and `tools/.preview-pipeline` says why no bump is owed (the
+  two files are unmodified since the commit that recorded 93, and the other 22
+  still hash as before). Two committed walks, each made to fail against a
+  planted defect: `tools/slider-own-value-walk.mjs` presses every stepped
+  slider at the value it holds, under Natural IR and Aerochrome, on four frames
+  (0 pixels moved; with the snap functions in `src/tile.ts` returning what they
+  are given, 176573 and 129696 pixels moved on canopy.jpg and 815038 on
+  NIR_1651, the controls intact; about 18 minutes), and
+  `tools/camera-jpeg-sky-walk.mjs` holds that the lens hot spot's disc stays
+  inside the sky selection on the owner's NIR_1597.JPG (100 percent selected;
+  with the clip-flag plant in `src/skyfine.ts`, 0 of 68 and 0 of 476 cells and
+  holes of 1219 and 8326 cells; needs no server and no build). The runner runs
+  both by name.
+- **Tools run by absolute path.** `REPO_ROOT` is exported from
+  `tools/fresh-dist.mjs`; sixteen walks and seven commit tools resolve the
+  repository from their own file's location, so each runs from any directory.
+  `keep-walk` and `conversion-walk` ask `tools/owner-images.mjs` for their
+  frames instead of naming a dead session's scratchpad, and `look-sheet` writes
+  to the machine's temp folder.
+- **Numbers, in the container (software graphics, a server's cores, not the
+  device).** The same 44-photograph session harness, Aerochrome pressed, Restore
+  depth on, page errors 0, run back to back in ONE window against a worktree
+  build of staging's head and against this tree, because the machine's speed
+  moved by a third between windows and only a pair compares. Planted 3000 ms
+  hold read 2983 ms on the harness's frame counter and 2980 ms on the app's
+  frame watch in both runs. Longest pause by the frame count: 20.5 s on
+  staging's head, 15.0 s here; the app's frame watch (first minute only) 20.47 s
+  and 14.73 s. Pauses over 250 ms went UP, 11 to 16, and long tasks 61 to 69;
+  frames 5418 in 244.0 s and 5610 in 260.5 s (22.2 and 21.5 a second). The
+  remaining pause is the press of Aerochrome: step 2's trace puts it in the
+  browser's own frame task waiting 4.1 to 4.2 s inside `ReadPixels` on the
+  software graphics process, six times, with the page's own frame callbacks at
+  6 ms in all; whether it exists on the iPad is for the device. Time to the
+  picture is unchanged: the first photograph's busy dialog closed 728 and 744 ms
+  after the files were handed over, and photographs 2 to 4 were active in 0.8,
+  0.8 and 0.7 s against 0.8, 1.0 and 0.8 s. **The look's sky arrives no sooner
+  in the container, and the map later:** the wait for the selection 15.0, 13.5
+  and 13.7 s against 14.8, 13.9 and 13.3 s, the map 4.1, 10.3 and 4.9 s against
+  9.2, 12.2 and 9.5 s, and from the press to the map built 28.3, 32.6 and 27.4 s
+  against 33.1, 35.3 and 32.3 s, because the lane shares four cores with three
+  decoders and the selection worker. Tiles: 131 jobs in each, wall median 631
+  and 660 ms, sum 114.4 and 126.5 s; the longest wall in the phase of a look
+  pressed with a photograph opened fell from 22.5 s to 14.8 s, while the longest
+  in the Aerochrome-press phase ROSE from 1.1 s to 9.4 s with a longest encode
+  of 60 ms, which reads as the page's 14.7 s pause delaying the receipt and not
+  as the lane (an inference from the figures; no probe of the message queue).
+  Strip redrawn and quiet after the Aerochrome press 47.2 s and 51.4 s.
+- **Checked headless, once, on the final tree.** The build (type check clean).
+  Every commit tool but the plan-scope check, which is the scope step's, by
+  absolute path: type check, preview version (93, 24 sources), manifest
+  screenshots, notes, hub pin (b279a08), token (83 defined), palette spec, lens
+  store, lens diagnostic, join fold, contract (396 of 396, 171 on the declared
+  backlog), architecture (82 modules), decisions, scope (70 knobs), stamp (29
+  written, 26 stamped, 3 per-shot), one pool, patch note, roadmap copy, pool
+  budget (168 combinations), shadow cast, keep file, openable, mask turn, and
+  the hub's surface gates. All 53 parts of the walk runner (the 51 there were,
+  and the two above), each by itself: 49 pass, and four are red. Three of the
+  four are red on staging's head too, with the same counts, run once against its
+  worktree build by this tree's walk files: bar-fit (iPad landscape 3 rows,
+  portrait 5, phone 2, and 0 of the first practice photograph's 150 px on
+  screen at 1180 by 820; expected until decision 060's first product change),
+  the control sweep (61 to answer for on staging's head, 59 here: 3 tooltip-rule
+  and 56 declared and never reached, the two extra there being an unnamed
+  practice-photograph button), and the accessibility walk (macro.html, four
+  variants, one serious label-content-name-mismatch on `#verTag`). **The fourth
+  was new and was the instrument:** rotation checks 9, 10, 11 and 15 read the
+  turned photograph 2.5 s after stepping to it, 31.2 percent of cells off (mean
+  7.61), and 14 s later the same read is 0.0 percent (mean 0.43); the pictures
+  were opened, and at the walk's read NIR_1651 has the look but a grey sky where
+  the upright copy has the blue one, while at 60 s the two match. The walk took
+  one second of a still canvas as settled, and the sky map lane makes the canvas
+  sit still for seconds before the sky arrives; on staging's head the page was
+  blocked for the same seconds, so the read came after the sky. It now also waits
+  until the sky workers have nothing outstanding and have been silent for 1.5 s,
+  reads check 16's two lifts and check 17's lift after the sky has landed, and is
+  green on this tree (all 17 checks), while on staging's head the same edited
+  walk fails check 17 alone: the Reset bug, which the old 800 ms read could not
+  see. One of the 49 passes only run directly: `offline-shell-walk` brings its
+  own server, which cannot bind while the runner's precondition (a server on
+  the port) holds, so through the runner it exits 1 after a second; run by
+  absolute path it passes all 30 checks, 4b (the build is stamped with the tree
+  it was built from) included.
+- **Needs the owner's hands, on the iPad.** Open a Z 50 raw with a bright sky and
+  a camera JPEG and see whether the picture draws and the look's sky follows,
+  and how long the gap reads; press Aerochrome and see whether the controls
+  answer while the strip redraws; press a look on a camera JPEG and see that it
+  does not hold the page; leave a photograph and come back and press Reset in
+  the first seconds; copy the report and read the "Last strip tile" line
+  (drawn in a worker or on the page, and what its encode cost) and the "Last
+  switch" line (where the sky map was built and what the page spent); open the
+  strip on a long set. Whether the iPad encodes a JPEG in a worker at all, and
+  what the lane's copy of a large photograph costs there (below), are read
+  only there.
+- **Left open, as questions about how a photograph looks.** The five comparison
+  sheets were drawn again from this tree, every one opened, with each pair of
+  candidates compared pixel for pixel and none identical. A Hue shift per file
+  kind for Natural IR (raws at 18, a camera JPEG at 0: on the JPEG the two read
+  rose and orange, mean 20.7 in 255 against 1.5 to 5.6 on the raws), and
+  Aerochrome's colour-mixer band moving with Restore depth, which decision 019
+  rejects and the build ships without. The sheets are the session's, not the
+  repository's; the questions go to the owner with them.
+- **Done from the 2026-10-06 entry's list:** the sky map and the histogram off
+  the page (the histogram's readback cannot leave the page, because the picture
+  it reads exists only in the page's graphics context, so it starts and collects
+  without waiting); the batch and shadow callers; the encode's wait (cause
+  measured, then removed); Reset; the camera JPEG; the preview-version check;
+  the two committed walks; the walks and commit tools that read the start
+  directory; the first server task's two-hour limit (this run's server was
+  restarted, not left).
+- **Found, and not fixed.**
+  - `grayWorldWB` still reads an 8-bit frame's 255s as clipped, so for a camera
+    JPEG the selection's balance and that one are two rules; the Masks tab's sky
+    layer and the IR tab's Auto WB still leave the blown foliage out. Not looked
+    at in a picture.
+  - The sky map lane holds a full copy of the open photograph beside the page's:
+    20.9 MB for a raw at 1.3 MP, 5.2 MB for an 8-bit source, and 82.7 MB for the
+    20-megapixel camera JPEG, because the lane is handed the full decode
+    whatever the canvas is. `tools/pool-budget-check.mjs` prices export bands
+    only. Read from the code, not measured on a device.
+  - `boxDownscale` holds a row pass of about 166 MB (2800 by 3712 by 4 by 4
+    bytes) as a transient on every large 8-bit open; production's v2.64 made the
+    same copy through a 2D canvas, whose transient was not read. A strip-wise row
+    pass would hold a few rows and give the same numbers.
+  - The press on the camera JPEG still holds the page 64.6 to 67.0 s on the 2800
+    px canvas, against about 15 s recorded at v2.64.56, and the open 35 to 36 s.
+    Where those seconds go is not measured; the sky map lane, the asynchronous
+    histogram, the re-fitted looks and the Aerochrome rewrite all changed since.
+    A paired run against a worktree of fab0ec7 would say whether the proxy alone
+    returns to 15 s. HEIC and PNG over 2800 px take the same path and were not
+    timed.
+  - The doc comments on `proxyFactorFor` (`src/export.ts`, around line 1110) and
+    `aCanvasTheSizeOfTheFrame` (`src/debug.ts`, around line 1697) still say an
+    8-bit source is shown at full size; both want a clause saying that path is
+    behind `OPEN_8BIT_AT_FULL_SIZE` and off.
+  - `tools/slider-own-value-walk.mjs` counts every message posted to a sky worker
+    as a question, including the scene pieces the map lane is sent, which are
+    never answered, so by reading it waits out its 60 s silence after each
+    press; that is probably most of its 18 minutes. Not measured, not changed.
+  - The look's sky is judged on the picture, not the line: an Aerochrome press on
+    a 20-megapixel raw keeps changing the picture for about 90 to 110 s in this
+    container (Natural IR 44 to 54 s), and the report's "Last switch" line reads
+    "none this session" after a look press, so it does not say when the look's
+    sky landed.
+  - `tools/look-sheet.mjs` cannot express a candidate set of its own (its list
+    is the closed six-frame question), so the five sheets came from a scratch
+    renderer that reuses its press-by-controls recipe; a candidate-set argument
+    would leave the instrument behind. No render of v2.64.56 sits beside the
+    candidates, and the earlier entry's "75 to 127 levels" for the Hue 18
+    candidate is not reproduced (the largest step on 640-wide block means is 23
+    to 57 on the raws and 126 on the JPEG). NIR_1688 and NIR_2920 have no sky,
+    their Aerochrome pairs differ by a mean of 0.6 and 0.9 levels, and so they
+    cannot carry the band question.
+  - The macro page's `#verTag` has an `aria-label` ("This build, what changed,
+    and the report to send") that does not contain its visible version text,
+    which is the accessibility walk's one serious finding on four variants. It
+    is the same on staging's head, and nothing here touched that page.
+  - `tools/walk-all.mjs` has no parts list: it runs every `*-walk.mjs` and
+    `--only=` is a comma list of file-name prefixes, so a short prefix matches
+    more than one walk. With `--only=` matching nothing it exits 2 before the
+    freshness check, so `--only=none` proves the port and not the build.
+  - A worktree of staging's head built from a directory that is not a repository
+    is stamped `unversioned` (vite resolves git from the start directory), so its
+    service worker names `ips-2.65` and not the head's cache.
+  - The session numbers vary between runs of one build by about 1 percent on the
+    longest pause and about 13 percent on the long-task count (59 to 68); the
+    camera JPEG was ranked by bytes and only NIR_2813 and NIR_1698 were
+    size-read.
+  - The walks' records for this release were taken on the tree before the one
+    edit to `tools/rotation-walk.mjs`; no other file reads that walk, and the
+    product tree is the same.
+  - `tools/camera-jpeg-sky-walk.mjs` fetches NIR_1597.JPG from
+    `drive.usercontent.google.com` when it is not cached; where that host is
+    refused it exits 2 with the reason printed, which is a fact about the host
+    and not the selection. The headless browsers print the proxy's notice for
+    `android.clients.google.com` on every run: browser background traffic that
+    the app never asks for.
+  - The plan said the decode worker takes the sky map and the readback. The
+    decode lanes hand the decoded frame to the page by transfer and keep none, so
+    the map lane is a second instance of the sky worker holding a copy, and the
+    readback stays on the page without waiting.
+
 **Aerochrome's sky by three routes, with decision 019's route re-fitted to a
 raised cap: measured 2026-10-06 and 2026-10-07 on staging's d27cc3c, nothing
 changed in the app.** Raising the Sky saturation slider's cap does reach the

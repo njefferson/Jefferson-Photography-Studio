@@ -77,7 +77,7 @@ import { createServer } from "node:http";
 import { readFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join, extname } from "node:path";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 import { execSync } from "node:child_process";
 
 requireFreshDist();
@@ -471,13 +471,17 @@ function serve() {
 // stamp's git read ran in that window, and every build of a clean commit was
 // stamped as modified with a digest that differed from build to build.
 {
-  const git = (c) => execSync(c, { encoding: "utf8" }).trim();
+  // THE REPOSITORY THIS FILE SITS IN, not the directory the walk was started in:
+  // the build was stamped from the repository, and a git read made from anywhere
+  // else answers about a different tree (or none).
+  const G = `git -C ${JSON.stringify(REPO_ROOT)}`;
+  const git = (c) => execSync(`${G} ${c}`, { encoding: "utf8" }).trim();
   let want = "(git could not be read)";
   try {
-    const sha = git("git rev-parse HEAD");
-    const changed = git("git status --porcelain");
+    const sha = git("rev-parse HEAD");
+    const changed = git("status --porcelain");
     want = changed
-      ? `${sha}+${createHash("sha256").update(changed).update(execSync("git diff HEAD", { maxBuffer: 1 << 28 })).digest("hex").slice(0, 12)}`
+      ? `${sha}+${createHash("sha256").update(changed).update(execSync(`${G} diff HEAD`, { maxBuffer: 1 << 28 })).digest("hex").slice(0, 12)}`
       : sha;
   } catch { /* want says so */ }
   check("4b the build is stamped with the tree it was built from, and nothing else",

@@ -55,6 +55,16 @@ const WHOLE = [
   "src/stamp.ts",          // the hash two parts of the key are built with
   "src/color.ts",          // the camera matrix a raw is rendered through
   "src/icc.ts",            // the sRGB curve the picture is encoded with
+  // THE STRIP'S TILE, AND THE SELECTION ITS SKY COMES FROM. Since 2026-10-06 a
+  // strip tile is made by `renderTile` in src/tile.ts (in a decode worker, or on
+  // the page where there is none), and the look's sky amount lands on the pixels
+  // `src/skyfine.ts` selects. Neither file was hashed here, so a change to the
+  // tile's lift or to the selection's logic moved no number and kept serving tiles
+  // rendered under the old one — the same shape as `lensflat.ts` and `hotspot.ts`
+  // above, one file along each time. (src/sky.ts and src/skymap.ts, which those
+  // two call, are still not hashed.)
+  "src/tile.ts",           // the tile itself: baseline, lift, pixels
+  "src/skyfine.ts",        // the sky selection the look's sky amount lands on
 ];
 const DIRS = ["src/raw"];  // the raw decoders, every file
 const REGIONS = [

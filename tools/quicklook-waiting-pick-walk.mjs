@@ -27,7 +27,7 @@
 // the case that always worked. The last check must go red, because the walk
 // then never exercised what it is named for.
 import { chromium } from "playwright-core";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
@@ -38,8 +38,9 @@ const PLANT = process.argv.includes("--plant");
 let failed = 0;
 const check = (n, ok, d = "") => { console.log(`${ok ? "ok  " : "FAIL"}  ${n}${d ? " — " + d : ""}`); if (!ok) failed++; };
 
-const files = readdirSync("public/examples").filter((f) => f.endsWith(".dng")).sort().slice(0, 6)
-  .map((f) => join("public/examples", f));
+const EXAMPLES = join(REPO_ROOT, "public/examples");
+const files = readdirSync(EXAMPLES).filter((f) => f.endsWith(".dng")).sort().slice(0, 6)
+  .map((f) => join(EXAMPLES, f));
 if (files.length < 4) { console.log("FAIL  not enough practice raws"); process.exit(1); }
 
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });

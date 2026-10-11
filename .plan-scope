@@ -1,26 +1,41 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
-plan=/root/.claude/plans/rippling-hugging-frog.md
-planhash=2d1142af74921630
-diffhash=b7b3f40a907c6cbd
-verdict=IN-SCOPE: the app's diff is one new NOTES.md section recording step 25's measurement and the .plan-scope record, both on the plan's Files list; nothing under src/ or ir.html changed and no look's numbers moved.
-# IN-SCOPE: the app's diff is one new NOTES.md section recording step 25's measurement and the .plan-scope record, both on the plan's Files list; nothing under src/ or ir.html changed and no look's numbers moved.
+plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
+planhash=6eef631cb6173c2c
+diffhash=567118cd81a2e617
+verdict=IN-SCOPE: every change in the app tree is an item of steps 2 to 6 or the step 6 NOTES entry, sits inside the plan's Files list, and nothing the plan did not ask for is in it.
+# IN-SCOPE: every change in the app tree is an item of steps 2 to 6 or the step 6 NOTES entry, sits inside the plan's Files list, and nothing the plan did not ask for is in it.
 # 
-# Read for this verdict, this run, by an agent that made none of the diff: the plan by its path (/root/.claude/plans/rippling-hugging-frog.md, steps 25, 27 and 28, Rules, Branches, Leaves open and Files), the scope check's printed output with the owner's messages it lists, git status and the whole git diff of /home/user/Jefferson-Photography-Studio on staging. A scope-verdict file and a recorded verdict from an earlier send of this step were already present; they were read, then the diff was judged again from the diff itself and this file replaces that one.
+# Read for this verdict, this run, by an agent that made none of the diff: the plan by its path at its current hash (Rules, Asked, Steps 2 to 8, Branches, Leaves open and Files), the scope check's printed output with the owner's messages it lists (one message, an approval), git status, and the whole git diff of /home/user/Jefferson-Photography-Studio on staging, 2302 lines read to their end, with both untracked walks read in full. A scope-verdict file and a recorded verdict from an earlier send of this step were already present; they were read, then the diff was judged again from the diff itself and this file replaces that one.
 # 
-# State of the app: on staging, up to date with origin/staging; two modified files, NOTES.md and .plan-scope, nothing staged, nothing untracked.
+# State of the app: on staging, up to date with origin/staging, nothing staged. 39 modified files (the 38 below and .plan-scope) and 2 untracked (tools/slider-own-value-walk.mjs, tools/camera-jpeg-sky-walk.mjs). Every path sits under a Files entry: the ten src/, docs/, .gitignore, NOTES.md and .plan-scope paths by name, every tools/ path under the entry `tools/`.
 # 
-# The diff:
-# - NOTES.md: one hunk, 134 lines added and none removed, placed at the top of the part headed "On staging, waiting on a device pass", above the white-balance entry, which is where step 25 says the measurement goes. It is a new entry headed "Aerochrome's sky by three routes, with decision 019's route re-fitted to a raised cap". It carries what was asked, where the cap of 2 lives and the seven places that enforce it, how the four arms were made on the seven named frames, the checks made to fail first, the sky saturation in force per arm, what each opened picture shows frame by frame, whether the route stays inside the sky where the band does not, what is not known, and the sheets' paths in the session scratchpad. It says the worktree was removed and that no file under src/ or ir.html changed, and the diff agrees.
-# - .plan-scope: the verdict line and its comment lines replaced by the plan-scope tool's record form for this plan's hash; the plan lists this file as changed.
+# Step 2, the open and the strip (src/decode.worker.ts, src/gl.ts, src/main.ts, src/sky.worker.ts, src/skyClient.ts, src/skymap.ts, all named in Files)
+# - The sky map of the open photograph is built off the page: skymap.ts gains the one definition buildOpenSkyMap, sky.worker.ts holds a copy of the photograph's pixels in a second instance and answers map asks, skyClient.ts gains the lane (requestSkyMap, holdSkyMapScene, releaseSkyMapScene), main.ts asks it and builds on the page only where the lane answers none. The unused imports main.ts drops (warpSampler, makeRowDenoiser, makeRowDetail) are the ones that move into skymap.ts with the build.
+# - The histogram readback is started into a pixel-pack buffer behind a fence and collected without waiting (gl.ts histogramStart, histogramInFlight, histogramTake, tally; main.ts refreshHistogram, pollHistogram). The plan said the worker takes it; the NOTES entry records why it cannot.
+# - The batch frame's lift and the report's Shadow light line take the worker's bitmap (batchSkyMaskOf, the bounded wait in wireVersionMenu), with the page build kept for a null answer. Those are the batch and shadow callers the step names.
+# - Reset: resolveLiftWithSky keeps the debt and solves again after the record has been written (LIFT_RETRY_MS, LIFT_RETRY_MAX), as the step asks.
+# - The encode's wait: decode.worker.ts warmEncoder makes the lane's first encode at its start, the cause the step measured, removed.
+# - The report's Last switch line says where the map was built and what the page spent (SkyProfile.mapBy and mapPage, switchSplit), which goal 1 asks for.
 # 
-# Checked against the plan's limits:
-# - No file under src/ and not ir.html is changed, no look's numbers moved, no slider range moved: the plan's "no pixel code is changed in the repository" holds.
-# - Nothing under docs/decisions/ is touched, the white-balance adjustment is not researched, recorded or built, and the roadmap's records are not edited; step 26's brief and step 30's timer are scratchpad files and are not in the diff.
-# - No raising of the cap and no moving of the band is made in the repository; the entry says that choice is not settled there, matching Leaves open.
-# - Step 27's condition (nothing changed but NOTES.md) held when it ran; the one later change is the .plan-scope record, which step 28 exists to write.
-# - The added lines hold no quotation of an owner message, no report attributed to the owner by name or as its source, no session link, no trailer, no model's name, no table and no set-apart quotation; a search of NOTES.md for those strings and for the owner's name found nothing inside the added lines.
-# - The scope check's printed owner messages are one message, an approval, and the diff does what the plan it approved asked and nothing beyond it.
+# Step 3, the camera JPEG (src/main.ts, src/gl.ts comments, docs/ARCHITECTURE.md)
+# - OPEN_8BIT_AT_FULL_SIZE (false) returns the open canvas to the 2800 px copy. The NOTES entry records that no decision record or entry asked for the full-size canvas, which is the branch the step gave for that case, and docs/ARCHITECTURE.md says what the tree now does. The full-size path stays in the code behind the switch; that is a choice inside the step and adds no behaviour. The module list's line counts in ARCHITECTURE.md are the generated ones.
 # 
-# Not read by this agent, because step 28's command line does not name them: git worktree list and the scratchpad's files other than this one's predecessor and the plan's step reports; step 27's report records the worktree list as one line, the repository itself.
+# Step 4, the checks the release lacked
+# - tools/preview-version-check.mjs hashes src/tile.ts and src/skyfine.ts; tools/.preview-pipeline moves its hash and keeps 93 with a proven line.
+# - tools/slider-own-value-walk.mjs and tools/camera-jpeg-sky-walk.mjs are the two walks, each with a printed MADE TO FAIL block, a described plant and a positive control or instrument check. tools/walk-all.mjs is unchanged because it runs every file ending -walk.mjs in its directory (read: lines 10, 31 and 32), so both are joined by existing.
+# - tools/fresh-dist.mjs exports REPO_ROOT; fifteen walks (bar-fit, build-wait, fix-brush, fullview-mask, grade-controls, keep, mask-fix-export, mask-fix, mask-panel, quicklook-speed, quicklook-waiting-pick, scroll-cue, start-screen, straighten-line, tiff-threads) name the practice set through it; the keep walk's raw and its axe path likewise. The seven commit tools (mask-turn, join-fold, lens-store, lens-diagnostic, shadow-cast, one-pool, contract-check) find the repository from their own file.
 # 
-# Nothing outside the plan was found in the diff.
+# Step 5 and step 6
+# - tools/look-sheet.mjs: the default output path moves off a dead session's scratchpad to the machine's temp folder, as step 5 says.
+# - .gitignore gains .worktrees/, as step 6 says.
+# - tools/rotation-walk.mjs: the instrument waits for the sky workers to go quiet before it reads (SKY_WATCH, skySilent, settleView, and checks 16 and 17). Step 6 allows a fix to a failure it finds in a file the plan lists, and the NOTES entry names the failure, its cause and the one cost (the other walks' records predate this edit).
+# - NOTES.md: one new entry at the top of "On staging, waiting on a device pass", above the 2026-10-06 entry, carrying what changed for the reader, the paired numbers, what was verified headless, what needs the iPad, the two look questions as open and the Found lines. Read in full: no quotation of an owner message, no attribution to the owner, no session link, no trailer, no table. A search of the whole diff and of both new walks for the owner's name, trailers, session links and model names found only the plan's own file name in the .plan-scope record.
+# 
+# Weighed and left in
+# - tools/conversion-walk.mjs asks tools/owner-images.mjs for its frame instead of naming a dead session's scratchpad. The step names the keep walk's arms; this is the same defect in the next file, under `tools/`, and a walk that fails on its first line stops the sweep step 6 runs.
+# - tools/offline-shell-walk.mjs reads git from the repository root instead of the start directory: the same class the step names, a walk reading the repository from the start directory.
+# 
+# Found, not scope (nothing here widens the diff; both are for the main thread to handle)
+# - tools/slider-own-value-walk.mjs line 61 imports playwright-core from an absolute path inside this machine's checkout (/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs), where the other walks use the bare package name. It runs here and in no other checkout. The fix is the one line import { chromium } from "playwright-core"; and, being a change to the diff, it needs a fresh scope verdict after it. This is a defect with a known one-line remedy, not a decision.
+# - The NOTES entry says "not committed yet"; after step 8 lands that clause is stale.
+# - Step 8 must name tools/slider-own-value-walk.mjs and tools/camera-jpeg-sky-walk.mjs in its git add, because both are untracked and git add of tracked paths alone leaves them out.

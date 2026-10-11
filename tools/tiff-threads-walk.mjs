@@ -31,7 +31,7 @@
 // --plant lets the "single-threaded" run keep its workers, so both runs are the
 // same. One check must go red.
 import { chromium } from "playwright-core";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
@@ -70,7 +70,7 @@ async function run(b, name, noExportWorkers, opts = {}) {
     });
   }
   await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
-  await p.setInputFiles("#file", ["public/examples/NIR_1651.dng"]);
+  await p.setInputFiles("#file", [`${REPO_ROOT}/public/examples/NIR_1651.dng`]);
   await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
   await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
   await p.waitForTimeout(600);

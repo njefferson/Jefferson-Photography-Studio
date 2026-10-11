@@ -33,14 +33,14 @@
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 requireFreshDist();
 
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) || `--${n}=${d}`).split("=")[1];
 const PORT = arg("port", "8131");
 const SHOTS = arg("shots", "");
 const URL = `http://127.0.0.1:${PORT}/ir.html`;
-const DNG = "public/examples/NIR_0063.dng";
+const DNG = join(REPO_ROOT, "public/examples/NIR_0063.dng");
 const IPAD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15";
 let failed = 0;
 const check = (n, ok, d = "") => { console.log(`${ok ? "ok  " : "FAIL"}  ${n}${d ? " — " + d : ""}`); if (!ok) failed++; };

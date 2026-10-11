@@ -160,16 +160,66 @@ function gridDiff(a, b) {
   }
   return { over: over / N, mean: sum / N };
 }
-/** Wait until the canvas stops changing: the sky worker's pair lands a moment
- *  after the picture, and a read before it measures the frame without it. */
-async function settleView(p) {
-  await p.waitForTimeout(1500);
-  let last = "", same = 0;
-  for (let i = 0; i < 80; i++) {
-    const h = await p.evaluate(() => { const cv = document.querySelector("#view"); const g = cv.getContext("webgl2") || cv.getContext("webgl"); const b = new Uint8Array(cv.width * cv.height * 4); g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, b); let h = 2166136261; for (let k = 0; k < b.length; k += 4 * 7) { h ^= b[k] ^ (b[k + 1] << 8) ^ (b[k + 2] << 16); h = Math.imul(h, 16777619); } return `${cv.width}x${cv.height}:${h >>> 0}`; });
-    if (h === last) { if (++same >= 3) return true; } else { same = 0; last = h; }
+/** Runs in the page before anything else: counts what the sky workers have been
+ *  asked and what they have handed back, and stamps the time of the last of either.
+ *  A selection ask has an `id` and no `kind`; a map ask (the sky map lane, which the
+ *  open photograph's sky map is built on since the open-and-strip release) has
+ *  `kind: "map"`; the scene, chunk and drop messages that feed the lane are never
+ *  answered and are not counted. Both are answered once each, so asked minus
+ *  answered is what is still outstanding. Only workers whose script is sky.worker
+ *  are wrapped. */
+function SKY_WATCH() {
+  const M = (window.__skyWatch = { asked: 0, answered: 0, last: performance.now() });
+  const W = window.Worker;
+  window.Worker = function (url, opts) {
+    const w = new W(url, opts);
+    if (/sky\.worker/.test(String(url))) {
+      const post = w.postMessage.bind(w);
+      w.postMessage = (...a) => {
+        const m = a[0];
+        if (m && (m.kind === "map" || (m.kind === undefined && m.id !== undefined))) { M.asked++; M.last = performance.now(); }
+        return post(...a);
+      };
+      w.addEventListener("message", () => { M.answered++; M.last = performance.now(); });
+    }
+    return w;
+  };
+  window.Worker.prototype = W.prototype;
+}
+/** Wait until the sky workers have nothing outstanding and have been silent for
+ *  `quiet` ms. The look's sky is asked of a worker and lands seconds later in
+ *  software graphics, and the picture sits perfectly still while it is on its way,
+ *  so a still canvas alone says nothing about whether the sky has arrived. At most
+ *  `max` ms; returns whether it was silent. Polls synchronous page state. */
+async function skySilent(p, quiet = 1500, max = 180000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < max) {
+    const w = await p.evaluate(() => { const m = window.__skyWatch; return m ? { out: m.asked - m.answered, quiet: performance.now() - m.last } : { out: 0, quiet: 1e9 }; });
+    if (w.out <= 0 && w.quiet >= quiet) return true;
     await p.waitForTimeout(300);
   }
+  return false;
+}
+/** Wait until the canvas stops changing AND the sky workers are silent: the picture
+ *  draws first and the look's sky follows it, and a read between the two measures
+ *  the frame without its sky. A canvas that is merely still was the whole of this
+ *  test once, and on the build that moved the sky map off the page it read the
+ *  picture a dozen seconds before its sky (checks 9, 10, 11 and 15 read 31 percent
+ *  of cells off, and 0.0 percent once the sky had landed). Gives up after three
+ *  minutes and says so, so a worker that never answers is a printed line, not a hang. */
+async function settleView(p) {
+  await p.waitForTimeout(1500);
+  const t0 = Date.now();
+  let last = "", same = 0;
+  while (Date.now() - t0 < 180000) {
+    const h = await p.evaluate(() => { const cv = document.querySelector("#view"); const g = cv.getContext("webgl2") || cv.getContext("webgl"); const b = new Uint8Array(cv.width * cv.height * 4); g.readPixels(0, 0, cv.width, cv.height, g.RGBA, g.UNSIGNED_BYTE, b); let h = 2166136261; for (let k = 0; k < b.length; k += 4 * 7) { h ^= b[k] ^ (b[k + 1] << 8) ^ (b[k + 2] << 16); h = Math.imul(h, 16777619); } return `${cv.width}x${cv.height}:${h >>> 0}`; });
+    const w = await p.evaluate(() => { const m = window.__skyWatch; return m ? { out: m.asked - m.answered, quiet: performance.now() - m.last } : { out: 0, quiet: 1e9 }; });
+    if (h !== last) { last = h; same = 0; }
+    else if (w.out <= 0 && w.quiet >= 1500) { if (++same >= 3) return true; }
+    else same = 0;
+    await p.waitForTimeout(300);
+  }
+  console.log("        (settleView gave up after three minutes: the canvas or the sky workers never went quiet)");
   return false;
 }
 /** Keep what was compared, when --shots names a directory. */
@@ -299,6 +349,7 @@ try {
     // sky stages act, and a lift solved at one turn cannot ride into another.
     const ctxA = await b.newContext({ viewport: { width: 1280, height: 950 } });
     await ctxA.addInitScript(() => { try { localStorage.setItem("ips-autolift", "0"); } catch { /* the walk then measures with it on, and says so below */ } });
+    await ctxA.addInitScript(SKY_WATCH);
     const a = await ctxA.newPage();
     a.on("pageerror", e => { console.log("FAIL  page error: " + e.message); failed++; });
     a.on("dialog", d => d.accept());
@@ -428,15 +479,20 @@ try {
     // one a reload opens on, which Reset's target after a resume is built under.
     const ctxB = await b.newContext({ viewport: { width: 1280, height: 950 } });
     await ctxB.addInitScript(() => { try { localStorage.setItem("ips-autolift", "1"); localStorage.setItem("ips-default-look", "aero"); } catch { /* the checks below then fail and say what they read */ } });
+    await ctxB.addInitScript(SKY_WATCH);
     const q = await ctxB.newPage();
     q.on("pageerror", e => { console.log("FAIL  page error: " + e.message); failed++; });
     q.on("dialog", d => d.accept());
     await q.goto(URL_IR);
     await openSet(q, [tw.upright, NIR, tw.turned]);
     await stepToName(q, NU);
+    // BOTH LIFTS ARE READ AFTER THEIR SKY HAS LANDED: two first answers (no sky yet) agree
+    // with each other whatever the app does, and 16 would then pass without measuring a sky.
+    if (!(await skySilent(q))) console.log("        (the sky workers never went quiet before the upright copy's lift was read)");
     const L0 = await liftRead(q);
     const near = (x) => x.every((v, i) => Math.abs(v - L0[i]) <= LIFT_TOL);
     await stepToName(q, NN);
+    if (!(await skySilent(q))) console.log("        (the sky workers never went quiet before NIR_1651's lift was read)");
     const L1 = await liftRead(q);
     check(`16 Restore depth measures the sky that is shown: NIR_1651 as shipped is lifted as its upright copy is\n        sky saturation, foliage saturation, sky band saturation ${JSON.stringify(L1)} against ${JSON.stringify(L0)} (within ${LIFT_TOL})`, near(L1), true);
     await stepToName(q, NT);
@@ -447,6 +503,12 @@ try {
     await stepToName(q, NT);
     await press(q, "resetBtn");
     await q.waitForTimeout(800);
+    // THE LIFT IS READ AFTER THE SKY HAS LANDED. Reset puts its target on screen at once
+    // and the look's sky arrives seconds later in software graphics; 800 ms after the
+    // press the lift is still the first answer whatever the app does, which is how this
+    // check came to be red on every build, including the one that fixed the lift. A read
+    // after the workers have gone quiet is what the reader holds a few seconds on.
+    if (!(await skySilent(q))) console.log("        (the sky workers never went quiet before the lift was read)");
     const L2 = await liftRead(q);
     check(`17 and after a reload that restores a turn, Reset returns to a lift solved at that turn\n        ${JSON.stringify(L2)} against ${JSON.stringify(L0)} (within ${LIFT_TOL})`, near(L2), true);
     await ctxB.close();

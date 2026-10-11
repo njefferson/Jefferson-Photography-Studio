@@ -1,3 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
 version=93
-hash=b02043d73f0ae40f
+hash=100a8ada6ecc91fc
+# Recorded WITHOUT a version bump. The evidence the pictures did not change:
+proven=only the hashed set widened: src/tile.ts and src/skyfine.ts are unmodified since a54f622, the commit that recorded version 93, and the other 22 sources still hash to b02043d73f0ae40f

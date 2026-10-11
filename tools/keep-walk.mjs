@@ -90,12 +90,13 @@
 // speed and the browser's answers changed from outside.
 import { openMasks, closeMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 import { readFileSync, existsSync, mkdtempSync, rmSync, copyFileSync, writeFileSync, statSync } from "node:fs";
 import { slowStorage } from "./slow-storage.mjs";
 import { slowBuild } from "./slow-build.mjs";
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
+import { resolve as ownerImage } from "./owner-images.mjs";
 
 // BEFORE THE BROWSER, AND THIS WALK PROVED WHY. It renders through the build in
 // `dist`, and a stale one measures the PREVIOUS build. The first attempt to make
@@ -107,9 +108,20 @@ requireFreshDist();
 
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");
 const BASE = `http://127.0.0.1:${arg("port", "8131")}`;
-const FILE = arg("file", "/tmp/claude-0/-home-user/e7a820ad-44f5-555c-96b8-a4dcabafb549/scratchpad/real2/NIR_1737.NEF");
 const ONLY = arg("only", "file,sweep,practice,quota,late,orders,full,busy,stack,margin,lookrace,keepsniff,hang,slowread,resume,persist,mixed,keeps,looks,stall,writefail,clearabort,unreach,batchend,batchlook").split(",").map((x) => x.trim()).filter(Boolean);
 const want = (arm) => ONLY.includes(arm);
+// THE FRAME COMES THROUGH THE ONE DOOR TO THE OWNER'S PHOTOGRAPHS, not from a path
+// in some session's scratchpad: the default used to name a folder that died with
+// the session that made it, so a bare run (which is how tools/walk-all.mjs runs
+// every walk) failed on its first line in every other session. --file= still
+// names any file; with none given, the arm that needs a raw asks the door for
+// NIR_1737.NEF, which is in tools/owner-images.json. A refused Drive host is a
+// fact about the machine and is printed as one.
+let FILE = arg("file", "");
+if (!FILE && want("file")) {
+  try { FILE = await ownerImage("NIR_1737.NEF"); }
+  catch (e) { console.log(`could not get the owner's photograph NIR_1737.NEF (${e.message}) — it comes through tools/owner-images.mjs from the Drive host drive.usercontent.google.com when it is not already in the cache; pass --file=, or --only=sweep,persist`); process.exit(1); }
+}
 if (want("file") && !existsSync(FILE)) { console.log(`no frame at ${FILE} — pass --file=, or --only=sweep,persist`); process.exit(1); }
 
 let failed = 0;
@@ -290,7 +302,7 @@ async function fileArm(br, dir) {
 // Quick look, Keep, the delete, the room check — is the same code for a JPEG as
 // for a NEF. Only storage's SPEED and the browser's ANSWERS are changed, from
 // outside, by tools/slow-storage.mjs.
-const EX = "public/examples";
+const EX = join(REPO_ROOT, "public/examples");
 const JPG = ["canopy.jpg", "hillside.jpg", "lodge.jpg"].map((f) => join(EX, f));
 const SLOW = 7000; // ms each photo's delete is held open; four photos = 28 s of sweep
 const RULES = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -368,7 +380,7 @@ const tiles = (p) => p.evaluate(() => document.querySelectorAll("#sessionThumbs 
 /** axe over the page as it stands, serious and critical only — the a11y
  *  walk's own rule set — in whichever colour scheme is being emulated. */
 async function axeNow(p, what) {
-  await p.addScriptTag({ path: "node_modules/axe-core/axe.min.js" });
+  await p.addScriptTag({ path: join(REPO_ROOT, "node_modules/axe-core/axe.min.js") });
   const r = await p.evaluate(async (rules) => await window.axe.run(document, { runOnly: rules }), RULES);
   const serious = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   check(`${what}: axe finds nothing serious or critical`, serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`).join(" | "), "");

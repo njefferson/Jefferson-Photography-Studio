@@ -24,12 +24,16 @@
 import { build } from "esbuild";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join, dirname } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
 
+// THE REPOSITORY THIS FILE SITS IN, found from the file's own location and never
+// from the directory the process was started in (nothing may `cd` in the sessions
+// that run these tools, so the start directory is not the repository).
+const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = mkdtempSync(join(tmpdir(), "shadowcast-"));
 const entry = join(dir, "entry.ts");
-writeFileSync(entry, `export { measureShadowCast, suggestedAmount } from ${JSON.stringify(join(process.cwd(), "src/shadowcast.ts"))};`);
+writeFileSync(entry, `export { measureShadowCast, suggestedAmount } from ${JSON.stringify(join(repo, "src/shadowcast.ts"))};`);
 const out = join(dir, "bundle.mjs");
 await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
 const { measureShadowCast, suggestedAmount } = await import(pathToFileURL(out).href);

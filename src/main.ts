@@ -41,16 +41,16 @@ import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache, type HealSolves } from "./heal";
 import { makeStickerAsset, stickerRect, stickerWorldCorners, stickerXform, compositeStickersIntoRect8, compositeStickersIntoRectF32, compositeStickersOverlay8, type StickerAsset } from "./sticker";
-import { makeWarpField, encodeWarp, paintWarp, warpSampler, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
+import { makeWarpField, encodeWarp, paintWarp, warpIsEmpty as warpFieldEmpty, type WarpField, type WarpTool } from "./warp";
 import type { Sticker, BrushMask, LensCurve, LocalMap } from "./pipeline";
 import { generateCube } from "./lut";
 import { generateDcp } from "./dcp";
 import { buildGlowMap } from "./glow";
 import { buildLocalMap } from "./localmap";
-import { buildSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI } from "./skymap";
+import { buildOpenSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI } from "./skymap";
+import { requestSkyMap, releaseSkyMapScene } from "./skyClient";
 import { prepareSkySource, buildSkySelectionFrom, buildSkyGuide, refineSkyMask, growSkyByColour, type SkyGuide } from "./skyfine";
-import { makeRowDenoiser, measuredStrength } from "./raw/denoise";
-import { makeRowDetail } from "./raw/detail";
+import { measuredStrength } from "./raw/denoise";
 import { buildSkyMask, skyPrepare, skyTurn, SKY_MIN_COVERAGE, type SkyPrep } from "./sky";
 import { measureShadowCast, type ShadowCast } from "./shadowcast";
 import { buildDiagnostic, tileLine, type LastTile } from "./diagnostic";
@@ -1474,8 +1474,42 @@ function refreshHistogram(p: EditParams) {
   if (!current || !histEnabled) return;
   if (adding) { histStale = true; return; }
   histStale = false;
-  const h = renderer.histogram(p);
-  if (h) drawHistogram(histCanvas, h);
+  // THE READBACK IS STARTED, NEVER WAITED FOR HERE. `renderer.histogram` called
+  // gl.readPixels into memory, which holds the page until the GPU has drawn every
+  // frame queued before it; this draws the same small pass into a pixel-pack
+  // buffer behind a fence and `pollHistogram` collects it when the GPU says it is
+  // done. One readback is in flight at a time; an edit that arrives meanwhile is
+  // remembered and read when the first lands (the newest wins).
+  if (renderer.histogramInFlight()) { histWant = p; return; }
+  if (!renderer.histogramStart(p)) return;
+  histFor = current;
+  window.setTimeout(() => pollHistogram(0), 4);
+}
+
+/** The photograph the readback in flight was drawn for, so a result that lands
+ *  after the reader has moved to another is dropped, not drawn. */
+let histFor: DecodedImage | null = null;
+/** The newest edit asked for while a readback was in flight, or null. */
+let histWant: EditParams | null = null;
+
+/** Collect the histogram readback that `refreshHistogram` started, when the GPU
+ *  has finished it, and draw it.
+ *  @param n  how many times this readback has been looked at already, which
+ *    spaces the looks (4 ms, doubling to 50 ms) so a long GPU wait is not a busy
+ *    loop.
+ *  Returns nothing. What it must satisfy: when it ends no readback is in flight,
+ *  and an edit that was asked for meanwhile has been started. */
+function pollHistogram(n: number): void {
+  const h = renderer.histogramTake();
+  if (!h && renderer.histogramInFlight()) {
+    window.setTimeout(() => pollHistogram(n + 1), Math.min(50, 4 << Math.min(n, 4)));
+    return;
+  }
+  if (h && current && histFor === current && histEnabled) drawHistogram(histCanvas, h);
+  histFor = null;
+  const want = histWant;
+  histWant = null;
+  if (want) refreshHistogram(want);
 }
 
 /** A refresh was skipped while a set was loading; catch it up when that ends. */
@@ -2177,8 +2211,10 @@ const skyMaskTurnOf = new WeakMap<BrushMask, number>();
  *  THE OPEN PHOTOGRAPH NO LONGER COMES HERE for its look. It takes the sky
  *  worker's pair (`seekSky`), and its lift waits for that pair (`liftSkyMask`);
  *  this is its fallback only, for a worker that answered null. What still comes
- *  here by design is a tile the page draws itself (`drawTileHere`), the shadow
- *  cast's report line, and that fallback. */
+ *  here by design is a tile the page draws itself (`drawTileHere`) and that
+ *  fallback. The report's shadow-cast line and a batch frame's lift take the
+ *  worker's bitmap, waited for (`wireVersionMenu`, `batchSkyMaskOf`), and come
+ *  here only where the worker answered none. */
 function skyMaskFor(img: DecodedImage, turn: number): BrushMask | null {
   const t = skyTurn(turn);
   if (img.skySel && img.skySel.turn === t) return img.skySel.mask;
@@ -2271,8 +2307,16 @@ interface SkyProfile {
   /** ms of the second solve of the lift, the one made with the sky in hand
    *  (`resolveLiftWithSky`); null when none was made for this open. */
   lift: number | null;
-  /** ms of the first sky map build once the selection was in hand; null when none yet. */
+  /** ms from the first sky map being asked for (the selection in hand) to it being
+   *  on its way to the GPU; null when none yet. When the sky worker built it this
+   *  includes the worker's own time and its queue, which the page did not spend. */
   map: number | null;
+  /** Where that first map was built: in the sky worker, or on the page (no lane,
+   *  or the lane could not). Null until it is. */
+  mapBy: "worker" | "page" | null;
+  /** ms the PAGE spent on that first map: handing the photograph's pixels and the
+   *  edit to the lane, or building it. Null until it is built. */
+  mapPage: number | null;
 }
 let skyProfile: SkyProfile | null = null;
 
@@ -2315,7 +2359,7 @@ function adoptSky(img: DecodedImage, sel: SkySelection): void {
   skyFine = sel.fine;
   lookSkyTurn = sel.turn;
   renderer.setSkyFine(skyFine);
-  skyMapKey = "";
+  forgetSkyMap();
 }
 
 /** THE PAGE'S OWN BUILD, for the one case that is left: the sky worker answered
@@ -2328,7 +2372,7 @@ function adoptSkyHere(img: DecodedImage, turn: number): void {
   skyFine = null;
   lookSkyTurn = turn;
   renderer.setSkyFine(null);
-  skyMapKey = "";
+  forgetSkyMap();
 }
 
 /** POINT THE OPEN PHOTOGRAPH'S LOOK AT THE SKY WORKER'S PAIR FOR THE TURN SHOWN.
@@ -2358,7 +2402,7 @@ function seekSky(img: DecodedImage): void {
   skyBitmap = null;
   skyFine = null;
   lookSkyTurn = null;
-  skyMapKey = "";
+  forgetSkyMap();
   renderer.setSkyFine(null);
   if (skyProfile?.img === img) skyProfile.asked = true;
   void requestSkySelectionAt(img, turn).then((sel) => {
@@ -2390,8 +2434,21 @@ function skyLanded(img: DecodedImage): void {
   const lifted = resolveLiftWithSky(img);
   if (lifted || (params.skySmooth ?? 0) > 0 || (params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0) {
     syncSkyMap();
-    draw();
+    drawWithMap();
   }
+}
+
+/** DRAW NOW, UNLESS THE SKY MAP LANE IS BUILDING THE MAP THIS DRAW WOULD SHOW.
+ *  Takes and returns nothing. When `syncSkyMap` has just handed the lane an ask, the
+ *  lane's answer draws the lift and the sky together (`skyMapBusy`, the answer's own
+ *  draw), so the look's sky arrives in one step and the open does not draw a frame
+ *  with the lift and without the map first; the draw is recorded as owed so that an
+ *  answer that is dropped still pays it. Otherwise it is `draw()`. What it must
+ *  satisfy: after it, either a draw has been asked for or `skyMapBusy` is true and
+ *  every way out of the busy state draws or asks again (`syncSkyMap`'s answer). */
+function drawWithMap(): void {
+  if (skyMapBusy) { skyMapDrawOwed = true; return; }
+  draw();
 }
 
 /** THE SKY THE LIFT MEASURES, for the open photograph.
@@ -2425,14 +2482,25 @@ function nearLift(a: readonly number[], b: readonly number[]): boolean {
   return a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 0.005);
 }
 
+/** How long, and how many times, `resolveLiftWithSky` waits for the edit record to
+ *  catch up with the live edit before it gives the second solve up: the record is
+ *  written 350 ms after an edit (`recordSoon`), so 400 ms is one write, and twelve
+ *  tries is a few seconds of someone still dragging a slider. */
+const LIFT_RETRY_MS = 400;
+const LIFT_RETRY_MAX = 12;
+
 /** SOLVE THE LIFT AGAIN, NOW THAT ITS SKY HAS ARRIVED — and leave every place
  *  that recorded the first answer holding the second.
  *
- *  Takes the photograph whose sky has just been adopted. Returns true when the
+ *  Takes the photograph whose sky has just been adopted, and `attempt`, which
+ *  counts the times it has come back for an edit the record had not caught up
+ *  with (0 on the first call). Returns true when the
  *  edit changed, so the caller draws. Does nothing, and returns false, unless
  *  the lift was solved WITHOUT this photograph's sky (`liftWait`), a look is on
  *  it, Restore depth is on, none of the four values has been moved by the
- *  reader since, and nothing is waiting to be recorded as an undo step.
+ *  reader since, and nothing is waiting to be recorded as an undo step — and
+ *  when only that last one holds it back, the debt is kept and the call is made
+ *  again after the record has been written (`LIFT_RETRY_MS`).
  *
  *  Why it exists: the open used to build the sky on this thread so that the lift
  *  could measure the sky by place at once. It now solves without it and comes
@@ -2449,7 +2517,7 @@ function nearLift(a: readonly number[], b: readonly number[]): boolean {
  *  it), the as-opened copy `origParams`, the slider defaults, and the look's
  *  mark. A record that holds something else — an undo step from before the
  *  look, a photograph the reader has since graded — is left as it is. */
-function resolveLiftWithSky(img: DecodedImage): boolean {
+function resolveLiftWithSky(img: DecodedImage, attempt = 0): boolean {
   const w = liftWait;
   if (!w || w.img !== img) return false;
   liftWait = null;
@@ -2461,7 +2529,29 @@ function resolveLiftWithSky(img: DecodedImage): boolean {
   if (!autoLift || !activeLook) { holdBaselineSky(img, w); return false; }
   const ours = untouched(params.tone, w.wrote.tone) && untouched(params.foliage, w.wrote.foliage)
     && untouched(params.sky, w.wrote.sky) && untouched([params.skySat ?? 0], w.wrote.skySat);
-  if (!ours || !settled || snapSig(snapshot()) !== snapSig(settled)) { holdBaselineSky(img, w); return false; }
+  if (!ours || !settled) { holdBaselineSky(img, w); return false; }
+  // AN EDIT THE RECORD HAS NOT CAUGHT UP WITH IS A REASON TO COME BACK, NOT TO GIVE
+  // THE LIFT UP. Reset is one: it puts the Reset target on screen at once and the
+  // undo step for it is written 350 ms later (`recordSoon`), so a sky that lands
+  // inside those 350 ms found the live edit ahead of `settled`, gave up, and the
+  // debt was already spent — the live lift stayed the first answer, without the
+  // sky, until Reset was pressed a second time (probed 2026-10-09: an edit made
+  // and recorded, then Reset and the sky's arrival in one task, lift [0,1.03,1]
+  // for 23 s against [0.5,1.03,1] after the second press). `settled = snapshot()`
+  // below would swallow the waiting step, which is why the solve cannot simply go
+  // ahead; so the Reset target is given the sky now, as before, the debt is kept,
+  // and the solve is tried again after the record has had its 350 ms.
+  if (snapSig(snapshot()) !== snapSig(settled)) {
+    holdBaselineSky(img, w);
+    if (attempt < LIFT_RETRY_MAX) {
+      liftWait = w;
+      oweLift(w);
+      window.setTimeout(() => {
+        if (current === img && liftWait === w && resolveLiftWithSky(img, attempt + 1)) { syncSkyMap(); drawWithMap(); }
+      }, LIFT_RETRY_MS);
+    }
+    return false;
+  }
   const marked = looksUntouched(lookMark);
   const old = liftFieldsOf(params);
   const l0 = performance.now();
@@ -2643,6 +2733,30 @@ let lastSkyMap: SkyMap | null = null;
  *  (startWarpStroke), so an Undo followed by a new stroke can reach a `rev`
  *  an earlier, different field had. */
 let skyMapWarp: WarpField | null = null;
+/** WHETHER THE SKY MAP LANE IS WORKING ON AN ASK, so there is never more than one:
+ *  an edit that moves the map's key meanwhile waits, and the answer's own draw
+ *  asks for the newest. Rebuilds then follow the lane's pace, one at a time,
+ *  instead of queueing a build for every frame of a drag. */
+let skyMapBusy = false;
+/** A DRAW THAT WAS HELD BACK because the lane was building the map it would show
+ *  (`drawWithMap`): the lane's answer draws it, and so does the stale-answer path
+ *  below when nothing is asked again. Cleared by the next draw that runs. */
+let skyMapDrawOwed = false;
+/** BUMPED EVERY TIME THE SKY MAP IS FORGOTTEN (`forgetSkyMap`, and the clearing
+ *  branch of `syncSkyMap`), so an answer for an ask made before the forgetting —
+ *  another photograph, another turn, a new selection — is dropped on arrival. */
+let skyMapGen = 0;
+/** The photograph whose map the lane could not build, after which the page builds
+ *  its maps itself for as long as it is open; null otherwise. */
+let skyMapPageFor: DecodedImage | null = null;
+/** Forget the sky map the renderer holds the key of: the next draw builds a new
+ *  one. Takes and returns nothing. What it must satisfy: any ask in flight is
+ *  dropped when it lands (`skyMapGen`), because its map was built for a selection
+ *  or a turn that is no longer the one shown. */
+function forgetSkyMap(): void {
+  skyMapKey = "";
+  skyMapGen++;
+}
 /** The clarity/dehaze map the renderer holds for the open photograph, built
  *  once at open from its working copy. The sky map reads it as the shader does. */
 let localMapNow: LocalMap | null = null;
@@ -2687,7 +2801,7 @@ function syncSkyMap(): void {
     if (skyProfile?.img === img && (skyProfile.how === "page" || skyProfile.how === "none")) skyProfile.built = (skyProfile.built ?? 0) + (performance.now() - r0);
   }
   if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0)) {
-    if (skyMapKey) { renderer.setSkyMap(null); skyMapKey = ""; lastSkyMap = null; }
+    if (skyMapKey) { renderer.setSkyMap(null); forgetSkyMap(); lastSkyMap = null; }
     return;
   }
   const { skySmooth: _s, skyDepth: _d, masks: _m, spots: _sp, stickers: _st, crop: _c, straighten: _str, warp: _w, grainAmt: _g, vigAmt: _v, ...rest } = params as EditParams & Record<string, unknown>;
@@ -2703,27 +2817,79 @@ function syncSkyMap(): void {
   if (key === skyMapKey && warp === skyMapWarp) return;
   // A live warp stroke moves the field every frame; the map waits for the end.
   if (warpStroke && skyMapKey) return;
+  // THE LANE IS ON AN EARLIER EDIT: this one waits for it. The answer's own draw
+  // comes back here and asks for whatever the key is by then.
+  if (skyMapBusy) return;
   skyMapKey = key;
   skyMapWarp = warp;
   const img = current;
   const mapFrom = performance.now();
-  // THE SAME PRE-PASS THE PIXELS COME THROUGH. The open image IS the preview's
-  // proxy (a half-res bin for a raw), so step 1 here is what the shader taps.
-  // Built from the raw decode instead, the map targeted a sky 16% more
-  // saturated than the rendered one — skymap.ts has the measurement.
-  // And through the warp FIRST, as the export's chain runs it (export.ts: the
-  // warp remaps the source at the very top, before denoise).
-  const unwarped = (x: number, y: number) => linearAt(img, x, y);
-  const raw = warp ? warpSampler(unwarped, warp, img.width, img.height) : unwarped;
-  const pre = makeRowDetail(makeRowDenoiser(raw, img.width, img.height, params.denoise, 1, params.chroma ?? 0, params.despeckle ?? 0), img.width, img.height, params.sharpen ?? 0, params.texture ?? 0, 1, decodePitch);
   // The clarity/dehaze map exactly when the export builds one.
   const local = (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0 ? localMapNow ?? undefined : undefined;
-  lastSkyMap = buildSkyMap(pre, img.width, img.height, params, img.camMatrix, img.width / Math.max(1, img.height), local, lensForEdit(img), skyBitmap, srcFlatOf(img), warp);
+  // OFF THE PAGE WHEN THERE IS A LANE FOR IT (skyClient.ts `requestSkyMap`): the
+  // sampler chain below is a denoiser and a detail pass tapped at some forty
+  // thousand places, which on a fast device was a few hundred milliseconds of
+  // every drag under a look with sky smoothing or depth, and seconds when the
+  // device was busy. The lane runs the same `buildOpenSkyMap` over a copy of this
+  // photograph's pixels it was sent once, so the map is the page's own; what moves
+  // is where the arithmetic runs, and the draw that shows it comes when it lands.
+  const asked = skyMapPageFor === img ? null : requestSkyMap(img, { params, local, lens: lensForEdit(img), sky: skyBitmap, warp, pitch: decodePitch });
+  if (asked) {
+    const pageSpent = performance.now() - mapFrom;
+    const gen = skyMapGen;
+    skyMapBusy = true;
+    void asked.then((ans) => {
+      skyMapBusy = false;
+      // Left behind: another photograph, a new selection, a turn. What is wanted now is
+      // asked for here, and its answer draws; a draw that was held back for this ask
+      // (`drawWithMap`) is paid when nothing else is asked for.
+      if (current !== img || gen !== skyMapGen) {
+        syncSkyMap();
+        if (!skyMapBusy && skyMapDrawOwed) draw();
+        return;
+      }
+      if (!ans) {
+        // The lane could not build it. The page does, now and from here on for this
+        // photograph, which is what it did before there was a lane.
+        skyMapPageFor = img;
+        skyMapKey = "";
+        draw();
+        return;
+      }
+      lastSkyMap = ans.map;
+      renderer.setSkyMap(lastSkyMap);
+      noteSkyMapBuilt(img, mapFrom, "worker", pageSpent);
+      draw();
+    });
+    return;
+  }
+  // ON THE PAGE: no lane, or the lane could not.
+  // THE SAME PRE-PASS THE PIXELS COME THROUGH (skymap.ts `buildOpenSkyMap`). The
+  // open image IS the preview's proxy (a half-res bin for a raw), so step 1 there is
+  // what the shader taps. Built from the raw decode instead, the map targeted a sky
+  // 16% more saturated than the rendered one — skymap.ts has the measurement. And
+  // through the warp FIRST, as the export's chain runs it (export.ts: the warp
+  // remaps the source at the very top, before denoise).
+  lastSkyMap = buildOpenSkyMap(img, params, local, lensForEdit(img), srcFlatOf(img), skyBitmap, warp, decodePitch);
   renderer.setSkyMap(lastSkyMap);
-  // THE FIRST BUILD AFTER THIS OPEN'S SELECTION WAS IN HAND, for the report
-  // (`SkyProfile.map`): the sampler chain, the build and the hand-over to the
-  // renderer, from the key being taken to the map being on its way to the GPU.
-  if (skyProfile?.img === img && skyProfile.how !== "waiting" && skyProfile.map === null) skyProfile.map = performance.now() - mapFrom;
+  noteSkyMapBuilt(img, mapFrom, "page", performance.now() - mapFrom);
+}
+
+/** Record, once, that this open's first sky map is on its way to the GPU.
+ *  @param img  the photograph it is for; ignored unless it is the one profiled.
+ *  @param from  the clock when the map was asked for.
+ *  @param by  "worker" (the sky map lane built it) or "page".
+ *  @param pageSpent  ms the page itself spent on it: handing the pixels and the edit
+ *    over, or building it.
+ *  Returns nothing. What it must satisfy: the first call for a profile wins and
+ *  only once the selection is in hand (`how` is not "waiting"), the rule the first
+ *  build always had; `SkyProfile.map` is the whole of it from the ask. */
+function noteSkyMapBuilt(img: DecodedImage, from: number, by: "worker" | "page", pageSpent: number): void {
+  const p = skyProfile;
+  if (!p || p.img !== img || p.how === "waiting" || p.map !== null) return;
+  p.map = performance.now() - from;
+  p.mapBy = by;
+  p.mapPage = pageSpent;
 }
 
 /** What `applyLook` last wrote onto `params.texture`, so leaving a look that
@@ -3663,6 +3829,7 @@ function draw() {
   if (raf) return;
   raf = requestAnimationFrame(() => {
     raf = 0;
+    skyMapDrawOwed = false; // this frame is the draw a held-back one was waiting for
     ensureLensApplied(); // the flat on the working copy first; everything below reads it
     const key = [params.tone, params.toneR, params.toneG, params.toneB].map((t) => t.join(",")).join(";");
     if (key !== lastToneKey) {
@@ -4129,6 +4296,13 @@ function wireVersionMenu() {
     // the reader's photographs, and how many there are is the whole of what a
     // report needs to say about them.
     const kept = await previewStats().catch(() => ({ rows: 0, bytes: 0 }));
+    // THE "Shadow light" LINE TAKES THE SKY WORKER'S BITMAP, WAITED FOR, and not the
+    // page's own build of it (`shadowCastFor` -> `skyMaskFor`). Bounded: a report
+    // that hangs because a worker never answers is worse than one that builds the
+    // bitmap itself, which is what happens after the wait.
+    if (current && canAskSkyAt(current)) {
+      await Promise.race([requestSkySelectionAt(current, shownSkyTurn()).catch(() => null), new Promise((r) => window.setTimeout(r, 20000))]);
+    }
     text.value = await buildDiagnostic(__APP_VERSION__, [
       { k: "Open now", v: current ? `a photo is open${real >= 2 ? ` in a session of ${real}` : ""}` : "nothing open" },
       // WHAT THE DRIVER SAID, when the editor's picture code did not build
@@ -9727,7 +9901,7 @@ let healPreviewTimer = 0;
 function uploadPreview() {
   if (!current) return;
   nativeGen++;                       // anything still building belongs to the old photograph
-  previewSrc = toPreview(current, proxyRefusedFor === current);
+  previewSrc = toPreview(current, !OPEN_8BIT_AT_FULL_SIZE || proxyRefusedFor === current);
   // THE TAP SCALE IS PART OF THE UPLOAD, NOT A SEPARATE STEP. The noise
   // reduction and the sharpening measure their footprint in texels of whatever
   // texture is bound; a working copy at native resolution has texels half the
@@ -9745,6 +9919,8 @@ function uploadPreview() {
   decodePitch = current.isRaw ? 2 : 1;
   renderer.setNativePitch(decodePitch * (current.width / Math.max(1, previewSrc.width)));
   renderer.setImage(previewSrc);
+  // (ONLY WHILE OPEN_8BIT_AT_FULL_SIZE IS ON; off, an 8-bit source is already
+  // the proxy above and this finds `previewSrc` is not `current`.)
   // ASKED FOR THE WHOLE FRAME; IF THE BROWSER GAVE LESS, THE PROXY. Checked
   // here, synchronously, so the first frame drawn is already the right one;
   // `renderer.onBufferShort` catches a later crop or rotation that asks for
@@ -11930,7 +12106,9 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
     // A record still waiting belongs to a photograph being left: say so, so its
     // line never claims an answer is on its way for a picture that is gone.
     if (skyProfile?.how === "waiting") skyProfile.how = "left";
-    skyProfile = { img, at: performance.now(), asked: false, how: "waiting", wait: null, built: null, lift: null, map: null };
+    skyProfile = { img, at: performance.now(), asked: false, how: "waiting", wait: null, built: null, lift: null, map: null, mapBy: null, mapPage: null };
+    // The sky map lane holds ONE photograph's pixels, the one open; the last one's go.
+    releaseSkyMapScene(img);
     seekSky(img);
   }
   const __f = performance.now();
@@ -15575,6 +15753,7 @@ async function endSession(): Promise<Awaited<ReturnType<typeof resetSessionState
   updateSessionStrip(); // hides the strip and gives the stage back to the photo
   current = null;
   currentFile = null;
+  releaseSkyMapScene(); // nothing is open, so the sky map lane holds nothing
   // THE STAGE IS EMPTIED WITH THE SESSION. Without this the last photograph
   // stayed drawn behind the start screen — the app no longer knew it was
   // there and the reader could see it, with no way back to it and no way to
@@ -15634,7 +15813,10 @@ function switchSplit(): string {
     }
   })();
   const afterwards = s && s.how !== "waiting" && s.how !== "left"
-    ? `, second lift solve ${s.lift === null ? "none made" : t(s.lift)}, sky map ${s.map === null ? "none built yet" : t(s.map)}`
+    ? `, second lift solve ${s.lift === null ? "none made" : t(s.lift)}, sky map ${s.map === null ? "none built yet" : t(s.map)}` +
+      // WHERE IT WAS BUILT, and what the page itself spent: the lane's own seconds
+      // and its queue are in the first number and are not the page's.
+      (s.map === null || s.mapBy === null ? "" : s.mapBy === "worker" ? ` (built in the sky worker; the page spent ${t(s.mapPage ?? 0)} of it)` : " (built on the page)")
     : "";
   return (
     `${p.megapixels.toFixed(1)} MP in ${t(p.total)} — reading ${t(p.getBytes)} over ${p.chunkRows} stored pieces` +
@@ -18387,8 +18569,12 @@ function neutralLook(): SavedLook {
  *  @param ex  the frame's own EXIF (`exifOf`), for the lens strength opening
  *    it would apply (`lensStrengthAtOpen`). A raw's export lays the flat at
  *    `lensFix` on the full-size source, so a 0 here is a batch frame with no
- *    lens correction at all. REQUIRED, with no default, for that reason. */
-function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["lut"], ex: ExifSubset | null): EditParams {
+ *    lens correction at all. REQUIRED, with no default, for that reason.
+ *  @param skyMask  the sky worker's coarse bitmap for this frame at its own turn
+ *    (`batchSkyMaskOf`), which the lift measures the sky by; absent or null, the
+ *    page builds the same bitmap itself (`skyMaskFor`), which is only where the
+ *    worker answered none. */
+function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["lut"], ex: ExifSubset | null, skyMask?: BrushMask | null): EditParams {
   // THE SAME FOUR VALUES OPENING THE FILE WOULD APPLY, from the one function
   // that states them. This assembler used to re-derive them and drifted on
   // three: it gray-world balanced every file, including a camera-rendered one
@@ -18565,11 +18751,29 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     const liftSky = grade.kind !== "builtin" || LOOKS[grade.key].liftSky !== false;
     const base: LiftBase = hasLook ? { foliage: [...look.foliage] as [number, number, number], sky: [...look.sky] as [number, number, number], skySat: look.skySat ?? 0, liftSky } : liftBaseNeutral();
     // At the file's own turn, which is the turn `runBatch` exports at (070).
-    const solved = solveLift(hasLook, img, p, hasLook ? skyMaskFor(img, img.rotate ?? 0) : null, base, lensForEdit(img));
+    const solved = solveLift(hasLook, img, p, hasLook ? (skyMask ?? skyMaskFor(img, img.rotate ?? 0)) : null, base, lensForEdit(img));
     const lift = solved && scaleLift(solved, liftAmount, base);
     if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; p.skySat = lift.skySat; }
   }
   return p;
+}
+
+/** THE SKY BITMAP A BATCH FRAME'S LIFT MEASURES, from the sky worker.
+ *  @param img  a frame decoded with `sky: true` (`decodeWithLens`).
+ *  @param grade  the batch's grade, which says whether a look is on the frame.
+ *  @returns the worker's coarse bitmap at the file's own turn, waited for; null
+ *  when the lift will not read one (Restore depth off, or no look chosen), when
+ *  the decode kept no copy to ask about, or when the worker answered none or
+ *  another turn — in which case `batchParamsFor` builds the bitmap on the page,
+ *  the only case that does. What it must satisfy: a non-null mask is the one
+ *  `skyMaskFor(img, img.rotate ?? 0)` would build, byte for byte, because the
+ *  worker runs the same `buildSkySelectionFrom` over the same copy (the coarse
+ *  bitmap is not changed by the refinement). */
+async function batchSkyMaskOf(img: DecodedImage, grade: BatchGrade): Promise<BrushMask | null> {
+  const hasLook = grade.kind === "builtin" || (grade.kind === "look" && grade.hasLook !== false);
+  if (!autoLift || !hasLook) return null;
+  const sel = img.skySel ?? (await img.skySelReady) ?? null;
+  return sel && sel.turn === skyTurn(img.rotate ?? 0) ? sel.mask : null;
 }
 
 /** Whether a frame in a bulk run matched a shipped lens profile. Nothing is
@@ -18738,7 +18942,9 @@ async function runBatch(files: File[]) {
         const batchLens = lensCurveFor(imported);
         // The sky selection is per photograph too, built the way the open builds
         // it; a set can hold frames with and without a sky.
-        const batchP = batchParamsFor(img, grade, batchSettings?.lut ?? null, exifOf(imported));
+        // THE LIFT'S SKY comes from the sky worker, waited for, not built on the page.
+        const liftSky = await batchSkyMaskOf(img, grade);
+        const batchP = batchParamsFor(img, grade, batchSettings?.lut ?? null, exifOf(imported), liftSky);
         // The sky selection — the same one the open path gets, built by the
         // decode worker from the same copy — when the look carries a sky
         // stage; a batch is developed at full size, where the coarse
@@ -18754,7 +18960,7 @@ async function runBatch(files: File[]) {
         const result = await exportImage(
           imported,
           img,
-          batchParamsFor(img, grade, batchSettings?.lut ?? null, exifOf(imported)),
+          batchParamsFor(img, grade, batchSettings?.lut ?? null, exifOf(imported), liftSky),
           { format, scale, quality, rotate: img.rotate ?? 0, lookRecipe: batchSettings?.recipe },
           (fr) => { busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name} · ${Math.round(fr * 100)}%`; },
           batchLens,
@@ -19870,19 +20076,31 @@ function estimateDenoise(img: DecodedImage): number {
 // autoExposure and autoRecover live in decode.ts, beside the balance they are
 // measured with, where a check can reach them without the page.
 
-// THE 8-BIT PROXY IS A FALLBACK NOW, NOT A RULE (2026-10-02). Every 8-bit
-// source over 2800 px (a big JPEG, PNG or HEIC, an embedded preview) used
-// to be shown from a
-// 2800 px copy on the premise that iOS Safari clamps WebGL drawing buffers over
-// about 16.7 MP to a black canvas. The WebGL spec says an unsatisfiable size
-// produces a SMALLER drawing buffer and reports its true size in
-// drawingBufferWidth/Height; WebKit clamps each side to the texture,
-// renderbuffer and viewport maxima with no area cap; and 16,777,216 was an old
-// iOS 2D-CANVAS area cap — which the downscale below itself used. So the full
-// frame is asked for, `Renderer.bufferShort` compares what came back, and only
-// a mismatch drops to this size. The tap scale stays pinned to the proxy's
-// footprint either way (decision 009's chosen option), so denoise and sharpen
-// mean what they meant. `current` keeps full resolution for export regardless.
+// THE 8-BIT PROXY IS THE RULE AGAIN, AND SHOWING THE FULL FRAME IS 3.0's
+// (2026-10-10). Every 8-bit source over 2800 px (a big JPEG, PNG or HEIC, an
+// embedded preview) is shown from a 2800 px copy, and `current` keeps full
+// resolution for sampling and export.
+//
+// From 2026-10-02 to 2026-10-10 the full frame was uploaded instead and the
+// proxy was only the fallback for a browser that gave a smaller drawing buffer.
+// That change rested on a sound reading of the platform: the WebGL spec says an
+// unsatisfiable size produces a SMALLER drawing buffer and reports its true size
+// in drawingBufferWidth/Height, WebKit clamps each side to the texture,
+// renderbuffer and viewport maxima with no area cap, and 16,777,216 was an old
+// iOS 2D-CANVAS area cap (which the downscale below no longer draws through).
+// What it did not have was a record asking for it in that release. Decision 009
+// puts the editor's native-resolution working copy in 3.0 and sets the test it
+// must pass, and NOTES (2026-09-13) records that the canvas follows the image's
+// size, so a native working copy asks for a drawing buffer as large as the
+// frame. For a camera JPEG that was a 5568 by 3712 canvas, and pressing a look
+// on it held the page for minutes in software graphics (NOTES, the 2026-10-06
+// entry).
+//
+// So the full-size path stays in the code, switched off here, for 3.0 to turn
+// on once 009's test is met. With it off, `toPreview` hands back the proxy,
+// `renderer.bufferShort` is never consulted for an 8-bit source, and the tap
+// scale is 1 because the proxy's texels already are the proxy's footprint.
+const OPEN_8BIT_AT_FULL_SIZE = false;
 const MAX_PREVIEW = 2800;
 /** The photograph whose full-size upload this browser refused (a smaller
  *  drawing buffer than asked for). Its later uploads go straight to the proxy
@@ -19922,8 +20140,9 @@ const NATIVE_MAX_MP = 24;
 
 /** What the live view draws from for this decode.
  *  @param img    the decoded photograph.
- *  @param proxy  true only after the browser refused the full-size drawing
- *    buffer for this photograph (uploadPreview, renderer.onBufferShort).
+ *  @param proxy  true unless OPEN_8BIT_AT_FULL_SIZE is on, and always true
+ *    after the browser refused the full-size drawing buffer for this
+ *    photograph (uploadPreview, renderer.onBufferShort).
  *  @returns `img` itself — always for a raw's half-size copy, and for an
  *    8-bit source unless `proxy` — or a <= MAX_PREVIEW downscale of an 8-bit
  *    source when `proxy` is set. Sets previewW/H to what it returns and

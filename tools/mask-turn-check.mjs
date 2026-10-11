@@ -29,12 +29,16 @@
 import { build } from "esbuild";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join, dirname } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
 
+// THE REPOSITORY THIS FILE SITS IN, found from the file's own location and never
+// from the directory the process was started in (nothing may `cd` in the sessions
+// that run these tools, so the start directory is not the repository).
+const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = mkdtempSync(join(tmpdir(), "maskturn-"));
 const entry = join(dir, "entry.ts");
-writeFileSync(entry, `export { maskWeight, radialLocal, radialPoint, aimWeight, foliageAt, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT } from ${JSON.stringify(join(process.cwd(), "src/pipeline.ts"))};`);
+writeFileSync(entry, `export { maskWeight, radialLocal, radialPoint, aimWeight, foliageAt, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT } from ${JSON.stringify(join(repo, "src/pipeline.ts"))};`);
 const out = join(dir, "bundle.mjs");
 await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
 const { maskWeight, radialLocal, radialPoint, aimWeight, foliageAt, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT } = await import(pathToFileURL(out).href);

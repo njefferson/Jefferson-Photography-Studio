@@ -30,7 +30,7 @@ import { openMasks } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 requireFreshDist();
 
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) || `--${n}=${d}`).split("=")[1];
@@ -91,7 +91,7 @@ try {
     !coldPanel.shown,
     `drawer ${coldPanel.shown ? "on screen" : "away"} · card ${cold.scrollH}px of content in ${cold.clientH}px · stage ${cold.stageH} of ${cold.winH}`);
 
-  await p.setInputFiles("#file", ["public/examples/NIR_1651.dng"]);
+  await p.setInputFiles("#file", [`${REPO_ROOT}/public/examples/NIR_1651.dng`]);
   await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
   await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
   await settle(p);

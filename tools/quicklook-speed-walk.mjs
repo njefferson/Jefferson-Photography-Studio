@@ -43,7 +43,7 @@
 // the plant produced two, which is the same defect one level up: a claim about
 // an instrument that nobody ran the instrument to check.
 import { chromium } from "playwright-core";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
@@ -60,8 +60,9 @@ let failed = 0;
 const check = (n, ok, d = "") => { console.log(`${ok ? "ok  " : "FAIL"}  ${n}${d ? " — " + d : ""}`); if (!ok) failed++; };
 const settle = async (p) => { await p.waitForTimeout(400); await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); };
 
-const files = readdirSync("public/examples").filter((f) => f.endsWith(".dng")).sort().slice(0, N)
-  .map((f) => join("public/examples", f));
+const EXAMPLES = join(REPO_ROOT, "public/examples");
+const files = readdirSync(EXAMPLES).filter((f) => f.endsWith(".dng")).sort().slice(0, N)
+  .map((f) => join(EXAMPLES, f));
 if (files.length < 2) { console.log("FAIL  not enough practice raws"); process.exit(1); }
 
 /** A TIFF THAT CARRIES A CAMERA PREVIEW, because none of the 44 practice DNGs
@@ -99,7 +100,7 @@ function previewTiff(jpeg) {
   buf.set(jpeg, jpegAt);
   return buf;
 }
-const jpegBytes = new Uint8Array(readFileSync("tools/fixtures/camera-ir-a.jpg"));
+const jpegBytes = new Uint8Array(readFileSync(join(REPO_ROOT, "tools/fixtures/camera-ir-a.jpg")));
 const fixtures = ["a", "b", "fail"].map((k) => {
   const path = join(OUT, `preview-${k}.dng`);
   writeFileSync(path, previewTiff(jpegBytes));

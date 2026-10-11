@@ -22,6 +22,8 @@ import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 import { mkdirSync, existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolve as ownerImage } from "./owner-images.mjs";
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");
 const PORT = arg("port", "8131");
@@ -40,7 +42,11 @@ const FILE = await ownerImage(arg("file", "NIR_1376.NEF"));
 // tools/fresh-dist.mjs. The file is checked first because refusing a practice
 // DNG needs no build.
 requireFreshDist();
-const OUT = arg("out", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/looksheet");
+// THE DEFAULT OUTPUT IS THE MACHINE'S OWN TEMP FOLDER, like mask-truth-walk,
+// sky-probe and film-reference beside it. It named an earlier session's
+// scratchpad, which exists in no container since (decision 083), so a run with
+// no --out wrote into a folder nobody could find. Pass --out to keep a run.
+const OUT = arg("out", join(tmpdir(), "look-sheet"));
 
 // Each candidate: a name, a one-line note on what it is reaching for, and the
 // controls to touch. `set` writes a slider and fires the events the app listens

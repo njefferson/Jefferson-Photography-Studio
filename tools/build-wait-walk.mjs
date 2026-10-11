@@ -63,7 +63,7 @@
 // SEEN FAILING against the build before this change (the synchronous one),
 // which is the only thing that makes a pass here mean anything.
 import { chromium } from "playwright-core";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 import { slowBuild } from "./slow-build.mjs";
 requireFreshDist();
 
@@ -73,7 +73,7 @@ const PAGE = `http://127.0.0.1:${PORT}/ir.html`;
 const PREPARING = "Preparing the editor…";
 const PREPARING_OPEN = "Preparing the editor — your photo opens as soon as it's ready.";
 const READY = "The editor is ready.";
-const JPG = ["public/examples/canopy.jpg", "public/examples/lodge.jpg"];
+const JPG = [`${REPO_ROOT}/public/examples/canopy.jpg`, `${REPO_ROOT}/public/examples/lodge.jpg`];
 // The reader's own phone, from a §7f report: the start card is at its most
 // crowded here, so a line that grew would show here first.
 const PHONE = { viewport: { width: 402, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true };

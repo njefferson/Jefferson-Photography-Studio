@@ -896,9 +896,10 @@ void main() {
           }
         }
       } else {
-        // TAP SCALE s > 1: a drawn export, and — since 2026-10-02 — the LIVE
-        // VIEW of an 8-bit picture over 2800 px, which is now shown at full size
-        // with its taps scaled by long / 2800 (main.ts toPreview). The taps
+        // TAP SCALE s > 1: a drawn export, and — only while main.ts's
+        // OPEN_8BIT_AT_FULL_SIZE is on, which it is not today — the LIVE VIEW of
+        // an 8-bit picture over 2800 px, shown at full size with its taps
+        // scaled by long / 2800 (main.ts toPreview). The taps
         // spread s texels apart, each a tent of half-width s over the texels
         // around it, so the lattice does not pass the native pixel Nyquist —
         // raw/denoise.ts says why, and builds the same kernel. Every native
@@ -1541,8 +1542,10 @@ export class Renderer {
    *  The WebGL spec's own answer to "what happens when a canvas is too big": "a
    *  drawing buffer with smaller dimensions shall be created", and its true
    *  size is drawingBufferWidth/Height — so the honest test is to ASK for the
-   *  whole frame and compare, rather than assume a cap. main.ts falls back to
-   *  a proxy only when this says the request was not met. */
+   *  whole frame and compare, rather than assume a cap. While main.ts's
+   *  OPEN_8BIT_AT_FULL_SIZE is on, it falls back to a proxy only when this says
+   *  the request was not met; it is off today, so an 8-bit source over
+   *  MAX_PREVIEW is the proxy to begin with and this is not what decides it. */
   get bufferShort(): boolean {
     return this.short;
   }
@@ -1739,6 +1742,15 @@ export class Renderer {
   private histW = 0;
   private histH = 0;
   private histBuf: Uint8Array | null = null;
+  /** An asynchronous histogram readback in flight (`histogramStart`): the fence
+   *  the GPU signals when the pixels have reached the pack buffer, and the size
+   *  they were read at. At most one at a time. */
+  private histAsync: { sync: WebGLSync; w: number; h: number } | null = null;
+  /** The pixel-pack buffer those readbacks land in, and how many bytes it holds. */
+  private histPbo: WebGLBuffer | null = null;
+  private histPboBytes = 0;
+  /** Where a finished asynchronous readback is copied to, reused while its size holds. */
+  private histRead: Uint8Array = new Uint8Array(0);
 
   private tapScale = 1;
 
@@ -3219,7 +3231,15 @@ export class Renderer {
     const buf = this.histBuf!;
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
     this.restoreDefaultFbo();
+    return Renderer.tally(buf);
+  }
 
+  /** Tally displayed RGBA bytes into per-channel and luminance bins.
+   *  @param buf  RGBA, 8 bits a channel, as a readback gives it.
+   *  @returns four 256-bin counts. What it must satisfy: the bins of the
+   *  synchronous and the asynchronous readback of the same pixels are the same
+   *  numbers, because both come through here. */
+  private static tally(buf: Uint8Array): { r: Uint32Array; g: Uint32Array; b: Uint32Array; l: Uint32Array } {
     const r = new Uint32Array(256);
     const g = new Uint32Array(256);
     const b = new Uint32Array(256);
@@ -3233,6 +3253,76 @@ export class Renderer {
       l[(R * 54 + G * 183 + B * 19) >> 8]++;
     }
     return { r, g, b, l };
+  }
+
+  /**
+   * START THE HISTOGRAM'S READBACK WITHOUT WAITING FOR IT. `histogram` draws the
+   * edit small and calls `readPixels` into memory, which does not return until
+   * the GPU has finished everything queued before it — the frame that was just
+   * drawn included — so the page stood still for as long as the GPU took. On a
+   * device with a real GPU that is a few milliseconds; behind a software
+   * rasteriser it is the whole frame, and the open-and-strip measurements put it
+   * at 11.7 to 18.5 s of each window. This draws the same offscreen pass, reads
+   * it into a pixel-pack buffer (which returns at once), and puts a fence behind
+   * the read; `histogramTake` collects the pixels once the fence has signalled.
+   * @param p  the edit to draw, as `histogram` takes it.
+   * @returns true when a readback is now in flight; false when there is nothing
+   *   to read (no image, a lost context) or one is already in flight — the caller
+   *   asks again when `histogramTake` has collected the first. What it must
+   *   satisfy: the pixels `histogramTake` hands back are those `histogram(p)`
+   *   would have read at this moment, because the draw and the read are the same
+   *   calls; only the wait has moved.
+   */
+  histogramStart(p: EditParams): boolean {
+    const gl = this.gl;
+    if (!this.drawable || this.histAsync || gl.isContextLost()) return false;
+    const { w, h } = this.renderOffscreen(p);
+    if (!this.histPbo) this.histPbo = gl.createBuffer();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.histPbo);
+    if (this.histPboBytes !== w * h * 4) {
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, w * h * 4, gl.STREAM_READ);
+      this.histPboBytes = w * h * 4;
+    }
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.restoreDefaultFbo();
+    const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    if (!sync) return false;
+    gl.flush(); // a fence that was never flushed never signals
+    this.histAsync = { sync, w, h };
+    return true;
+  }
+
+  /** Whether `histogramStart` has a readback that `histogramTake` has not yet
+   *  collected. Takes nothing; gives true or false. */
+  histogramInFlight(): boolean {
+    return this.histAsync !== null;
+  }
+
+  /**
+   * COLLECT THE HISTOGRAM `histogramStart` BEGAN, if the GPU has finished it.
+   * @returns the bins when the fence has signalled; null when it has not (call
+   *   again later — nothing is waited for here, the timeout is zero), when none
+   *   is in flight, or when the wait failed (the readback is then dropped and
+   *   `histogramInFlight` is false). What it must satisfy: after a non-null
+   *   answer or a failure no readback is in flight, so the caller may start
+   *   the next.
+   */
+  histogramTake(): { r: Uint32Array; g: Uint32Array; b: Uint32Array; l: Uint32Array } | null {
+    const a = this.histAsync;
+    if (!a) return null;
+    const gl = this.gl;
+    if (gl.isContextLost()) { this.histAsync = null; return null; }
+    const st = gl.clientWaitSync(a.sync, 0, 0);
+    if (st === gl.TIMEOUT_EXPIRED) return null;
+    gl.deleteSync(a.sync);
+    this.histAsync = null;
+    if (st === gl.WAIT_FAILED) return null;
+    if (this.histRead.length !== a.w * a.h * 4) this.histRead = new Uint8Array(a.w * a.h * 4);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.histPbo);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.histRead);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    return Renderer.tally(this.histRead);
   }
 
   /** Ensure the offscreen FBO exists at the histogram scale, render `p` into it

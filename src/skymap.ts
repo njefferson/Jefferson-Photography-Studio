@@ -39,8 +39,11 @@
 // than a box: mottle finer than the tap spacing that the pre-pass leaves can
 // alias into the map (decimation without a low-pass, the standard result). The
 // measurements below were taken through it as it is.
-import { sampleWarp, warpIsEmpty, type WarpField } from "./warp";
+import { sampleWarp, warpIsEmpty, warpSampler, type WarpField } from "./warp";
 import { compileEdit, SKY_CHROMA_RANGE, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, smooth01, rgb2hsv, type EditParams, type BrushMask, type LensCurve, type LocalMap, type SkyMap, type SourceFlat } from "./pipeline";
+import { linearAt, type DecodedImage } from "./decode";
+import { makeRowDenoiser } from "./raw/denoise";
+import { makeRowDetail } from "./raw/detail";
 export { sampleSkyMap, decSkyChroma, type SkyMap } from "./pipeline";
 
 const REC = [0.2126, 0.7152, 0.0722];
@@ -285,4 +288,49 @@ function brushAt(b: BrushMask, u: number, v: number): number {
   const top = s(x0, y0) * (1 - tx) + s(x1, y0) * tx;
   const bot = s(x0, y1) * (1 - tx) + s(x1, y1) * tx;
   return (top * (1 - ty) + bot * ty) / 255;
+}
+
+/** What the sky map of the OPEN photograph reads of it: its size and the pixels
+ *  `linearAt` reads, and the camera matrix. A `DecodedImage` is one; so is what the
+ *  sky map lane (a second instance of sky.worker.ts) holds, which is a copy of
+ *  those fields and nothing else. */
+export type MapScene = Pick<DecodedImage, "width" | "height" | "linear" | "pixels" | "camMatrix">;
+
+/**
+ * BUILD THE SKY MAP OF THE OPEN PHOTOGRAPH'S EDIT — the one definition, run on the
+ * page where no worker can be used and in the sky map worker everywhere else.
+ * @param scene  the photograph's pixels (`MapScene`), after the lens flat the edit
+ *   asks for (`bringLensTo`) — the buffer `linearAt` reads.
+ * @param p  the edit (`buildSkyMap` renders it with the sky stages off).
+ * @param local  the clarity/dehaze map when the open photograph has one; used only
+ *   when the edit has clarity or dehaze on, as the shader and the export use it.
+ * @param lens,flat  the lens curve the edit is rendered through and the flat a raw's
+ *   pixels carry (`lensForEdit`, `srcFlatOf`).
+ * @param sky  the coarse sky bitmap at the turn shown.
+ * @param warp  the non-empty warp field the sampler reads through, or null.
+ * @param pitch  the native pitch the detail pre-pass is told (`decodePitch`).
+ * @returns the map, or null when the bitmap selects nothing. What it must satisfy:
+ *   the same sampler chain the pixels are drawn through — warp, then the denoiser,
+ *   then the detail stage — as the export builds it, so the map targets the sky the
+ *   reader sees (the agreement walk holds the screen and the file to each other);
+ *   and it is what `syncSkyMap` built on the page before this moved off it, byte
+ *   for byte, because the arithmetic is the same calls on the same numbers.
+ */
+export function buildOpenSkyMap(
+  scene: MapScene,
+  p: EditParams,
+  local: LocalMap | undefined,
+  lens: LensCurve | null | undefined,
+  flat: SourceFlat | null,
+  sky: BrushMask,
+  warp: WarpField | null,
+  pitch: number,
+): SkyMap | null {
+  const { width: w, height: h } = scene;
+  const unwarped = (x: number, y: number) => linearAt(scene as DecodedImage, x, y);
+  const raw = warp ? warpSampler(unwarped, warp, w, h) : unwarped;
+  const pre = makeRowDetail(makeRowDenoiser(raw, w, h, p.denoise, 1, p.chroma ?? 0, p.despeckle ?? 0), w, h, p.sharpen ?? 0, p.texture ?? 0, 1, pitch);
+  // The clarity/dehaze map exactly when the export builds one.
+  const map = (p.clarity ?? 0) !== 0 || (p.dehaze ?? 0) !== 0 ? local : undefined;
+  return buildSkyMap(pre, w, h, p, scene.camMatrix, w / Math.max(1, h), map, lens, sky, flat, warp);
 }

@@ -23,11 +23,21 @@ import { requireFreshDist } from "./fresh-dist.mjs";
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
 import { existsSync } from "node:fs";
+import { resolve as ownerImage } from "./owner-images.mjs";
 
 const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=").slice(1).join("=");
 const PORT = arg("port", "8131");
 const BASE = `http://127.0.0.1:${PORT}`;
-const RAW = arg("file", "/tmp/claude-0/-home-user/2bd37282-d617-5a51-b357-6b20783a5840/scratchpad/real/NIR_1376.NEF");
+// THE FRAME COMES THROUGH THE ONE DOOR TO THE OWNER'S PHOTOGRAPHS, not from a path
+// in a session's scratchpad: the default used to name a folder that died with the
+// session that made it. --file= still names any file; with none given the door is
+// asked for NIR_1376.NEF (tools/owner-images.json), and a refused Drive host is
+// printed as a fact about the machine.
+let RAW = arg("file", "");
+if (!RAW) {
+  try { RAW = await ownerImage("NIR_1376.NEF"); }
+  catch (e) { console.log(`could not get the owner's photograph NIR_1376.NEF (${e.message}) — it comes through tools/owner-images.mjs from the Drive host drive.usercontent.google.com when it is not already in the cache; pass --file=`); process.exit(1); }
+}
 // The control: a bundled practice DNG. Its channel content differs from the real
 // frame's, so it is what proves the reading is not a constant.
 const CONTROL = new URL("../dist/examples/NIR_0063.dng", import.meta.url).pathname;

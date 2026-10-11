@@ -22,16 +22,20 @@
 import { build } from "esbuild";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join, dirname } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
 
+// THE REPOSITORY THIS FILE SITS IN, found from the file's own location and never
+// from the directory the process was started in (nothing may `cd` in the sessions
+// that run these tools, so the start directory is not the repository).
+const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = mkdtempSync(join(tmpdir(), "lensstore-"));
 const entry = join(dir, "entry.ts");
-writeFileSync(entry, `export { bumpFrom, bumpProblem } from ${JSON.stringify(join(process.cwd(), "src/lensstore.ts"))};
-export { matchIn, withheldFor, centreProblem, saveFromPayload, listProfiles } from ${JSON.stringify(join(process.cwd(), "src/lensstore.ts"))};
-export { lensHalves } from ${JSON.stringify(join(process.cwd(), "src/hotspot.ts"))};
-export { SHIPPED_PROFILES } from ${JSON.stringify(join(process.cwd(), "src/hotspotProfiles.ts"))};
-export { NBINS } from ${JSON.stringify(join(process.cwd(), "src/lensprofile.ts"))};`);
+writeFileSync(entry, `export { bumpFrom, bumpProblem } from ${JSON.stringify(join(repo, "src/lensstore.ts"))};
+export { matchIn, withheldFor, centreProblem, saveFromPayload, listProfiles } from ${JSON.stringify(join(repo, "src/lensstore.ts"))};
+export { lensHalves } from ${JSON.stringify(join(repo, "src/hotspot.ts"))};
+export { SHIPPED_PROFILES } from ${JSON.stringify(join(repo, "src/hotspotProfiles.ts"))};
+export { NBINS } from ${JSON.stringify(join(repo, "src/lensprofile.ts"))};`);
 const out = join(dir, "bundle.mjs");
 await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
 // A localStorage for node, so the store's two doors can be exercised for real

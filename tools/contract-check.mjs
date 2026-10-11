@@ -31,8 +31,14 @@
 // before this rule. A new function is not on it and so must carry its contract.
 import { readFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repo = process.argv.find((a) => a.startsWith("--repo="))?.slice(7) ?? ".";
+// `--repo=` names another checkout; with none given, the repository THIS FILE SITS
+// IN, found from the file's own location and never from the directory the process
+// was started in (it used to default to "." and read the start directory, and
+// nothing may `cd` in the sessions that run these tools).
+const repo = process.argv.find((a) => a.startsWith("--repo="))?.slice(7) ?? join(dirname(fileURLToPath(import.meta.url)), "..");
 const files = execSync(`git -C ${repo} ls-files "src/*.ts" "src/**/*.ts"`, { encoding: "utf8" })
   .split("\n").filter(Boolean);
 

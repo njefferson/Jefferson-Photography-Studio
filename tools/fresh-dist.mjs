@@ -36,7 +36,14 @@ import { fileURLToPath } from "node:url";
 // anywhere but the repository root looked for dist/ir.html in the wrong place and
 // refused a current build ("there is no dist/ir.html"). Nothing may `cd` in the
 // sessions that run these walks, so the start directory is not the repository.
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+//
+// EXPORTED, so a walk that reads the practice set (`public/examples/...`) names
+// it as `join(REPO_ROOT, "public/examples/...")` and runs by its absolute path
+// from any start directory, the same way this file's own two functions do. A
+// relative `public/examples/...` in a walk is read from the START directory, and
+// from anywhere but the repository root it opens no file and fails for a reason
+// that has nothing to do with the build.
+export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** THE NEWEST SOURCE FILE AGAINST THE BUILD, as two timestamps and a verdict.
  *

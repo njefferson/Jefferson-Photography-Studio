@@ -74,6 +74,29 @@ async function encodeTile(px: TilePixels): Promise<ArrayBuffer | null> {
   return blob.arrayBuffer();
 }
 
+/** MAKE THE FIRST PUTIMAGEDATA OF THIS LANE HAPPEN NOW, WHILE THE PAGE IS FREE.
+ *  Takes and returns nothing. The first `putImageData` a worker makes on an
+ *  OffscreenCanvas waits, synchronously, for the page's main thread to answer
+ *  (measured 2026-10-09 in a throwaway worker: 3784 ms under a 4 s hold of the
+ *  page, 2.0 to 2.4 s under software graphics stalls, 2 ms on every later call,
+ *  with or without `willReadFrequently`). The lanes are spawned together and the
+ *  third is the last to be handed a tile, so its first encode came in the middle
+ *  of the busiest stretch of the session and the tile took 10.8 s to encode while
+ *  the lane's own decode, lift and pixels took 0.3 s (the report's "Last strip
+ *  tile" line, the longest wall of a tile job in the press-and-open phase). Done
+ *  here, at the lane's start, the one wait is spent where the page has nothing to
+ *  hold it. What it must satisfy: nothing it makes is kept or posted, and a
+ *  browser without OffscreenCanvas, a 2D context or a JPEG encoder gets exactly
+ *  what it got before (`encodeTile` returns null and the page draws the tile). */
+function warmEncoder(): void {
+  try {
+    if (typeof OffscreenCanvas === "undefined") return;
+    const g = new OffscreenCanvas(1, 1).getContext("2d");
+    if (g) g.putImageData(new ImageData(1, 1), 0, 0);
+  } catch { /* the first real encode reports whatever is wrong */ }
+}
+warmEncoder();
+
 self.onmessage = async (e: MessageEvent<Job>) => {
   const { id, file, sky, lens, tile } = e.data;
   // THE JOB'S OWN CLOCK, for a tile's timings: from the message being taken up to

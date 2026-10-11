@@ -15,8 +15,13 @@
 // were individually correct. What was wrong was that there were two sides. So
 // this refuses the SHAPE: `workerCount` may be called from exactly one place.
 import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const SRC = "src/exportparallel.ts";
+// THE REPOSITORY THIS FILE SITS IN, found from the file's own location and never
+// from the directory the process was started in (nothing may `cd` in the sessions
+// that run these tools, so the start directory is not the repository).
+const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "src/exportparallel.ts");
 const src = readFileSync(SRC, "utf8");
 let failed = 0;
 const check = (n, ok, d = "") => { console.log(`${ok ? "ok  " : "FAIL"}  ${n}${d ? " — " + d : ""}`); if (!ok) failed++; };

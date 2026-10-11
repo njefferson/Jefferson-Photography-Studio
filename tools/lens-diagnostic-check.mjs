@@ -22,14 +22,18 @@
 import { build } from "esbuild";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join, dirname } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
 
 console.log("MADE TO FAIL: lensCentreLine reverted to reading the stored bins through lensGain failed 215 of 290 cases, both made-up curves among them (2026-09-29); the 72 at strength 0 cannot tell the two apart.");
 
+// THE REPOSITORY THIS FILE SITS IN, found from the file's own location and never
+// from the directory the process was started in (nothing may `cd` in the sessions
+// that run these tools, so the start directory is not the repository).
+const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = mkdtempSync(join(tmpdir(), "lensdiag-"));
 const entry = join(dir, "entry.ts");
-const src = (f) => JSON.stringify(join(process.cwd(), f));
+const src = (f) => JSON.stringify(join(repo, f));
 writeFileSync(entry, `export { lensCentreLine, lensGains } from ${src("src/lensflat.ts")};
 export { lensHalves } from ${src("src/hotspot.ts")};
 export { SHIPPED_PROFILES } from ${src("src/hotspotProfiles.ts")};`);

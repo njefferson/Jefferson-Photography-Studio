@@ -46,7 +46,7 @@
 // go red.
 import { openMasks, setMaskValue } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
@@ -78,7 +78,7 @@ try {
   const p = await ctx.newPage();
   p.on("dialog", (d) => d.accept());
   await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
-  await p.setInputFiles("#file", ["public/examples/NIR_1651.dng"]);
+  await p.setInputFiles("#file", [`${REPO_ROOT}/public/examples/NIR_1651.dng`]);
   await p.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
   await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
   await settle(p);
@@ -208,7 +208,7 @@ try {
   const p2 = await ctx.newPage();
   p2.on("dialog", (d) => d.accept());
   await p2.goto(`http://127.0.0.1:${PORT}/ir.html`);
-  await p2.setInputFiles("#file", ["public/examples/NIR_0063.dng"]);
+  await p2.setInputFiles("#file", [`${REPO_ROOT}/public/examples/NIR_0063.dng`]);
   await p2.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
   await p2.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
   await settle(p2);
