@@ -54,6 +54,89 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**The report names where the app holds, and the test page's build rows say why:
+built 2026-10-11 on the tree of staging's head (0edcaa6), not committed yet.**
+Two instruments and nothing else; no pixel path is touched. They exist because
+the record holds two holds and no device number that would choose a fix for
+either: on the PC in Firefox the editor's picture code takes about 45 seconds to
+build at every load, and three rows of the test page's build measurement never
+said why they did not build; on the iPad this release has never been measured,
+and the report's frame watch covered only the first minute, so a hold during a
+look pressed later was in no report. The container can measure neither: it has
+no Direct3D, and its remaining hold sits inside its software graphics process.
+- **New: the report's hold watch runs for the whole session.** A timer looks
+  every 100 ms (`src/startup.ts`) and keeps every look that came more than 250 ms
+  late. The report gains two lines after "Start-up". "Holds" prints how many
+  there were, their total, and the longest three, each with its length, when it
+  began (seconds since the page was requested, as the Start-up line counts) and
+  the stages in force across it. "Hold watch" prints what the watch costs by the
+  page's own clock and the stages in force right now, which reads "none" on an
+  idle page, so a stage that was never ended shows before it is blamed. A look
+  that fell in a hidden stretch, or after the device slept, is counted apart and
+  is not a hold. The first-minute frame watch stays as it was: the Start-up
+  line and the build-wait walk read it.
+- **The stage marker is `busyWith`** (`src/startup.ts`), set by the paths that
+  hold the page and ended on every way out of each: the open's decode, the sky
+  selection's wait, the sky map (asked of the lane or built on the page), the
+  lift, the strip's tiles, a look press, an export (single and picked) and a
+  batch. A stage is kept as an interval, because a hold that is synchronous
+  work has finished before the timer can fire to say it happened; read only at
+  the look, the marker would say idle for exactly the holds worth naming. The
+  look press keeps its stage through the press's first two painted frames (or
+  30 s on a hidden page), since the stall that follows a press is the browser's
+  frame task waiting on the graphics and falls after the handler has returned.
+  The picture code's build is read from the start-up marks as a stage of its
+  own, so the PC's 45 seconds is named. Not marked, deliberately: the quick
+  look's decode, the open's first draw, and every ordinary draw. A hold that
+  names no stage says "no stage was marked", which is itself a finding.
+- **New: every row of the test page's build measurement says why.** A row that
+  built now carries a Build line in the copied block, as one that did not did
+  not before: whether the vertex shader compiled, the fragment shader compiled
+  and the program linked (read separately, after the timed stretch, so the
+  reads cost the measurement nothing), what the compiler's own log said, the GL
+  error, and whether the row's graphics context was lost, told apart as lost
+  and reported by the browser, lost with no event heard, and not lost. A step
+  whose status cannot be read because the context was lost says that, rather
+  than saying the program failed. A row that was not attempted says so. The two
+  "Building the picture code" rows carry the same line. The test page's speed
+  run gains "The hold watch's own cost": the real look timed many times over,
+  three runs, with every run printed.
+- **What the container printed** (software graphics, a server's four cores, not
+  the device). The test page's build measurement: all eight rows built, 24 to
+  44 ms to build and 1.0 to 2.5 s for the first picture, each with a Build line
+  reading compiled, linked, an empty log, no GL error, context not lost. No row
+  failed here, so there was no row to repair in the container; the PC's three
+  silent rows are for the PC. Planted, to see the lines can tell a refusal from
+  a loss: a corrupted fragment source on the texture row printed "fragment
+  shader did not compile · program did not link · context not lost" with the
+  compiler's own words in the reason beside it, and a context lost on the
+  counted-to-2 row printed "status could not be read · GL error 37442 · LOST
+  (the browser reported it)". The watch's cost: 2.2 to 3.5 microseconds a look,
+  about 0.03 ms of every second. The watch itself, against plants: a 3000 ms
+  spin on the editor's page read 2.91 and 2.96 s with no stage named; a 2500 ms
+  spin inside a marked stage read 2.41 s and named it; a stage that had ended
+  before a spin was not named for it; a stage left set showed in the "Hold
+  watch" line. The editor with two practice raws open, one switch, and
+  Aerochrome pressed: the press held the page 17.7 s and 21.0 s on two runs and
+  the line named the strip's tiles, a look press and the sky map across it; the
+  open held 10.7 s while the sky selection's wait and the lift were in force;
+  the "Last switch" and "Last strip tile" lines were intact beside the new ones;
+  the report named no file; and the stages in force read none after the sky
+  landed. One hold of about 9 s a few seconds after the sky map landed names no
+  stage. It is not the report: a run that opened no report until 124 s showed the
+  same hold at 37.5 s. Which work it is, is not known; the first draw after the
+  map lands is the guess, it is not marked, and the device run says whether it
+  exists there.
+- **The two runs that decide the fix, and only the owner can make them.** On the
+  PC in Firefox: the test page's "What makes the picture code slow to build",
+  then "Copy the results". Its Build lines say whether the three rows that never
+  said why were refused by the compiler, lost with the context, or built; the
+  report's "Start-up" line already names the 45 s build. On the iPad: open a
+  raw, press Aerochrome, wait for the sky, open the ⓘ report and copy it. Its
+  "Holds" line names where the page held and under which stage, and "Last
+  switch" names where the sky map was built. The fix each number names is the
+  next plan; nothing here changes how a photograph looks.
+
 **The open and the strip, finished: built 2026-10-10 and 2026-10-11 on staging's
 v2.65.10 (412052f), not committed yet.** Everything on staging below, plus this
 release, for the device pass. It finishes the 2026-10-06 entry's open list on
@@ -2267,6 +2350,12 @@ user-scalable=no.
   rows did not build with no reason given, and the way the test page read the
   driver's logs could have hidden one; a fix for that goes to staging, and the
   next PC run says whether the program or the graphics context failed.
+  **2026-10-11: the test page's build rows now say why.** Every row, built or
+  not, carries a Build line in the copied block: whether each shader compiled and
+  the program linked, the compiler's log, the GL error, and whether the row's
+  graphics context was lost. The report also keeps a hold watch for the whole
+  session, naming the stage in force at each hold; the PC and iPad runs it asks
+  for decide the fix.
 - [ ] **On Firefox the practice photographs stay empty while the editor builds** <!-- decision: 086 -->
   **Shown as:** The practice photographs on the start card show their pictures straight away, even while the editor is still getting ready.
   Reported from the PC on the evening of 2026-09-30, Pacific: every practice

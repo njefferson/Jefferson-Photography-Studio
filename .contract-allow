@@ -18,7 +18,6 @@ src/decode.ts:pickLargestPreview
 src/decodeClient.ts:decodeOffThread
 src/decodeClient.ts:decodeLanes
 src/decodeClient.ts:decodeLaneTarget
-src/diagnostic.ts:buildDiagnostic
 src/exif.ts:externSize
 src/exif.ts:buildExifTiff
 src/exif.ts:buildExifApp1

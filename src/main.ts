@@ -11,8 +11,14 @@
 // export — has to reconstruct by hand what opening it would do, and why those
 // reconstructions drift apart. `freshBaseline` exists to be the single copy of
 // that ruling; tools/agreement-walk.mjs exists because they still disagree.
+//
+// IT ALSO NAMES THE STAGE IT IS IN, for the report's hold watch (startup.ts
+// `busyWith`, decision 071): the open's decode, the sky selection's wait, the sky
+// map, the lift, the strip's tiles, a look press, an export and a batch each mark
+// themselves in force until they end, so a hold the report names says what the
+// app was doing across it.
 // FIRST, so its clock starts before anything else this page loads (decision 071).
-import { markStartup } from "./startup";
+import { markStartup, busyWith } from "./startup";
 import { writeVersionStamp } from "./verstamp";
 import { srgbToLinear } from "./icc";
 import "./style.css";
@@ -902,8 +908,24 @@ function lensPlanFor(imported: ImportedFile): LensPlan | null {
 /** Every decode in this file goes through here, so every path — the open, the
  *  tile, the batch, the quick look, the resume — lays the same flat on the same
  *  file (decision 021). Same signature as decodeOffThread plus the plan. */
-function decodeWithLens(imported: ImportedFile, opts?: Parameters<typeof decodeOffThread>[1]): ReturnType<typeof decodeOffThread> {
-  return decodeOffThread(imported, { ...(opts ?? {}), lens: lensPlanFor(imported) });
+function decodeWithLens(imported: ImportedFile, opts?: Parameters<typeof decodeOffThread>[1], stage: string | null = "the open's decode"): ReturnType<typeof decodeOffThread> {
+  // THE OPEN'S DECODE IS A STAGE THE HOLD WATCH NAMES (startup.ts `busyWith`).
+  // `stage` is the name it goes under: the open's by default, since every open
+  // comes through here, and null for the decodes another stage already covers
+  // (the strip's tile on the page, a batch frame) or that nothing names yet (the
+  // quick look). Set before the work starts, so a decode that runs on this
+  // thread is inside it, and ended whichever way it settles.
+  if (stage === null) return decodeOffThread(imported, { ...(opts ?? {}), lens: lensPlanFor(imported) });
+  const endStage = busyWith(stage);
+  try {
+    return decodeOffThread(imported, { ...(opts ?? {}), lens: lensPlanFor(imported) }).then(
+      (img) => { endStage(); return img; },
+      (err) => { endStage(); throw err; },
+    );
+  } catch (err) {
+    endStage();
+    throw err;
+  }
 }
 
 /** The lens curve for a file that is not the open photograph.
@@ -2405,7 +2427,15 @@ function seekSky(img: DecodedImage): void {
   forgetSkyMap();
   renderer.setSkyFine(null);
   if (skyProfile?.img === img) skyProfile.asked = true;
-  void requestSkySelectionAt(img, turn).then((sel) => {
+  // THE WAIT IS A STAGE THE HOLD WATCH NAMES, ended when the answer lands or fails
+  // (a rejection ends it too; the handler below is as it was).
+  const endStage = busyWith("the sky selection's wait");
+  let asking: ReturnType<typeof requestSkySelectionAt>;
+  try {
+    asking = requestSkySelectionAt(img, turn);
+  } catch (err) { endStage(); throw err; }
+  asking.then(endStage, endStage);
+  void asking.then((sel) => {
     const arrived = performance.now(); // the wait ends here, before the page does anything with the answer
     if (mine !== skyEpoch || current !== img) return;
     const now = shownSkyTurn();
@@ -2616,7 +2646,14 @@ function holdBaselineSky(img: DecodedImage, w: LiftOwed): void {
   if (!held(b.params)) return;
   const sky = liftSkyMask(img);
   if (sky.waiting) return;
-  const solved = solveLift(true, img, w.at, sky.mask, w.base, lensForEdit(img));
+  // The same solve `applyLift` makes, for the Reset target: a stage the hold watch names.
+  const endStage = busyWith("the lift");
+  let solved: ReturnType<typeof solveLift>;
+  try {
+    solved = solveLift(true, img, w.at, sky.mask, w.base, lensForEdit(img));
+  } finally {
+    endStage();
+  }
   if (!solved) return;
   const r = scaleLift(solved, w.amount, w.base);
   const set = (p: EditParams) => {
@@ -2824,6 +2861,10 @@ function syncSkyMap(): void {
   skyMapWarp = warp;
   const img = current;
   const mapFrom = performance.now();
+  // THE MAP IS A STAGE THE HOLD WATCH NAMES, from the ask to the map being in hand:
+  // handing the pixels over, the lane building, or the page building it. Ended on
+  // every way out below.
+  const endStage = busyWith("the sky map");
   // The clarity/dehaze map exactly when the export builds one.
   const local = (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0 ? localMapNow ?? undefined : undefined;
   // OFF THE PAGE WHEN THERE IS A LANE FOR IT (skyClient.ts `requestSkyMap`): the
@@ -2833,11 +2874,15 @@ function syncSkyMap(): void {
   // device was busy. The lane runs the same `buildOpenSkyMap` over a copy of this
   // photograph's pixels it was sent once, so the map is the page's own; what moves
   // is where the arithmetic runs, and the draw that shows it comes when it lands.
-  const asked = skyMapPageFor === img ? null : requestSkyMap(img, { params, local, lens: lensForEdit(img), sky: skyBitmap, warp, pitch: decodePitch });
+  let asked: ReturnType<typeof requestSkyMap> = null;
+  try {
+    asked = skyMapPageFor === img ? null : requestSkyMap(img, { params, local, lens: lensForEdit(img), sky: skyBitmap, warp, pitch: decodePitch });
+  } catch (err) { endStage(); throw err; }
   if (asked) {
     const pageSpent = performance.now() - mapFrom;
     const gen = skyMapGen;
     skyMapBusy = true;
+    asked.then(endStage, endStage);
     void asked.then((ans) => {
       skyMapBusy = false;
       // Left behind: another photograph, a new selection, a turn. What is wanted now is
@@ -2870,9 +2915,13 @@ function syncSkyMap(): void {
   // 16% more saturated than the rendered one — skymap.ts has the measurement. And
   // through the warp FIRST, as the export's chain runs it (export.ts: the warp
   // remaps the source at the very top, before denoise).
-  lastSkyMap = buildOpenSkyMap(img, params, local, lensForEdit(img), srcFlatOf(img), skyBitmap, warp, decodePitch);
-  renderer.setSkyMap(lastSkyMap);
-  noteSkyMapBuilt(img, mapFrom, "page", performance.now() - mapFrom);
+  try {
+    lastSkyMap = buildOpenSkyMap(img, params, local, lensForEdit(img), srcFlatOf(img), skyBitmap, warp, decodePitch);
+    renderer.setSkyMap(lastSkyMap);
+    noteSkyMapBuilt(img, mapFrom, "page", performance.now() - mapFrom);
+  } finally {
+    endStage();
+  }
 }
 
 /** Record, once, that this open's first sky map is on its way to the GPU.
@@ -3209,7 +3258,24 @@ function updateLookUI() {
   if (noneSub) noneSub.textContent = none ? "no look on" : "take it off";
 }
 
+/** A LOOK PRESSED, as a stage the hold watch names. Takes the look's key and
+ *  does what `pressLookNow` does. The stage is in force from the press until the
+ *  picture it drew has been through two animation frames (or 30 s, for a page
+ *  that is hidden and paints none): the press draws and returns at once, and the
+ *  stall that follows it is the browser's frame task waiting on the graphics
+ *  (measured in the container, 4.1 s inside ReadPixels), which would otherwise
+ *  fall after the stage had ended and be named as no stage at all. */
 function pressLook(key: string) {
+  const endStage = busyWith("a look press");
+  try {
+    pressLookNow(key);
+  } finally {
+    requestAnimationFrame(() => requestAnimationFrame(endStage));
+    window.setTimeout(endStage, 30000);
+  }
+}
+
+function pressLookNow(key: string) {
   if (activeLook === key && LOOKS[key].toggleSwap) {
     params.swapRB = !params.swapRB;
     syncToUI();
@@ -4542,11 +4608,13 @@ let liftApplied: { tone: string; foliage: string; sky: string; skySat: string; p
  *  knowing a switch is running. The clock reads nothing the solve reads. */
 function applyLift(withColour: boolean): { pull: number; foliage: number; sky: number } | null {
   const t0 = performance.now();
+  const endStage = busyWith("the lift"); // a stage the hold watch names
   try {
     return applyLiftNow(withColour);
   } finally {
     liftClock.ms += performance.now() - t0;
     liftClock.runs++;
+    endStage();
   }
 }
 
@@ -14841,6 +14909,9 @@ const thumbsInFlight = new Set<string>();
  *  whole point. Returns nothing and throws nothing: a thumbnail is not worth
  *  failing an open over. */
 async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
+  // A TILE IS A STAGE THE HOLD WATCH NAMES, "the strip's tiles": several run side
+  // by side and the watch counts the time any of them was in force once.
+  const endStage = busyWith("the strip's tiles");
   try {
     const bytes = await Session.getBytes(view.id);
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
@@ -14875,7 +14946,7 @@ async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
       // No lane could be started, the lane died, or this browser would not
       // encode a JPEG off the page: the page draws it, as it always did.
       const d0 = performance.now();
-      const img = await decodeWithLens(imported);
+      const img = await decodeWithLens(imported, undefined, null); // inside "the strip's tiles"
       const decodeMs = performance.now() - d0;
       const here = await drawTileTimed(img, inputs);
       thumb = here.bytes;
@@ -14902,6 +14973,7 @@ async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
     view.thumbGrade = stampFor(view);
   } finally {
     thumbsInFlight.delete(view.id);
+    endStage();
   }
 }
 
@@ -17040,7 +17112,7 @@ async function openQuickLook(files: File[]) {
         updateQuickHeader(`Reading ${done} / ${files.length}…`);
       }
       const tDecode = performance.now();
-      const img = await decodeWithLens(imported);
+      const img = await decodeWithLens(imported, undefined, null); // the quick look names no stage yet
       const tRender = performance.now();
       msDecode += tRender - tDecode;
       if (gen !== quickGen) return;
@@ -18304,6 +18376,7 @@ async function exportPicked(): Promise<void> {
       const job = openPhotoExportJob();
       if (!job) { skipped.push(`${view.name} (could not be opened)`); continue; }
 
+      const endStage = busyWith("an export"); // a stage the hold watch names
       try {
         const result = await exportImage(
           job.file, job.frame, job.params, job.opts,
@@ -18322,6 +18395,8 @@ async function exportPicked(): Promise<void> {
       } catch (err) {
         if (isQuotaError(err)) { skipped.push("stopped — this device is out of storage"); break; }
         skipped.push(`${view.name} (${(err as Error).message})`);
+      } finally {
+        endStage();
       }
     }
   } catch (err) {
@@ -18477,6 +18552,7 @@ async function runExport(): Promise<void> {
   ui.exBtn.disabled = true; // ONE AT A TIME: at most one extra frame is ever held
   const releaseWake = keepAwake();
   showExportStrip(`Exporting ${file.name}… 0%${threadNote()}`);
+  const endStage = busyWith("an export"); // a stage the hold watch names
   try {
     const result = await exportImage(
       file,
@@ -18507,6 +18583,7 @@ async function runExport(): Promise<void> {
   } finally {
     ui.exBtn.disabled = false;
     releaseWake();
+    endStage();
   }
 }
 
@@ -18910,6 +18987,7 @@ async function runBatch(files: File[]) {
   recoverBtn.hidden = true;
   acquireWakeLock();
   void requestPersistentStorage(); // never awaited — see the function (decision 076)
+  const endStage = busyWith("a batch"); // a stage the hold watch names; ended in the finally below
 
   try {
     // Frames already stored (an earlier stopped part, or accepted leftovers)
@@ -18934,7 +19012,7 @@ async function runBatch(files: File[]) {
       try {
         const imported = guardLocation(await importFile(f));
         if (imported.looksTranscoded) { skipped.push(`${f.name} (arrived as flattened JPEG)`); continue; }
-        const img = await decodeWithLens(imported, { sky: true });
+        const img = await decodeWithLens(imported, { sky: true }, null); // inside "a batch"
         const noLens = !batchHasLens(imported);
         // Each photo in a batch is matched on its OWN EXIF: a set can span
         // lenses and focal lengths, and one match for the whole run would
@@ -19019,6 +19097,7 @@ async function runBatch(files: File[]) {
     alert("Batch failed: " + (err as Error).message);
   } finally {
     releaseWakeLock();
+    endStage();
   }
 }
 

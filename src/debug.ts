@@ -7,9 +7,16 @@
 // Read-only with respect to the reader's work: it opens nothing, changes no
 // setting, and the storage test writes to a throwaway database of its own that
 // it deletes afterwards. Nothing leaves the device.
+//
+// THE BUILD ROWS SAY WHY THEY DID NOT BUILD (decision 071). Each row of the
+// picture code's build carries a Build line into the copied block: whether the
+// vertex and fragment shaders compiled and the program linked, the compiler's own
+// log, the GL error, and whether the row's graphics context was lost. And the
+// report's hold watch (startup.ts) has a row here giving what a look of it costs.
 
 import "./style.css";
 import { buildDiagnostic } from "./diagnostic";
+import { measureHoldWatch, holdWatchLine } from "./startup";
 // The test page gets the update strip too — it had never had one, so the page a
 // reader is most likely to be sitting on during a release was the one that
 // never told them a release had happened.
@@ -51,19 +58,27 @@ const NOT_MEASURED = /^(did not (build|draw)|not run|does not fit|failed|refused
  *  hidden the program log, which `timedBuild` read only when the fragment log
  *  was empty; reading every log, labelled, with the GL error and a build in a
  *  fresh context, tells these apart.) A measured
- *  row's copied line is exactly what it was. */
-function row(name: string, value: string, meaning: string, samples?: string) {
+ *  row's copied line is exactly what it was, unless it carries `build`.
+ *  AND A ROW OF THE PICTURE CODE'S BUILD CARRIES ITS BUILD LINE in the copy,
+ *  measured or not (`buildLine`): whether each shader compiled and the program
+ *  linked, the compiler's log, the GL error and whether the graphics context was
+ *  lost. A row that built said nothing of this in the copy, so a row that did
+ *  not could only be told from it by the value, and the PC's three silent rows
+ *  were silent in exactly this. */
+function row(name: string, value: string, meaning: string, samples?: string, build?: string) {
   const d = document.createElement("div");
   d.className = "dbg-row";
   d.innerHTML = `<div class="dbg-k"></div><div class="dbg-v"></div><p class="dbg-m"></p>`;
   (d.querySelector(".dbg-k") as HTMLElement).textContent = name;
   (d.querySelector(".dbg-v") as HTMLElement).textContent = value;
-  (d.querySelector(".dbg-m") as HTMLElement).textContent = samples ? `${meaning} Runs: ${samples}.` : meaning;
+  (d.querySelector(".dbg-m") as HTMLElement).textContent = (samples ? `${meaning} Runs: ${samples}.` : meaning) + (build ? ` ${build}` : "");
   results.appendChild(d);
   // Folded here, where the copy is built, so every source of a reason is one
   // line with no control characters, the editor's own build error included.
+  const fold = (s: string) => s.replace(/[\u0000-\u001f\s]+/g, " ").trim();
   out.push(`${name}: ${value}` + (samples ? `   [${samples}]` : "")
-    + (NOT_MEASURED.test(value) ? `\n    ${meaning.replace(/[\u0000-\u001f\s]+/g, " ").trim()}` : ""));
+    + (NOT_MEASURED.test(value) ? `\n    ${fold(meaning)}` : "")
+    + (build ? `\n    ${fold(build)}` : ""));
 }
 function note(text: string) {
   const p = document.createElement("p");
@@ -321,9 +336,11 @@ function bindSamplers(gl: WebGL2RenderingContext, prog: WebGLProgram): () => voi
  *  and returns its own undo; builds them, then draws once so the driver has to
  *  finish. Gives back the build and the first picture in milliseconds, and
  *  `err`, the GL error that draw raised (0 for none), so a "first picture" that
- *  never drew cannot pass for one; throws if the program did not build, with
+ *  never drew cannot pass for one, and `status`, whether each shader compiled
+ *  and the program linked and what the logs said (`BuildStatus`); throws a
+ *  `BuildError` if the program did not build, with
  *  every one of the driver's logs that says anything, labelled, the time the
- *  failed build took and the GL error read after it.
+ *  failed build took and the GL error read after it, and the same `status`.
  *  `buildingThePictureCode` and `whatMakesTheBuildSlow` both read these two
  *  numbers against each other's, so they must stay one measurement.
  *  Everything queued before a run is finished first, so no run is billed for
@@ -333,7 +350,7 @@ function bindSamplers(gl: WebGL2RenderingContext, prog: WebGLProgram): () => voi
  *  when it first draws, so the build alone can look cheap while the first
  *  picture pays for it. */
 function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string,
-  prep?: (gl: WebGL2RenderingContext, prog: WebGLProgram) => () => void): { link: number; draw: number; err: number } {
+  prep?: (gl: WebGL2RenderingContext, prog: WebGLProgram) => () => void): { link: number; draw: number; err: number; status: BuildStatus } {
   const px = new Uint8Array(4);
   const drain = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
   drain();
@@ -348,6 +365,26 @@ function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string,
   // own start does.
   const ok = gl.getProgramParameter(prog, gl.LINK_STATUS);
   const t1 = performance.now();
+  // WHAT THE DRIVER SAID ABOUT EACH STEP, read AFTER the timed stretch so the
+  // reads cost the measurement nothing: whether each shader compiled, whether the
+  // program linked, and every log that says anything. A context that was lost
+  // answers all of these with nothing, so each flag is null (unknown) rather than
+  // false there, and the row says the status could not be read instead of saying
+  // the program did not compile.
+  const known = !gl.isContextLost();
+  const flag = (v: unknown): boolean | null => (known ? !!v : null);
+  const fold = (s: string | null) => (s ?? "").replace(/[\u0000-\u001f\s]+/g, " ").trim().slice(0, 300);
+  const logs = ([["program", gl.getProgramInfoLog(prog)], ["fragment", gl.getShaderInfoLog(fs)], ["vertex", gl.getShaderInfoLog(vs)]] as [string, string | null][])
+    .map(([what, log]) => [what, fold(log)])
+    .filter(([, log]) => log)
+    .map(([what, log]) => `${what}: ${log}`);
+  const status: BuildStatus = {
+    vertex: flag(gl.getShaderParameter(vs, gl.COMPILE_STATUS)),
+    fragment: flag(gl.getShaderParameter(fs, gl.COMPILE_STATUS)),
+    linked: flag(ok),
+    logs: logs.join(" · "),
+    glErr: 0,
+  };
   if (!ok) {
     // THE DRIVER'S OWN WORDS, EVERY LOG, LABELLED, as the editor's own build
     // reads them (gl.ts). This read `shader log || program log` until
@@ -358,18 +395,14 @@ function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string,
     // words from the driver; whether this, a context that had died, or a driver
     // that gave no words explains them is not known. One line each, with no control characters: drivers
     // end a log with a newline and a NUL, and the copied results put this under
-    // its row as one line.
+    // its row as one line. (Read above, with the status of each step.)
     // AND THE TIME AND THE GL ERROR, so a refusal can be told from a context
     // that had already died: a lost context answers every log with nothing and
     // the first `getError` after the loss with CONTEXT_LOST_WEBGL (37442).
-    const fold = (s: string | null) => (s ?? "").replace(/[\u0000-\u001f\s]+/g, " ").trim().slice(0, 300);
-    const logs = ([["program", gl.getProgramInfoLog(prog)], ["fragment", gl.getShaderInfoLog(fs)], ["vertex", gl.getShaderInfoLog(vs)]] as [string, string | null][])
-      .map(([what, log]) => [what, fold(log)])
-      .filter(([, log]) => log)
-      .map(([what, log]) => `${what}: ${log}`);
     const glErr = gl.getError();
+    status.glErr = glErr;
     gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
-    throw new Error(`the editor's picture code did not build on this device after ${ms(t1 - t0)} (${logs.join(" · ") || "the driver gave no reason"}; ${glErr ? `GL error ${glErr}` : "no GL error"})`);
+    throw new BuildError(`the editor's picture code did not build on this device after ${ms(t1 - t0)} (${logs.join(" · ") || "the driver gave no reason"}; ${glErr ? `GL error ${glErr}` : "no GL error"})`, status);
   }
   gl.useProgram(prog);
   const loc = gl.getAttribLocation(prog, "a_pos");
@@ -388,7 +421,50 @@ function timedBuild(gl: WebGL2RenderingContext, vert: string, frag: string,
   undoSamplers();
   gl.useProgram(null);
   gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
-  return { link: t1 - t0, draw: t2 - td, err };
+  return { link: t1 - t0, draw: t2 - td, err, status };
+}
+
+/** WHAT THE DRIVER SAID ABOUT ONE BUILD, step by step (decision 071). `vertex`
+ *  and `fragment` are whether that shader compiled and `linked` whether the
+ *  program linked; each is null when the graphics context was lost, which
+ *  answers nothing, so a lost context never reads as a program that failed.
+ *  `logs` is every log that says anything, labelled and folded to one line (empty
+ *  when the driver said nothing), and `glErr` the GL error read after a failed
+ *  link (0 for none, and always 0 on a build that linked). */
+interface BuildStatus { vertex: boolean | null; fragment: boolean | null; linked: boolean | null; logs: string; glErr: number }
+
+/** The error `timedBuild` throws when the program did not build: the same words
+ *  as before, and the status of each step beside them, for the row's build line. */
+class BuildError extends Error {
+  status: BuildStatus;
+  constructor(message: string, status: BuildStatus) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** THE BUILD LINE OF A ROW, for the copied block and the panel (decision 071).
+ *  Takes the build's `status` (null when none was read), `context`, the state of
+ *  the row's graphics context in words, and `how`: "picture" with the GL error its
+ *  first picture raised (`pictureErr`), or "failed" for a build that did not link
+ *  (`reasonAbove` true when the row's reason already carries the driver's words,
+ *  so they are not printed twice). Returns one sentence beginning "Build:" saying
+ *  whether the vertex shader compiled, the fragment shader compiled and the
+ *  program linked, what the compiler's log said, the GL error, and whether the
+ *  context was lost. What the caller relies on: it is a statement of what was
+ *  read and never an explanation, and a step whose status could not be read
+ *  (a lost context) says so instead of saying it failed. */
+function buildLine(status: BuildStatus | null, context: string, how: "picture" | "failed", pictureErr = 0, reasonAbove = false): string {
+  if (!status) return `Build: no status was read for this row; graphics context: ${context}.`;
+  const step = (what: string, v: boolean | null, good: string, bad: string) =>
+    `${what} ${v === null ? "status could not be read (the context was lost)" : v ? good : bad}`;
+  const log = how === "failed" && reasonAbove
+    ? (status.logs ? "compiler log: in the reason above" : "compiler log: none given by the driver")
+    : `compiler log: ${status.logs || (how === "failed" ? "none given by the driver" : "empty")}`;
+  const glError = how === "failed"
+    ? (status.glErr ? `GL error ${status.glErr} after the failed link` : "no GL error after the failed link")
+    : (pictureErr ? `first picture raised GL error ${pictureErr}` : "first picture drawn with no GL error");
+  return `Build: ${step("vertex shader", status.vertex, "compiled", "did not compile")} · ${step("fragment shader", status.fragment, "compiled", "did not compile")} · ${step("program", status.linked, "linked", "did not link")} · ${log} · ${glError} · graphics context: ${context}.`;
 }
 
 async function buildingThePictureCode(): Promise<void> {
@@ -400,11 +476,15 @@ async function buildingThePictureCode(): Promise<void> {
   const build = (tag: number) => timedBuild(gl, VERT, uniqueFrag(FRAG, tag));
   try {
     const stamp = 1000 + Math.floor(Math.random() * 8e8);
-    const cold: { link: number; draw: number; err: number }[] = [];
+    const cold: { link: number; draw: number; err: number; status: BuildStatus }[] = [];
     for (let i = 0; i < 3; i++) { cold.push(build(stamp + i)); await tick(); }
     const warm = build(stamp);
     p.remove();
     const tot = (r: { link: number; draw: number }) => r.link + r.draw;
+    // THE BUILD LINE (decision 071): whether it compiled and linked, what the log
+    // said, and whether this page's one context was lost, for the first build and
+    // for the warm one, which are the two this row reports.
+    const ctx = gl.isContextLost() ? "LOST (the context says so)" : "not lost";
     // THE FIRST RUN IS THE HEADLINE, NOT THE MEDIAN. It is the only one of the
     // three made the way a launch makes it, as the first program in a fresh
     // context; the two after it ran with the driver already started and can be
@@ -417,7 +497,8 @@ async function buildingThePictureCode(): Promise<void> {
     if (refused) {
       row("Building the picture code (first time)", `did not draw (GL error ${refused.err})`,
         "The picture code built, but its first picture raised an error, so no time here would be what a launch pays.",
-        `${cold.map((r) => `${ms(r.link)} to build${r.err ? `, GL error ${r.err}` : ""}`).join("; ")}`);
+        `${cold.map((r) => `${ms(r.link)} to build${r.err ? `, GL error ${r.err}` : ""}`).join("; ")}`,
+        buildLine(refused.status, ctx, "picture", refused.err));
       return;
     }
     const runs = cold.map((r) => `${ms(r.link)} + ${ms(r.draw)}`).join(", ");
@@ -425,12 +506,15 @@ async function buildingThePictureCode(): Promise<void> {
       tot(first) > 5000
         ? `SLOW. The editor takes this long to get ready the first time after a release that changes its graphics.${parallel ? " The start screen says it is preparing, and should stay usable meanwhile — the report's Start-up line says whether it did." : " This device offers no way to build it without holding the page, so the start screen says it is preparing and then waits."}`
         : "The editor takes this long to get ready the first time after a release that changes its graphics. On this device it is not what would hold up a launch.",
-      `${runs} (built + first picture). The first is what a launch after a release pays; the later ones ran in the same page after the graphics had started, and can be much cheaper.`);
+      `${runs} (built + first picture). The first is what a launch after a release pays; the later ones ran in the same page after the graphics had started, and can be much cheaper.`,
+      buildLine(first.status, ctx, "picture", first.err));
     row("Building it again (a normal launch)", ms(tot(warm)),
-      `What an ordinary launch pays once the device has kept the built program: ${ms(warm.link)} to build and ${ms(warm.draw)} for the first picture.${parallel ? " This device offers to build it without holding the page, and the editor now asks it to." : " This device offers no way to build it without holding the page, so on a first start after an update the editor says it is preparing before it waits."}`);
+      `What an ordinary launch pays once the device has kept the built program: ${ms(warm.link)} to build and ${ms(warm.draw)} for the first picture.${parallel ? " This device offers to build it without holding the page, and the editor now asks it to." : " This device offers no way to build it without holding the page, so on a first start after an update the editor says it is preparing before it waits."}`,
+      undefined, buildLine(warm.status, ctx, "picture", warm.err));
   } catch (err) {
     p.remove();
-    row("Building the picture code", "failed", (err as Error).message);
+    row("Building the picture code", "failed", (err as Error).message, undefined,
+      buildLine(err instanceof BuildError ? err.status : null, gl.isContextLost() ? "LOST (the context says so)" : "not lost", "failed", 0, true));
   } finally {
     gl.deleteBuffer(tri);
   }
@@ -685,7 +769,9 @@ function freshBuild(src: string, tag: number, prep?: (gl: WebGL2RenderingContext
  *  `buildFrame`, listens for its loss, and builds and draws a tiny program in
  *  it first, so the row's own build is not billed for starting the graphics.
  *  Gives back the context, `lost()`, true once the browser has reported this
- *  context lost or the context says it is, and `done()`, which stops listening
+ *  context lost or the context says it is, `state()`, the same fact in words
+ *  for the row's build line (lost and reported, lost with no event heard, or
+ *  not lost), and `done()`, which stops listening
  *  and gives the context up; or, where no usable context could be had, one
  *  sentence for the row's reason.
  *  What it has to satisfy: no two rows share a context, so a row that loses
@@ -695,7 +781,7 @@ function freshBuild(src: string, tag: number, prep?: (gl: WebGL2RenderingContext
  *  past that. Until 2026-10-02 the eight rows shared one context, and on the
  *  PC's run of v2.64.56 three of them never ran: the first row that failed
  *  lost that context, and every row after it read "not run". */
-function rowContext(): { gl: WebGL2RenderingContext; lost: () => boolean; done: () => void } | string {
+function rowContext(): { gl: WebGL2RenderingContext; lost: () => boolean; state: () => string; done: () => void } | string {
   const f = buildFrame();
   if (!f) return "A fresh graphics context could not be made for this row, so it was not built.";
   const { gl, tri } = f;
@@ -706,6 +792,10 @@ function rowContext(): { gl: WebGL2RenderingContext; lost: () => boolean; done: 
   const onLost = () => { heard = true; };
   canvas.addEventListener("webglcontextlost", onLost);
   const lost = () => heard || gl.isContextLost();
+  // THE CONTEXT'S STATE IN WORDS, for the row's build line: lost and the browser
+  // said so (the event), lost by the context's own account with no event heard,
+  // or not lost. The three are different findings.
+  const state = () => heard ? "LOST (the browser reported it)" : gl.isContextLost() ? "LOST (the context says so; the browser sent no event)" : "not lost";
   const done = () => {
     canvas.removeEventListener("webglcontextlost", onLost);
     try { gl.deleteBuffer(tri); } catch { /* already gone */ }
@@ -724,7 +814,7 @@ function rowContext(): { gl: WebGL2RenderingContext; lost: () => boolean; done: 
     done();
     return `The fresh graphics context made for this row ${why}, so the row was not built.`;
   }
-  return { gl, lost, done };
+  return { gl, lost, state, done };
 }
 
 /** WHICH PART OF THE PICTURE CODE THE 44 SECONDS IS (decision 071). The PC in
@@ -800,20 +890,22 @@ async function whatMakesTheBuildSlow(): Promise<void> {
       const v = variants[i];
       if (!v.ok) {
         row(v.name, "not run",
-          "The picture code has changed shape since this test was written, so this rewrite no longer finds what it changes. Timing it would time a program that is not what this row says.");
+          "The picture code has changed shape since this test was written, so this rewrite no longer finds what it changes. Timing it would time a program that is not what this row says.",
+          undefined, "Build: not attempted, so nothing was compiled or linked for this row; no graphics context was made for it.");
         continue;
       }
       const units = samplerUnits(v.src);
       if (units > maxUnits) {
         row(v.name, "does not fit",
-          `This copy of the picture code reads ${units} textures and this device gives a picture program ${maxUnits}, so it was not built: any device with that limit refuses it, which says nothing about this one. The test needs rewriting to fit, not the device; the editor's own program reads ${samplerUnits(FRAG)}.`);
+          `This copy of the picture code reads ${units} textures and this device gives a picture program ${maxUnits}, so it was not built: any device with that limit refuses it, which says nothing about this one. The test needs rewriting to fit, not the device; the editor's own program reads ${samplerUnits(FRAG)}.`,
+          undefined, "Build: not attempted, so nothing was compiled or linked for this row; no graphics context was made for it.");
         continue;
       }
       // THIS ROW'S OWN CONTEXT, made for it and given up after it, so nothing
       // that happens to it reaches the next row.
       const c = rowContext();
       if (typeof c === "string") {
-        row(v.name, "not run", c);
+        row(v.name, "not run", c, undefined, "Build: not attempted, so nothing was compiled or linked for this row; the graphics context it needed could not be made or started, as the reason above says.");
         await tick();
         continue;
       }
@@ -836,22 +928,30 @@ async function whatMakesTheBuildSlow(): Promise<void> {
         if (c.lost()) {
           row(v.name, "did not draw (context lost)",
             `Built once, from nothing, in a context of its own: ${v.changed}. That context was lost before the first picture; the rows after it each have their own. ${again()}`,
-            `${ms(r.link)} to build; no picture drawn`);
+            `${ms(r.link)} to build; no picture drawn`,
+            buildLine(r.status, c.state(), "picture", r.err));
         } else if (r.err) {
           row(v.name, `did not draw (GL error ${r.err})`,
             `Built once, from nothing, in a context of its own: ${v.changed}. The first picture raised GL error ${r.err}, so it was not drawn and this is not compared.`,
-            `${ms(r.link)} to build; no picture drawn`);
+            `${ms(r.link)} to build; no picture drawn`,
+            buildLine(r.status, c.state(), "picture", r.err));
         } else {
           timed.push({ name: v.name, t: tot(r) });
-          row(v.name, ms(tot(r)), `Built once, from nothing, in a context of its own: ${v.changed}.`, `${ms(r.link)} + ${ms(r.draw)} (built + first picture)`);
+          row(v.name, ms(tot(r)), `Built once, from nothing, in a context of its own: ${v.changed}.`, `${ms(r.link)} + ${ms(r.draw)} (built + first picture)`,
+            buildLine(r.status, c.state(), "picture", r.err));
         }
       } catch (err) {
         await tick();
+        // THE STATUS OF EVERY STEP, from the error itself: a build that threw
+        // for any other reason has none, and the line says no status was read.
+        const status = err instanceof BuildError ? err.status : null;
         if (c.lost()) {
           row(v.name, "did not build (context lost)",
-            `This row's own graphics context was lost while it was being built, with ${v.changed}: ${(err as Error).message}. The rows after it each have their own. ${again()}`);
+            `This row's own graphics context was lost while it was being built, with ${v.changed}: ${(err as Error).message}. The rows after it each have their own. ${again()}`,
+            undefined, buildLine(status, c.state(), "failed", 0, true));
         } else {
-          row(v.name, "did not build", `${(err as Error).message}, with ${v.changed}. ${again()}`);
+          row(v.name, "did not build", `${(err as Error).message}, with ${v.changed}. ${again()}`,
+            undefined, buildLine(status, c.state(), "failed", 0, true));
         }
       } finally {
         c.done();
@@ -1294,6 +1394,23 @@ function threads(): void {
     n === 1
       ? "Either this browser has no background threads, or the memory each would need does not fit the budget. The export runs as it always did."
       : `Each one holds its own copy of the file and its own decode of it. A 45-megapixel raw would get ${big === 1 ? "none — it would not split" : big}.`);
+}
+
+/** WHAT THE REPORT'S HOLD WATCH COSTS, MEASURED ON THIS DEVICE (decision 071).
+ *  The "Holds" line of the report is kept by a timer that looks every 100 ms for
+ *  as long as a page is open (startup.ts). It costs nothing between its looks,
+ *  and a look is two clock reads, a comparison and a timer set, but a figure for
+ *  that is the device's to give, not a container's: this times the real look many
+ *  times over, three runs, and prints the median with every run.
+ *  Takes nothing; adds one row. The page is held for the length of the three runs
+ *  (tens of milliseconds), which the watch itself records under its own name. */
+function theHoldWatch(): void {
+  const per = measureHoldWatch();
+  const mid = [...per].sort((a, b) => a - b)[(per.length - 1) >> 1];
+  const msEachSecond = (mid * 10) / 1000;
+  row("The hold watch's own cost", `${mid.toFixed(2)} µs a look`,
+    `The report's Holds line is kept by a timer that looks every 100 ms. At ten looks a second that is ${msEachSecond.toFixed(3)} ms of every second (${(msEachSecond / 10).toFixed(4)} percent of the page's time), spent between the page's own work and never during it. This page's own count of its looks so far: ${holdWatchLine()}.`,
+    per.map((x) => `${x.toFixed(2)} µs`).join(", "));
 }
 
 /** WHAT ONE TILE IN THE STRIP COSTS, on this device.
@@ -2197,6 +2314,7 @@ async function fullResolutionPreview(): Promise<void> {
   await graphics();
   await buildingThePictureCode();
   threads();
+  theHoldWatch();
   await exportOnTheGpu();
   await decoding();
   await buildingATile();

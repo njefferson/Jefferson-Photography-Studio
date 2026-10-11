@@ -12,8 +12,14 @@
 // session appears as a COUNT and nothing else. That is asserted, not assumed:
 // the session walk opens a named practice file and greps the built report for
 // its name. Anything added here has to survive the same test.
+//
+// IT NAMES WHERE THE APP HELD, FOR THE WHOLE SESSION (decision 071). The
+// "Holds" line carries the three longest times the page could not run a timer,
+// each with the stage the app was in (startup.ts `busyWith`), and "Hold watch"
+// says what the watch costs and what is in force now. Stage names are the
+// app's own words and never a file's.
 
-import { startupLine } from "./startup";
+import { startupLine, holdsLine, holdWatchLine } from "./startup";
 import { adoptAnswer, type AdoptAnswer } from "./swupdate";
 import { device } from "./platform";
 import type { TileTimings } from "./tile";
@@ -316,9 +322,17 @@ async function holdingsLine(): Promise<string> {
   }
 }
 
-/** Build the report. `extra` lets a page add its own lines (the editor adds
- *  what it has open, as counts). */
-/** WHICH APP THIS REPORT IS ABOUT, and it has to be told.
+/** BUILD THE REPORT: the text a reader copies into a message.
+ *  Takes `version`, the release (printed on the first line); `extra`, the lines a
+ *  page adds after its own (the editor adds what it has open, as counts); and
+ *  `appName`, which app the report is about. Returns the report as aligned
+ *  "Key  value" lines, one fact each, ending in a newline. What the callers rely
+ *  on: it names no file and nothing the reader wrote, on any page, and its
+ *  "Holds" and "Hold watch" lines read the same on every page that builds it
+ *  (startup.ts), so a hold is read the same way in the editor, the test page and
+ *  Macro Studio.
+ *
+ *  WHICH APP THIS REPORT IS ABOUT, and it has to be told.
  *
  *  This module was written for the editor and named it in the first line, which
  *  was true while the editor was the only caller. Macro Studio is the second,
@@ -357,6 +371,10 @@ export async function buildDiagnostic(
     // can be told apart: the page, the code, the picture code, or a download
     // (decision 071).
     { k: "Start-up", v: startupLine() },
+    // WHERE THE PAGE HELD AFTER THE START-UP, for the whole session and not only
+    // its first minute, with the stage in force at each hold (decision 071).
+    { k: "Holds", v: holdsLine() },
+    { k: "Hold watch", v: holdWatchLine() },
     { k: "Storage", v: await storageLine(standalone) },
     // The line that turns an origin-wide number into something actionable.
     { k: "App is holding", v: await holdingsLine() },
