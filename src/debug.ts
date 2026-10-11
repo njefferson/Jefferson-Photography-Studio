@@ -14,6 +14,17 @@
 // log, the GL error, and whether the row's graphics context was lost. And the
 // report's hold watch (startup.ts) has a row here giving what a look of it costs.
 //
+// EACH ROW OF THE BUILD MEASUREMENT GIVES ITS GRAPHICS CONTEXT BACK, AND THE THREE
+// THAT NEVER BUILT RUN FIRST (decision 071). On the PC, in Firefox, the last three
+// rows (the mask settings in a texture and the mask loops counted to 2 and to 8)
+// did not build: the browser would not make a sixth graphics context for the page,
+// and each earlier row had kept its own. `releaseContext` now asks each row's
+// context to be lost through the browser's lose-context extension and empties and
+// drops its canvas once the row has its number (or has said why it has none), so
+// the next row asks for a fresh one; and the three rows with no PC number run
+// before the others, so that if the browser still counts a released context until
+// it collects it, the rows that go without are the ones that already have a number.
+//
 // THE "MASK LOOPS TAKEN OUT" VARIANT IS THE EDITOR'S OWN PROGRAM (decision 071,
 // option 11): it is made by `dropMaskLoops` from gl.ts, the function that makes
 // the program the editor now opens on, so this page measures what the editor runs.
@@ -284,6 +295,26 @@ function buildFrame(): { gl: WebGL2RenderingContext; tri: WebGLBuffer } | null {
   return { gl, tri };
 }
 
+/** GIVES A GRAPHICS CONTEXT BACK TO THE BROWSER, for the build rows (decision 071).
+ *  Takes `gl`, a context made by `buildFrame`. Returns nothing. Asks the context
+ *  to be lost through the browser's lose-context extension (when it is not lost
+ *  already), then empties its canvas (width and height 0, which frees the drawing
+ *  buffer) and takes the canvas out of any parent, so nothing the page holds
+ *  keeps the context reachable. Each step is tried alone, so a context that has
+ *  already gone, or an extension a browser withholds, stops none of the others.
+ *  What the caller relies on: after this the page holds no reference to the
+ *  context through the canvas, and the context is lost by its own account. What
+ *  it cannot promise: when the browser stops counting it. Firefox may count a lost
+ *  context until it collects it, which a page cannot ask for, and that is why the
+ *  rows that never built run first. The caller must read anything it wants from
+ *  the context (`isContextLost`, the status of a program) before calling this. */
+function releaseContext(gl: WebGL2RenderingContext): void {
+  const canvas = gl.canvas as HTMLCanvasElement;
+  try { if (!gl.isContextLost()) gl.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* already gone */ }
+  try { canvas.width = 0; canvas.height = 0; } catch { /* nothing to empty */ }
+  try { canvas.remove(); } catch { /* never attached to a page */ }
+}
+
 /** The editor's fragment program made unique by `tag`. Takes a fragment source
  *  and a number; gives back the source with a branch no pixel takes carrying
  *  that number, so no stored copy of an earlier build can answer.
@@ -520,7 +551,10 @@ async function buildingThePictureCode(): Promise<void> {
     row("Building the picture code", "failed", (err as Error).message, undefined,
       buildLine(err instanceof BuildError ? err.status : null, gl.isContextLost() ? "LOST (the context says so)" : "not lost", "failed", 0, true));
   } finally {
+    // The rows are written above, so the context's state has been read; this one
+    // is given back so the build measurement after it starts from a fresh one.
     gl.deleteBuffer(tri);
+    releaseContext(gl);
   }
 }
 
@@ -743,6 +777,7 @@ function freshBuild(src: string, tag: number, prep?: (gl: WebGL2RenderingContext
   if (!f) return "A fresh context could not be made, so it was not built again.";
   if (f.gl.isContextLost()) {
     f.gl.deleteBuffer(f.tri);
+    releaseContext(f.gl);
     return "A fresh context was lost before anything was built in it, so it was not built again.";
   }
   try {
@@ -755,7 +790,7 @@ function freshBuild(src: string, tag: number, prep?: (gl: WebGL2RenderingContext
     return `Built again in a fresh context, and it did not build there: ${(err as Error).message}.`;
   } finally {
     f.gl.deleteBuffer(f.tri);
-    f.gl.getExtension("WEBGL_lose_context")?.loseContext();
+    releaseContext(f.gl);
   }
 }
 
@@ -766,8 +801,9 @@ function freshBuild(src: string, tag: number, prep?: (gl: WebGL2RenderingContext
  *  Gives back the context, `lost()`, true once the browser has reported this
  *  context lost or the context says it is, `state()`, the same fact in words
  *  for the row's build line (lost and reported, lost with no event heard, or
- *  not lost), and `done()`, which stops listening
- *  and gives the context up; or, where no usable context could be had, one
+ *  not lost), and `done()`, which stops listening and gives the context back
+ *  through `releaseContext` (lost by the lose-context extension, its canvas
+ *  emptied and dropped); or, where no usable context could be had, one
  *  sentence for the row's reason.
  *  What it has to satisfy: no two rows share a context, so a row that loses
  *  its own cannot stop the rows after it from being measured; and every
@@ -794,7 +830,7 @@ function rowContext(): { gl: WebGL2RenderingContext; lost: () => boolean; state:
   const done = () => {
     canvas.removeEventListener("webglcontextlost", onLost);
     try { gl.deleteBuffer(tri); } catch { /* already gone */ }
-    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    releaseContext(gl);
   };
   if (lost()) {
     done();
@@ -812,26 +848,36 @@ function rowContext(): { gl: WebGL2RenderingContext; lost: () => boolean; state:
   return { gl, lost, state, done };
 }
 
+/** The name of the build row that is the editor's program unchanged, which every
+ *  other row is compared against. */
+const AS_SHIPPED = "As shipped";
+
 /** WHICH PART OF THE PICTURE CODE THE 44 SECONDS IS (decision 071). The PC in
  *  Firefox took 44,527 ms to build it on v2.63.34, and changing how its loops
  *  sample did nothing, because ANGLE already did that itself. The sources name
  *  two causes: FXC unrolling every loop it can count, and FXC's slowness with
  *  loops that index uniform arrays. This builds the editor's own program eight
  *  ways, once each, EACH IN A CONTEXT OF ITS OWN (`rowContext`) after a tiny
- *  program has started the graphics there: as shipped, with the counts hidden,
- *  with the mask loops dropped, both, option 8's two forms (the mask settings in
- *  uniform blocks and in a texture, each bound by its `prep` before the first
- *  draw), and the mask loops counted to 2 and to 8, a count the compiler can
- *  see. Each is built and drawn once here and never used by the editor. A row
- *  whose rewrite does not fit the source prints "not run", and one whose draw
- *  fails prints no time; the rest are compared, and the one that saves the most
- *  names the cause. A row that does not build, or whose context is lost, says
- *  so, and is built once more in another fresh context (`freshBuild`), so a
- *  refusal can be told from a context that died: the PC's last three rows
- *  failed in a row with no reason given, 2026-09-30. A row's failure, or the
- *  loss of its context, reaches no other row. */
+ *  program has started the graphics there: the mask settings in a texture and
+ *  the mask loops counted to 2 and to 8 (the three that never built on the PC,
+ *  so they run first), then as shipped, then with the counts hidden, with the
+ *  mask loops dropped, both, and the mask settings in uniform blocks (each of
+ *  option 8's forms bound by its `prep` before the first draw; counted to 2 and
+ *  to 8 is a count the compiler can see). Each is built and drawn once here and
+ *  never used by the editor, and each row's context is given back to the browser
+ *  (`releaseContext`) once its row is written, before the next row asks for
+ *  one. A row whose rewrite does not fit the source prints "not run", and one
+ *  whose draw fails prints no time; the rest are compared, and the one that
+ *  saves the most names the cause. A row that does not build, or whose context
+ *  is lost, says so, and is built once more in another fresh context
+ *  (`freshBuild`), so a refusal can be told from a context that died: the PC's
+ *  last three rows failed in a row with no reason given, 2026-09-30, and on the
+ *  PC's run of staging 2.65.13 they did not build because the browser would not
+ *  make a sixth context. A row's failure, or the loss of its context, reaches no
+ *  other row. What the copied block relies on: every row has a Build line, and
+ *  the line naming what saved the most reads over the rows that built. */
 async function whatMakesTheBuildSlow(): Promise<void> {
-  const p = note("Building the editor's picture code eight ways, each in a graphics context of its own… this takes about eight builds, which on a Windows PC can be five minutes or more; the last row may take longer than all the others, and a row that does not build is built once more on its own.");
+  const p = note("Building the editor's picture code eight ways, each in a graphics context of its own that is given back after its row… this takes about eight builds, which on a Windows PC can be five minutes or more; the first three rows are the ones that did not build here before, and a row that does not build is built once more on its own.");
   // A first context, only to learn whether WebGL2 is here and how many
   // texture units this device gives a picture program; given up at once.
   const probe = buildFrame();
@@ -842,7 +888,7 @@ async function whatMakesTheBuildSlow(): Promise<void> {
   // which says nothing about this one. Such a row is not built.
   const maxUnits = probe.gl.getParameter(probe.gl.MAX_TEXTURE_IMAGE_UNITS) as number;
   probe.gl.deleteBuffer(probe.tri);
-  probe.gl.getExtension("WEBGL_lose_context")?.loseContext();
+  releaseContext(probe.gl);
   const tot = (r: { link: number; draw: number }) => r.link + r.draw;
   try {
     const hidden = hideLoopCounts(FRAG);
@@ -852,32 +898,38 @@ async function whatMakesTheBuildSlow(): Promise<void> {
     const texed = masksToTexture(FRAG);
     const two = fixMaskLoops(FRAG, 2);
     const most = fixMaskLoops(FRAG, MAX_MASKS);
+    // THE ORDER THE ROWS RUN IN: the three that never built on the PC first (the
+    // mask settings in a texture, then the mask loops counted to 2 and to the
+    // most), then the as-shipped row, then the rest. On the PC, in Firefox, the
+    // browser would not make a sixth graphics context and these three came last;
+    // they are the routes that might make the masked build fast and have no
+    // number from that machine, so they go before anything that already has one.
     const variants: { name: string; src: string; changed: string; ok: boolean; prep?: (gl: WebGL2RenderingContext, prog: WebGLProgram) => () => void }[] = [
-      { name: "As shipped", src: FRAG, changed: "nothing changed", ok: true },
+      // OPTION 8 (decision 071): the mask loops kept, their parameters moved out
+      // of the indexed uniform arrays FXC is slow on. Measured here before the
+      // editor's own program changes.
+      { name: "…with the mask settings in a texture", src: texed.src,
+        changed: `${texed.sites} reads of the thirteen mask arrays moved into one texture, read through ${MASK_TEX_SAMPLER}`, ok: texed.ok, prep: bindZeroMaskTexture },
+      // THE PER-MASK-COUNT BUILD (decision 071): the mask loops kept, run to a
+      // count the compiler can see. A count of 8 may unroll into a long build.
+      // Each row has a context of its own, given back after it, so a loss here
+      // does not silence the rows after it; a device whose graphics give up
+      // altogether can still refuse every context after, and those rows then say
+      // so. TWO, NOT ONE: at 1 the inner `j = i + 1` loops vanish as well, which is
+      // part of what "taken out" measures, so the two could not be told apart.
+      { name: "…with the mask loops counted to 2", src: two.src,
+        changed: `${two.loops} mask loops given a count it can see, 2`, ok: two.loops > 0 && two.clean },
+      { name: `…with the mask loops counted to ${MAX_MASKS}`, src: most.src,
+        changed: `${most.loops} mask loops given a count it can see, ${MAX_MASKS}, the most a photograph holds`, ok: most.loops > 0 && most.clean },
+      { name: AS_SHIPPED, src: FRAG, changed: "nothing changed", ok: true },
       { name: "…with every loop's count hidden from the compiler", src: hidden.src,
         changed: `${hidden.loops} loops given a count it cannot see`, ok: hidden.loops > 0 },
       { name: "…with the mask loops taken out", src: dropped.src,
         changed: `${dropped.loops} mask loops run zero times`, ok: dropped.loops > 0 },
       { name: "…with both", src: both.src,
         changed: `${hidden.loops} counts hidden and ${both.loops} mask loops taken out`, ok: hidden.loops > 0 && both.loops > 0 },
-      // OPTION 8 (decision 071): the mask loops kept, their parameters moved out
-      // of the indexed uniform arrays FXC is slow on. Measured here before the
-      // editor's own program changes.
       { name: "…with the mask settings in uniform blocks", src: blocks.src,
         changed: `${blocks.sites} reads of the thirteen mask arrays moved into three blocks`, ok: blocks.ok, prep: bindZeroBlocks },
-      { name: "…with the mask settings in a texture", src: texed.src,
-        changed: `${texed.sites} reads of the thirteen mask arrays moved into one texture, read through ${MASK_TEX_SAMPLER}`, ok: texed.ok, prep: bindZeroMaskTexture },
-      // THE PER-MASK-COUNT BUILD (decision 071): the mask loops kept, run to a
-      // count the compiler can see. LAST, because a count of 8 may unroll into a
-      // long build. Each row has a context of its own, so a loss here no longer
-      // silences the rows after it; a device whose graphics give up altogether
-      // can still refuse every context after, and those rows then say so. TWO,
-      // NOT ONE: at 1 the inner `j = i + 1` loops vanish as well, which is part
-      // of what "taken out" measures, so the two could not be told apart.
-      { name: "…with the mask loops counted to 2", src: two.src,
-        changed: `${two.loops} mask loops given a count it can see, 2`, ok: two.loops > 0 && two.clean },
-      { name: `…with the mask loops counted to ${MAX_MASKS}`, src: most.src,
-        changed: `${most.loops} mask loops given a count it can see, ${MAX_MASKS}, the most a photograph holds`, ok: most.loops > 0 && most.clean },
     ];
     const stamp = 1000 + Math.floor(Math.random() * 8e8);
     const timed: { name: string; t: number }[] = [];
@@ -907,11 +959,20 @@ async function whatMakesTheBuildSlow(): Promise<void> {
       // A ROW THAT DID NOT BUILD, OR WHOSE CONTEXT WAS LOST, IS BUILT ONCE MORE
       // ON ITS OWN, with a tag no earlier build used, so no stored copy answers
       // it either. A row whose draw raised a GL error is not.
-      const again = () => freshBuild(v.src, stamp + 100 + i, v.prep);
+      //
+      // THE ROW'S OWN CONTEXT IS GIVEN BACK BEFORE THAT SECOND BUILD, so the fresh
+      // one is not the second of two the page holds at once; its state is read
+      // first (`state`, below), since a context this page has just released would
+      // otherwise read as lost.
+      const again = () => {
+        c.done();
+        return freshBuild(v.src, stamp + 100 + i, v.prep);
+      };
       try {
         const r = timedBuild(c.gl, VERT, uniqueFrag(v.src, stamp + i), v.prep);
         // A loss the browser reports arrives from a queued task.
         await tick();
+        const state = c.state();
         // A FIRST PICTURE THAT RAISED AN ERROR DID NOT DRAW: its time is the
         // build alone, and the row says so rather than passing it for a picture.
         // A CONTEXT LOST IN THIS ROW may be the device giving up on the program
@@ -924,37 +985,40 @@ async function whatMakesTheBuildSlow(): Promise<void> {
           row(v.name, "did not draw (context lost)",
             `Built once, from nothing, in a context of its own: ${v.changed}. That context was lost before the first picture; the rows after it each have their own. ${again()}`,
             `${ms(r.link)} to build; no picture drawn`,
-            buildLine(r.status, c.state(), "picture", r.err));
+            buildLine(r.status, state, "picture", r.err));
         } else if (r.err) {
           row(v.name, `did not draw (GL error ${r.err})`,
             `Built once, from nothing, in a context of its own: ${v.changed}. The first picture raised GL error ${r.err}, so it was not drawn and this is not compared.`,
             `${ms(r.link)} to build; no picture drawn`,
-            buildLine(r.status, c.state(), "picture", r.err));
+            buildLine(r.status, state, "picture", r.err));
         } else {
           timed.push({ name: v.name, t: tot(r) });
           row(v.name, ms(tot(r)), `Built once, from nothing, in a context of its own: ${v.changed}.`, `${ms(r.link)} + ${ms(r.draw)} (built + first picture)`,
-            buildLine(r.status, c.state(), "picture", r.err));
+            buildLine(r.status, state, "picture", r.err));
         }
       } catch (err) {
         await tick();
+        const state = c.state();
         // THE STATUS OF EVERY STEP, from the error itself: a build that threw
         // for any other reason has none, and the line says no status was read.
         const status = err instanceof BuildError ? err.status : null;
         if (c.lost()) {
           row(v.name, "did not build (context lost)",
             `This row's own graphics context was lost while it was being built, with ${v.changed}: ${(err as Error).message}. The rows after it each have their own. ${again()}`,
-            undefined, buildLine(status, c.state(), "failed", 0, true));
+            undefined, buildLine(status, state, "failed", 0, true));
         } else {
           row(v.name, "did not build", `${(err as Error).message}, with ${v.changed}. ${again()}`,
-            undefined, buildLine(status, c.state(), "failed", 0, true));
+            undefined, buildLine(status, state, "failed", 0, true));
         }
       } finally {
+        // The number (or the reason there is none) is written; the context goes
+        // back to the browser, and its canvas with it, before the next row asks.
         c.done();
       }
       await tick();
     }
     p.remove();
-    const shipped = timed.find((t) => t.name === variants[0].name);
+    const shipped = timed.find((t) => t.name === AS_SHIPPED);
     const rest = timed.filter((t) => t !== shipped);
     if (shipped && rest.length) {
       const best = rest.reduce((a, b) => (b.t < a.t ? b : a));

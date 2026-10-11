@@ -16,7 +16,10 @@
 // `busyWith`, decision 071): the open's decode, the sky selection's wait, the sky
 // map, the lift, the strip's tiles, a look press, an export, a batch and the build
 // of the masks' picture code each mark themselves in force until they end, so a
-// hold the report names says what the app was doing across it.
+// hold the report names says what the app was doing across it. The start-up's own
+// stages are marked too: the stored session's restore (`resumeSession`) and a
+// photograph's open and first draw (`showDecoded` and `activateCurrent`, kept in
+// force through the first two painted frames), each ended on every way out.
 //
 // IT OPENS ON A PICTURE PROGRAM WITHOUT THE MASK LOOPS (decision 071, option 11):
 // the program that draws masks is built behind the picture where the browser
@@ -12192,11 +12195,40 @@ welcomeBack.addEventListener("click", returnToEditor);
  *  from the device they were measured on. */
 let lastShowPhases: { hotspot: number; upload: number; zoom: number; glow: number; local: number; rest: number; px: number } | null = null;
 
+/** THE STAGE A PHOTOGRAPH'S OPEN AND FIRST DRAW IS NAMED UNDER, for the hold watch.
+ *  Takes `run`, the synchronous part of an open (`showDecodedNow` or
+ *  `activateCurrentNow`); returns what it returns. The stage is in force from the
+ *  start of `run` until the picture it drew has been through two animation frames
+ *  (or 30 s, for a page that is hidden and paints none), because the open uploads
+ *  and schedules its draw and returns, and the stall that follows is the browser's
+ *  frame task waiting on the graphics, which would otherwise fall after the stage
+ *  had ended and read as no stage at all. Ended on every way out, a throw
+ *  included. What it relies on: a second call while the first is still in force
+ *  (`showDecoded`, then `activateCurrent`) adds a stage of the same name, and the
+ *  watch counts the time either was in force once. */
+function inOpenStage<T>(run: () => T): T {
+  const endStage = busyWith("a photograph's open and first draw");
+  try {
+    return run();
+  } finally {
+    requestAnimationFrame(() => requestAnimationFrame(endStage));
+    window.setTimeout(endStage, 30000);
+  }
+}
+
 /** Show an already-decoded image: upload it, build its reference maps and set
  *  the view. Does NOT touch the edit — callers follow with either a fresh
  *  baseline (establishFreshEdit) or a restored one (restoreLiveEdit). Shared by
- *  the single-open path, the example loader and session photo-switching. */
+ *  the single-open path, the example loader and session photo-switching. It is
+ *  a stage the hold watch names (`inOpenStage`): the report's "Holds" line says
+ *  "a photograph's open and first draw" for a hold in it. */
 function showDecoded(img: DecodedImage, imported: ImportedFile) {
+  inOpenStage(() => showDecodedNow(img, imported));
+}
+
+/** The body of `showDecoded`, which marks its stage around this. Takes what
+ *  `showDecoded` takes; returns nothing. */
+function showDecodedNow(img: DecodedImage, imported: ImportedFile) {
   // THE FIRST AND LAST INSTANT OF THIS FUNCTION, so the phases below can be
   // held to the whole rather than to most of it. The five named phases cover
   // the middle — the location guard, the canvas label and the tool disarm run
@@ -13047,8 +13079,16 @@ function restoreLiveEdit(st: LiveEdit) {
 
 /** Make `current` (already decoded + shown) the active photo, restoring its
  *  live edit if we have one, else establishing a fresh baseline and layering
- *  any durably-stored edit (from a resumed session) on top. */
+ *  any durably-stored edit (from a resumed session) on top. The second half of a
+ *  photograph's open and first draw, so a stage the hold watch names
+ *  (`inOpenStage`, as `showDecoded`). */
 function activateCurrent(id: string) {
+  inOpenStage(() => activateCurrentNow(id));
+}
+
+/** The body of `activateCurrent`, which marks its stage around this. Takes what
+ *  `activateCurrent` takes; returns nothing. */
+function activateCurrentNow(id: string) {
   const st = liveEdits.get(id);
   lastActivateFresh = !st; // a first visit does far more work than a return one
   // Set the active id BEFORE any capture below, so seeding this photo's entry
@@ -16154,6 +16194,10 @@ async function resumeSession() {
   if (refuseSecondOpen()) return;
   takeOpen(SAYS_RESUMING);
   showBusy("Resuming session…");
+  // THE STORED SESSION'S RESTORE IS A STAGE THE HOLD WATCH NAMES (startup.ts
+  // `busyWith`): from reading the stored index to the first photograph on screen.
+  // Ended in the `finally` below, so a return, a throw and a refused build all end it.
+  const endStage = busyWith("the stored session's restore");
   try {
     const metas = await Session.listPhotos();
     if (metas.length < 2) { hideBusy(); return; }
@@ -16190,6 +16234,7 @@ async function resumeSession() {
     recordFailure("resuming the session", err);
     alert("Couldn't resume the session: " + (err as Error).message);
   } finally {
+    endStage();
     hideBusy();
     releaseOpen();
   }

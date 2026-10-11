@@ -22,6 +22,18 @@
 // build asks, whether it has finished, once per look and never as a wait; the
 // Start-up line prints when the masks' build started and ended and where it ran.
 //
+// AND WHETHER A HOLD WAS THE PAGE HIDDEN OR THE PAGE BLOCKED. Every change of the
+// page's visibility is kept with its time (`visLog`: the browser's event with the
+// time it carries, and a check at each look for a change the event has not
+// delivered yet), and a hold prints how much of it the page was hidden, or that it
+// was not hidden at any time in it. Only a look made while the page is still
+// hidden is left out; one made the instant the page returns is a hold, because
+// that is the look that tells a tab held in the background from a page that could
+// not run. The Holds line counts how many holds spanned a hidden stretch, and the
+// Hold watch line prints the newest entries of the record. The hidden amount is
+// read when the report is taken, not when the look is made, so an event that
+// arrives after the look can still correct the time of the change.
+//
 // Evaluated as early as the entry module's imports allow, which is why it is a
 // module of its own with no imports: the clock it keeps starts when it runs.
 
@@ -35,15 +47,73 @@ marks.set("module", T0);
 // in the first minute is the number that says whether the page itself stalled.
 let lastFrame = T0, longestGap = 0, longestAt = 0;
 // A HIDDEN PAGE DRAWS NO FRAMES, so a covered window would read as a frozen one.
-// Every hidden stretch is kept, and the longest pause says if it overlapped one.
-const hidden: [number, number][] = [];
-let hiddenSince: number | null = typeof document !== "undefined" && document.visibilityState === "hidden" ? T0 : null;
+// EVERY CHANGE OF THE PAGE'S VISIBILITY IS KEPT WITH ITS TIME (the record of
+// what the page was doing between two looks), and the longest pause and every
+// hold say how much of themselves fell in a hidden stretch.
+
+/** One entry of the visibility record: from `at` (the page's clock, ms) the page
+ *  was shown or hidden. The first entry is the state at load. `byLook` is true
+ *  when the change was first seen by the hold watch's look and not by the
+ *  browser's event, so its time is the look's and no earlier. */
+interface VisEntry { at: number; shown: boolean; byLook: boolean }
+const visLog: VisEntry[] = [{
+  at: T0,
+  shown: !(typeof document !== "undefined" && document.visibilityState === "hidden"),
+  byLook: false,
+}];
+const VIS_LOG_CAP = 2000;
+
+/** Whether the document says it is hidden right now. Takes nothing; returns true
+ *  only when the browser reports `hidden` (false where there is no document). */
+const hiddenNow = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+
+/** RECORDS THE PAGE'S VISIBILITY IF IT HAS CHANGED SINCE THE LAST ENTRY.
+ *  Takes `now`, the page's clock at this moment, and `stamp`, the time the
+ *  browser gave the change when it came as an event (undefined at a look).
+ *  Returns nothing; appends an entry only when the state differs from the last
+ *  one, so calling it twice for one change records one. Two ways in, because
+ *  each fails alone: the event can arrive after the hold watch's look when the
+ *  page was held across the change, and a browser that held the page may not
+ *  deliver it at all. When the look saw a change first and the event comes
+ *  after with an earlier time that fits between the entries, the entry takes the
+ *  event's time, which is the moment of the change and not of the look. */
+function seeVisibility(now: number, stamp?: number): void {
+  const last = visLog[visLog.length - 1];
+  const shown = !hiddenNow();
+  const at = Math.max(last.at, stamp ?? now);
+  if (shown === last.shown) {
+    const before = visLog.length > 1 ? visLog[visLog.length - 2].at : -Infinity;
+    if (stamp !== undefined && last.byLook && stamp >= before && stamp < last.at) { last.at = stamp; last.byLook = false; }
+    return;
+  }
+  visLog.push({ at, shown, byLook: stamp === undefined });
+  // Dropped in pairs so the entries still alternate; a page that changed
+  // visibility a thousand times has long stopped asking about its first minute.
+  if (visLog.length > VIS_LOG_CAP) visLog.splice(0, 500);
+}
 if (typeof document !== "undefined") {
-  document.addEventListener("visibilitychange", () => {
+  document.addEventListener("visibilitychange", (e) => {
     const t = performance.now();
-    if (document.visibilityState === "hidden") hiddenSince = t;
-    else if (hiddenSince !== null) { hidden.push([hiddenSince, t]); hiddenSince = null; }
+    const s = e.timeStamp;
+    seeVisibility(t, s > 0 && s <= t ? s : t);
   });
+}
+
+/** HOW MUCH OF A STRETCH THE PAGE WAS HIDDEN. Takes `from` and `to` on the page's
+ *  clock. Returns the milliseconds inside them that the visibility record says the
+ *  page was hidden (an unfinished hidden stretch runs to `to`), 0 when it was
+ *  visible throughout. What the caller relies on: never more than `to - from`,
+ *  and the same stretch asked twice gives the same answer unless an event has
+ *  corrected an entry between. */
+function hiddenWithin(from: number, to: number): number {
+  let total = 0;
+  for (let i = 0; i < visLog.length; i++) {
+    if (visLog[i].shown) continue;
+    const lo = Math.max(visLog[i].at, from);
+    const hi = Math.min(i + 1 < visLog.length ? visLog[i + 1].at : Infinity, to);
+    if (hi > lo) total += hi - lo;
+  }
+  return total;
 }
 const FRAME_WATCH_MS = 60000;
 // EVERY PAUSE WORTH NAMING, with where it began, so the graphics build can be
@@ -123,8 +193,7 @@ function heldDuring(from: number, to: number): string {
   for (const [a, b] of gaps) if (a < to && b > from) worst = Math.max(worst, b - a);
   // An unfinished pause: the page has not drawn since before the build ended.
   if (lastFrame < to && to - lastFrame > worst && lastFrame >= from) worst = to - lastFrame;
-  const wasHidden = hidden.some(([a, b]) => a < to && b > from) || (hiddenSince !== null && hiddenSince < to);
-  const tail = wasHidden ? ", and the page was hidden for part of it" : "";
+  const tail = hiddenWithin(from, to) > 0 ? ", and the page was hidden for part of it" : "";
   return worst > 250 ? `the page waited — longest pause ${took(worst)}${tail}` : `the page stayed free — longest pause ${worst >= GAP_KEPT_MS ? took(worst) : `under ${GAP_KEPT_MS} ms`}${tail}`;
 }
 
@@ -175,7 +244,7 @@ export function startupLine(): string {
   }
   parts.push(marks.has("controls-wired") ? `controls wired ${at(marks.get("controls-wired"))}` : "controls not marked on this page");
   const gapEnd = longestAt + longestGap;
-  const wasHidden = hidden.some(([a, b]) => a < gapEnd && b > longestAt) || (hiddenSince !== null && hiddenSince < gapEnd);
+  const wasHidden = hiddenWithin(longestAt, gapEnd) > 0;
   parts.push(`longest pause ${took(longestGap)} at ${at(longestAt)}${wasHidden ? " (the page was hidden for part of it)" : ""}`);
   parts.push(updateFound != null
     ? `update found ${at(updateFound)}, ${installEnded != null ? `${installState} ${at(installEnded)}` : "still installing"}`
@@ -258,41 +327,54 @@ function stagesDuring(from: number, to: number): string {
   return spans.slice(0, 3).map((s) => `${s.name} (${took(s.len)} of it)`).join(", ") + (spans.length > 3 ? `, and ${spans.length - 3} more` : "");
 }
 
-/** A hold: when it was due to be answered, how late it was, and the stages in
- *  force across it. */
-interface Hold { at: number; len: number; during: string }
+/** A hold: when it was due to be answered, when it was answered, how late it was
+ *  (`len`, so `at + len` is `came`), and the stages in force across it. How much
+ *  of it the page was hidden is not stored: it is read from the visibility record
+ *  when the report is taken, because an event can correct the record after the
+ *  look that found the hold. */
+interface Hold { at: number; came: number; len: number; during: string }
 const longestHolds: Hold[] = [];
 let holdCount = 0, holdTotal = 0, holdsSkipped = 0, watchChecks = 0, watchSelfMs = 0;
-
-/** Whether the page was hidden at any time between `from` and `to`: a hidden page
- *  has its timers slowed by the browser, and a late look then is not the app. */
-const pageAway = (from: number, to: number) => hidden.some(([a, b]) => a < to && b > from) || (hiddenSince !== null && hiddenSince < to);
+/** The span of every hold counted, due to answered, so the report can say how
+ *  many spanned a hidden stretch. Capped; the report says when the cap was hit. */
+const holdSpans: [number, number][] = [];
+const HOLD_SPANS_CAP = 1000;
 
 /** ONE LOOK OF THE WATCH, JUDGED. Takes the time of the previous look and the
  *  wall clock then, and this look's. Counts a hold when this look came more than
- *  250 ms after it was due, except when the page was hidden meanwhile or the
- *  device slept (the wall clock ran on five seconds or more past the page's own,
- *  which stops while a machine sleeps): those are counted apart and are not the
- *  app's. Returns nothing. What it must satisfy: a look on time costs only the
- *  arithmetic, which is why the watch is cheap enough to leave running. */
+ *  250 ms after it was due, except when the device slept (the wall clock ran on
+ *  five seconds or more past the page's own, which stops while a machine sleeps)
+ *  or the page is STILL HIDDEN as the look runs: a hidden page has its timers
+ *  slowed by the browser, and a look made under that slowing is not the app. Those
+ *  are counted apart. A look that comes the instant the page returns is a hold
+ *  and is kept, with how much of it the page was hidden read when the report is
+ *  taken (`holdsLine`), because that is exactly the look that says a page was in
+ *  the background and not blocked. Returns nothing. What it must satisfy: a look
+ *  on time costs only the arithmetic, which is why the watch is cheap enough to
+ *  leave running. */
 function checkHold(prev: number, prevWall: number, now: number, wall: number): void {
   const late = now - prev - HOLD_EVERY_MS;
   if (late <= HOLD_OVER_MS) return;
-  if (pageAway(prev, now) || (wall - prevWall) - (now - prev) > 5000) { holdsSkipped++; return; }
+  if (hiddenNow() || (wall - prevWall) - (now - prev) > 5000) { holdsSkipped++; return; }
   holdCount++;
   holdTotal += late;
+  if (holdSpans.length < HOLD_SPANS_CAP) holdSpans.push([prev + HOLD_EVERY_MS, now]);
   // The stretch the stages are read over is the hold itself, from when the look was
   // due to when it came, so no stage is credited with more time than the hold has.
-  longestHolds.push({ at: prev + HOLD_EVERY_MS, len: late, during: stagesDuring(prev + HOLD_EVERY_MS, now) });
+  longestHolds.push({ at: prev + HOLD_EVERY_MS, came: now, len: late, during: stagesDuring(prev + HOLD_EVERY_MS, now) });
   longestHolds.sort((a, b) => b.len - a.len);
   if (longestHolds.length > HOLDS_KEPT) longestHolds.length = HOLDS_KEPT;
 }
 
-/** One look, in full: reads both clocks, judges the gap since the previous look
- *  and lets go of stages that ended before it. Takes the previous look's page time
- *  and wall time; returns this look's, as [page time, wall time], for the next. */
+/** One look, in full: reads both clocks, notes a change of the page's visibility
+ *  the browser's event has not delivered yet, judges the gap since the previous
+ *  look and lets go of stages that ended before it. Takes the previous look's page
+ *  time and wall time; returns this look's, as [page time, wall time], for the
+ *  next. What it must satisfy: the visibility is read before the gap is judged, so
+ *  a hold found by this look is read against a record that includes the change. */
 function look(prev: number, prevWall: number): [number, number] {
   const c0 = performance.now(), wall = Date.now();
+  seeVisibility(c0);
   checkHold(prev, prevWall, c0, wall);
   if (stages.length) stages = stages.filter((s) => s.to === null || s.to > c0);
   return [c0, wall];
@@ -338,34 +420,50 @@ const lookAgain = () => {
 if (typeof setTimeout === "function") setTimeout(lookAgain, HOLD_EVERY_MS);
 
 /** The report's "Holds" line: the longest stretches this session in which the
- *  page could not run a timer.
- *  Takes nothing. Returns one line: how many holds there were over 250 ms and
- *  their total, then the longest three, each with its length, when it was due
- *  (seconds since the page was requested, as the Start-up line counts) and the
- *  stages in force across it; or that there were none. Late looks that fell in a
- *  hidden stretch or a sleep are counted apart, so a covered window is not read as
- *  a frozen app. What the caller relies on: it names no file and nothing the
- *  reader wrote, only stage names this module's callers chose. */
+ *  page could not run a timer, and whether each was the page hidden or the page
+ *  blocked.
+ *  Takes nothing. Returns one line: how many holds there were over 250 ms, how
+ *  many of them spanned a hidden stretch, and their total, then the longest
+ *  three, each with its length, when it was due (seconds since the page was
+ *  requested, as the Start-up line counts), the stages in force across it and how
+ *  much of it the page was hidden (or that it was not hidden at any time in it);
+ *  or that there were none. Late looks made while the page was still hidden, or
+ *  after a sleep, are counted apart, so a covered window is not read as a frozen
+ *  app; a look that came the instant the page returned is a hold and says how much
+ *  of itself was the page hidden. What the caller relies on: the hidden amount is
+ *  never more than the hold's own length, and the line names no file and nothing
+ *  the reader wrote, only stage names this module's callers chose. */
 export function holdsLine(): string {
   const watched = performance.now() - T0;
-  const away = holdsSkipped ? `; ${holdsSkipped} late look${holdsSkipped === 1 ? "" : "s"} left out because the page was hidden or the device asleep` : "";
+  const away = holdsSkipped ? `; ${holdsSkipped} late look${holdsSkipped === 1 ? "" : "s"} left out because the page was still hidden when the look came, or the device asleep` : "";
   if (!holdCount) return `none over ${HOLD_OVER_MS} ms in the ${at(watched)} watched${away}`;
-  const top = longestHolds.map((h) => `${took(h.len)} at ${at(h.at)}, while ${h.during}`).join(" · ");
-  return `${holdCount} over ${HOLD_OVER_MS} ms, ${took(holdTotal)} in all, in the ${at(watched)} watched — the longest ${longestHolds.length === 1 ? "one" : longestHolds.length}: ${top}${away}`;
+  const spanned = holdSpans.filter(([a, b]) => hiddenWithin(a, b) > 0).length;
+  const counted = holdSpans.length < holdCount ? ` among the first ${holdSpans.length}` : "";
+  const top = longestHolds.map((h) => {
+    const hid = Math.min(h.len, hiddenWithin(h.at, h.came));
+    return `${took(h.len)} at ${at(h.at)}, while ${h.during}; ${hid > 0 ? `the page was hidden for ${took(hid)} of it` : "the page was not hidden at any time in it"}`;
+  }).join(" · ");
+  return `${holdCount} over ${HOLD_OVER_MS} ms (${spanned ? `${spanned} spanned` : "none spanned"} a hidden stretch${counted}), ${took(holdTotal)} in all, in the ${at(watched)} watched — the longest ${longestHolds.length === 1 ? "one" : longestHolds.length}: ${top}${away}`;
 }
 
-/** The report's "Hold watch" line: what the watch is, what it has cost and what
- *  is in force now. Takes nothing. Returns one line: the interval, the looks made
- *  and the time spent in them by the page's own clock (a coarse clock, so the test
- *  page's "The hold watch's own cost" row is the real figure), and the stages in
- *  force at this moment with how long each has been. What the caller relies on:
- *  "stages in force now" reads "none" on an idle page, so a stage that was never
- *  ended is seen here before it is blamed for a hold. */
+/** The report's "Hold watch" line: what the watch is, what it has cost, what is in
+ *  force now and what the page's visibility has been. Takes nothing. Returns one
+ *  line: the interval, the looks made and the time spent in them by the page's own
+ *  clock (a coarse clock, so the test page's "The hold watch's own cost" row is the
+ *  real figure), the stages in force at this moment with how long each has been,
+ *  and the newest five entries of the visibility record, each the state the page
+ *  was in from that time (the first is the state at load; one marked "seen at a
+ *  look" was found by the watch before the browser's event, so its time is the
+ *  look's). What the caller relies on: "stages in force now" reads "none" on an
+ *  idle page, so a stage that was never ended is seen here before it is blamed for
+ *  a hold, and the record always has at least the state at load. */
 export function holdWatchLine(): string {
   const now = performance.now();
   const open = stages.filter((s) => s.to === null);
   const inForce = open.length ? open.map((s) => `${s.name} for ${took(now - s.from)}`).join(", ") : "none";
-  return `a look every ${HOLD_EVERY_MS} ms, ${watchChecks} made, ${watchSelfMs.toFixed(1)} ms spent in them by the page's own clock; stages in force now: ${inForce}`;
+  const shown = visLog.slice(-5).map((e) => `${e.shown ? "visible" : "hidden"} from ${at(e.at)}${e.byLook ? " (seen at a look)" : ""}`).join(", ");
+  const earlier = visLog.length > 5 ? ` (and ${visLog.length - 5} earlier)` : "";
+  return `a look every ${HOLD_EVERY_MS} ms, ${watchChecks} made, ${watchSelfMs.toFixed(1)} ms spent in them by the page's own clock; stages in force now: ${inForce}; page visibility: ${shown}${earlier}`;
 }
 
 /** WHAT ONE LOOK OF THE WATCH COSTS, MEASURED ON THIS DEVICE (the test page's row).

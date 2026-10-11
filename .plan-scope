@@ -1,23 +1,15 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=0d9eb62423505f68
-diffhash=ae9633e8fd608e23
-verdict=IN-SCOPE: the six changed files are all named in the plan's Files, and the change is the mask-free open with the masks' program built afterwards, as step 18 describes, and nothing more.
-# IN-SCOPE: the six changed files are all named in the plan's Files, and the change is the mask-free open with the masks' program built afterwards, as step 18 describes, and nothing more.
-# 
-# Judged against this plan by its path and against the owner's messages as the scope check printed them. The substance of what was asked is that the editor become usable on the PC, where the build takes about 37 seconds; the diff addresses that and nothing else.
-# 
-# Files in the diff: NOTES.md, docs/ARCHITECTURE.md, src/debug.ts, src/gl.ts (the picture-code module), src/main.ts, src/startup.ts. No untracked file, no version file, no decision record edit (option 11 is already in the record), no src/pipeline.ts change, no .contract-allow change.
-# 
-# Inside the plan, item by item:
-# - The program built at open has the mask loops taken out (maskFreeFrag, dropMaskLoops, the masksAfter option that only the editor passes); the test page and the GPU export keep today's one program.
-# - The masked program is built afterwards: started behind the picture where KHR_parallel_shader_compile is offered, with its completion read once per tick of the hold watch's existing timer (onWatchTick in startup.ts) and never waited on; built at the first draw of an edit holding a mask where it is not offered, after the busy card's words have painted, with busyWith set for the build and cleared after it.
-# - A link that fails leaves the mask-free program in use and puts the driver's words in the report's Graphics build line.
-# - Until the masked program is in use the edit is drawn as if it held no masks, by a copy of the parameters, so the masks on the edit are untouched; the coverage overlay is off for the same reason, which is a consequence of the same sentence and not an addition.
-# - The test page's source imports the one shared function in place of its own copy; the pattern and the replacement text are identical, so its rows and output do not change. The Asked section says the test page is not touched, and Files and step 18 name src/debug.ts for exactly this reuse, so this is read as the plan's own instruction.
-# - The Start-up line gains a masks clause and the frame watch counts the masks' build as a build; both exist so that the owner's one run on the PC can read what the build now costs, which the plan names as the run only the owner can make.
-# - NOTES.md gains the new entry at the top of the staging section, with the PC numbers, the off-page and first-use split, the two vector-indexing lines as the next candidate, the test page's three rows and the cause, and the one run for the owner; the 071 bullet gains one line. docs/ARCHITECTURE.md changes only its generated line counts.
-# 
-# Not in the diff, and correctly: the iPad's sky wait, the look, the Aerochrome cap, the hub's gates, the camera JPEG, promotion, any walk or sheet, any change to a test-page row. This step judges scope only; the build, the checks and the pixel comparison are step 18's.
-# 
-# Found, not fixed: where the browser offers no parallel compile, a photograph that opens already holding saved masks starts the on-page build at its first draw, so the long build is paid then, after the card's words have painted. The plan accepts the on-page build at the first use of a mask. The PC run on a photograph holding no mask will show no masks build in the Start-up line until a mask is set.
+planhash=8c1420a8ea12d8ea
+diffhash=e11f3f64cf5b971b
+verdict=IN-SCOPE: six modified files, each named in the plan Files, holding only the test page context release and row order, the report hidden-stretch attribution, the start-up stage markers, and the record of them.
+# IN-SCOPE: six modified files, each named in the plan Files, holding only the test page context release and row order, the report hidden-stretch attribution, the start-up stage markers, and the record of them.
+# Read against the plan by its path, the step 21 report, and the owner messages the scope check printed. Nothing is staged, nothing is untracked, no file outside the plan Files is touched.
+# src/debug.ts: one helper gives a row graphics context back (the lose-context extension, then the canvas emptied and removed). The row context finish, the fresh build, the first probe and the picture-code row all use it. The texture row and the two counted-loop rows now run first, the as-shipped row is found by name, and the other rows follow. A failed row gives its context back before its second build, and its state is read before that. The progress note on the page was reworded to match. No row program text, Build line or row name changed. Edge, judged inside the ask: the picture-code row belongs to the full run and not to the separate build button; it is released by the same helper for the same limit on live contexts, and no other row outside the build measurement was touched.
+# src/startup.ts: one record of every visibility change with its time replaces the older list of hidden stretches. Each hold keeps its answered time, prints how much of it the page was hidden (or that it was not hidden at any time in it), and the Holds line counts how many spanned a hidden stretch. Only a look made while the page is still hidden, or after a sleep, is left out. The longest-pause and graphics-build attributions read the same record, so there is one record and not two. Edge, judged inside the ask: the Hold watch line now ends with the newest five entries of that record; it is the record the plan asks the watch to keep, made readable in the copied block, and it carries nothing the reader wrote.
+# src/main.ts: busyWith marks the stored session restore (ended in a finally) and a photograph open and first draw (thin wrappers around the two original bodies, ended after two painted frames or a long cap, on every way out, and ending twice is harmless). No other behaviour changed. The head comment says what was added.
+# src/diagnostic.ts: head comment only.
+# docs/ARCHITECTURE.md: regenerated line counts for the four touched source files and nothing else.
+# NOTES.md: the new entry at the top of the staging section (what the two changes measure, what the two PC blocks read, that the next two PC runs decide the masked build route and the warm reload hold), the one production paragraph that step 24 was told to add and that rides this commit, and one dated paragraph inside the 071 roadmap bullet. No decision record, no new gate, no walk, no committed scratch script.
+# Not touched, as the plan holds: debug.html, the contract allow list, the preview pipeline record, the pixel path, the sky map, the masked build itself, the Aerochrome cap, the hub.
+# Nothing in the diff goes beyond what the owner asked for; the owner messages ask for the test page to come quickly and the instruments to answer on the PC, and that is all the diff does.

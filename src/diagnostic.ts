@@ -17,7 +17,11 @@
 // "Holds" line carries the three longest times the page could not run a timer,
 // each with the stage the app was in (startup.ts `busyWith`), and "Hold watch"
 // says what the watch costs and what is in force now. Stage names are the
-// app's own words and never a file's.
+// app's own words and never a file's. Each hold also says whether the page was
+// hidden for it or blocked: how much of it the page was hidden, or that it was
+// not hidden at any time in it, and the Holds line counts how many holds spanned
+// a hidden stretch; the Hold watch line ends with the newest entries of the
+// page's visibility record (startup.ts).
 
 import { startupLine, holdsLine, holdWatchLine } from "./startup";
 import { adoptAnswer, type AdoptAnswer } from "./swupdate";

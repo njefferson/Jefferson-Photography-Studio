@@ -54,6 +54,83 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**Production, 2026-10-11: the staging head ca7270cc4c17b0e12d65042d2a7f9965bebe8cdc went to main by fast-forward, on the owner's go after the PC and device runs of that head; production serves version 2.65.13, its worker names that build, and Deploy to Cloudflare Pages run 985 for it concluded success.**
+
+**The test page's last build rows build again, and the report says whether a
+hold was the page hidden: built 2026-10-11 on staging's head, after the PC's two
+blocks of 2.65.13.** Two instrument changes and nothing else. No pixel path is
+touched and no row's program text changed. They exist because two PC blocks
+(Firefox, Direct3D 11, 15:00 and 15:01 California on 2026-10-11) left two
+questions with no instrument that could answer them.
+- **What the two PC blocks read.** The editor's build took 2.36 s and 2.22 s,
+  with no way to build off the page offered and the masks' program built at the
+  first mask. The test page's last three build rows (the mask settings in a
+  texture, and the mask loops counted to 2 and to 8) did not build, because
+  Firefox would not make a sixth graphics context for the page: each row kept
+  its context, and those three ran last. So the routes that might make the
+  masked build fast have no number from that PC. And on a warm reload the page
+  held 16.85 s from 0.25 s with no stage marked, the controls wiring only at
+  17.1 s and the editor's build beginning at 17.4 s, with 5 late looks left out
+  as hidden. The report could not tell a tab held in the background until that
+  moment (Firefox holds its frames and timers) from a block on the page: it left
+  out a look that fires while the page is still hidden, kept one that fires the
+  instant it returns with nothing said about the hidden time, and the start-up's
+  own stages carried no marker.
+- **New: the test page gives each row's graphics context back.** After a row has
+  its number, or has said why it has none, the context is lost through the
+  browser's lose-context extension, its canvas is emptied and dropped
+  (`releaseContext`, `src/debug.ts`), and the next row asks for a fresh one. A
+  row that fails gives its own context back before its second build. The "Building
+  the picture code" rows give theirs back too. The three rows that never built on
+  the PC now run first (the texture, then counted to 2, then to 8), then the
+  as-shipped row, then the rest, so that if Firefox still counts a released
+  context until it collects it, the rows that go without are the ones that
+  already have a number. Every row keeps its Build line in the copied block, and
+  the line naming what saved the most reads over the rows that built.
+- **New: the report says when a hold was the page hidden.** `src/startup.ts`
+  records every change of the page's visibility with its time (the browser's event
+  and a check at each look of the hold watch, the event's time winning when it
+  arrives after the look). A hold prints how much of it the page was hidden, or
+  that the page was not hidden at any time in it; the Holds line says how many
+  holds spanned a hidden stretch; the Hold watch line ends with the newest entries
+  of the record. Only a look made while the page is still hidden is left out now,
+  and a look made the instant the page returns is a hold, which is the look that
+  tells a held tab from a blocked page.
+- **New: the start-up's own stages are marked.** `busyWith` names "the stored
+  session's restore" (Resume session, to the first photograph on screen) and "a
+  photograph's open and first draw" (`showDecoded` and `activateCurrent`, kept
+  through the first two painted frames), each ended on every way out.
+- **What the container measured** (software graphics, headless Chromium; no time
+  here is the PC's). This Chromium has no control that hides a page: another tab
+  brought to the front, the window minimised and a frozen lifecycle state all left
+  the page reading visible, and the frozen state did not stop its timers. So the
+  document's visibility was a stand-in from an init script, the page's thread was
+  held for the known stretch, and everything else was the app's own. On two of the
+  owner's raws, a hold of 20 s with the stand-in hidden printed "the page was
+  hidden for 20.00 s of it" (against a known 20 s, within 0.2 s), a hold of 12 s
+  with the page visible printed "not hidden at any time in it", and with the
+  record planted out (the stand-in pinned visible) the same 20 s hold printed
+  "not hidden" and the comparison went red. After the open, no start-up stage
+  was left in force. Read 400 ms into a Resume session, "stages in force now"
+  listed "the stored session's restore". The test page's build measurement,
+  under a stand-in limit of five live graphics contexts, built all eight rows in
+  the new order with a Build line each; with the lose-context extension made a
+  no-op it stopped after three, which is what the PC saw.
+- **What the container cannot show.** Whether Firefox frees a released context
+  before the next row asks: that is the PC's run. Whether a real background tab
+  reads as hidden to this record: the stand-in reads what the page is told.
+- **The PC's next two runs decide the next fixes.** The test page's "What makes
+  the picture code slow to build", then "Copy the results": it says whether the
+  texture and the counted-loop rows build in Firefox and what each costs, which
+  chooses the masked build's route. And a warm reload of the editor, then the
+  report's Holds, Hold watch and Start-up lines: "the page was hidden for X of it"
+  means the 17 s was a tab held in the background; "not hidden at any time in it"
+  means the page was blocked. A hold from the first look to the wiring of the
+  controls sits in the editor's own start, before either new stage can be in
+  force, so it will still read "no stage was marked" if it is the page's
+  work; that is itself the finding, and the marker for the module's start is the
+  next one.
+
 **The masks leave the program the editor builds at open, and are prepared after
 the picture: built 2026-10-11 on the tree of staging's head (de2aa07), not
 committed yet.** One change, chosen by the PC's own numbers and by nothing
@@ -2442,6 +2519,11 @@ user-scalable=no.
   page and at the first mask where it does not. The staging entry in this file
   has the rest, and the PC's own run of the report's Start-up line is what
   closes it.
+  **2026-10-11, staging: the two instruments the PC's blocks asked for.** The
+  test page's last three build rows run first and each row gives its graphics
+  context back, and the report's Holds line says how much of each hold the page
+  was hidden and names the start-up's own stages; the PC's next two runs choose
+  the masked build's route and the warm reload's hold.
 - [ ] **On Firefox the practice photographs stay empty while the editor builds** <!-- decision: 086 -->
   **Shown as:** The practice photographs on the start card show their pictures straight away, even while the editor is still getting ready.
   Reported from the PC on the evening of 2026-09-30, Pacific: every practice
