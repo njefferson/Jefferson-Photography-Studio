@@ -2,6 +2,16 @@
 // fragment shader and runs in real time on the iPad GPU.
 //
 // Order matches PLAN.md: white balance -> channel swap -> hue/sat -> tone.
+//
+// THE EDITOR OPENS ON THE PROGRAM WITHOUT THE MASK LOOPS (decision 071, option
+// 11). On a Windows PC through Direct3D the mask loops are 35 of the 37 seconds
+// the program takes to build, so a Renderer built with `masksAfter` builds
+// `maskFreeFrag()` first, draws from it, and builds the full program afterwards
+// (`startMasks` and `pollMasks` where the browser offers parallel compile,
+// `buildMasksNow` where it does not). Until the full program is in use the edit
+// is drawn with no masks and no coverage overlay; the edit itself is untouched.
+// The transformation is `dropMaskLoops`, exported so the test page measures the
+// program the editor runs.
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
@@ -1459,6 +1469,41 @@ void main() {
   frag = vec4(g, 1.0);
 }`;
 
+/** A loop over the photograph's masks, which indexes the mask uniform arrays
+ *  with its loop variable: the shape ANGLE issue 3682 records as slow for FXC,
+ *  Direct3D's compiler. Matches `; i < u_maskCount;` in FRAG's `for` headers and
+ *  captures the loop variable. Global, so it is used only through
+ *  `String.prototype.replace`, which resets it. Consumers: `dropMaskLoops`, and
+ *  the test page's counted-loop variants. */
+export const MASK_LOOP = /; (\w+) < u_maskCount;/g;
+
+/** The editor's fragment program with every mask loop run zero times, so the
+ *  compiler drops it. Takes `src`, a fragment source; gives back the rewritten
+ *  source and how many loops it changed. What callers rely on: `loops` of zero means the
+ *  program has changed shape, and the result must not be timed or drawn from as
+ *  the mask-free program, because it is the program as shipped under another
+ *  name. This one function makes the test page's "with the mask loops taken out"
+ *  variant and the program the editor opens on, so the page measures what the
+ *  editor runs. */
+export function dropMaskLoops(src: string): { src: string; loops: number } {
+  let loops = 0;
+  const s = src.replace(MASK_LOOP, (_m, v: string) => { loops++; return `; ${v} < 0;`; });
+  return { src: s, loops };
+}
+
+/** THE FRAGMENT PROGRAM THE EDITOR OPENS ON: FRAG with every mask loop taken
+ *  out. Takes nothing. Returns the source, or null when the rewrite is not whole:
+ *  no loop matched, or `u_maskCount` is read anywhere but its one declaration
+ *  (a loop written some other way would still run, and a program that draws
+ *  some masks and not others is worse than one that draws none). What the caller
+ *  relies on: null means build FRAG whole, as before; a source means a program
+ *  that draws exactly what FRAG draws for an edit with no masks. */
+export function maskFreeFrag(): string | null {
+  const d = dropMaskLoops(FRAG);
+  const left = (d.src.match(/\bu_maskCount\b/g) ?? []).length;
+  return d.loops > 0 && left === 1 ? d.src : null;
+}
+
 /** The next animation frame, as a promise. Takes nothing; resolves inside the
  *  next frame callback. Frames rather than a timer: a frame is the unit a reader
  *  sees, and a hidden page gets none, so a build polled this way costs nothing
@@ -1492,7 +1537,20 @@ export interface BuildOptions {
    *  handed to the driver. Never called while the page is held: there are no
    *  frames to call it from. */
   onWaiting?: (elapsedMs: number) => void;
+  /** Open on the program without the mask loops (`maskFreeFrag`) and leave the
+   *  full program to be built afterwards by `startMasks` or `buildMasksNow`
+   *  (decision 071, option 11). Only the editor passes it. Absent, the one
+   *  program is the full one, as it was: the test page's rows and the GPU export
+   *  draw masks and must not open on a program that cannot. */
+  masksAfter?: boolean;
 }
+
+/** WHERE THE PROGRAM THAT DRAWS THE MASKS STANDS. `in`: it is the one in use
+ *  (always, for a Renderer built without `masksAfter`). `idle`: the mask-free
+ *  program is in use and the full one has not been started. `building`: handed
+ *  to the driver, completion not yet seen. `failed`: it did not link, the
+ *  mask-free program stays in use, and `maskLog` holds the driver's words. */
+export type MaskState = "in" | "idle" | "building" | "failed";
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
@@ -1570,6 +1628,32 @@ export class Renderer {
   /** True once `ready` has resolved. Takes nothing; returns whether a draw
    *  would draw. */
   get built(): boolean { return this.prog !== null; }
+
+  /** The extension the build asked for, kept for the masks' program; null where
+   *  the browser offers none. */
+  private par: { COMPLETION_STATUS_KHR: number } | null = null;
+  /** The program in use has the mask loops. True from the start unless the
+   *  Renderer opened on the mask-free program (`BuildOptions.masksAfter`). */
+  private masksOn = true;
+  /** The full program while it is being built, with the two shaders it owns. */
+  private masked: { p: WebGLProgram; vs: WebGLShader; fs: WebGLShader } | null = null;
+  /** The two shaders attached to the program in use, freed with it on a swap. */
+  private shaders: WebGLShader[] = [];
+  private maskedState: MaskState = "in";
+  private maskedLog = "";
+
+  /** Whether the program in use draws masks. Takes nothing. Returns false only
+   *  while the Renderer is on the mask-free program; main.ts reads it to know
+   *  that an edit holding masks is being shown without them. */
+  get masksIn(): boolean { return this.masksOn; }
+  /** Where the masks' program stands (see `MaskState`). */
+  get maskState(): MaskState { return this.maskedState; }
+  /** What the driver said when the masks' program did not link, one line; empty
+   *  otherwise. For the report's Graphics build line. */
+  get maskLog(): string { return this.maskedLog; }
+  /** Whether this browser offers to build without holding the page. Known once
+   *  `ready` has resolved; before that, false. */
+  get buildsOffPage(): boolean { return this.par !== null; }
 
   /** The linked program, for the two places that bind it. Throws rather than
    *  drawing nothing: arriving here before `ready` is a missing await, and a
@@ -2016,6 +2100,7 @@ export class Renderer {
     // never asked until 071; the test page did, so its 42 s was measured on a
     // different thread from the launch it was meant to explain.
     const par = gl.getExtension("KHR_parallel_shader_compile");
+    this.par = par;
     const first = opts.beforeBuild?.(!!par);
     if (first) {
       // WHAT HAS TO ARRIVE BEFORE IT CAN BE PAINTED (decision 086), then the
@@ -2028,13 +2113,13 @@ export class Renderer {
     if (this.lost) throw new Error(LOST);
     opts.onBuildStart?.(!!par);
     const t0 = performance.now();
+    // THE PROGRAM THE EDITOR OPENS ON (decision 071, option 11): FRAG with the
+    // mask loops taken out where it was asked for and the rewrite is whole; the
+    // full FRAG otherwise, as before.
+    const free = opts.masksAfter ? maskFreeFrag() : null;
     const vs = this.shader(gl.VERTEX_SHADER, VERT);
-    const fs = this.shader(gl.FRAGMENT_SHADER, FRAG);
-    const p = gl.createProgram()!;
-    gl.attachShader(p, vs);
-    gl.attachShader(p, fs);
-    gl.bindAttribLocation(p, 0, "a_pos");
-    gl.linkProgram(p);
+    const fs = this.shader(gl.FRAGMENT_SHADER, free ?? FRAG);
+    const p = this.makeProgram(vs, fs);
     // Sent now, not whenever the browser next flushes: the poll can only ever
     // say yes to a link the graphics process has actually been handed.
     gl.flush();
@@ -2057,19 +2142,139 @@ export class Renderer {
     // fails LINK_STATUS; checked first so it is reported as lost, not broken.
     if (this.lost) throw new Error(LOST);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-      // EVERY LOG, JOINED. Compile errors surface here — nothing asked
-      // COMPILE_STATUS on the way in, because that question waits too — and on
-      // a compile error the program's own log is a generic "Fragment shader is
-      // not compiled", which would hide the one line that says why.
-      const logs = [["program", gl.getProgramInfoLog(p)], ["fragment", gl.getShaderInfoLog(fs)], ["vertex", gl.getShaderInfoLog(vs)]]
-        .map(([what, log]) => [what, (log ?? "").trim()])
-        .filter(([, log]) => log)
-        .map(([what, log]) => `${what}: ${log}`);
-      throw new Error("the editor's picture code did not build — " + (logs.join(" · ") || "the driver gave no reason"));
+      throw new Error("the editor's picture code did not build — " + this.linkLogs(p, fs, vs));
     }
     gl.useProgram(p);
     for (const u of UNIFORMS) this.loc[u] = gl.getUniformLocation(p, u);
+    this.shaders = [vs, fs];
+    // Asked for and not whole: the full program was built, and the masks are in.
+    this.masksOn = !free;
+    this.maskedState = free ? "idle" : "in";
     this.prog = p;
+  }
+
+  /** A program from two shaders, linked and not yet asked anything. Takes the
+   *  vertex and fragment shaders. Returns the program, with `a_pos` bound to
+   *  attribute 0 by declaration (getAttribLocation would make the browser finish
+   *  the link) and the link handed to the driver. What callers rely on: nothing
+   *  here asks the program a question, so with the parallel-compile extension
+   *  the link runs off the page. */
+  private makeProgram(vs: WebGLShader, fs: WebGLShader): WebGLProgram {
+    const gl = this.gl;
+    const p = gl.createProgram()!;
+    gl.attachShader(p, vs);
+    gl.attachShader(p, fs);
+    gl.bindAttribLocation(p, 0, "a_pos");
+    gl.linkProgram(p);
+    return p;
+  }
+
+  /** EVERY LOG THE DRIVER WROTE FOR A PROGRAM THAT DID NOT LINK, joined. Takes
+   *  the program and its two shaders. Returns the logs as one line, or "the
+   *  driver gave no reason". Compile errors surface at the link — nothing asked
+   *  COMPILE_STATUS on the way in, because that question waits too — and on a
+   *  compile error the program's own log is a generic "Fragment shader is not
+   *  compiled", which would hide the one line that says why. */
+  private linkLogs(p: WebGLProgram, fs: WebGLShader, vs: WebGLShader): string {
+    const gl = this.gl;
+    const logs = [["program", gl.getProgramInfoLog(p)], ["fragment", gl.getShaderInfoLog(fs)], ["vertex", gl.getShaderInfoLog(vs)]]
+      .map(([what, log]) => [what, (log ?? "").trim()])
+      .filter(([, log]) => log)
+      .map(([what, log]) => `${what}: ${log}`);
+    return logs.join(" · ") || "the driver gave no reason";
+  }
+
+  /** THE MASKS' PROGRAM, HANDED TO THE DRIVER BEHIND THE PICTURE (decision 071,
+   *  option 11). Takes nothing. Returns true when the build was started, false
+   *  when it cannot or need not be: the Renderer is not on the mask-free
+   *  program, the build is already started or done, the browser offers no
+   *  parallel compile (there `buildMasksNow` is the way, at the first mask), or
+   *  the graphics are gone. What callers rely on: nothing here asks the program
+   *  a question, so with the extension the page is not held; `pollMasks` is how
+   *  it is found finished. */
+  startMasks(): boolean {
+    if (this.maskedState !== "idle" || !this.par || this.lost) return false;
+    const gl = this.gl;
+    const vs = this.shader(gl.VERTEX_SHADER, VERT);
+    const fs = this.shader(gl.FRAGMENT_SHADER, FRAG);
+    this.masked = { p: this.makeProgram(vs, fs), vs, fs };
+    // Sent now: the poll can only say yes to a link the graphics process has
+    // been handed.
+    gl.flush();
+    this.maskedState = "building";
+    return true;
+  }
+
+  /** ONE LOOK AT THE MASKS' PROGRAM, never a wait. Takes nothing. Returns the
+   *  state after the look: `building` when the driver has not finished, `in`
+   *  when it has and the program is now the one in use (the caller redraws),
+   *  `failed` when it did not link (the mask-free program stays, `maskLog` holds
+   *  the driver's words), and `idle` or `in`/`failed` unchanged when no build is
+   *  under way. What callers rely on: the only question put to the driver while
+   *  it is unfinished is COMPLETION_STATUS_KHR; LINK_STATUS and the uniform
+   *  lookups wait for the link, so they are asked only after it says done. */
+  pollMasks(): MaskState {
+    const m = this.masked;
+    if (this.maskedState !== "building" || !m || !this.par) return this.maskedState;
+    if (!this.lost && !this.gl.getProgramParameter(m.p, this.par.COMPLETION_STATUS_KHR)) return "building";
+    return this.settleMasks();
+  }
+
+  /** THE MASKS' PROGRAM BUILT NOW, HOLDING THE PAGE, for a browser with no
+   *  parallel compile (decision 071, option 11). Takes nothing. Returns the
+   *  state after: `in` or `failed`. The caller has put words on screen and let
+   *  them paint first, because this does not return until the driver has linked
+   *  the program (Firefox on the PC measured 36 s). A Renderer not on the
+   *  mask-free program, or one whose build is under way, is left as it is. */
+  buildMasksNow(): MaskState {
+    if (this.maskedState !== "idle" || this.lost) return this.maskedState;
+    const gl = this.gl;
+    const vs = this.shader(gl.VERTEX_SHADER, VERT);
+    const fs = this.shader(gl.FRAGMENT_SHADER, FRAG);
+    this.masked = { p: this.makeProgram(vs, fs), vs, fs };
+    this.maskedState = "building";
+    return this.settleMasks();
+  }
+
+  /** THE MASKS' PROGRAM HAS FINISHED LINKING, OR THE GRAPHICS ARE GONE: make it
+   *  the program in use, or record why not. Takes nothing; returns the new
+   *  state. On success every uniform is found in the new program, the old
+   *  program and its shaders are freed, and the pre-pass cache is cleared,
+   *  because the denoised picture it holds was drawn by the other program and
+   *  its key does not name which. Every uniform the next draw needs is set again
+   *  by `bindPipeline`, which sets them all on every draw. On failure the
+   *  mask-free program stays in use. */
+  private settleMasks(): MaskState {
+    const gl = this.gl;
+    const m = this.masked;
+    if (!m) return this.maskedState;
+    this.masked = null;
+    if (this.lost) {
+      this.maskedLog = LOST;
+      this.maskedState = "failed";
+      return this.maskedState;
+    }
+    if (!gl.getProgramParameter(m.p, gl.LINK_STATUS)) {
+      this.maskedLog = this.linkLogs(m.p, m.fs, m.vs);
+      gl.deleteProgram(m.p);
+      gl.deleteShader(m.vs);
+      gl.deleteShader(m.fs);
+      this.maskedState = "failed";
+      return this.maskedState;
+    }
+    gl.useProgram(m.p);
+    const loc: Record<string, WebGLUniformLocation | null> = {};
+    for (const u of UNIFORMS) loc[u] = gl.getUniformLocation(m.p, u);
+    const old = this.prog;
+    this.prog = m.p;
+    this.loc = loc;
+    if (old) gl.deleteProgram(old);
+    for (const s of this.shaders) gl.deleteShader(s);
+    this.shaders = [m.vs, m.fs];
+    this.masksOn = true;
+    this.detailKey = "";
+    this.maskedState = "in";
+    return this.maskedState;
   }
 
   /** One shader, compiled and NOT asked whether it compiled: COMPILE_STATUS
@@ -2616,6 +2821,18 @@ export class Renderer {
    *  otherwise remap out from under callers like clientToImageUv. */
   private bindPipeline(p: EditParams, split: number, rot: number, readMode = 0, spotVis = 0, applyCrop = true, maskViz = -1, maskMatte = false, stage = 0) {
     const gl = this.gl;
+    // WHILE THE MASKS' PROGRAM IS NOT IN, THE EDIT IS DRAWN AS IF IT HELD NO
+    // MASKS (decision 071, option 11). The program in use has no mask loops, so
+    // nothing it is handed about masks would be read; a copy with the list
+    // emptied keeps every mask upload, the mixer and grade switches a mask can
+    // turn on, and the pre-pass's key out of the draw, so the picture is exactly
+    // the one an edit with no masks makes. The edit itself is the caller's and is
+    // not touched. The coverage overlay needs the loop that captures a mask's
+    // weight, so it is off too.
+    if (!this.masksOn) {
+      if (p.masks?.length) p = { ...p, masks: [] };
+      maskViz = -1;
+    }
     // The detail pre-pass FIRST, while nothing of this draw is bound yet — it
     // binds this same program and its own target, and puts both back.
     const straighten = applyCrop ? p.straighten ?? 0 : 0;

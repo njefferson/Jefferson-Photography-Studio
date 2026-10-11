@@ -1,24 +1,23 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=f861bd2909572d66
-diffhash=c6f0ebbb125fa0cd
-verdict=IN-SCOPE: every change in the diff is one of the plan's two instruments (the report's whole-session hold watch with its stage marker, and the test page's build rows that say why) or the record the plan names for them, in files the plan lists, with no pixel path touched.
-# IN-SCOPE: every change in the diff is one of the plan's two instruments (the report's whole-session hold watch with its stage marker, and the test page's build rows that say why) or the record the plan names for them, in files the plan lists, with no pixel path touched.
+planhash=0d9eb62423505f68
+diffhash=ae9633e8fd608e23
+verdict=IN-SCOPE: the six changed files are all named in the plan's Files, and the change is the mask-free open with the masks' program built afterwards, as step 18 describes, and nothing more.
+# IN-SCOPE: the six changed files are all named in the plan's Files, and the change is the mask-free open with the masks' program built afterwards, as step 18 describes, and nothing more.
 # 
-# Read: the scope check (exit 1, the recorded verdict was for an earlier plan, not run again), git status, the whole of git diff, the plan by its path, and the owner's messages the check printed, which add no ask beyond the plan's Asked section.
+# Judged against this plan by its path and against the owner's messages as the scope check printed them. The substance of what was asked is that the editor become usable on the PC, where the build takes about 37 seconds; the diff addresses that and nothing else.
 # 
-# Files changed, all in the plan's Files list: .contract-allow, NOTES.md, docs/ARCHITECTURE.md, src/debug.ts, src/diagnostic.ts, src/main.ts, src/startup.ts. Nothing untracked and nothing outside that list. debug.html and tools/.preview-pipeline, also listed, are unchanged, which agrees with the plan: the test page's markup needed no new element and no pixel path moved.
+# Files in the diff: NOTES.md, docs/ARCHITECTURE.md, src/debug.ts, src/gl.ts (the picture-code module), src/main.ts, src/startup.ts. No untracked file, no version file, no decision record edit (option 11 is already in the record), no src/pipeline.ts change, no .contract-allow change.
 # 
-# Change by change:
-# - src/startup.ts: a timer looking every 100 ms for the whole session, a hold recorded when a look comes more than 250 ms late, the new busyWith stage marker, the three longest holds with the stage in force, a count of holds over 250 ms, and the watch's own cost. The existing first-minute frame watch is left as it was. This is the plan's report change and nothing else.
-# - src/diagnostic.ts: two new report lines, Holds and Hold watch, after Start-up, and the contract for buildDiagnostic written onto the function whose body gained those two lines. The report still names no file.
-# - src/main.ts: only busyWith set and ended around the paths the plan names: the open's decode, the sky selection's wait, the sky map, the lift, the strip's tiles, a look press, an export (single and picked) and a batch. Each stage is ended on every way out. decodeWithLens gains an optional stage argument whose default is the open's, and the three callers whose time another stage already covers pass null. pressLook becomes a wrapper around the unchanged body, now pressLookNow. No behaviour of the editor changes.
-# - src/debug.ts: every variant row of the build measurement now carries a Build line (vertex and fragment compile, link, compiler log, GL error, context lost or not, told apart as reported, lost with no event, not lost), read after the timed stretch; rows not attempted say so; the two Building the picture code rows carry the same line; one new row gives the hold watch's cost on the device. This is the plan's test page change. No row needed repair in the container, so none was altered.
-# - NOTES.md: the new entry at the top of the staging section (what the two instruments measure, what the container printed, that the two device runs decide the fix) and a short addition to decision 071's roadmap bullet. No decision record was added, as the plan says.
-# - docs/ARCHITECTURE.md: the regenerated lines for the four touched modules. .contract-allow: buildDiagnostic taken off the list now that it states its contract, which the repository's standing contract rule asks of a touched function and the plan lists the file for.
+# Inside the plan, item by item:
+# - The program built at open has the mask loops taken out (maskFreeFrag, dropMaskLoops, the masksAfter option that only the editor passes); the test page and the GPU export keep today's one program.
+# - The masked program is built afterwards: started behind the picture where KHR_parallel_shader_compile is offered, with its completion read once per tick of the hold watch's existing timer (onWatchTick in startup.ts) and never waited on; built at the first draw of an edit holding a mask where it is not offered, after the busy card's words have painted, with busyWith set for the build and cleared after it.
+# - A link that fails leaves the mask-free program in use and puts the driver's words in the report's Graphics build line.
+# - Until the masked program is in use the edit is drawn as if it held no masks, by a copy of the parameters, so the masks on the edit are untouched; the coverage overlay is off for the same reason, which is a consequence of the same sentence and not an addition.
+# - The test page's source imports the one shared function in place of its own copy; the pattern and the replacement text are identical, so its rows and output do not change. The Asked section says the test page is not touched, and Files and step 18 name src/debug.ts for exactly this reuse, so this is read as the plan's own instruction.
+# - The Start-up line gains a masks clause and the frame watch counts the masks' build as a build; both exist so that the owner's one run on the PC can read what the build now costs, which the plan names as the run only the owner can make.
+# - NOTES.md gains the new entry at the top of the staging section, with the PC numbers, the off-page and first-use split, the two vector-indexing lines as the next candidate, the test page's three rows and the cause, and the one run for the owner; the 071 bullet gains one line. docs/ARCHITECTURE.md changes only its generated line counts.
 # 
-# Not in the diff: the Aerochrome cap, hub gate work, the camera JPEG, promotion to production, any walk change, any change to how a photograph looks. No trailer, link to a chat, owner quotation or attribution is in the added text; the only identifier added is the staging head the new NOTES entry names, which matches the branch's actual head.
+# Not in the diff, and correctly: the iPad's sky wait, the look, the Aerochrome cap, the hub's gates, the camera JPEG, promotion, any walk or sheet, any change to a test-page row. This step judges scope only; the build, the checks and the pixel comparison are step 18's.
 # 
-# Found: the new NOTES entry does not say that the six walks of step 15 were not run under this plan; the plan's Leaves open carries that, and the fix plan's staging boundary runs them.
-# Found: the roadmap addition under decision 071 is a short paragraph where the plan said one line; it is the same content in the same bullet and is not a scope matter.
-# Found: the container run left one hold of about 9 s a few seconds after the sky map lands naming no stage; the NOTES entry already records it as not known and for the device run to settle.
+# Found, not fixed: where the browser offers no parallel compile, a photograph that opens already holding saved masks starts the on-page build at its first draw, so the long build is paid then, after the card's words have painted. The plan accepts the on-page build at the first use of a mask. The PC run on a photograph holding no mask will show no masks build in the Start-up line until a mask is set.

@@ -16,6 +16,12 @@
 // The report's "Holds" and "Hold watch" lines print the three longest, how many
 // there were and what the watch itself costs.
 //
+// AND THE MASKS' PICTURE CODE, BUILT BEHIND THE PICTURE (decision 071, option
+// 11). The editor opens on a program with the mask loops taken out and builds the
+// full one afterwards. `onWatchTick` lets this timer carry the one question that
+// build asks, whether it has finished, once per look and never as a wait; the
+// Start-up line prints when the masks' build started and ended and where it ran.
+//
 // Evaluated as early as the entry module's imports allow, which is why it is a
 // module of its own with no imports: the clock it keeps starts when it runs.
 
@@ -46,7 +52,9 @@ const FRAME_WATCH_MS = 60000;
 // not the same as not holding it, and only the frames can tell them apart.
 const GAP_KEPT_MS = 50;
 const gaps: [number, number][] = [];
-const graphicsBuilding = () => marks.has("graphics-start") && !marks.has("graphics-built") && !marks.has("graphics-failed");
+const graphicsBuilding = () =>
+  (marks.has("graphics-start") && !marks.has("graphics-built") && !marks.has("graphics-failed")) ||
+  (marks.has("masks-start") && !marks.has("masks-built") && !marks.has("masks-failed"));
 const onFrame = (t: number) => {
   const gap = t - lastFrame;
   if (gap > longestGap) { longestGap = gap; longestAt = lastFrame; }
@@ -85,7 +93,9 @@ if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
  *  Takes `name`, one of the moments the start-up line knows how to print
  *  ("graphics-start", "graphics-built", "graphics-failed", "graphics-parallel"
  *  — the browser offered to build without holding the page — "graphics-words" —
- *  the start screen said it was preparing — and "controls-wired"); stores the time since
+ *  the start screen said it was preparing — "masks-start", "masks-built",
+ *  "masks-failed" and "masks-onpage" — the build of the program that draws the
+ *  masks, which follows the picture's — and "controls-wired"); stores the time since
  *  the page began and returns nothing. The first call for a name wins, so a
  *  moment re-reached later in the session (a second renderer, say) cannot move
  *  it. Read by `startupLine`. */
@@ -148,6 +158,21 @@ export function startupLine(): string {
     : gs != null && gf != null ? `graphics failed ${at(gf)}, ${took(gf - gs)} after starting (${offered}${said})`
     : gs != null ? `graphics still building since ${at(gs)} (${heldDuring(gs, performance.now())} so far; ${offered}${said})`
     : "no graphics on this page");
+  // THE MASKS' PROGRAM, WHICH FOLLOWS THE PICTURE'S (decision 071, option 11).
+  // Said only on a page that built graphics. Where it ran is stated, and whether
+  // the page stayed free is read off the frames only for a build made off the
+  // page, which starts within the frame watch's first minute; one made on the
+  // page at the first mask can come long after the watch stopped, and the
+  // "Holds" line names it as a stage instead.
+  if (gs != null) {
+    const ms = marks.get("masks-start"), mb = marks.get("masks-built"), mf = marks.get("masks-failed");
+    const where = marks.has("masks-onpage") ? "built on the page at the first mask" : "built off the page";
+    const free = (a: number, b: number) => marks.has("masks-onpage") ? "" : `; ${heldDuring(a, b)}`;
+    parts.push(ms != null && mb != null ? `masks built ${at(ms)}–${at(mb)} (${took(mb - ms)}; ${where}${free(ms, mb)})`
+      : ms != null && mf != null ? `masks failed ${at(mf)}, ${took(mf - ms)} after starting (${where})`
+      : ms != null ? `masks still building since ${at(ms)} (${where})`
+      : "masks not built yet (they are built after the picture where the browser allows, and at the first mask where it does not)");
+  }
   parts.push(marks.has("controls-wired") ? `controls wired ${at(marks.get("controls-wired"))}` : "controls not marked on this page");
   const gapEnd = longestAt + longestGap;
   const wasHidden = hidden.some(([a, b]) => a < gapEnd && b > longestAt) || (hiddenSince !== null && hiddenSince < gapEnd);
@@ -273,6 +298,33 @@ function look(prev: number, prevWall: number): [number, number] {
   return [c0, wall];
 }
 
+/** Work the watch's timer carries, one call per look. Each entry returns true
+ *  when it has nothing left to do, and is then dropped. */
+const ticks: (() => boolean)[] = [];
+
+/** ASKS THE HOLD WATCH'S TIMER TO CARRY ONE QUESTION, once per look.
+ *  Takes `fn`, called on every look after the first it is registered for, with
+ *  no arguments. It returns true when it is finished, and is not called again;
+ *  false keeps it. Returns nothing. What it must satisfy: `fn` asks and does not
+ *  wait, since it runs on the page's own thread between two looks, and a call
+ *  that throws counts as finished. Consumed by main.ts for the masks' program:
+ *  started once the picture's is built, then asked whether it has linked. It runs
+ *  after the next look is scheduled and outside the cost the "Hold watch" line
+ *  prints, so a call that does hold the page shows as a late look. */
+export function onWatchTick(fn: () => boolean): void {
+  ticks.push(fn);
+}
+
+/** One round of the registered questions. Takes nothing; returns nothing.
+ *  Walks the list from the end so a finished entry can be dropped in place. */
+function runTicks(): void {
+  for (let i = ticks.length - 1; i >= 0; i--) {
+    let done = false;
+    try { done = ticks[i](); } catch { done = true; }
+    if (done) ticks.splice(i, 1);
+  }
+}
+
 let lastLook = T0, lastWall = Date.now();
 const lookAgain = () => {
   const c0 = performance.now();
@@ -281,6 +333,7 @@ const lookAgain = () => {
   setTimeout(lookAgain, HOLD_EVERY_MS);
   watchChecks++;
   watchSelfMs += performance.now() - c0;
+  if (ticks.length) runTicks();
 };
 if (typeof setTimeout === "function") setTimeout(lookAgain, HOLD_EVERY_MS);
 

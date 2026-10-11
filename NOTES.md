@@ -54,6 +54,86 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**The masks leave the program the editor builds at open, and are prepared after
+the picture: built 2026-10-11 on the tree of staging's head (de2aa07), not
+committed yet.** One change, chosen by the PC's own numbers and by nothing
+else. The test
+page, run on the PC (Firefox, Direct3D 11) on staging 2.65.12, printed: the
+editor's picture code takes 36.9 s to build as shipped, 36.7 s with every loop
+count hidden from the compiler, 24.5 s with the mask settings moved into
+uniform blocks, and 2.2 s with the ten loops over the photograph's masks taken
+out (2.1 s with both). So the mask loops are about 35 of the 37 seconds. In
+Firefox that build is paid at every load and at every return from the test
+page, and hiding the counts or moving the settings does not make it usable. The
+2.2 s row is the figure the PC should now show for the editor's open; whether it
+does is the owner's run below, not something this container can say. Decision
+071's option 11.
+- **Faster: the editor opens on the program without the mask loops.**
+  `Renderer` takes a new option, `masksAfter`, that only `src/main.ts` passes.
+  With it the first program is the fragment shader with every loop over
+  `u_maskCount` run zero times (`maskFreeFrag`, `src/gl.ts`), and the picture
+  draws from it. The rewrite is `dropMaskLoops`, the same function the test
+  page's "with the mask loops taken out" row now imports from `src/gl.ts`, so
+  the page measures the program the editor runs. `maskFreeFrag` gives back
+  nothing, and the full program is built at open as before, unless the rewrite
+  is whole: at least one loop changed and `u_maskCount` read nowhere but its
+  declaration. The test page's other rows and the GPU export build a bare
+  `Renderer` and keep today's one program.
+- **Where the program that draws masks is built.** Where the browser offers
+  `KHR_parallel_shader_compile`, it is started behind the picture as soon as
+  the first program has linked, and the hold watch's 100 ms timer asks once per
+  tick whether it has finished (`COMPLETION_STATUS_KHR`, one read, never a
+  wait); when it has, the editor swaps to it and redraws, and a photograph that
+  opened with saved masks shows them from that redraw. Where the browser offers
+  none (Firefox, which is the PC's case) it is built at the first draw of an
+  edit that holds a mask, on the page, after the busy card has said "Preparing
+  the masks — this computer builds them the first time one is used." and two
+  frames have painted it; the hold watch is told the stage
+  (`busyWith("the masks' picture code")`) for the build and the card comes down
+  after it. A link that fails leaves the mask-free program in use, and the
+  report's "Graphics build" line carries the driver's log.
+- **Until the masks' program is in use**, an edit that holds masks is drawn as
+  if it held none, with no coverage overlay; the masks stay on the edit
+  untouched, and the masks' controls are as they were.
+  The report's "Start-up" line gains a masks clause (when the build started and
+  ended, and whether it ran off the page or on it) and the "Graphics build" line
+  says where the masks' program stands.
+- **Proved on one of the owner's raws (NIR_1651.NEF), in the container.** A
+  scratch script served the built app and hooked the graphics calls to learn
+  which program drew each frame. Its first line counts the editor's mask loops:
+  ten, in `src/gl.ts` and in the first full program the page handed the driver.
+  With the full program's completion held, the editor opened and drew from the
+  mask-free program; released, the full program took over, and with no mask set
+  the two pictures are identical byte for byte (0 of about 21 million bytes
+  differ). With one radial mask set the picture changed and the full program was
+  the one in use. Made to fail: one channel of the mask-free program moved by
+  0.01 turned the comparison red (about 5.2 million bytes differ, the largest
+  difference 3), and the run without the plant is clean. Without the extension
+  (the PC's case) the editor opened on the mask-free program, built nothing more
+  while no mask was set, and at the first mask put up the card's words, built the
+  full program on the page, showed the mask and took the card down.
+- **What that does not show.** This container's Chromium offers no parallel
+  compile, so the first arm uses a stand-in extension object from the script's
+  hook that answers only the completion question (held, then done); every
+  program is still compiled and linked for real and the editor's own code does
+  the polling, the link check and the swap. The container's build times (the
+  mask-free program drawing about 4 s after the page began in software graphics)
+  are not the PC's. The PC's number is the owner's run below.
+- **The next candidate, for the masked build itself.** On the PC the compiler's
+  log names two lines of the fragment shader where a vector is indexed by a loop
+  variable, emulated and slow. Moving the mask settings into a texture, or
+  building one program per mask count (decision 071's option 8 and the counted
+  rows), stay the candidates for making that build fast; they are unmeasured
+  because the rows that would measure them did not build.
+- **Recorded for later: the test page's three rows that did not build.** The PC
+  block names the cause: Firefox refused a sixth graphics context. That is a
+  test-page defect, not the editor's, and nothing on that page is touched here.
+- **The one run only the owner can make.** On the PC in Firefox, open the
+  editor on staging, open a raw, then the ⓘ report, and copy its "Start-up"
+  line: it says how long the picture's program took to build and when the
+  masks' program was built (at the first mask, on the page). The iPad's report
+  is the plan after this one.
+
 **The report names where the app holds, and the test page's build rows say why:
 built 2026-10-11 on the tree of staging's head (0edcaa6), not committed yet.**
 Two instruments and nothing else; no pixel path is touched. They exist because
@@ -2356,6 +2436,12 @@ user-scalable=no.
   graphics context was lost. The report also keeps a hold watch for the whole
   session, naming the stage in force at each hold; the PC and iPad runs it asks
   for decide the fix.
+  **2026-10-11, staging: the editor opens on the program without the mask
+  loops** (the PC's test page: 36.9 s as shipped, 2.2 s without them); the
+  masks' program is built behind the picture where the browser builds off the
+  page and at the first mask where it does not. The staging entry in this file
+  has the rest, and the PC's own run of the report's Start-up line is what
+  closes it.
 - [ ] **On Firefox the practice photographs stay empty while the editor builds** <!-- decision: 086 -->
   **Shown as:** The practice photographs on the start card show their pictures straight away, even while the editor is still getting ready.
   Reported from the PC on the evening of 2026-09-30, Pacific: every practice

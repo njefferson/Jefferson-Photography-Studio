@@ -14,11 +14,17 @@
 //
 // IT ALSO NAMES THE STAGE IT IS IN, for the report's hold watch (startup.ts
 // `busyWith`, decision 071): the open's decode, the sky selection's wait, the sky
-// map, the lift, the strip's tiles, a look press, an export and a batch each mark
-// themselves in force until they end, so a hold the report names says what the
-// app was doing across it.
+// map, the lift, the strip's tiles, a look press, an export, a batch and the build
+// of the masks' picture code each mark themselves in force until they end, so a
+// hold the report names says what the app was doing across it.
+//
+// IT OPENS ON A PICTURE PROGRAM WITHOUT THE MASK LOOPS (decision 071, option 11):
+// the program that draws masks is built behind the picture where the browser
+// builds off the page, and at the first mask (`wantMasks`, with the busy card
+// saying so) where it does not. Until it is in, an edit's masks are kept and the
+// photograph is shown without them.
 // FIRST, so its clock starts before anything else this page loads (decision 071).
-import { markStartup, busyWith } from "./startup";
+import { markStartup, busyWith, onWatchTick } from "./startup";
 import { writeVersionStamp } from "./verstamp";
 import { srgbToLinear } from "./icc";
 import "./style.css";
@@ -255,6 +261,12 @@ async function practicePicturesPainted(): Promise<void> {
 const renderer = (() => {
   try {
     return new Renderer(canvas, {
+      // THE EDITOR OPENS ON THE PROGRAM WITHOUT THE MASK LOOPS (decision 071,
+      // option 11): on a PC through Direct3D they are 35 of the 37 seconds this
+      // build takes. The program that draws masks is built behind the picture,
+      // or at the first mask where the browser cannot build off the page
+      // (`prepareMasks`, below).
+      masksAfter: true,
       // WORDS BEFORE A BUILD THAT IS PROBABLY COLD, painted before it starts,
       // whether or not the browser offered to build it off the page: offering
       // is not doing, and a browser that holds the page anyway would otherwise
@@ -341,6 +353,92 @@ const graphicsReady: Promise<void> = renderer.ready.then(() => {
 // Observed by every open path through editorReady; this only stops a launch in
 // which nothing was opened from reporting an unhandled rejection.
 graphicsReady.catch(() => {});
+
+// THE PROGRAM THAT DRAWS MASKS, BUILT BEHIND THE PICTURE (decision 071, option
+// 11). The editor opened on a program with the mask loops taken out, so a
+// photograph is on screen within seconds; an edit that holds masks is drawn
+// without them, and the masks are kept on the edit untouched, until the full
+// program is in. Where the browser builds off the page the full program is
+// started once the first is built, and the hold watch's timer asks once per look
+// whether it has linked: one question, never a wait. Where it cannot,
+// `wantMasks` builds it at the first draw of an edit that holds a mask, after
+// the busy card has said so and painted.
+const MASKS_PREPARING = "Preparing the masks — this computer builds them the first time one is used.";
+/** The hold-watch stage in force while the masks' program is being built off the
+ *  page, ended when it is in or has failed. */
+let masksStage: (() => void) | null = null;
+/** The on-page build has been asked for and not yet finished; a second draw
+ *  must not ask again. */
+let masksOnPage = false;
+
+/** The masks' program has ended its build, whichever way. Takes nothing; returns
+ *  nothing. Ends the stage, marks the moment for the Start-up line, says on the
+ *  console what the driver said when it failed (the report's Graphics build line
+ *  carries it too), and redraws so a photograph that holds masks shows them. */
+function masksBuilt(): void {
+  if (masksStage) { masksStage(); masksStage = null; }
+  const ok = renderer.maskState === "in";
+  markStartup(ok ? "masks-built" : "masks-failed");
+  if (!ok) console.error("the masks' picture code did not build — " + renderer.maskLog);
+  if (ok && current) draw();
+}
+
+onWatchTick(() => {
+  if (graphicsFailure !== null) return true; // the editor never built; nothing to follow
+  if (!renderer.built) return false; // the picture's own program is still building
+  if (renderer.maskState === "idle") {
+    // No parallel compile here: the build would hold the page, so it waits for
+    // the first mask and `wantMasks` makes it then.
+    if (!renderer.buildsOffPage || !renderer.startMasks()) return true;
+    markStartup("masks-start");
+    masksStage = busyWith("the masks' picture code");
+    return false;
+  }
+  if (renderer.maskState !== "building") return true; // in or failed: nothing left to ask
+  if (renderer.pollMasks() === "building") return false;
+  masksBuilt();
+  return true;
+});
+
+/** THE FIRST USE OF A MASK, ON A BROWSER THAT CANNOT BUILD OFF THE PAGE. Takes
+ *  nothing; returns nothing. Called from every draw. When the edit holds a mask,
+ *  the program in use cannot draw it and this browser offers no way to build the
+ *  full one without holding the page, it starts `buildMasksOnPage`; in every
+ *  other case it does nothing, and does it cheaply. What it relies on: where the
+ *  browser does build off the page, the timer above has the build, and an edit
+ *  that holds a mask meanwhile is shown without it until that lands. A card some
+ *  other flow owns is left alone and the next draw asks again. */
+function wantMasks(): void {
+  if (masksOnPage || !renderer.built || renderer.maskState !== "idle" || renderer.buildsOffPage) return;
+  if (!params.masks.length) return;
+  if (busy.open && !openOwnsCard()) return;
+  masksOnPage = true;
+  void buildMasksOnPage();
+}
+
+/** THE MASKS' PROGRAM, BUILT ON THE PAGE AFTER THE WORDS HAVE PAINTED. Takes
+ *  nothing; returns nothing. Puts "Preparing the masks…" on the busy card (the
+ *  line the open already uses while it prepares; on the open's own card when
+ *  that is up), lets two animation frames paint it, builds the program with the
+ *  page held and the hold watch told which stage it is, takes the card down and
+ *  redraws. The wait for the frames is bounded: a hidden page paints none. */
+async function buildMasksOnPage(): Promise<void> {
+  const claim = claimCard(MASKS_PREPARING, openOwnsCard());
+  try {
+    await new Promise<void>((resolve) => {
+      const t = window.setTimeout(resolve, 2000);
+      requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); resolve(); }));
+    });
+    markStartup("masks-onpage");
+    markStartup("masks-start");
+    const end = busyWith("the masks' picture code");
+    try { renderer.buildMasksNow(); } finally { end(); }
+    masksBuilt();
+  } finally {
+    claim.release();
+    masksOnPage = false;
+  }
+}
 
 /** The modal dialog open now, if any. Takes nothing; returns it, or null. While
  *  one is open everything outside it is inert, and a live region there is not
@@ -3909,6 +4007,7 @@ function draw() {
     // "fit" view so a rotated photo isn't clipped by the frame); the crop box
     // overlays it and the real crop only takes effect on exit. See setGeoMode.
     renderer.render(cropArmed ? { ...params, crop: fitViewCrop() } : params);
+    wantMasks(); // an edit that holds a mask, on a browser that builds on the page: the program that draws it is built after this frame
     refreshHistogram(params);
     positionMaskOverlay();
     positionHealOverlay();
@@ -15923,12 +16022,28 @@ function quickLookSplit(): string {
   );
 }
 
+/** WHERE THE MASKS' PROGRAM STANDS, FOR THE REPORT (decision 071, option 11).
+ *  Takes nothing; returns a clause: in use, still building off the page, not
+ *  started, or — when it did not link — that the masks are kept and not shown,
+ *  with the driver's words flattened and capped as the line below does. */
+function masksBuildLine(): string {
+  switch (renderer.maskState) {
+    case "in": return "in use";
+    case "building": return "still building off the page";
+    case "idle": return renderer.buildsOffPage ? "not started yet" : "not built; this browser builds it at the first mask";
+    default: {
+      const said = renderer.maskLog.replace(/\s+/g, " ").trim();
+      return `did not build, so masks are kept and not shown — ${said.length > 1500 ? `${said.slice(0, 1500)}… (${said.length - 1500} more characters)` : said}`;
+    }
+  }
+}
+
 /** THE EDITOR'S PICTURE CODE, FOR THE REPORT (decision 071). Takes nothing;
- *  returns one line: built, still building, or — when it failed — every log
- *  the driver wrote, flattened to one line and capped so the report stays
- *  something a reader can paste. */
+ *  returns one line: built (with where the masks' program stands), still
+ *  building, or — when it failed — every log the driver wrote, flattened to one
+ *  line and capped so the report stays something a reader can paste. */
 function graphicsBuildLine(): string {
-  if (renderer.built) return "built";
+  if (renderer.built) return `built · masks' program: ${masksBuildLine()}`;
   if (graphicsFailure === null) return "still building";
   const said = graphicsFailure.replace(/\s+/g, " ").trim();
   return said.length > 1500 ? `${said.slice(0, 1500)}… (${said.length - 1500} more characters)` : said;

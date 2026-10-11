@@ -13,6 +13,10 @@
 // vertex and fragment shaders compiled and the program linked, the compiler's own
 // log, the GL error, and whether the row's graphics context was lost. And the
 // report's hold watch (startup.ts) has a row here giving what a look of it costs.
+//
+// THE "MASK LOOPS TAKEN OUT" VARIANT IS THE EDITOR'S OWN PROGRAM (decision 071,
+// option 11): it is made by `dropMaskLoops` from gl.ts, the function that makes
+// the program the editor now opens on, so this page measures what the editor runs.
 
 import "./style.css";
 import { buildDiagnostic } from "./diagnostic";
@@ -30,7 +34,7 @@ import { makeRowDenoiser } from "./raw/denoise";
 import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, type EditParams, type MaskLayer } from "./pipeline";
 import { exportImage } from "./export";
 import { drawFrame, canDrawFrame, buildLinearSource, type DrawnFrame } from "./gpuexport";
-import { Renderer, VERT, FRAG } from "./gl";
+import { Renderer, VERT, FRAG, MASK_LOOP, dropMaskLoops } from "./gl";
 
 declare const __APP_VERSION__: string;
 
@@ -525,10 +529,6 @@ async function buildingThePictureCode(): Promise<void> {
  *  mark, and ANGLE marks only loops that take a gradient (decision 071, Looked
  *  up). The count of these, and of `MASK_LOOP`, is printed with each variant. */
 const COUNTED_LOOP = /for \(int (\w+) = (-?\d+); \1 (<=?) (-?\d+);/g;
-/** A loop over the photograph's masks, which indexes the mask uniform arrays
- *  with its loop variable: the shape ANGLE issue 3682 records as slow for FXC. */
-const MASK_LOOP = /; (\w+) < u_maskCount;/g;
-
 /** The editor's fragment program with every counted loop given a count the
  *  compiler cannot see: `<= 3` becomes `<= 3 + u_dbgZero`, an unset uniform,
  *  so 0. Takes a fragment source; gives back the rewritten source and how many
@@ -544,14 +544,9 @@ function hideLoopCounts(src: string): { src: string; loops: number } {
   return { src: s.replace("void main() {", "uniform int u_dbgZero;\nvoid main() {"), loops };
 }
 
-/** The editor's fragment program with every mask loop run zero times, so the
- *  compiler drops it. Takes a fragment source; gives back the rewritten source
- *  and how many loops it changed, zero meaning the same as in `hideLoopCounts`. */
-function dropMaskLoops(src: string): { src: string; loops: number } {
-  let loops = 0;
-  const s = src.replace(MASK_LOOP, (_m, v: string) => { loops++; return `; ${v} < 0;`; });
-  return { src: s, loops };
-}
+// The variant "with the mask loops taken out" is `dropMaskLoops` from gl.ts, the
+// very function that makes the program the editor opens on (decision 071, option
+// 11), so this page measures what the editor runs.
 
 /** The editor's fragment program with every mask loop run to a count the
  *  compiler can see, `k`, in place of `u_maskCount`: the per-mask-count build
