@@ -50,8 +50,8 @@ import { writeZip, crc32 } from "./zip";
 import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } from "./batchstore";
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
-import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP } from "./maskstore";
-import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, type SkyMap } from "./pipeline";
+import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP, keepSkyMap, getKeptSkyMap, keptSkyMapHint, photographStamp, digestBytes } from "./maskstore";
+import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, skyReference, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache, type HealSolves } from "./heal";
@@ -74,7 +74,7 @@ import { drawHistogram } from "./histogram";
 import * as Hotspot from "./hotspot";
 import { wireLensRig } from "./lensrig";
 import { findTilt } from "./straighten";
-import { getPreview, putPreview, prunePreviews, clearPreviews, previewStats } from "./previewcache";
+import { getPreview, putPreview, prunePreviews, clearPreviews, previewStats, PREVIEW_PIPELINE } from "./previewcache";
 import { fnv1a } from "./stamp";
 import * as LensStore from "./lensstore";
 import { readExifSubset, type ExifSubset } from "./exif";
@@ -2434,12 +2434,25 @@ interface SkyProfile {
    *  on its way to the GPU; null when none yet. When the sky worker built it this
    *  includes the worker's own time and its queue, which the page did not spend. */
   map: number | null;
-  /** Where that first map was built: in the sky worker, or on the page (no lane,
-   *  or the lane could not). Null until it is. */
-  mapBy: "worker" | "page" | null;
+  /** Where that first map came from: the sky worker, the page (no lane, or the lane
+   *  could not), or the STORE (kept from an earlier visit, nothing built). Null
+   *  until it is. */
+  mapBy: "worker" | "page" | "store" | null;
   /** ms the PAGE spent on that first map: handing the photograph's pixels and the
-   *  edit to the lane, or building it. Null until it is built. */
+   *  edit to the lane, or building it, or reading the store. Null until it is built. */
   mapPage: number | null;
+  /** The COARSE map the lane posts before the full one (skymap.ts SKY_MAP_COARSE_W):
+   *  ms from the ask to it being on its way to the GPU, ms from the picture to the
+   *  same, and the lane's own clock for building it. Null where none came — a map
+   *  from the store or the page, a later ask, or one still on its way. */
+  coarse: number | null;
+  coarseAt: number | null;
+  coarseBuild: number | null;
+  /** The same two figures for the FULL map (or the kept one) — `map` is the first
+   *  from the ask; `fullAt` is from the picture — and the lane's own clock for
+   *  building the full map (null from the store and the page). */
+  fullAt: number | null;
+  fullBuild: number | null;
 }
 let skyProfile: SkyProfile | null = null;
 
@@ -2866,6 +2879,14 @@ let skyMapKey = "";
  *  and the chroma the key was read from are the two numbers that say whether
  *  the Sky depth slider can do anything on this photograph. */
 let lastSkyMap: SkyMap | null = null;
+/** THE PHOTOGRAPH, AND THE SELECTION OF IT, WHOSE SKY MAP THE RENDERER HOLDS (a
+ *  coarse one, a kept one or a full one), or null when it holds none. The map an ask
+ *  is for is the FIRST of its photograph exactly when this is not that photograph
+ *  and that selection: only the first is looked up in the store and built coarse
+ *  first, because only the first is one the reader waits on with no map of that
+ *  sky in view. A later edit keeps the map it has on screen until the new one lands,
+ *  as it always did. Cleared where the map is cleared. */
+let skyMapHeld: { img: DecodedImage; sky: BrushMask } | null = null;
 /** The warp field the current sky map was built through. Compared by IDENTITY
  *  beside its `rev` in the key: a stroke paints a fresh copy of the field
  *  (startWarpStroke), so an Undo followed by a new stroke can reach a `rev`
@@ -2938,20 +2959,17 @@ function syncSkyMap(): void {
     // what the page spent on it (`SkyProfile.built`), beside the coarse bitmap.
     if (skyProfile?.img === img && (skyProfile.how === "page" || skyProfile.how === "none")) skyProfile.built = (skyProfile.built ?? 0) + (performance.now() - r0);
   }
-  if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0)) {
+  // The sky saturation stage's second gate (pipeline.ts `skyRefWeight`) reads the sky
+  // colour direction off the map, so the map is built whenever the saturation is up,
+  // not only for smoothing or depth: a reader who takes the smoothing to 0 keeps the
+  // gate that keeps a wall or a wire from being tripled.
+  const satReadsMap = (params.skySat ?? 0) > 0;
+  if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0 && !satReadsMap)) {
     if (skyMapKey) { renderer.setSkyMap(null); forgetSkyMap(); lastSkyMap = null; }
+    skyMapHeld = null;
     return;
   }
-  const { skySmooth: _s, skyDepth: _d, masks: _m, spots: _sp, stickers: _st, crop: _c, straighten: _str, warp: _w, grainAmt: _g, vigAmt: _v, ...rest } = params as EditParams & Record<string, unknown>;
-  // THE MASKS ARE IN THE KEY, without their four bitmaps. buildSkyMap renders
-  // each sample through compileEdit with the masks at its own position, so a
-  // mask's change moves the map's target; keyed without them, the screen kept a
-  // stale map after a mask changed while the export built a fresh one, and an
-  // Undo there came back to a different sky. A stroke or a regenerated sky
-  // changes a bitmap in place, and bumps `rev`, which the key does carry.
-  const maskKey = (params.masks ?? []).map(({ brush: _b, fine: _f, eff: _e, effFine: _ef, ...m }) => m);
-  const warp = params.warp && !warpFieldEmpty(params.warp) ? params.warp : null;
-  const key = JSON.stringify([rest, maskKey, warp ? warp.rev : -1]);
+  const { key, masked, warp } = skyMapKeyNow();
   if (key === skyMapKey && warp === skyMapWarp) return;
   // A live warp stroke moves the field every frame; the map waits for the end.
   if (warpStroke && skyMapKey) return;
@@ -2961,85 +2979,250 @@ function syncSkyMap(): void {
   skyMapKey = key;
   skyMapWarp = warp;
   const img = current;
+  const sky = skyBitmap;
   const mapFrom = performance.now();
   // THE MAP IS A STAGE THE HOLD WATCH NAMES, from the ask to the map being in hand:
-  // handing the pixels over, the lane building, or the page building it. Ended on
-  // every way out below.
+  // reading the store, handing the pixels over, the lane building, or the page
+  // building it. Ended on every way out below.
   const endStage = busyWith("the sky map");
   // The clarity/dehaze map exactly when the export builds one.
   const local = (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0 ? localMapNow ?? undefined : undefined;
-  // OFF THE PAGE WHEN THERE IS A LANE FOR IT (skyClient.ts `requestSkyMap`): the
-  // sampler chain below is a denoiser and a detail pass tapped at some forty
-  // thousand places, which on a fast device was a few hundred milliseconds of
-  // every drag under a look with sky smoothing or depth, and seconds when the
-  // device was busy. The lane runs the same `buildOpenSkyMap` over a copy of this
-  // photograph's pixels it was sent once, so the map is the page's own; what moves
-  // is where the arithmetic runs, and the draw that shows it comes when it lands.
-  let asked: ReturnType<typeof requestSkyMap> = null;
-  try {
-    asked = skyMapPageFor === img ? null : requestSkyMap(img, { params, local, lens: lensForEdit(img), sky: skyBitmap, warp, pitch: decodePitch });
-  } catch (err) { endStage(); throw err; }
-  if (asked) {
-    const pageSpent = performance.now() - mapFrom;
-    const gen = skyMapGen;
-    skyMapBusy = true;
-    asked.then(endStage, endStage);
-    void asked.then((ans) => {
-      skyMapBusy = false;
-      // Left behind: another photograph, a new selection, a turn. What is wanted now is
-      // asked for here, and its answer draws; a draw that was held back for this ask
-      // (`drawWithMap`) is paid when nothing else is asked for.
-      if (current !== img || gen !== skyMapGen) {
-        syncSkyMap();
-        if (!skyMapBusy && skyMapDrawOwed) draw();
-        return;
-      }
-      if (!ans) {
-        // The lane could not build it. The page does, now and from here on for this
-        // photograph, which is what it did before there was a lane.
-        skyMapPageFor = img;
-        skyMapKey = "";
-        draw();
-        return;
-      }
-      lastSkyMap = ans.map;
+  // THE FIRST MAP OF THIS PHOTOGRAPH'S SKY is the one the reader is waiting on, with
+  // no map of that sky in view: it is looked up in the store before anything is built,
+  // and when it is built the lane posts a coarse one first. A later edit keeps the map
+  // on screen until its own lands, as it always did, and is neither (`skyMapHeld`).
+  const first = !skyMapHeld || skyMapHeld.img !== img || skyMapHeld.sky !== sky;
+  const keep = skyMapKeep(img, key, masked || warp !== null, sky);
+  const gen = skyMapGen;
+
+  /** Make the map for this ask: the lane when there is one, else the page. `fromStore`
+   *  is true when the store was read first and had nothing, which is the one way this
+   *  runs after a delay and not inside the draw that asked. */
+  const build = (fromStore: boolean): void => {
+    // THE EDIT MAY HAVE MOVED while the store was read. A map built from a newer edit
+    // would be kept under this ask's dependencies, a sky labelled with inputs it was
+    // not made from, so the ask is dropped and the newest edit is asked for instead.
+    if (fromStore && skyMapKeyNow().key !== key) { endStage(); skyMapKey = ""; syncSkyMap(); return; }
+    // OFF THE PAGE WHEN THERE IS A LANE FOR IT (skyClient.ts `requestSkyMap`): the
+    // sampler chain below is a denoiser and a detail pass tapped at some forty
+    // thousand places, which on a fast device was a few hundred milliseconds of
+    // every drag under a look with sky smoothing or depth, and seconds when the
+    // device was busy. The lane runs the same `buildOpenSkyMap` over a copy of this
+    // photograph's pixels it was sent once, so the map is the page's own; what moves
+    // is where the arithmetic runs, and the draw that shows it comes when it lands.
+    let asked: ReturnType<typeof requestSkyMap> = null;
+    try {
+      asked = skyMapPageFor === img ? null : requestSkyMap(img, {
+        params, local, lens: lensForEdit(img), sky, warp, pitch: decodePitch,
+        // THE COARSE MAP, ahead of the full one, for the first map only. It goes to the
+        // GPU and the frame is drawn at once; the full map replaces it below. Left behind
+        // (another photograph or selection since) it is dropped, and the full answer's
+        // own handler does what is owed.
+        onCoarse: first ? (rough, laneMs) => {
+          if (current !== img || gen !== skyMapGen || !rough) return;
+          lastSkyMap = rough;
+          renderer.setSkyMap(rough);
+          skyMapHeld = { img, sky };
+          noteSkyMapCoarse(img, mapFrom, laneMs);
+          draw(false);
+        } : undefined,
+      });
+    } catch (err) { endStage(); throw err; }
+    if (asked) {
+      const pageSpent = performance.now() - mapFrom;
+      skyMapBusy = true;
+      asked.then(endStage, endStage);
+      void asked.then((ans) => {
+        skyMapBusy = false;
+        // Left behind: another photograph, a new selection, a turn. What is wanted now is
+        // asked for here, and its answer draws; a draw that was held back for this ask
+        // (`drawWithMap`) is paid when nothing else is asked for.
+        if (current !== img || gen !== skyMapGen) {
+          syncSkyMap();
+          if (!skyMapBusy && skyMapDrawOwed) draw(false);
+          return;
+        }
+        if (!ans) {
+          // The lane could not build it. The page does, now and from here on for this
+          // photograph, which is what it did before there was a lane.
+          skyMapPageFor = img;
+          skyMapKey = "";
+          draw(false);
+          return;
+        }
+        lastSkyMap = ans.map;
+        renderer.setSkyMap(lastSkyMap);
+        skyMapHeld = { img, sky };
+        noteSkyMapBuilt(img, mapFrom, "worker", pageSpent, ans.ms);
+        // KEPT for the next visit, under what it was built from at the ask (`keep`), not
+        // what the edit is by now: a null map (no sky) is not worth a row.
+        if (ans.map && keep) void keepSkyMap(keep.id, keep.deps, ans.map);
+        draw(false);
+      });
+      return;
+    }
+    // ON THE PAGE: no lane, or the lane could not.
+    // THE SAME PRE-PASS THE PIXELS COME THROUGH (skymap.ts `buildOpenSkyMap`). The
+    // open image IS the preview's proxy (a half-res bin for a raw), so step 1 there is
+    // what the shader taps. Built from the raw decode instead, the map targeted a sky
+    // 16% more saturated than the rendered one — skymap.ts has the measurement. And
+    // through the warp FIRST, as the export's chain runs it (export.ts: the warp
+    // remaps the source at the very top, before denoise).
+    try {
+      lastSkyMap = buildOpenSkyMap(img, params, local, lensForEdit(img), srcFlatOf(img), sky, warp, decodePitch);
       renderer.setSkyMap(lastSkyMap);
-      noteSkyMapBuilt(img, mapFrom, "worker", pageSpent);
-      draw();
+      skyMapHeld = { img, sky };
+      noteSkyMapBuilt(img, mapFrom, "page", performance.now() - mapFrom);
+      if (lastSkyMap && keep) void keepSkyMap(keep.id, keep.deps, lastSkyMap);
+    } finally {
+      endStage();
+    }
+    // Run from the store's answer there is no draw of the caller's coming after it.
+    if (fromStore) draw(false);
+  };
+
+  // THE STORE IS READ FIRST ONLY WHEN A GLANCE SAYS IT WILL HAVE THE MAP
+  // (`keptSkyMapHint`, localStorage, answered at once). A store answer reaches the page
+  // as an event, and a page held by its own draw delivers it only when the draw ends;
+  // read in front of every first map, that put the lane's start behind the draw, which
+  // the lane used to be asked inside of. With no hint the lane is asked now, as before.
+  if (first && keep && keptSkyMapHint(keep.id, keep.deps)) {
+    skyMapBusy = true;
+    const r0 = performance.now();
+    void getKeptSkyMap(keep.id, keep.deps).catch(() => null).then((kept) => {
+      skyMapBusy = false;
+      // Left behind while the store was read: the same hand-over the lane's answer makes.
+      if (current !== img || gen !== skyMapGen) {
+        endStage();
+        syncSkyMap();
+        if (!skyMapBusy && skyMapDrawOwed) draw(false);
+        return;
+      }
+      if (!kept) { build(true); return; }
+      // A KEPT MAP, built from exactly these inputs: the sky is on screen with the
+      // picture and nothing is built or asked of the lane.
+      endStage();
+      lastSkyMap = kept;
+      renderer.setSkyMap(kept);
+      skyMapHeld = { img, sky };
+      noteSkyMapBuilt(img, mapFrom, "store", performance.now() - r0);
+      draw(false);
     });
     return;
   }
-  // ON THE PAGE: no lane, or the lane could not.
-  // THE SAME PRE-PASS THE PIXELS COME THROUGH (skymap.ts `buildOpenSkyMap`). The
-  // open image IS the preview's proxy (a half-res bin for a raw), so step 1 there is
-  // what the shader taps. Built from the raw decode instead, the map targeted a sky
-  // 16% more saturated than the rendered one — skymap.ts has the measurement. And
-  // through the warp FIRST, as the export's chain runs it (export.ts: the warp
-  // remaps the source at the very top, before denoise).
-  try {
-    lastSkyMap = buildOpenSkyMap(img, params, local, lensForEdit(img), srcFlatOf(img), skyBitmap, warp, decodePitch);
-    renderer.setSkyMap(lastSkyMap);
-    noteSkyMapBuilt(img, mapFrom, "page", performance.now() - mapFrom);
-  } finally {
-    endStage();
-  }
+  build(false);
 }
 
-/** Record, once, that this open's first sky map is on its way to the GPU.
+/** WHAT THE SKY SATURATION STAGE'S SECOND GATE HAS TO GO ON, for the report's "Sky map" line.
+ *  @param m  the sky map the renderer holds, or null.
+ *  @returns a sentence fragment: the direction the photograph's sky colour was read to
+ *  point (degrees in the red-minus-luma, blue-minus-luma plane) and how many texels it was
+ *  read from, or that none was found and the stage runs on its own gate alone. What it
+ *  must satisfy: it reads `skyReference`, the function the shader's uniform and the
+ *  export's edit are read from, so the line says what the stage used. */
+function skyReferenceNote(m: SkyMap | null): string {
+  const r = m ? skyReference(m) : null;
+  if (!r) return "no sky colour found in the map, so the stage runs on its own saturation gate alone";
+  const deg = (Math.atan2(r.y, r.x) * 180) / Math.PI;
+  return `the sky colour points ${deg.toFixed(0)} degrees, read from ${r.n} texels; a pixel's boost fades out from 30 to 60 degrees away from it`;
+}
+
+/** THE SKY MAP KEY OF THE EDIT AS IT IS NOW.
+ *  Takes nothing; reads `params`. Returns `key`, the text the in-memory map is
+ *  compared on (the edit minus the fields the map does not read, the masks without
+ *  their bitmaps, and the warp's revision); `masked`, whether the edit holds any mask;
+ *  and `warp`, the non-empty warp field or null.
+ *  What it must satisfy: two edits with one key build one map, which `syncSkyMap`
+ *  relies on to skip a rebuild and the kept map relies on to be right — so it
+ *  carries every field a stage of the map reads, and it is cheap enough to call
+ *  twice in an ask. */
+function skyMapKeyNow(): { key: string; masked: boolean; warp: WarpField | null } {
+  const { skySmooth: _s, skyDepth: _d, masks: _m, spots: _sp, stickers: _st, crop: _c, straighten: _str, warp: _w, grainAmt: _g, vigAmt: _v, ...rest } = params as EditParams & Record<string, unknown>;
+  // THE MASKS ARE IN THE KEY, without their four bitmaps. buildSkyMap renders
+  // each sample through compileEdit with the masks at its own position, so a
+  // mask's change moves the map's target; keyed without them, the screen kept a
+  // stale map after a mask changed while the export built a fresh one, and an
+  // Undo there came back to a different sky. A stroke or a regenerated sky
+  // changes a bitmap in place, and bumps `rev`, which the key does carry.
+  const maskKey = (params.masks ?? []).map(({ brush: _b, fine: _f, eff: _e, effFine: _ef, ...m }) => m);
+  const warp = params.warp && !warpFieldEmpty(params.warp) ? params.warp : null;
+  return { key: JSON.stringify([rest, maskKey, warp ? warp.rev : -1]), masked: maskKey.length > 0, warp };
+}
+
+/** WHAT THE SKY MAP OF THIS EDIT IS KEPT UNDER, AND WHAT IT WAS BUILT FROM.
+ *  @param img  the photograph the map is for; it must be the open one.
+ *  @param key  the edit's map key (`skyMapKeyNow`).
+ *  @param unkeepable  true when the edit holds a mask or a warp. Neither is safe to
+ *    keep: a mask's bitmap and a warp's field are identified by a revision counter
+ *    that means something only inside one session, so a map built under them could
+ *    be read back under a different bitmap with the same revision.
+ *  @param sky  the selection the map is built from (`skyBitmap`).
+ *  @returns `id`, the photograph's stamp (`photographStamp`), and `deps`, the text of
+ *  everything else the map depends on; or null when it must not be kept or looked
+ *  up (the edit is unkeepable, or the open file's bytes are not in hand).
+ *  What it must satisfy: two asks with the same `deps` for the same `id` build the
+ *  same map, so `getKeptSkyMap` may hand the kept one back — which is why `deps`
+ *  carries the edit's whole key, the pipeline version, the lens profiles' stamp, the
+ *  lens flat the photograph's pixels carry, the photograph's size and pitch, the turn
+ *  the selection was built at and a digest of every byte of the selection's bitmap.
+ *  A selection that differs in one byte, or an edit that differs in one slider
+ *  step, is a different text. */
+function skyMapKeep(img: DecodedImage, key: string, unkeepable: boolean, sky: BrushMask): { id: string; deps: string } | null {
+  if (unkeepable || img !== current || !currentFile) return null;
+  const lens = img.lensApplied ? [img.lensApplied.stamp, img.lensApplied.strength] : null;
+  // THE EDIT KEY WITHOUT ITS NULLS. A photograph left and come back to has its edit read
+  // back from the session, and that round trip turns a field that was never set into one
+  // set to null (measured: `lut`, absent on the first visit and null on the return), which
+  // made the return's key a different text from the one the map was kept under and put every
+  // return visit past the store. Null and absent mean the same for each field of an edit
+  // that can be null (`lut`, `lensPick`: the pipeline reads both as "none"; `warp` is not in
+  // the key), so both are left out of the kept text. A nullable field added later must
+  // keep that meaning, or this has to name it.
+  const editKey = JSON.stringify(JSON.parse(key), (_k, v) => (v === null ? undefined : v));
+  const deps = JSON.stringify(["kept-sky-map", PREVIEW_PIPELINE, LensStore.profilesStamp(), img.width, img.height, lens, decodePitch, lookSkyTurn, sky.w, sky.h, digestBytes(sky.data, Infinity), editKey]);
+  return { id: photographStamp(currentFile.name, currentFile.bytes), deps };
+}
+
+/** Record, once, that this open's first FULL sky map (or the kept one) is on its way
+ *  to the GPU.
  *  @param img  the photograph it is for; ignored unless it is the one profiled.
  *  @param from  the clock when the map was asked for.
- *  @param by  "worker" (the sky map lane built it) or "page".
+ *  @param by  "worker" (the sky map lane built it), "page", or "store" (kept from an
+ *    earlier visit and read, not built).
  *  @param pageSpent  ms the page itself spent on it: handing the pixels and the edit
- *    over, or building it.
+ *    over, or building it, or reading the store.
+ *  @param laneMs  the lane's own clock for building the full map, or null where the
+ *    lane did not build it.
  *  Returns nothing. What it must satisfy: the first call for a profile wins and
  *  only once the selection is in hand (`how` is not "waiting"), the rule the first
- *  build always had; `SkyProfile.map` is the whole of it from the ask. */
-function noteSkyMapBuilt(img: DecodedImage, from: number, by: "worker" | "page", pageSpent: number): void {
+ *  build always had; `SkyProfile.map` is the whole of it from the ask and `fullAt`
+ *  from the picture, so the report can say how long the sky took to follow the
+ *  picture as well as how long the map took. */
+function noteSkyMapBuilt(img: DecodedImage, from: number, by: "worker" | "page" | "store", pageSpent: number, laneMs: number | null = null): void {
   const p = skyProfile;
   if (!p || p.img !== img || p.how === "waiting" || p.map !== null) return;
-  p.map = performance.now() - from;
+  const now = performance.now();
+  p.map = now - from;
+  p.fullAt = now - p.at;
   p.mapBy = by;
   p.mapPage = pageSpent;
+  p.fullBuild = laneMs;
+}
+
+/** Record, once, that this open's COARSE sky map is on its way to the GPU.
+ *  @param img  the photograph it is for; ignored unless it is the one profiled.
+ *  @param from  the clock when the map was asked for.
+ *  @param laneMs  the lane's own clock for building the coarse map.
+ *  Returns nothing. What it must satisfy: the first call for a profile wins and only
+ *  once the selection is in hand and before any full map is recorded, so the report's
+ *  two landing times are in the order they happened. */
+function noteSkyMapCoarse(img: DecodedImage, from: number, laneMs: number): void {
+  const p = skyProfile;
+  if (!p || p.img !== img || p.how === "waiting" || p.map !== null || p.coarse !== null) return;
+  const now = performance.now();
+  p.coarse = now - from;
+  p.coarseAt = now - p.at;
+  p.coarseBuild = laneMs;
 }
 
 /** What `applyLook` last wrote onto `params.texture`, so leaving a look that
@@ -3990,9 +4173,18 @@ function ensureLensApplied(): void {
 // ratio) is imported from ./tile: a tile drawn from a photograph's own edit
 // does the same in the decode worker.
 
-function draw() {
+/** DRAW THE OPEN PHOTOGRAPH ON THE NEXT FRAME.
+ *  @param byReader  false for a draw that an ANSWER asked for (the sky map lane's coarse
+ *    or full map, a kept map read back from the store) and not the reader; anything
+ *    else, an event handler's own argument included, is the reader at work.
+ *  Returns nothing. What it must satisfy: the frame is drawn either way; only a draw
+ *  the reader asked for stamps the activity clock the stale-tile pass waits on, because
+ *  the clock means WHEN THE READER LAST DID SOMETHING. A map that lands seconds after a
+ *  look was pressed is not the reader acting, and counted as if it were it put the strip's
+ *  redraw back by the lane's whole build time (tile-truth-walk, 2026-10-14). */
+function draw(byReader: unknown = true) {
   recordSoon();
-  noteActivity(); // every slider and every tool: the tile redraw pass waits on this
+  if (byReader !== false) noteActivity(); // every slider and every tool: the tile redraw pass waits on this
   if (raf) return;
   raf = requestAnimationFrame(() => {
     raf = 0;
@@ -4482,7 +4674,7 @@ function wireVersionMenu() {
       // from the sky's mean rendered chroma (skymap.ts); a key of 0 is why a
       // Sky depth slider does nothing, and the chroma beside it says how far
       // below the window that sky sits.
-      { k: "Sky map", v: lastSkyMap ? `depth key ${lastSkyMap.key.toFixed(2)} from sky chroma ${lastSkyMap.chroma.toFixed(3)} (window ${SKY_DEPTH_CHROMA_LO}–${SKY_DEPTH_CHROMA_HI}) · palest sky texel ${lastSkyMap.paleTexel.toFixed(3)} single ${lastSkyMap.minTexel.toFixed(3)} (grey guard ${SKY_DEPTH_GREY_LO}–${SKY_DEPTH_GREY_HI} of the mean) · sky saturation ${(params.skySat ?? 0).toFixed(2)}` : "none built" },
+      { k: "Sky map", v: lastSkyMap ? `depth key ${lastSkyMap.key.toFixed(2)} from sky chroma ${lastSkyMap.chroma.toFixed(3)} (window ${SKY_DEPTH_CHROMA_LO}–${SKY_DEPTH_CHROMA_HI}) · palest sky texel ${lastSkyMap.paleTexel.toFixed(3)} single ${lastSkyMap.minTexel.toFixed(3)} (grey guard ${SKY_DEPTH_GREY_LO}–${SKY_DEPTH_GREY_HI} of the mean) · sky saturation ${(params.skySat ?? 0).toFixed(2)} · its second gate: ${skyReferenceNote(lastSkyMap)}` : "none built" },
       // THE VIEW, because a photograph that fills the screen with no way out
       // looks the same in a screenshot whichever of four states caused it.
       { k: "View", v: viewDiagnostic() },
@@ -12305,7 +12497,7 @@ function showDecodedNow(img: DecodedImage, imported: ImportedFile) {
     // A record still waiting belongs to a photograph being left: say so, so its
     // line never claims an answer is on its way for a picture that is gone.
     if (skyProfile?.how === "waiting") skyProfile.how = "left";
-    skyProfile = { img, at: performance.now(), asked: false, how: "waiting", wait: null, built: null, lift: null, map: null, mapBy: null, mapPage: null };
+    skyProfile = { img, at: performance.now(), asked: false, how: "waiting", wait: null, built: null, lift: null, map: null, mapBy: null, mapPage: null, coarse: null, coarseAt: null, coarseBuild: null, fullAt: null, fullBuild: null };
     // The sky map lane holds ONE photograph's pixels, the one open; the last one's go.
     releaseSkyMapScene(img);
     seekSky(img);
@@ -15284,8 +15476,9 @@ function stampFor(view: { id: string; edit: string | null }): string {
  *  lands, so nothing blanks out. Debounced, because pressing through four looks
  *  in a row should redraw once, not four times. */
 let regradeTimer = 0;
-/** WHEN THE READER LAST DID SOMETHING — every draw (so every slider, every
- *  tool) and every photo switch stamps this. The stale-tile pass below waits
+/** WHEN THE READER LAST DID SOMETHING — every draw the reader asked for (so
+ *  every slider, every tool; not the sky map's answer landing, `draw(false)`) and
+ *  every photo switch stamps this. The stale-tile pass below waits
  *  for it to go quiet before taking a decoder lane.
  *
  *  Why: a look pressed on one photograph marks every OTHER tile's grade stamp
@@ -15991,7 +16184,9 @@ async function endSession(): Promise<Awaited<ReturnType<typeof resetSessionState
  *  Takes nothing; reads the last switch. Returns "none this session" before the
  *  first, else the line. After the parts of the switch it carries what came
  *  AFTER the picture — the look's sky: how the selection arrived and what it
- *  cost, the second solve of the lift, the first sky map build — which runs
+ *  cost, the second solve of the lift, the first sky map — whether it came from
+ *  the store or the lane, and when the coarse map and the full map landed after
+ *  the picture — which runs
  *  beside the switch and past its end and so is NOT in the whole above; and
  *  inside settling, what the lift's first solve took of it. What the line must
  *  satisfy: the switch's parts add up to its whole; settling's two parts add up
@@ -16023,11 +16218,23 @@ function switchSplit(): string {
       case "none": return `the worker gave no selection after waiting ${t(s.wait ?? 0)}, built on the page, ${t(s.built ?? 0)}`;
     }
   })();
+  // THE COARSE MAP, when the lane posted one ahead of the full one: when it landed
+  // after the ask and after the picture, and the lane's own clock for building it.
+  const coarse = s && s.coarse !== null
+    ? `a coarse map first, landed ${t(s.coarse)} after the ask and ${t(s.coarseAt ?? 0)} after the picture, the lane's own build ${t(s.coarseBuild ?? 0)}`
+    : "no coarse map first";
   const afterwards = s && s.how !== "waiting" && s.how !== "left"
     ? `, second lift solve ${s.lift === null ? "none made" : t(s.lift)}, sky map ${s.map === null ? "none built yet" : t(s.map)}` +
-      // WHERE IT WAS BUILT, and what the page itself spent: the lane's own seconds
-      // and its queue are in the first number and are not the page's.
-      (s.map === null || s.mapBy === null ? "" : s.mapBy === "worker" ? ` (built in the sky worker; the page spent ${t(s.mapPage ?? 0)} of it)` : " (built on the page)")
+      // WHERE IT CAME FROM, and what the page itself spent: the lane's own seconds
+      // and its queue are in the first number and are not the page's. Said plainly
+      // when the sky came out of the store, because then nothing was built at all.
+      (s.map === null || s.mapBy === null
+        ? (s.coarse !== null ? ` (${coarse}; the full map still being built)` : "")
+        : s.mapBy === "store"
+          ? ` (from the store, kept from an earlier visit, nothing built; the page spent ${t(s.mapPage ?? 0)} reading it; landed ${t(s.fullAt ?? 0)} after the picture)`
+          : s.mapBy === "worker"
+            ? ` (built in the sky worker; the page spent ${t(s.mapPage ?? 0)} of it; ${coarse}; the full map landed ${t(s.fullAt ?? 0)} after the picture, the lane's own build ${t(s.fullBuild ?? 0)})`
+            : ` (built on the page; landed ${t(s.fullAt ?? 0)} after the picture)`)
     : "";
   return (
     `${p.megapixels.toFixed(1)} MP in ${t(p.total)} — reading ${t(p.getBytes)} over ${p.chunkRows} stored pieces` +

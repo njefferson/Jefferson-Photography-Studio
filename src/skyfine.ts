@@ -337,12 +337,157 @@ export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): Sky
     : { w, h, rgb, srcW, srcH, cam: img.camMatrix ?? null, turn: skyTurn(turn) };
 }
 
+/** WIRES, PYLON MEMBERS, ROOF FITTINGS AND CROWN TIPS ARE TAKEN OUT OF THE LOOK'S
+ *  SELECTION (decision 087). The selection holds a wire at full weight, so the sky
+ *  stages colour it: Sky saturation triples the colour the foliage band gave it (a
+ *  full red wire), and the sky map averages a tap that lands on it into the sky round
+ *  it (the soft discs). A wire is not sky, and is the shape the selection cannot see:
+ *  it is narrower than the window the guided filter fits.
+ *  The test is the one image morphology gives for lines. A closing (maximum, then
+ *  minimum, over a square element) fills a dark feature narrower than the element and
+ *  an opening fills a bright one, so the closing minus the picture, or the picture
+ *  minus its opening, is large on a line and zero on an edge or on a region wider
+ *  than the element, and a long thin line cannot contain a square element. Cloud edges
+ *  are steps, and cloud is wider than the element, so neither is touched.
+ *  The four numbers, and what each rests on and how far each can move before the
+ *  result does, are in decision 087 (its Context and Looked at). In short: the element
+ *  is 2·SKY_THIN_RADIUS+1 = 11 grid pixels, 1.07% of the long edge, wider than the
+ *  structures it is for with the margin the half size binning and the lens soften an
+ *  edge by (decision 061); the contrast is read against the frame's own 95th percentile
+ *  of luminance, so a dark frame and a bright one are judged alike, over a ramp from
+ *  SKY_THIN_LO to SKY_THIN_HI of it; and the spread of SKY_THIN_SPREAD grid pixels
+ *  covers the structure's soft edge. All of them are scaled by the grid's longest edge
+ *  over SKY_FINE_EDGE, so a photograph smaller than the grid is judged at the same
+ *  fraction of its frame. */
+export const SKY_THIN_RADIUS = 5;
+export const SKY_THIN_SPREAD = 2;
+export const SKY_THIN_LO = 0.05;
+export const SKY_THIN_HI = 0.12;
+
+/** Maximum (or minimum) filter over a square element, separable.
+ *  @param a  one value per pixel, w by h.
+ *  @param w,h  its size.
+ *  @param R  the element's half width in pixels; the element is 2R+1 wide.
+ *  @param isMax  true for the maximum, false for the minimum.
+ *  @returns a new array of the same size whose each pixel is the extreme of `a` over
+ *  the element centred on it, clamped at the borders. What it must satisfy: with
+ *  isMax it is never below `a`, and without it never above. */
+function squareFilter(a: Float32Array, w: number, h: number, R: number, isMax: boolean): Float32Array {
+  const t = new Float32Array(w * h), o = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let m = a[y * w + x];
+      const x1 = Math.min(w - 1, x + R);
+      for (let k = Math.max(0, x - R); k <= x1; k++) { const v = a[y * w + k]; if (isMax ? v > m : v < m) m = v; }
+      t[y * w + x] = m;
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - R), y1 = Math.min(h - 1, y + R);
+    for (let x = 0; x < w; x++) {
+      let m = t[y * w + x];
+      for (let k = y0; k <= y1; k++) { const v = t[k * w + x]; if (isMax ? v > m : v < m) m = v; }
+      o[y * w + x] = m;
+    }
+  }
+  return o;
+}
+
+/**
+ * Find the thin structures in a selection source.
+ * @param src  from prepareSkySource; only its grid (`w`, `h`) and `rgb` are read.
+ * @returns one value per source pixel, 0 to 1: 1 on a structure narrower than the
+ *   element that stands out from its surroundings by SKY_THIN_HI of the frame's own
+ *   95th percentile of luminance or more, 0 on anything else, spread SKY_THIN_SPREAD
+ *   pixels (scaled, see above). Luminance is the square root of the mean linear
+ *   channel; the larger of the black top-hat (closing minus the picture, for dark
+ *   lines) and the white top-hat (the picture minus its opening, for bright ones) is
+ *   read. What it must satisfy: it is a function of `rgb` and the grid alone, so every
+ *   path that builds the selection from one source finds the same structures; a
+ *   uniform picture gives 0 everywhere; a line of one pixel across a flat field gives
+ *   1 along it; and a square wider than the element gives 0 inside it.
+ */
+export function thinStructures(src: SkySource): Float32Array {
+  const { w, h, rgb } = src;
+  const n = w * h;
+  const grow = Math.max(w, h) / SKY_FINE_EDGE;
+  const R = Math.max(1, Math.round(SKY_THIN_RADIUS * grow));
+  const S = Math.max(1, Math.round(SKY_THIN_SPREAD * grow));
+  const L = new Float32Array(n);
+  for (let i = 0; i < n; i++) L[i] = Math.sqrt(Math.max(0, (rgb[i * 3] + rgb[i * 3 + 1] + rgb[i * 3 + 2]) / 3));
+  // The scale the contrast is read on: the frame's 95th percentile of L, from a 512-bin histogram.
+  let top = 1e-6;
+  for (let i = 0; i < n; i++) if (L[i] > top) top = L[i];
+  const hist = new Uint32Array(512);
+  for (let i = 0; i < n; i++) hist[Math.min(511, Math.floor((L[i] / top) * 511))]++;
+  let acc = 0, p95 = 511;
+  for (let b = 0; b < 512; b++) { acc += hist[b]; if (acc >= n * 0.95) { p95 = b; break; } }
+  const scale = Math.max(1e-6, (p95 / 511) * top);
+  const opened = squareFilter(squareFilter(L, w, h, R, false), w, h, R, true);
+  const closed = squareFilter(squareFilter(L, w, h, R, true), w, h, R, false);
+  const thin = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const d = Math.max(closed[i] - L[i], L[i] - opened[i]) / scale;
+    const t = Math.min(1, Math.max(0, (d - SKY_THIN_LO) / (SKY_THIN_HI - SKY_THIN_LO)));
+    thin[i] = t * t * (3 - 2 * t);
+  }
+  return squareFilter(thin, w, h, S, true);
+}
+
+/**
+ * Take the thin structures out of a selection.
+ * @param sel  the selection `buildSkySelectionFrom` has built before this step: the
+ *   coarse bitmap and, unless the caller wanted none, its refinement.
+ * @param thin  from `thinStructures`, on the grid the selection was built from
+ *   (`w` by `h`); the refinement is on that grid and the coarse bitmap is on its own.
+ * @param w,h  the grid `thin` is on.
+ * @returns a selection whose refinement is each value times one minus `thin` at the
+ *   same place, and whose coarse bitmap is each value times one minus the largest
+ *   `thin` over the coarse pixel's footprint, so a coarse pixel that holds a wire
+ *   anywhere in it gives the sky map's tap nothing to pull. What it must satisfy: no
+ *   value is ever above its input, so the step can only take sky away; with `thin`
+ *   all 0 the result equals `sel`; and the turn and the "no sky" answer (null
+ *   bitmaps) are unchanged.
+ */
+export function subtractThin(sel: SkySelection, thin: Float32Array, w: number, h: number): SkySelection {
+  let fine: BrushMask | null = null;
+  if (sel.fine) {
+    const f = sel.fine;
+    const data = new Uint8Array(f.data.length);
+    for (let y = 0; y < f.h; y++) {
+      const sy = Math.min(h - 1, Math.floor((y * h) / f.h));
+      for (let x = 0; x < f.w; x++) {
+        const sx = Math.min(w - 1, Math.floor((x * w) / f.w));
+        data[y * f.w + x] = Math.round(f.data[y * f.w + x] * (1 - thin[sy * w + sx]));
+      }
+    }
+    fine = { w: f.w, h: f.h, data };
+  }
+  let mask: BrushMask | null = null;
+  if (sel.mask) {
+    const m = sel.mask;
+    const data = new Uint8Array(m.data.length);
+    for (let y = 0; y < m.h; y++) {
+      const y0 = Math.floor((y * h) / m.h), y1 = Math.max(y0 + 1, Math.floor(((y + 1) * h) / m.h));
+      for (let x = 0; x < m.w; x++) {
+        const x0 = Math.floor((x * w) / m.w), x1 = Math.max(x0 + 1, Math.floor(((x + 1) * w) / m.w));
+        let big = 0;
+        for (let yy = y0; yy < Math.min(h, y1); yy++) for (let xx = x0; xx < Math.min(w, x1); xx++) if (thin[yy * w + xx] > big) big = thin[yy * w + xx];
+        data[y * m.w + x] = Math.round(m.data[y * m.w + x] * (1 - big));
+      }
+    }
+    mask = { w: m.w, h: m.h, data };
+  }
+  return { mask, fine, turn: sel.turn };
+}
+
 /**
  * Build the sky selection from a SkySource.
  * @param src  from prepareSkySource, for THIS photograph.
  * @param refine  false to stop at the coarse bitmap (a tile needs no more).
  * @returns the coarse bitmap (null when buildSkyMask finds no clear sky), its
- *   refinement (null with it, and null when `refine` is false), and the turn
+ *   refinement (null with it, and null when `refine` is false), both with the thin
+ *   structures taken out (`thinStructures`, decision 087), and the turn
  *   both were found at, which is `src.turn`. Gray-world gains are taken from
  *   the copy itself, a raw's clipped cells left out, by the same rule the main
  *   thread's grayWorldWB applies over the full frame (grayWorldFromMeans); an
@@ -376,9 +521,14 @@ export function buildSkySelectionFrom(src: SkySource, refine = true): SkySelecti
   const turn = skyTurn(src.turn ?? 0);
   const res = buildSkyMask(sample, w, h, turn, src.cam, wb, BRUSH_MAX_EDGE, 1, 0.5);
   if (!res.found) return { mask: null, fine: null, turn };
-  if (!refine) return { mask: res.mask, fine: null, turn };
+  // THE THIN STRUCTURES COME OUT OF EVERY PATH'S SELECTION HERE, the coarse bitmap
+  // included (decision 087): the sky worker the devices use, the page's fallback, the
+  // decode worker's held bitmaps, the strip's tiles and the export all build the
+  // selection through this function, so they all hold one selection.
+  const thin = thinStructures(src);
+  if (!refine) return subtractThin({ mask: res.mask, fine: null, turn }, thin, w, h);
   const guide = buildSkyGuide(sample, w, h, wb);
-  return { mask: res.mask, fine: refineSkyMask(res.mask, guide), turn };
+  return subtractThin({ mask: res.mask, fine: refineSkyMask(res.mask, guide), turn }, thin, w, h);
 }
 
 /** Outer colour tolerance for the grow, in units of the sky's own chroma

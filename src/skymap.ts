@@ -39,6 +39,16 @@
 // than a box: mottle finer than the tap spacing that the pre-pass leaves can
 // alias into the map (decimation without a low-pass, the standard result). The
 // measurements below were taken through it as it is.
+//
+// AND SINCE 2026-10-13 THE FOUR TAPS ARE COMBINED BY THEIR WEIGHTED MEDIAN, then the
+// finished map's chroma by the median of each texel's 3 by 3 neighbourhood (decision
+// 069, option 12). The mean let one tap in four that landed on a wire or a lattice
+// member set the texel's colour to near grey or pink, and the smoothing stage pulled
+// the clean sky beside it toward that: the soft blobs along every wire and the pale
+// dots in open sky and cloud. Four samples cannot carry a spread of their own, so a
+// median of the taps takes out one outlier and the median over the neighbouring
+// texels, which are the data that can, takes out what is left. Which pixels the map
+// covers does not change: the weight and depth bytes are as they were.
 import { sampleWarp, warpIsEmpty, warpSampler, type WarpField } from "./warp";
 import { compileEdit, SKY_CHROMA_RANGE, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, smooth01, rgb2hsv, type EditParams, type BrushMask, type LensCurve, type LocalMap, type SkyMap, type SourceFlat } from "./pipeline";
 import { linearAt, type DecodedImage } from "./decode";
@@ -51,6 +61,15 @@ const REC = [0.2126, 0.7152, 0.0722];
  *  measured smoothing radius; smaller would blur the sky's real gradient,
  *  larger would leave the patches. */
 export const SKY_MAP_W = 128;
+/** The COARSE map's width in texels: a quarter of the full one, so a quarter of the
+ *  texels along each edge and about a sixteenth of the taps through the denoiser and
+ *  the detail stage, which is where a map's seconds go. The sky map lane builds this
+ *  one first and posts it, so the look's sky is on screen after a fraction of the
+ *  full build; the full map replaces it when it lands (skyClient.ts, main.ts
+ *  `syncSkyMap`). One texel of a 2800 px frame is ~87 px at this width against ~22 at
+ *  the full one, which is blurrier than the smoothing radius the full map is sized
+ *  for and is why it is only ever the first picture of a photograph's sky. */
+export const SKY_MAP_COARSE_W = 32;
 /** Sub-samples per texel edge. A texel's footprint is box-averaged from this
  *  many PRE-PASSED samples on each axis — four, not the ~480 in the footprint,
  *  because each sample already carries the denoiser's own average, the texel's
@@ -133,7 +152,11 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  *             lies on the unwarped pixels, so each sample reads BOTH where its
  *             pixel came from — compileEdit's (mu, mv) — as the export and the
  *             shader do (2026-10-02). Omitted or empty, both are read in place.
- * @returns the map, or null when the bitmap selects nothing. Four bytes per
+ * @param width the map's width in texels; omitted it is SKY_MAP_W, the map every
+ *             consumer but the lane's first picture uses. The height follows the
+ *             frame's shape. SKY_MAP_COARSE_W is the one other value in use.
+ * @returns the map, or null when the bitmap selects nothing (at any width: the
+ *   bitmap is what decides that). Four bytes per
  *   texel: encoded chroma a and b, the bitmap's mean weight, and the depth
  *   key — the PHOTOGRAPH's key (SKY_DEPTH_CHROMA_LO/HI on the sky's mean
  *   rendered chroma, times the sky's hue band) times the texel's grey guard
@@ -145,11 +168,16 @@ const encC = (v: number) => Math.round(((Math.min(SKY_CHROMA_RANGE, Math.max(-SK
  *   at least half sky and `minTexel` the palest one, which are what the grey
  *   guard's window (relative to `chroma`) is set from.
  * What the result must satisfy: every texel's (a, b) is the MASK-WEIGHTED
- * mean chroma of the rendered sky over that texel's footprint with luma
- * discarded and non-finite samples dropped, so blending a pixel's chroma
- * toward it preserves the sky's mean colour by construction — the control
- * that the saturation route failed (9k) — and a texel on the canopy's edge
- * carries the sky's colour, not the leaves'. `weight` is the mean mask weight
+ * MEDIAN of the chroma of the rendered sky at that texel's taps (three or four
+ * of them; the mean for fewer) with luma discarded and non-finite samples
+ * dropped, and then the median over the texel's 3 by 3 neighbourhood of the sky
+ * texels (decision 069, option 12). A median ignores a wire or a lattice member
+ * that one tap in four lands on, which the mean did not (the soft blobs and the
+ * pale dots), and on sky that has no outlier it agrees with the mean to a
+ * fraction of a level (decision 069, Looked at); the sky's own mean colour, the
+ * photograph's key and the grey guard are still read off the means, so Sky depth is
+ * unchanged. A texel on the canopy's edge carries the sky's colour, not the
+ * leaves'. `weight` is the mean mask weight
  * of the texel's samples and is 0 wherever the bitmap is, so `compileEdit` and
  * the shader leave every non-sky pixel byte-identical; what they do with a
  * pixel the soft mask leaks onto is their gate's business (SKY_GATE_LO/HI).
@@ -166,13 +194,14 @@ export function buildSkyMap(
   sky: BrushMask,
   srcFlat: SourceFlat | null = null,
   warp?: WarpField | null,
+  width: number = SKY_MAP_W,
 ): SkyMap | null {
   // WHETHER OR NOT THERE IS A LOCAL MAP: (mu, mv) is also where the source flat
   // is divided back out for highlight recovery, and a warped sample carries the
   // flat of the place it came from.
   const warpF = warp && !warpIsEmpty(warp) ? warp : null;
   const wd = new Float32Array(2);
-  const W = SKY_MAP_W;
+  const W = Math.max(8, Math.round(width));
   const H = Math.max(8, Math.round((W * srcH) / srcW));
   // NO SKY, NO MAP — and a map of zeros would still cost a texture upload and
   // a blend per pixel for nothing.
@@ -187,6 +216,7 @@ export function buildSkyMap(
   // Per-texel mean chroma for the grey guard, and the photograph's sums for
   // the one key, both filled in the loop and resolved after it.
   const texChroma = new Float32Array(W * H);
+  const tapA = new Float64Array(SUB * SUB), tapB = new Float64Array(SUB * SUB), tapW = new Float64Array(SUB * SUB);
   let gr = 0, gg = 0, gb = 0, gw = 0;
   for (let ty = 0; ty < H; ty++) {
     for (let tx = 0; tx < W; tx++) {
@@ -200,7 +230,7 @@ export function buildSkyMap(
       // pipeline cannot render (not a number) is not a sample. The texel's own
       // weight is the mean of its samples' mask weights, which is what the
       // shader and compileEdit blend by.
-      let sa = 0, sb = 0, wsum = 0, wall = 0, n = 0, mr = 0, mg = 0, mb = 0;
+      let wsum = 0, wall = 0, n = 0, mr = 0, mg = 0, mb = 0, taps = 0;
       for (let j = 0; j < SUB; j++) {
         const sy = Math.min(srcH - 1, Math.floor(((ty + (j + 0.5) / SUB) * srcH) / H));
         for (let i = 0; i < SUB; i++) {
@@ -215,13 +245,23 @@ export function buildSkyMap(
           const L = out[0] * REC[0] + out[1] * REC[1] + out[2] * REC[2];
           const a = out[0] - L, b = out[2] - L;
           if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
-          sa += a * wgt; sb += b * wgt; wsum += wgt;
+          tapA[taps] = a; tapB[taps] = b; tapW[taps] = wgt; taps++;
+          wsum += wgt;
           mr += out[0] * wgt; mg += out[1] * wgt; mb += out[2] * wgt;
         }
       }
       if (wsum <= 0) { rgba[o] = encC(0); rgba[o + 1] = encC(0); rgba[o + 2] = 0; rgba[o + 3] = 0; continue; }
-      rgba[o] = encC(sa / wsum);
-      rgba[o + 1] = encC(sb / wsum);
+      // THE TEXEL'S CHROMA IS THE TAPS' WEIGHTED MEDIAN, not their weighted mean, once
+      // there are three or more of them (decision 069, option 12). A tap that lands on
+      // a wire carries the wire's own chroma at the selection's full weight, and one
+      // tap in four moved the mean to near grey or to pink: the soft blobs beside every
+      // wire and the pale dots in open sky. A median ignores one outlier of four. Two
+      // taps or fewer give no outlier to ignore and keep the mean.
+      let ea = 0, eb = 0;
+      if (taps >= 3) { ea = weightedMedian(tapA, tapW, taps); eb = weightedMedian(tapB, tapW, taps); }
+      else { for (let k = 0; k < taps; k++) { ea += tapA[k] * tapW[k]; eb += tapB[k] * tapW[k]; } ea /= wsum; eb /= wsum; }
+      rgba[o] = encC(ea);
+      rgba[o + 1] = encC(eb);
       rgba[o + 2] = Math.round((wall / n) * 255);
       // The texel's MEAN rendered colour, clamped to the display range first —
       // the mean of clamped samples is what the eye averages — for its grey
@@ -231,6 +271,10 @@ export function buildSkyMap(
       gr += cr * wsum; gg += cg * wsum; gb += cb * wsum; gw += wsum;
     }
   }
+  // THEN EACH TEXEL'S CHROMA IS THE MEDIAN OF ITS 3 BY 3 NEIGHBOURHOOD (decision 069,
+  // option 12): four taps cannot carry a scale of their own, so the neighbouring texels
+  // are the data that can. The weight and depth bytes are left as built.
+  medianChromaOver3x3(rgba, W, H);
   // THE KEY, once per photograph: is the sky, taken as a whole, a blue sky —
   // THE SKY THE READER SEES. The texels above are rendered with the sky
   // saturation stage off, so their mean is that stage's INPUT; the stage scales
@@ -271,6 +315,67 @@ export function buildSkyMap(
   return { width: W, height: H, rgba, key, chroma, paleTexel, minTexel };
 }
 
+/** The weighted median of the first `k` entries of `vals`, each counting `wts`.
+ *  @param vals  the values; only the first `k` are read.
+ *  @param wts  their weights, above 0, the same length of use as `vals`.
+ *  @param k  how many entries to use, at least 1 and at most 4.
+ *  @returns the value where the running weight, taken in ascending order of value,
+ *  first passes half the total; the mean of that value and the next when it lands
+ *  exactly on half, so four equal weights give the mean of the middle two. What it
+ *  must satisfy: for one value it is that value, and it never lies outside the range
+ *  of the values — a single outlier among three or four cannot move it past the
+ *  others, which is the reason it replaces the mean in `buildSkyMap`. */
+export function weightedMedian(vals: ArrayLike<number>, wts: ArrayLike<number>, k: number): number {
+  const idx = [0, 1, 2, 3].slice(0, k);
+  idx.sort((p, q) => vals[p] - vals[q]);
+  let tot = 0;
+  for (let i = 0; i < k; i++) tot += wts[i];
+  let acc = 0;
+  for (let i = 0; i < k; i++) {
+    acc += wts[idx[i]];
+    if (acc > tot / 2 + 1e-12) return vals[idx[i]];
+    if (Math.abs(acc - tot / 2) <= 1e-12) return i + 1 < k ? (vals[idx[i]] + vals[idx[i + 1]]) / 2 : vals[idx[i]];
+  }
+  return vals[idx[k - 1]];
+}
+
+/** Replace each sky texel's chroma bytes with the median of its 3 by 3 neighbourhood.
+ *  @param rgba  the map's bytes, four per texel [aEnc, bEnc, weight, depthKey], changed
+ *    in place.
+ *  @param w,h  the map's size in texels.
+ *  Returns nothing. A texel the sky reaches (weight byte 1 or more) takes the median of
+ *  the chroma bytes of the neighbours the sky reaches, itself among them, when at least
+ *  five of the nine do, and is otherwise left as built; a texel the sky does not reach
+ *  is not touched, and no weight or depth byte is changed. What it must satisfy: the
+ *  shader and the export blend by the weight byte and key by the depth byte, so they
+ *  read the same selection as before and only the colour they blend toward moves; a
+ *  chroma byte moves to a value that some neighbour held (or the mean of two); and
+ *  reading is from a copy, so the result does not depend on the scan order. */
+export function medianChromaOver3x3(rgba: Uint8Array, w: number, h: number): void {
+  const src = new Uint8Array(rgba);
+  const va: number[] = [], vb: number[] = [];
+  const mid = (v: number[]) => { v.sort((p, q) => p - q); return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2; };
+  for (let ty = 0; ty < h; ty++) {
+    for (let tx = 0; tx < w; tx++) {
+      const o = (ty * w + tx) * 4;
+      if (src[o + 2] < 1) continue;
+      va.length = 0; vb.length = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = tx + dx, y = ty + dy;
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const q = (y * w + x) * 4;
+          if (src[q + 2] < 1) continue;
+          va.push(src[q]); vb.push(src[q + 1]);
+        }
+      }
+      if (va.length < 5) continue;
+      rgba[o] = Math.round(mid(va));
+      rgba[o + 1] = Math.round(mid(vb));
+    }
+  }
+}
+
 /** The sky bitmap's weight at image-uv, the same bilinear-on-texel-centres
  *  read the pipeline's brush sampler makes. Kept here rather than imported so
  *  this module does not reach into pipeline.ts's private helpers; the arithmetic
@@ -309,12 +414,16 @@ export type MapScene = Pick<DecodedImage, "width" | "height" | "linear" | "pixel
  * @param sky  the coarse sky bitmap at the turn shown.
  * @param warp  the non-empty warp field the sampler reads through, or null.
  * @param pitch  the native pitch the detail pre-pass is told (`decodePitch`).
+ * @param width  the map's width in texels (`buildSkyMap`'s); omitted it is the full
+ *   map's, SKY_MAP_W, and the lane's first picture passes SKY_MAP_COARSE_W.
  * @returns the map, or null when the bitmap selects nothing. What it must satisfy:
  *   the same sampler chain the pixels are drawn through — warp, then the denoiser,
  *   then the detail stage — as the export builds it, so the map targets the sky the
  *   reader sees (the agreement walk holds the screen and the file to each other);
- *   and it is what `syncSkyMap` built on the page before this moved off it, byte
- *   for byte, because the arithmetic is the same calls on the same numbers.
+ *   and at the default width it is what `syncSkyMap` built on the page before this
+ *   moved off it, byte for byte, because the arithmetic is the same calls on the
+ *   same numbers. A narrower map is the same arithmetic over fewer places, so it
+ *   agrees with the full one to the resolution it has and no better.
  */
 export function buildOpenSkyMap(
   scene: MapScene,
@@ -325,6 +434,7 @@ export function buildOpenSkyMap(
   sky: BrushMask,
   warp: WarpField | null,
   pitch: number,
+  width: number = SKY_MAP_W,
 ): SkyMap | null {
   const { width: w, height: h } = scene;
   const unwarped = (x: number, y: number) => linearAt(scene as DecodedImage, x, y);
@@ -332,5 +442,5 @@ export function buildOpenSkyMap(
   const pre = makeRowDetail(makeRowDenoiser(raw, w, h, p.denoise, 1, p.chroma ?? 0, p.despeckle ?? 0), w, h, p.sharpen ?? 0, p.texture ?? 0, 1, pitch);
   // The clarity/dehaze map exactly when the export builds one.
   const map = (p.clarity ?? 0) !== 0 || (p.dehaze ?? 0) !== 0 ? local : undefined;
-  return buildSkyMap(pre, w, h, p, scene.camMatrix, w / Math.max(1, h), map, lens, sky, flat, warp);
+  return buildSkyMap(pre, w, h, p, scene.camMatrix, w / Math.max(1, h), map, lens, sky, flat, warp, width);
 }

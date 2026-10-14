@@ -1891,6 +1891,82 @@ export const SAT_GUARD_HI = 0.26;
 export const SKY_SAT_GATE_LO = 0.05;
 export const SKY_SAT_GATE_HI = 0.13;
 
+/** THE SKY'S OWN COLOUR, AS A DIRECTION, FOR THE SKY SATURATION STAGE'S SECOND GATE
+ *  (decision 073, option 2). The stage multiplies a pixel's chroma, and its own
+ *  gate asks only whether the pixel HAS colour. A wire, a wall or a crown that the
+ *  selection holds has colour, so it was tripled: on four test frames the red pixels
+ *  the stage made lay 137 to 161 degrees from the sky's chroma, and the sky's own
+ *  pixels within 3 degrees of it at the median and 8 to 12 at the 99th percentile
+ *  (decision 073, Looked at). The gate asks the second question: does this pixel's
+ *  colour point where the photograph's own sky colour points.
+ *  The reference is read off the sky map's bytes, so it is one number for the
+ *  screen, the strip's tiles and the export, which all hold one map. Its texels are
+ *  those whose weight byte is at least SKY_REF_WHOLE (the selection holds all of
+ *  them), whose chroma points toward blue (red minus luma under 0, blue minus luma
+ *  over 0) and is at least SKY_REF_MIN_CHROMA long (a shorter chroma has no direction
+ *  to speak of). At least SKY_REF_MIN_SHARE of the map's texels, and never fewer than
+ *  SKY_REF_MIN_TEXELS, have to be such texels, else there is no reference and the
+ *  stage is as it was. That quadrant is the sky the look renders (Aerochrome sends a
+ *  clear sky to teal and blue, and the red foliage is the opposite direction); a
+ *  wall, a crown or a wire is not in it. */
+export const SKY_REF_WHOLE = 250;
+export const SKY_REF_MIN_CHROMA = 0.02;
+export const SKY_REF_MIN_SHARE = 1 / 1024;
+export const SKY_REF_MIN_TEXELS = 3;
+/** The gate's ramp in radians: full boost within SKY_REF_ANGLE_LO of the reference,
+ *  none from SKY_REF_ANGLE_HI, Hermite between. 30 and 60 degrees sit in the gap
+ *  measured on the owner's frames, 12 degrees at the sky's 99th percentile and 137
+ *  at the nearest defect pixel, with margins of 18 and 77 degrees (decision 073). A
+ *  pixel whose chroma is shorter than SKY_REF_DIR_LO has no direction and keeps the
+ *  boost it already had by its own saturation gate; the blend runs to
+ *  SKY_REF_DIR_HI so the gate has no step. The shader reads the same numbers. */
+export const SKY_REF_ANGLE_LO = Math.PI / 6;
+export const SKY_REF_ANGLE_HI = Math.PI / 3;
+export const SKY_REF_DIR_LO = 0.01;
+export const SKY_REF_DIR_HI = 0.03;
+
+/** A photograph's sky colour direction: a unit vector in (red minus luma, blue minus
+ *  luma) and the number of texels it was read from. */
+export interface SkyReference { x: number; y: number; n: number }
+
+/** The photograph's sky colour direction, read off its sky map.
+ *  @param m  the map (`SkyMap`), any width.
+ *  @returns the direction of the componentwise median chroma of the texels described
+ *  at SKY_REF_WHOLE, or null when fewer than max(SKY_REF_MIN_TEXELS, SKY_REF_MIN_SHARE
+ *  of the map's texels) are such texels or their median has no direction. What it
+ *  must satisfy: it is a function of the map's bytes alone, so every consumer of one
+ *  map reads one reference; x*x + y*y is 1 when it is not null; and a null leaves
+ *  `skyRefWeight` at 1, so the stage is then exactly what it was. */
+export function skyReference(m: SkyMap): SkyReference | null {
+  const as: number[] = [], bs: number[] = [];
+  for (let i = 0; i < m.width * m.height; i++) {
+    if (m.rgba[i * 4 + 2] < SKY_REF_WHOLE) continue;
+    const a = decSkyChroma(m.rgba[i * 4]), b = decSkyChroma(m.rgba[i * 4 + 1]);
+    if (a < 0 && b > 0 && Math.hypot(a, b) >= SKY_REF_MIN_CHROMA) { as.push(a); bs.push(b); }
+  }
+  if (as.length < Math.max(SKY_REF_MIN_TEXELS, Math.ceil(m.width * m.height * SKY_REF_MIN_SHARE))) return null;
+  const med = (v: number[]): number => { const t = Float64Array.from(v).sort(); return t.length % 2 ? t[(t.length - 1) / 2] : (t[t.length / 2 - 1] + t[t.length / 2]) / 2; };
+  const a = med(as), b = med(bs);
+  const len = Math.hypot(a, b);
+  return len > 0 ? { x: a / len, y: b / len, n: as.length } : null;
+}
+
+/** The sky saturation gate's second multiplier at one pixel.
+ *  @param ca,cb  the pixel's chroma at the stage, red minus luma and blue minus luma.
+ *  @param ref  the photograph's sky reference (`skyReference`), or null.
+ *  @returns a number in 0..1 the stage's boost is multiplied by: 1 without a
+ *  reference and for a pixel with no direction, falling to 0 from SKY_REF_ANGLE_HI
+ *  away from the reference. What it must satisfy: it is `gl.ts`'s `gw` in the sky
+ *  saturation stage, term for term, so the export and the screen agree; and it is
+ *  never above 1, so it only ever takes boost away from a pixel. */
+export function skyRefWeight(ca: number, cb: number, ref: SkyReference | null): number {
+  if (!ref) return 1;
+  const pm = Math.hypot(ca, cb);
+  if (pm <= 1e-6) return 1;
+  const ang = Math.acos(Math.max(-1, Math.min(1, (ca * ref.x + cb * ref.y) / pm)));
+  return 1 - smooth01(SKY_REF_ANGLE_LO, SKY_REF_ANGLE_HI, ang) * smooth01(SKY_REF_DIR_LO, SKY_REF_DIR_HI, pm);
+}
+
 /** One band's multiplier on a pixel's saturation.
  *  Takes `k`, the band's saturation slider (1 = none); `w`, the band's weight at
  *  the pixel's hue (bandWeight); and `s`, the pixel's own HSV saturation at
@@ -2632,6 +2708,9 @@ export function compileEdit(
   // The sky's saturation needs the refined selection and nothing else — no
   // map, because it targets no colour; it scales the pixel's own.
   const skySatAmt = skyFine ? Math.min(2, Math.max(0, p.skySat ?? 0)) : 0;
+  // The photograph's sky colour direction for that stage's second gate, read once per
+  // edit off the map's bytes (`skyReference`); null leaves the gate at 1.
+  const skyRef = skyMap && skySatAmt > 0 ? skyReference(skyMap) : null;
   const grade = p.grade ?? GRADE_DEFAULT;
   const gAmtS = grade[1] ?? 0, gAmtM = grade[3] ?? 0, gAmtH = grade[5] ?? 0;
   const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0 || gradeGroups.length > 0;
@@ -3070,7 +3149,8 @@ export function compileEdit(
           const gate = smooth01(SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, rgb2hsv(out[0], out[1], out[2])[1]);
           if (gate > 0) {
             const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
-            const k = 1 + skySatAmt * fw * gate;
+            const gw = skyRefWeight(out[0] - L, out[2] - L, skyRef);
+            const k = 1 + skySatAmt * fw * gate * gw;
             out[0] = Math.min(1, Math.max(0, L + (out[0] - L) * k));
             out[1] = Math.min(1, Math.max(0, L + (out[1] - L) * k));
             out[2] = Math.min(1, Math.max(0, L + (out[2] - L) * k));

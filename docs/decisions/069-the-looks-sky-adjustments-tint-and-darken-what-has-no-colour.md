@@ -391,6 +391,8 @@ What exists that this item will use, so a second one does not get written
   cell-tower set, the lens's uncorrected centre drift (015, Looked at). With
   015 on at open, what arrives at these stages changes.
 - distinct-from 061 — both are about NIR_3461's steel under the look, and they are different pixels: 061's steel arrives red from the foliage band and its discs are sky moved toward red wire, neither of which this guard reaches; this record's are the steel and cloud that arrive without colour.
+- touches 087 — option 12's discs and dots are measured with 087's route under them, and the map's taps are weighted by the selection 087 changes.
+- touches 088 — option 12 is the estimator the coarse map and the full map are both built with.
 
 ## Found on the device, 2026-09-26
 
@@ -672,6 +674,63 @@ What exists that this item will use, so a second one does not get written
       keeps only the 2% of the sky lying furthest below the model, its floor,
       and reads 97% of the sky as cloud, clear sky included. Pale clear sky is
       what it was meant to leave alone, so it is rejected as measured.
+
+12. **BUILT 2026-10-13, for the pink discs and the dots and not for the cloud: each
+    texel of the sky map is the weighted median of its taps, and the finished
+    map's chroma is the median of each texel's 3 by 3 neighbourhood.** Option 7's
+    own last sentence named the missing half, "a map whose edge texels carry the
+    sky's colour; that is a change to how the map is built, not to the stages", and
+    this is a change to how the map is built. Researched first (the Hampel test and
+    robust statistics, read 2026-10-13: a median is the simple robust choice for
+    small blocks, and four taps cannot carry a spread of their own, so the
+    neighbouring texels are the data that can).
+    - **What it does** (`buildSkyMap`, `weightedMedian` and `medianChromaOver3x3` in
+      `src/skymap.ts`). Where a texel has three or more taps the sky reaches, its
+      chroma is their weighted median per channel and not their weighted mean; fewer
+      keep the mean. Then each texel the sky reaches (weight byte 1 or more) takes the
+      median of the chroma bytes of its 3 by 3 neighbours the sky reaches, itself
+      among them, when at least five of the nine do, and is otherwise left as built.
+      The weight byte and the depth byte are not touched, so the shader and the
+      export, which read the map's bytes, change nothing, and the coarse and the full
+      map, one function at two widths, carry it alike (088).
+    - **How it differs from Rejected 7.** 7 changed the stages: three rules read the
+      four texels round each pixel and acted where they disagreed, and the texels
+      disagree along every edge of the selection (31% to 83% of the cells along it), so
+      the rules acted in a band along every treeline. This changes no stage and no
+      rule. It takes the disagreement out of the map's own bytes, so there is nothing
+      for a stage to read at an edge.
+    - **How it differs from Rejected 8.** 8 built each texel from the taps the refined
+      selection scores above one half and filled the texels with none from their
+      neighbours, ring by ring, and what it spread on NIR_1703 was the red crown tips
+      the selection itself scores as sky. This reads no selection beyond the weight the
+      map already used, and it has no fill: a texel the sky does not reach is not
+      touched, a texel with fewer than five neighbours the sky reaches is left as
+      built, and a median needs a majority, so one polluted texel is outvoted by its
+      neighbours and not copied into them. What a median cannot do is outvote a
+      pollution three texels wide.
+    - **The constants it carries are structural.** Three taps, because a median of two
+      has no outlier to ignore; five of nine, a majority. No width, gate or amount was
+      set by looking at these frames (Rejected 2).
+    - **What it was measured against** (step 58's emulation, 2026-10-13, offline from
+      the captured pictures; its map rebuilt by the four-tap mean read the app's
+      captured map to within 1 count at each of 10,880 texels, so the emulation is the
+      app's own arithmetic). The reference is the weighted median over every pixel of
+      a texel's footprint, about 480 pixels, of which a thin line takes under a tenth.
+      On NIR_3461's 7,343 sky texels, the texels more than 0.04 of chroma from that
+      reference: the shipped four-tap mean 154, the tap median 47, the 3 by 3 median of
+      the shipped map 13, both together 9. The pixels the smoothing stage alone moves
+      where the reference map would not: 47,140 shipped, 13,099 tap median, 4,831 spatial
+      median, 1,503 both.
+    - **What it did when rendered** (2026-10-13, with 087's route under it, so the
+      two are not split): on NIR_3460 and NIR_3463 the pale pink dots and discs over open
+      sky and beside the wires are gone and the sky is smooth; on NIR_3461 the discs beside
+      the pylons and the blue discs at the lattice are gone. The cloud's colour is
+      not what this changes: the cloud regions measured on NIR_1651 and NIR_1703 read
+      the same before and after to within 0.3 levels.
+    - **What is still wrong.** The sky between a lattice's struts reads grey with blue
+      patches on NIR_3460's left pylon, where it was one blue (087's margin, and the
+      map's estimate over a lattice, which the render does not separate). The coarse
+      map's halo at NIR_1651's crown is what 088 measures.
 
 ## Rejected
 
@@ -1318,3 +1377,8 @@ because of this, so the rank does not move.
 - NIR_3461.NEF, 2026-09-30: the same sheet. The yellow covers the dense cloud and the pale band of clear sky just above the horizon.
 - NIR_3466.NEF, 2026-09-30: the same sheet. The yellow covers the whole sky but its dark top corners, blue and streaks alike, and the building's lit wall, which the look's selection holds; brightness alone draws only that wall.
 - NIR_3698.NEF, 2026-09-30: the same sheet. A few yellow dots in a clear sky.
+- NIR_3460.NEF, 2026-10-13: option 12 with 087's route under it beside the head build, whole frame and crops of the wires over open sky, the pylon crossarms and the left pylon's legs. Head: pink dots and discs over the open sky and beside the wires. Build: the sky smooth, no dots or discs; inside the lattice the sky grey with blue patches.
+- NIR_3463.NEF, 2026-10-13: the same two builds, whole frame and crops at the right pylon, the wires over blue sky and the middle pylon. Head: brown discs beside the wires, red halos at the crossarms. Build: none of them.
+- NIR_3461.NEF, 2026-10-13: the same two builds, whole frame and crops of the wires, the pylons and the right pylon's foot. Head: pink discs beside the pylons, a blue disc at the foot. Build: none of them.
+- NIR_1651.NEF, 2026-10-13: the same two builds, whole frame and crops of the cloud, the treetop and the cyan band. The cloud and the band read the same to within 0.3 levels.
+- NIR_1703.NEF, 2026-10-13: the same two builds, whole frame and crown crops. The cloud regions read the same to within 0.3 levels; the crowns' red halo gone, which of option 12 and 087's route removed it was not split.

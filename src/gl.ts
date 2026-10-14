@@ -15,7 +15,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer, toHalf } from "./half";
 import { sharpenSigmaTexels } from "./raw/detail";
 export type { EditParams };
@@ -211,6 +211,7 @@ uniform vec3 u_bwMix;        // B&W channel weights (normalised in-shader)
 uniform sampler2D u_skyFineTex; // R8 per-image sky bitmap refined to the picture's edges (skyfine.ts)
 uniform float u_skyDepth;       // 0..1 — see EditParams.skyDepth; 0 without a map or a refined bitmap
 uniform float u_skySat;         // 0..2 — see EditParams.skySat; 0 without a refined bitmap
+uniform vec3 u_skyRef;          // the photograph's sky colour direction (pipeline.ts skyReference): xy a unit vector in (R-luma, B-luma), z 1 when there is one, 0 when not
 uniform sampler2D u_skyTex;  // RGB8 per-edit sky chroma map (skymap.ts):
                              //   R,G = opponent chroma encoded ±0.5 -> 0..255,
                              //   B = the sky bitmap's weight
@@ -1385,7 +1386,20 @@ void main() {
         float gate = smoothstep(SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, rgb2hsv(max(g, 0.0)).y);
         if (gate > 0.0) {
           float Ls = dot(g, LUMA_W);
-          g = clamp(Ls + (g - Ls) * (1.0 + u_skySat * fw * gate), 0.0, 1.0);
+          // THE SECOND GATE (pipeline.ts skyRefWeight, term for term): the boost is taken
+          // away from a pixel whose colour does not point where the photograph's own
+          // sky colour points, SKY_REF_ANGLE_LO to HI of angle (30 to 60 degrees). 1
+          // without a reference and for a pixel with no direction to speak of.
+          float gw = 1.0;
+          if (u_skyRef.z > 0.5) {
+            vec2 pc = vec2(g.r - Ls, g.b - Ls);
+            float pm = length(pc);
+            if (pm > 1e-6) {
+              float ang = acos(clamp(dot(pc, u_skyRef.xy) / pm, -1.0, 1.0));
+              gw = 1.0 - smoothstep(0.5235988, 1.0471976, ang) * smoothstep(0.01, 0.03, pm);
+            }
+          }
+          g = clamp(Ls + (g - Ls) * (1.0 + u_skySat * fw * gate * gw), 0.0, 1.0);
         }
       }
     }
@@ -1554,7 +1568,7 @@ export type MaskState = "in" | "idle" | "building" | "failed";
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_skyRef", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -1785,6 +1799,9 @@ export class Renderer {
   private localTex: WebGLTexture;
   private skyTex: WebGLTexture;
   private skyOn = false;
+  /** The held sky map's sky colour direction (pipeline.ts `skyReference`), for the sky
+   *  saturation stage's second gate; null without a map or without a reference. */
+  private skyRef: SkyReference | null = null;
   private skyFineTex: WebGLTexture;
   private fineOn = false;
   private warpTex!: WebGLTexture;
@@ -2348,6 +2365,7 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.skyTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     this.skyOn = !!m;
+    this.skyRef = m ? skyReference(m) : null;
     if (!m) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 0]));
       return;
@@ -2963,6 +2981,7 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.skyTex);
     gl.uniform1f(this.loc.u_skyDepth, this.skyOn && this.fineOn ? Math.min(1, Math.max(0, p.skyDepth ?? 0)) : 0);
     gl.uniform1f(this.loc.u_skySat, this.fineOn ? Math.min(2, Math.max(0, p.skySat ?? 0)) : 0);
+    gl.uniform3f(this.loc.u_skyRef, this.skyRef?.x ?? 0, this.skyRef?.y ?? 0, this.skyOn && this.skyRef ? 1 : 0);
     gl.uniform1i(this.loc.u_skyFineTex, 12);
     gl.activeTexture(gl.TEXTURE12);
     gl.bindTexture(gl.TEXTURE_2D, this.skyFineTex);

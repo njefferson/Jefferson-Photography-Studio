@@ -296,6 +296,9 @@ async function holdingsLine(): Promise<string> {
     // "meta" in both — batchstore's v1 "frames" store was deleted at its own
     // v2 upgrade, so naming it here would count a store that cannot exist.
     ["ips-batch", "meta", "saved frame"],
+    // The sky map kept for each photograph (maskstore.ts), counted in its database of
+    // its own; the saved masks' database is not counted here.
+    ["ips-skymaps", "maps", "kept sky map"],
   ];
   try {
     const listed = await (indexedDB as { databases?(): Promise<{ name?: string }[]> }).databases?.();

@@ -768,13 +768,13 @@ cannot describe something the code does not say about itself.
 - **`src/decode.ts`** (820 lines) — Image decoding. Real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (147 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (422 lines) — Main-thread side of the decode workers.
-- **`src/diagnostic.ts`** (394 lines) — The text report (Doctrine §7f).
+- **`src/diagnostic.ts`** (397 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (339 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
 - **`src/export.ts`** (1349 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (70 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (393 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (3694 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (3713 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
@@ -803,10 +803,10 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (20853 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
-- **`src/maskstore.ts`** (186 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks").
+- **`src/main.ts`** (21060 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/maskstore.ts`** (479 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks"), and for the KEPT SKY MAP of each photograph, in a database of its own ("ips-skymaps").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (3156 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (3236 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
@@ -823,11 +823,11 @@ cannot describe something the code does not say about itself.
 - **`src/shadowcast.ts`** (252 lines) — THE SHADOW'S OWN ILLUMINANT, MEASURED FROM THIS PHOTOGRAPH (decision 034).
 - **`src/share.ts`** (156 lines) — Share / copy-link for the INSTALLED (standalone) app.
 - **`src/sky.ts`** (722 lines) — Classical sky detection (mask type 4).
-- **`src/sky.worker.ts`** (136 lines) — The sky selection, built off the main thread on a lane of its own.
-- **`src/skyClient.ts`** (204 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
-- **`src/skyfine.ts`** (700 lines) — The sky selection refined to the picture's own edges.
+- **`src/sky.worker.ts`** (160 lines) — The sky selection, built off the main thread on a lane of its own.
+- **`src/skyClient.ts`** (224 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
+- **`src/skyfine.ts`** (850 lines) — The sky selection refined to the picture's own edges.
 - **`src/skyhorizon.ts`** (608 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
-- **`src/skymap.ts`** (337 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
+- **`src/skymap.ts`** (447 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.
 - **`src/stamp.ts`** (27 lines) — ONE HASH, BECAUSE THE SECOND COPY IS WHERE THE TWO ANSWERS COME FROM.
 - **`src/startup.ts`** (500 lines) — WHAT THE FIRST SECONDS OF THIS LAUNCH COST, AND WHERE THE PAGE HELD AFTER THAT (decision 071).
 - **`src/sticker.ts`** (577 lines) — Sticker compositing — rhymes with heal.ts (src/heal.ts): stickers are baked INTO the linear source (pre-pipeline), so each one inherits the channel swap / WB / looks / grade / grain and lands in the I

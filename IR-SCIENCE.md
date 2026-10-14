@@ -5357,3 +5357,60 @@ with the grass texture intact and no fringe at the edges of the blown areas,
 and the frame comes up 0.37 stops brighter because the bright end is read from
 the samples that did not clip. Both renders were opened, whole and at two
 full-resolution crops.
+
+### 9t. WIRES AND LATTICES IN A SKY SELECTION, THE SKY'S COLOUR AS A DIRECTION, AND A MAP THAT IGNORES ONE OUTLIER (decisions 087, 073, 069 and 088, 2026-10-13)
+
+What the field says about the three things the look's sky stages got wrong on
+power lines, and what these frames measured:
+
+- **A line is found by a top-hat, not by an edge test.** The black top-hat of
+  image morphology is the closing of a picture minus the picture: a dark feature
+  narrower than the structuring element is filled by the closing and so left in the
+  difference, while an edge or a region wider than the element is not (scikit-image's
+  documentation of the black and white top-hat, read 2026-10-13). A wire a pixel or
+  two wide at the 1024 grid, with the sky's own colour on both sides of it, is
+  invisible to the look's colour grow and to its guided filter (a window of 12 pixels)
+  and is the thing the top-hat is for. The element is read as a plateau: from 7 to 13
+  pixels the share of the selection it removes moves by under 2 points of the
+  selection, and the places of smooth sky it touches stay at or under 0.1% of the
+  smooth sky tested (110 of 218,547 places at 11 pixels on one frame) and grow tenfold
+  at 17 (1,614, 0.74%). The contrast ramp (0.05 to 0.12 of the
+  frame's 95th percentile of luminance) and the spread (2 pixels) are not plateaus.
+  A thin cirrus streak is a line to this test, and so is the sky inside a lattice
+  whose gaps are narrower than the element plus its margin; the renders show both.
+- **The Aerochrome sky is one direction in the plane of red minus luma against blue
+  minus luma.** On seven of the reader's raws the median chroma of the map's wholly
+  selected blue-quadrant texels points 135 to 139 degrees, and the sky's pixels lie
+  within 2 to 4 degrees of it at the median and within 12 at the 99th percentile
+  where the selection holds mostly sky, while the red the saturation stage makes
+  lies 138 degrees or more away. A gate on the angle therefore has a wide gap to sit
+  in, 12 to 138 degrees, and the ramp 30 to 60 degrees sits in it with room on both
+  sides. That the direction is the same on every frame is what a fixed band would
+  rely on; it is within 4 degrees here, so these frames cannot tell a fixed band from
+  one read off the map. Not established: a frame whose sky the look colours
+  differently.
+- **A median of four taps ignores one outlier, and four taps cannot estimate their
+  own spread.** A tap that lands on a wire carries the wire's chroma (about +0.27
+  red and -0.11 blue against the sky's -0.13 and +0.11, the opposite sign) at the
+  selection's full weight, and one tap in four moved a texel's mean to near grey or
+  to pink. The Hampel test and the robust statistics that follow it name the median
+  as the simple robust choice for small blocks and say a scale estimate needs more
+  samples than four, so the neighbouring texels are the data that can supply one
+  (read 2026-10-13). Measured against the weighted median of a texel's whole
+  footprint, about 480 pixels, on 7,343 sky texels of one frame: texels off it by more
+  than 0.04 of chroma, 154 with the mean, 47 with the tap median, 13 with a 3 by 3
+  median of the finished map and 9 with both.
+- **A partial-convolution average drops a cell with no valid support and does not
+  fill it** (Liu et al., ECCV 2018, arXiv 1804.07723, read 2026-10-13). The sky map's
+  texel is already a mask-weighted average of its taps; what remains polluted is what
+  the selection counts as valid, so no change to the averaging clears a red tuft the
+  selection holds.
+- **A browser database cannot be opened at a version below the stored one.** The
+  kept sky maps live in a database of their own so the masks database stays at
+  version 1 and a tab running an older build is not locked out of its saved masks.
+
+What the pictures say, with the build's own renders opened on ten of the reader's
+raws: the stage's red falls to nothing on every frame compared, the wires read as
+thin dark lines, and three costs stay and are named in the decisions: the sky inside
+a lattice or between willow strands goes grey with blue patches, thin cirrus goes
+neutral, and foliage the selection used to hold reads dark red and not scarlet.

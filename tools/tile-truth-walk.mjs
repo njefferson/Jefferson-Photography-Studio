@@ -76,6 +76,21 @@ const check = (name, got, want) => {
 };
 const note = (s) => console.log(`        ${s}`);
 
+// --plant-frozen: THE MADE-TO-FAIL FOR THE REDRAW WAIT BELOW (2026-10-14). After the C and D
+// section's tiles are first read, every write to a strip tile's src is thrown away, so the
+// strip can never be seen to redraw whatever the app does. D1, D2 and C1 to C3 must then FAIL
+// (the wait gives up after its bound and reads "no tile moved"); a wait that passed with the
+// strip frozen would be measuring nothing.
+const PLANT_FROZEN = process.argv.includes("--plant-frozen");
+const freezeTiles = (page) =>
+  page.evaluate(() => {
+    const inStrip = (el) => el instanceof HTMLImageElement && !!el.closest("#sessionThumbs");
+    const setAttr = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (n, v) { if (n === "src" && inStrip(this)) return; return setAttr.call(this, n, v); };
+    const d = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+    Object.defineProperty(HTMLImageElement.prototype, "src", { ...d, set(v) { if (inStrip(this)) return; d.set.call(this, v); } });
+  });
+
 /** Read every tile matching `sel` three ways: the blob URL (was it redrawn),
  *  a hash of the stored JPEG bytes (is it the same stored picture), and a
  *  32x32 RGB signature (is it the same photograph). */
@@ -136,6 +151,33 @@ async function settle(page, sel, { quiet = 2200, max = 300000, lead = 1200 } = {
     await page.waitForTimeout(250);
   }
   console.log(`        (settle timed out after ${max}ms on ${sel})`);
+}
+
+/** WAIT FOR THE REDRAW TO BEGIN, THEN FOR IT TO BE QUIET.
+ *  Takes the page, a selector for the tiles' images and `max`, how long the redraw may
+ *  take to begin (ms, default 60000). Returns the seconds from the call to the first
+ *  tile whose src changed, or null when none changed within `max`, after which the
+ *  tiles have been quiet for `settle`'s own window.
+ *  What the caller relies on: a look or a toggle that has to redraw tiles is measured
+ *  after the redraw, not after a fixed wait that the redraw might not have started in.
+ *  `settle` alone returns after about 3.4 s of unchanged tiles, and since 2026-10-14 a
+ *  look whose sky saturation is up asks the sky map lane for a map, whose two landings
+ *  are two full draws that, in this container's software graphics, take about 3 s each
+ *  and hold the main thread; the redraw pass starts when they are done (head build: the
+ *  first tile moved 4 to 5 s after the press, this build 10 to 12 s). A redraw that never
+ *  begins still fails: `max` bounds the wait and null comes back, which the checks read as
+ *  tiles that did not move. The delay itself is printed by the caller, not hidden. */
+async function settleAfterRedraw(page, sel, max = 60000) {
+  const read = () => page.evaluate((s) => [...document.querySelectorAll(s)].map((i) => i.getAttribute("src") || "").join("|"), sel);
+  const base = await read();
+  const t0 = Date.now();
+  let first = null;
+  while (Date.now() - t0 < max) {
+    if ((await read()) !== base) { first = +((Date.now() - t0) / 1000).toFixed(1); break; }
+    await page.waitForTimeout(250);
+  }
+  await settle(page, sel);
+  return first;
 }
 
 async function freshPage(browser) {
@@ -355,8 +397,10 @@ try {
       // yet opened; photos 1 and 2 were graded and left, and a look pressed
       // here is not about them, so their tiles must not move.
       const preLook = await readTiles(page, sel);
+      if (PLANT_FROZEN) { await freezeTiles(page); console.log("        PLANT: the strip's tiles are frozen from here; D1, D2 and C1 to C3 must fail"); }
       await pressLook(page, "lookAero");
-      await settle(page, sel);
+      const lookBegan = await settleAfterRedraw(page, sel);
+      note(`the strip began to redraw ${lookBegan === null ? "never (no tile moved)" : lookBegan + " s"} after the look was pressed (counted from the call, so the click itself is in it)`);
       const postLook = await readTiles(page, sel);
       const byLook = preLook.map((t, i) => mad(t.sig, postLook[i].sig));
       byLook.forEach((m, i) =>
@@ -369,7 +413,8 @@ try {
       // C — the toggle.
       const before = await readTiles(page, sel);
       await page.click("#irLift");
-      await settle(page, sel);
+      const liftBegan = await settleAfterRedraw(page, sel);
+      note(`the strip began to redraw ${liftBegan === null ? "never (no tile moved)" : liftBegan + " s"} after the toggle was pressed`);
       const after = await readTiles(page, sel);
       const picture = before.map((t, i) => mad(t.sig, after[i].sig));
       const redrawn = before.map((t, i) => t.src !== after[i].src);

@@ -15,7 +15,8 @@ import type { DecodedImage, SkySelection } from "./decode";
 import { buildSkySelectionFrom, type SkySource } from "./skyfine";
 import type { BrushMask, EditParams, LensCurve, LocalMap, SkyMap } from "./pipeline";
 import type { WarpField } from "./warp";
-import type { MapJob, SceneChunk, SceneStart } from "./sky.worker";
+import type { MapAnswer, MapJob, SceneChunk, SceneStart } from "./sky.worker";
+import { SKY_MAP_COARSE_W } from "./skymap";
 
 let worker: Worker | null | undefined;
 let nextId = 1;
@@ -72,13 +73,15 @@ export function requestSkySelection(src: SkySource): Promise<SkySelection | null
 // --- The sky MAP lane ----------------------------------------------------------------------------------------
 
 /** What a map ask comes back with: the map (null when the sky bitmap selects
- *  nothing, which is an answer), or null when the lane could not build it and the
- *  page has to. */
-export type SkyMapAnswer = { map: SkyMap | null } | null;
+ *  nothing, which is an answer) and `ms`, the lane's own clock for building it, or
+ *  null when the lane could not build it and the page has to. */
+export type SkyMapAnswer = { map: SkyMap | null; ms: number } | null;
 
 let mapWorker: Worker | null | undefined;
 let mapNext = 1;
 const mapWaiting = new Map<number, (a: SkyMapAnswer) => void>();
+/** Who wants the COARSE map of an ask, until the full one ends the ask. */
+const mapCoarse = new Map<number, (map: SkyMap | null, ms: number) => void>();
 /** The photograph whose pixels the lane holds, and the scene's number there. */
 let sceneOwner: DecodedImage | null = null;
 let sceneId = 0;
@@ -96,16 +99,25 @@ function mapLane(): Worker | null {
     mapWorker = null;
     return null;
   }
-  mapWorker.onmessage = (e: MessageEvent<{ ask: number; map?: SkyMap | null; failed?: string }>) => {
-    const w = mapWaiting.get(e.data.ask);
-    mapWaiting.delete(e.data.ask);
-    w?.(e.data.failed !== undefined ? null : { map: e.data.map ?? null });
+  mapWorker.onmessage = (e: MessageEvent<MapAnswer>) => {
+    const a = e.data;
+    // The coarse map is the first of two answers to one ask: hand it over and keep
+    // the ask open for the full map, which ends it. A failure ends it either way.
+    if (a.stage === "coarse" && a.failed === undefined) {
+      mapCoarse.get(a.ask)?.(a.map ?? null, a.ms ?? 0);
+      return;
+    }
+    const w = mapWaiting.get(a.ask);
+    mapWaiting.delete(a.ask);
+    mapCoarse.delete(a.ask);
+    w?.(a.failed !== undefined ? null : { map: a.map ?? null, ms: a.ms ?? 0 });
   };
   const dead = () => {
     // Everything waiting is told to build on the page, and the lane is not
     // respawned: one that died once is not worth a second wait.
     for (const w of mapWaiting.values()) w(null);
     mapWaiting.clear();
+    mapCoarse.clear();
     try { mapWorker?.terminate(); } catch { /* already gone */ }
     mapWorker = null;
     sceneOwner = null;
@@ -170,21 +182,27 @@ export interface SkyMapAsk {
   sky: BrushMask;
   warp: WarpField | null;
   pitch: number;
+  /** Given, the lane builds a COARSE map first (skymap.ts SKY_MAP_COARSE_W) and this
+   *  is called with it when it lands, before the promise of the full map settles;
+   *  `ms` is the lane's own clock for it. Omitted, only the full map is built. */
+  onCoarse?: (map: SkyMap | null, ms: number) => void;
 }
 
 /**
  * Ask the lane for the sky map of an edit of the open photograph, building
  * nothing on this thread.
  * @param img  the open photograph (`current`); its pixels are sent on the first ask.
- * @param a  the edit and what `syncSkyMap` builds the map from.
+ * @param a  the edit and what `syncSkyMap` builds the map from; with `onCoarse` the
+ *   lane builds a map a quarter as wide first and `onCoarse` receives it.
  * @returns null at once when there is no lane (the caller builds the map itself),
- * else a promise of the answer: `{ map }` when the lane built it, or null when it
+ * else a promise of the answer: `{ map, ms }` when the lane built it, or null when it
  * could not (it died, or the build threw) and the caller builds it itself. What it
  * must satisfy: `map` is what `buildOpenSkyMap` returns for the same pixels, edit
  * and flat, because the lane runs that function and nothing else; the pixels it
  * reads are the page's own as of the first ask, brought to the flat the page's copy
  * carries at THIS ask. Stickers are left out of the copy of the edit sent: no stage
- * of the map reads them.
+ * of the map reads them. The coarse map, when asked for, reaches `onCoarse` before
+ * the promise settles and never after, and a failed ask never calls it.
  */
 export function requestSkyMap(img: DecodedImage, a: SkyMapAsk): Promise<SkyMapAnswer> | null {
   if (!holdSkyMapScene(img)) return null;
@@ -194,10 +212,12 @@ export function requestSkyMap(img: DecodedImage, a: SkyMapAsk): Promise<SkyMapAn
   const { stickers: _stickers, ...params } = a.params;
   return new Promise<SkyMapAnswer>((res) => {
     mapWaiting.set(ask, res);
+    if (a.onCoarse) mapCoarse.set(ask, a.onCoarse);
     const job: MapJob = {
       kind: "map", ask, scene: sceneId, params: params as EditParams, local: a.local ?? null,
       applied: img.lensApplied ?? null, lens: a.lens ?? null, sky: a.sky, warp: a.warp, pitch: a.pitch,
+      coarse: a.onCoarse ? SKY_MAP_COARSE_W : undefined,
     };
-    try { w.postMessage(job); } catch { mapWaiting.delete(ask); res(null); }
+    try { w.postMessage(job); } catch { mapWaiting.delete(ask); mapCoarse.delete(ask); res(null); }
   });
 }

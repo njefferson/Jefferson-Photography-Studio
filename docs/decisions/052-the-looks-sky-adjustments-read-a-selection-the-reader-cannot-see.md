@@ -187,6 +187,18 @@ selection being read.
 mask arriving on a photograph that had none is a state change the reader must be
 told about in words.
 
+**087, 073's option 2 and 088, built 2026-10-13**, which change what the look's
+selection holds and what its stages do with it, without making it visible: 087 takes
+thin structures out of the selection (most of it on the willow frames, 73% to 76%),
+and 073's gate makes the saturation stage read the photograph's own sky colour, so a
+wall or a tree the selection holds is no longer tripled. Option 1's evidence stands
+as rendered the same day: the reader's mask and the look's selection hold the same
+wires (on NIR_3461 the selection is at least half over 67.7% of the frame and the
+reader's mask over 68.6%), and 087 is the cheaper cure for the wires. What is left
+for this record is the surface question and the selection's remaining wrongness: the
+willow's bright sky, and the sky between a lattice's struts, which 087's margin now
+takes with the struts.
+
 ## Depends
 
 - touches 018 — 018 unified the refinement the two selections share; this
@@ -197,6 +209,7 @@ told about in words.
   look's stages read, and this changes which population that is.
 - touches 049 — 049 makes the sky selection's border movable; this is what makes
   that control reach the look's sky stages.
+- touches 087 — 087 changes what the look's selection holds, which is what this record would show the reader; whichever changes it moves the other's evidence.
 - distinct-from 030 — 030 is the pipeline having exactly one place a mask may
   act, which a perfect selection does not fix. This is about WHICH selection a
   stage reads, and would still be true if a mask could act anywhere.

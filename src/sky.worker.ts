@@ -15,7 +15,10 @@
 // the page that was a few hundred milliseconds of every slider drag on a fast
 // device and seconds under load. This lane holds ONE copy of the open
 // photograph's pixels (sent once, in pieces, by `holdScene`) and answers a map
-// request with the 128-texel map alone. It runs `buildOpenSkyMap`, the one
+// request with the 128-texel map alone — or, for the first map of a photograph,
+// with a 32-texel map first (about a sixteenth of the work) and the 128-texel one
+// after it, so the page can show the sky while the full map is still being made.
+// It runs `buildOpenSkyMap`, the one
 // definition (skymap.ts), over those pixels, so the map is the page's own; the
 // only difference is where the arithmetic runs. A selection ask has no `kind`
 // and a map or scene message has one, so the two instances cannot be confused
@@ -67,7 +70,17 @@ export interface MapJob {
   sky: BrushMask;
   warp: WarpField | null;
   pitch: number;
+  /** When set, the width in texels of a COARSE map to build and post first
+   *  (skymap.ts SKY_MAP_COARSE_W), before the full one; absent, only the full map is
+   *  built. The page asks for it for the first map of a photograph, which is the one
+   *  the reader is waiting for. */
+  coarse?: number;
 }
+/** What the lane posts for a map ask. `stage` says which map `map` is: the coarse one
+ *  comes first and the ask stays open, the full one (`stage` absent or "full") ends
+ *  it. `ms` is the lane's own clock for building that map, not the queue before it
+ *  or the trip back. `failed` ends the ask and tells the page to build the map. */
+export interface MapAnswer { ask: number; map?: SkyMap | null; stage?: "coarse" | "full"; ms?: number; failed?: string }
 type Job = SelectJob | SceneStart | SceneChunk | SceneDrop | MapJob;
 
 /** The scene held: the pixels as a `MapScene` plus how much of them has arrived. */
@@ -124,12 +137,23 @@ self.onmessage = (e: MessageEvent<Job>) => {
   // A map ask. An answer that carries `failed` tells the page to build the map
   // itself: the scene was not here, or had not all arrived, or the build threw.
   try {
-    if (!held || held.scene !== m.scene || held.filled < held.total) { post({ ask: m.ask, failed: "scene not held" }); return; }
+    if (!held || held.scene !== m.scene || held.filled < held.total) { post({ ask: m.ask, failed: "scene not held" } satisfies MapAnswer); return; }
     follow(held.img, m.applied);
     const flat = held.img.linear ? held.img.lensApplied?.gains ?? null : null;
+    // THE COARSE MAP FIRST WHEN THE PAGE ASKED FOR IT: posted as soon as it is built,
+    // so the page can show the sky while the full map, sixteen times the taps, is
+    // still being made. A bitmap that selects nothing gives no map at any width, so
+    // the full build is skipped and the ask ends with that answer.
+    if (m.coarse) {
+      const c0 = performance.now();
+      const rough: SkyMap | null = buildOpenSkyMap(held.img, m.params, m.local ?? undefined, m.lens, flat, m.sky, m.warp, m.pitch, m.coarse);
+      post({ ask: m.ask, map: rough, stage: "coarse", ms: performance.now() - c0 } satisfies MapAnswer, rough ? [rough.rgba.buffer] : []);
+      if (!rough) { post({ ask: m.ask, map: null, stage: "full", ms: 0 } satisfies MapAnswer); return; }
+    }
+    const f0 = performance.now();
     const map: SkyMap | null = buildOpenSkyMap(held.img, m.params, m.local ?? undefined, m.lens, flat, m.sky, m.warp, m.pitch);
-    post({ ask: m.ask, map }, map ? [map.rgba.buffer] : []);
+    post({ ask: m.ask, map, stage: "full", ms: performance.now() - f0 } satisfies MapAnswer, map ? [map.rgba.buffer] : []);
   } catch (err) {
-    post({ ask: m.ask, failed: String((err as Error)?.message ?? err) });
+    post({ ask: m.ask, failed: String((err as Error)?.message ?? err) } satisfies MapAnswer);
   }
 };
