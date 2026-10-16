@@ -309,6 +309,13 @@ export async function exportBands(
   outH: number,
   job: ParallelJob,
   onProgress?: (fraction: number) => void,
+  /** HOW FAR THE WORKERS' SETUP HAS GOT, 0 to 1, the mean over the workers, each
+   *  worker's own figure being how far it has got making what its per-pixel pass
+   *  reads (export.ts `getReady`). Called while any worker is still doing that and
+   *  not after the last one has begun its pass; from then on `onProgress` speaks.
+   *  So the strip counts two stages, each from 0 to 1, and a figure never runs
+   *  backwards when a slow worker is behind a fast one. Optional. */
+  onPrepare?: (fraction: number) => void,
 ): Promise<{ data?: Uint8ClampedArray<ArrayBuffer>; rgb?: Uint16Array<ArrayBuffer>; threads: number }> {
   // THE SAME AXIS THE EXPORT'S OWN LOOP RUNS ALONG — rows, or columns under a
   // quarter-turn. Derived from the same `rotate` the workers are handed, so the
@@ -328,11 +335,26 @@ export async function exportBands(
   const workers: Worker[] = [];
   const pending = new Map<number, Pending>();
   const shares = new Float64Array(n);
+  // TWO STAGES, ONE AFTER THE OTHER. A worker's first `progress` message comes
+  // when its setup is over and its pass begins, so `begun` counts workers out of
+  // setup; the pass is reported only once all of them are, and the setup until
+  // then. Reporting the pass as soon as the first worker began would have the
+  // strip's words and figure flip back to "preparing" every time a slower worker
+  // posted its own setup figure.
+  const prepShares = new Float64Array(n);
+  const began = new Uint8Array(n);
+  let begun = 0;
   const report = () => {
-    if (!onProgress) return;
+    if (!onProgress || begun < workers.length) return;
     let s = 0;
     for (let i = 0; i < n; i++) s += shares[i];
     onProgress(s / n);
+  };
+  const reportPrep = () => {
+    if (!onPrepare || begun >= workers.length) return;
+    let s = 0;
+    for (let i = 0; i < n; i++) s += prepShares[i];
+    onPrepare(s / Math.max(1, workers.length));
   };
   try {
     const jobs: Promise<BandResult>[] = [];
@@ -352,11 +374,25 @@ export async function exportBands(
           progress: (f) => { shares[i] = f; report(); },
         });
         w.addEventListener("message", (e: MessageEvent) => {
-          const m = e.data as { id: number; progress?: number; done?: BandResult; error?: string };
+          const m = e.data as { id: number; progress?: number; prep?: number; done?: BandResult; error?: string };
           const p = pending.get(m.id);
           if (!p) return;
           if (m.error) { pending.delete(m.id); p.reject(new Error(m.error)); return; }
-          if (typeof m.progress === "number") { p.progress(m.progress); return; }
+          // A SETUP FIGURE from a worker still getting ready. One that arrives after
+          // that worker's pass has begun is stale and is dropped.
+          if (typeof m.prep === "number") {
+            if (!began[m.id]) { prepShares[m.id] = m.prep; reportPrep(); }
+            return;
+          }
+          if (typeof m.progress === "number") {
+            if (!began[m.id]) {
+              began[m.id] = 1; begun++; prepShares[m.id] = 1;
+              // The last one out of setup closes the stage at 1, then `onProgress` speaks.
+              if (begun >= workers.length) onPrepare?.(1); else reportPrep();
+            }
+            p.progress(m.progress);
+            return;
+          }
           if (m.done) { pending.delete(m.id); p.progress(1); p.resolve(m.done); }
         });
         w.addEventListener("error", (ev) => {

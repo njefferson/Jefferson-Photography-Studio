@@ -233,6 +233,16 @@
              role=status with aria-live so the change announces on open rather
              than only being visible; it is not a control and takes no taps. -->
         <div id="fileKind" role="status" aria-live="polite" hidden></div>
+        <!-- WHILE THE LOOK'S SKY IS STILL BEING REFINED, said in words. The sky
+             colour of a look arrives after the picture (a coarse map, then the
+             full one), and until the full one lands the picture is not final.
+             main.ts writes one sentence here from a moment after the sky lane is
+             asked until its answer lands, and empties it again. Present from
+             parse and EMPTY at rest — not hidden, and not inside anything
+             hidden — because a live region created or revealed together with
+             its words is not reliably announced. It is not a control and takes
+             no taps; the style sheet places it where it moves nothing. -->
+        <p id="skyRefine" role="status" aria-live="polite" aria-atomic="true"></p>
         <!-- Zoom controls: work with no mouse wheel and no pinch (a desktop/laptop
              without either had NO way to zoom in to brush up close —
              2026-07-21). They also work while a brush tool is armed, when the

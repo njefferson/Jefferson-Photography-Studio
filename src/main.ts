@@ -2897,6 +2897,45 @@ let skyMapWarp: WarpField | null = null;
  *  asks for the newest. Rebuilds then follow the lane's pace, one at a time,
  *  instead of queueing a build for every frame of a drag. */
 let skyMapBusy = false;
+/** THE LINE THAT SAYS THE LOOK'S SKY IS STILL BEING REFINED (`#skyRefine`, ir.html).
+ *  Under a look with sky stages the sky colour comes after the picture, from the
+ *  lane, a coarse map first and the full one later; until the full one lands the
+ *  picture is not final. The line is shown from a moment after a lane ask is made
+ *  until its answer settles, and is empty otherwise.
+ *
+ *  A MOMENT AFTER, NOT AT ONCE: a build that takes under 700 ms says nothing, so
+ *  a fast device is not made to announce a thing that is already over. And not
+ *  gone and back between two asks in a row — the count of asks in flight is what
+ *  decides, read a task after an answer, so the answer's own handler can ask again
+ *  and the line stays up. Takes no tap and moves no control (style.css).
+ *  Words only, no motion, so there is nothing for reduced motion to switch off. */
+const skyRefineLine = $("skyRefine") as HTMLElement;
+const SKY_REFINE_DELAY_MS = 700;
+const SKY_REFINE_WORDS = "Refining the sky for this look…";
+let skyRefineAsks = 0;
+let skyRefineTimer: ReturnType<typeof setTimeout> | null = null;
+/** A lane ask for the sky map has just been made. Takes and returns nothing.
+ *  What it must satisfy: every call is paired with one `skyRefineEnd` when that
+ *  ask settles, so the count never stays above zero after the lane is idle. */
+function skyRefineBegin(): void {
+  skyRefineAsks++;
+  if (skyRefineLine.textContent || skyRefineTimer !== null) return;
+  skyRefineTimer = setTimeout(() => {
+    skyRefineTimer = null;
+    if (skyRefineAsks > 0) skyRefineLine.textContent = SKY_REFINE_WORDS;
+  }, SKY_REFINE_DELAY_MS);
+}
+/** The lane has answered, or failed, an ask made with `skyRefineBegin`. Takes and
+ *  returns nothing. The line is emptied a task later, and only if no other ask was
+ *  made in the meantime. */
+function skyRefineEnd(): void {
+  skyRefineAsks = Math.max(0, skyRefineAsks - 1);
+  setTimeout(() => {
+    if (skyRefineAsks > 0) return;
+    if (skyRefineTimer !== null) { clearTimeout(skyRefineTimer); skyRefineTimer = null; }
+    skyRefineLine.textContent = "";
+  }, 0);
+}
 /** A DRAW THAT WAS HELD BACK because the lane was building the map it would show
  *  (`drawWithMap`): the lane's answer draws it, and so does the stale-answer path
  *  below when nothing is asked again. Cleared by the next draw that runs. */
@@ -3031,7 +3070,11 @@ function syncSkyMap(): void {
     if (asked) {
       const pageSpent = performance.now() - mapFrom;
       skyMapBusy = true;
+      skyRefineBegin();
       asked.then(endStage, endStage);
+      // Registered before the answer's own handler below, so the line is told first
+      // and that handler, which may ask again, is the last word on the count.
+      asked.then(skyRefineEnd, skyRefineEnd);
       void asked.then((ans) => {
         skyMapBusy = false;
         // Left behind: another photograph, a new selection, a turn. What is wanted now is
@@ -16339,7 +16382,7 @@ function exportSplit(): string {
   const p = lastExportProfile();
   if (!p) return "none this session";
   const s = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
-  return `${p.megapixels.toFixed(1)} MP in ${s(p.total)} — reading ${s(p.source)}, pixels ${s(p.pixels)}` +
+  return `${p.megapixels.toFixed(1)} MP in ${s(p.total)} — reading ${s(p.source)}, setup ${s(p.setup)}, pixels ${s(p.pixels)}` +
     ` on ${p.threads === 1 ? "one thread" : `${p.threads} threads`}` +
     // THE WHOLE POINT OF THE LINE, when it is there: the export asked for
     // several threads and got none, and this says what stopped them in the
@@ -18751,6 +18794,7 @@ async function exportPicked(): Promise<void> {
           job.lens,
           job.sky,
           job.skyFine,
+          (f) => showExportStrip(`Preparing ${where} — ${view.name}… ${Math.round(f * 100)}%`, { actions: true, stop: true }),
         );
         const out = new Uint8Array(await result.blob.arrayBuffer());
         await EXPORTS.putFrame(
@@ -18893,17 +18937,61 @@ function openPhotoExportJob(): {
   return { file, frame, params: cloneParams(params), opts, lens: currentLensCurve(), sky: skyBitmap, skyFine };
 }
 
+/** LET THE PAGE PAINT BEFORE HEAVY WORK STARTS: resolves once the frame after this
+ *  call has been drawn, or after 150 ms if no frame is drawn (a hidden tab draws
+ *  none). Takes nothing and returns a promise of nothing.
+ *  What it must satisfy: whatever the caller wrote to the DOM before calling it is
+ *  on screen by the time the promise resolves, in a tab that is drawing — the
+ *  frame callback runs before the paint, and the timeout scheduled inside it runs
+ *  after (web.dev "Optimize JavaScript execution"; the "after the next paint"
+ *  pattern) — and it resolves in any case, so an export is never held waiting for
+ *  a frame that will not come. Consumer: `runExport`, so the strip says the export
+ *  has begun in the frame after the press instead of after the setup. */
+function afterPaint(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let done = false;
+    const go = () => { if (!done) { done = true; resolve(); } };
+    requestAnimationFrame(() => setTimeout(go, 0));
+    setTimeout(go, 150);
+  });
+}
+
 async function runExport(): Promise<void> {
   if (!current || !currentFile) return;
   if (heapNearFull()) {
     showExportStrip("This device is low on memory right now. Close a few tabs, or end the session and open the photo on its own.", { actions: true });
     return;
   }
+  // SAID AT THE PRESS, BEFORE ANYTHING ELSE: the strip is written in the same task
+  // as the press, so the frame after it carries "preparing". It used to be written
+  // only after the sticker check and the job copy, and the export's own setup then
+  // ran in the same task as the write, so the page was held for that setup's whole
+  // length with nothing drawn (9.91 s and 9.95 s on the two device reports).
+  ui.exBtn.disabled = true; // ONE AT A TIME: at most one extra frame is ever held
+  const preparingName = currentFile.name;
+  showExportStrip(`Preparing the export of ${preparingName}… 0%`);
   // Placed stickers are loaded before the job copies the images it will bake.
-  const stickersMissing = await ensurePlacedStickerAssets();
+  let stickersMissing = 0;
+  try {
+    stickersMissing = await ensurePlacedStickerAssets();
+  } catch (err) {
+    // The button is already off and the strip already up, so a refusal here must
+    // leave neither behind.
+    recordFailure("exporting a photo", err, { name: preparingName });
+    ui.exBtn.disabled = false;
+    showExportStrip(`Export failed: ${(err as Error).message}`, { actions: true, retry: true });
+    return;
+  }
+  // THE JOB IS READ HERE, before the frame is awaited, so what the export reads is
+  // still read at the press and not a frame later — the editor stays live.
   const job = openPhotoExportJob();
-  if (!job) return;
-  const { file, frame, params: snapParams, opts, lens } = job;
+  if (!job) { ui.exBtn.disabled = false; exportStrip.hidden = true; return; }
+  const { file, frame, params: snapParams, opts, lens, sky: jobSky, skyFine: jobSkyFine } = job;
+  const releaseWake = keepAwake();
+  const endStage = busyWith("an export"); // a stage the hold watch names
+  // THE FRAME THE STRIP IS DRAWN IN comes before the export's own work, which is
+  // what held the page unpainted for as long as its setup took.
+  await afterPaint();
   // WHY THIS ONE WILL BE SLOW, said only where it is actually knowable at the
   // press. The parallel export refuses a photo carrying healed spots, stickers
   // or a warp, and refuses TIFF — those are facts about the edit. It ALSO
@@ -18915,11 +19003,6 @@ async function runExport(): Promise<void> {
   // to canRunParallel, and printed "on one thread" over an export the app's own
   // report then said had run on three. A label that is wrong about the thing it
   // exists to explain is worse than no label.
-
-  ui.exBtn.disabled = true; // ONE AT A TIME: at most one extra frame is ever held
-  const releaseWake = keepAwake();
-  showExportStrip(`Exporting ${file.name}… 0%${threadNote()}`);
-  const endStage = busyWith("an export"); // a stage the hold watch names
   try {
     const result = await exportImage(
       file,
@@ -18932,9 +19015,15 @@ async function runExport(): Promise<void> {
       // The raw export re-decodes from the file, so the measured correction has
       // to travel with it or the saved image would not match the screen.
       lens,
-      // And the sky selection, for the same reason — and its refinement.
-      skyBitmap,
-      skyFine,
+      // And the sky selection, for the same reason — and its refinement. As they
+      // were at the press (`job`), not as they are a frame later.
+      jobSky,
+      jobSkyFine,
+      // The setup, counted as its own stage with its own words so the strip moves
+      // from the start instead of sitting at 0% for as long as the setup takes.
+      (f) => {
+        showExportStrip(`Preparing the export of ${file.name}… ${Math.round(f * 100)}%`);
+      },
     );
     pendingExport = result;
     await collectExport(result, file.name, file.bytes.length);

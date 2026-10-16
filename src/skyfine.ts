@@ -350,19 +350,65 @@ export function prepareSkySource(img: DecodedImage, turn = img.rotate ?? 0): Sky
  *  than the element, and a long thin line cannot contain a square element. Cloud edges
  *  are steps, and cloud is wider than the element, so neither is touched.
  *  The four numbers, and what each rests on and how far each can move before the
- *  result does, are in decision 087 (its Context and Looked at). In short: the element
- *  is 2·SKY_THIN_RADIUS+1 = 11 grid pixels, 1.07% of the long edge, wider than the
- *  structures it is for with the margin the half size binning and the lens soften an
- *  edge by (decision 061); the contrast is read against the frame's own 95th percentile
- *  of luminance, so a dark frame and a bright one are judged alike, over a ramp from
- *  SKY_THIN_LO to SKY_THIN_HI of it; and the spread of SKY_THIN_SPREAD grid pixels
- *  covers the structure's soft edge. All of them are scaled by the grid's longest edge
- *  over SKY_FINE_EDGE, so a photograph smaller than the grid is judged at the same
- *  fraction of its frame. */
+ *  result does, are in decision 087 (its Context, Looked at and Option 6). In short:
+ *  the element is 2·SKY_THIN_RADIUS+1 = 11 grid pixels, 1.07% of the long edge, wider
+ *  than the structures it is for with the margin the half size binning and the lens
+ *  soften an edge by (decision 061); the contrast is read against the frame's own 95th
+ *  percentile of luminance, so a dark frame and a bright one are judged alike, and a
+ *  structure counts from SKY_THIN_LO of it and in full from SKY_THIN_HI; and the margin
+ *  FADES over SKY_THIN_SPREAD + 1 grid pixels round what counts (`coneSpread`), because
+ *  what a structure leaks into the pixels beside it fades with distance. All of them
+ *  are scaled by the grid's longest edge over SKY_FINE_EDGE, so a photograph smaller
+ *  than the grid is judged at the same fraction of its frame.
+ *  WHAT CHANGED ON 2026-10-14 AND WHY (decision 087, Option 6). The ramp ran from 0.05
+ *  to 0.12 and the margin was a 5 by 5 square of the largest value near it. On the
+ *  frames read that took the sky out of a lattice's gaps and left blocky blue islands
+ *  where a few pixels of gap survived (the square), turned thin cirrus grey (a bright
+ *  streak whose response sits at 0.05 to 0.16 of the scale, the very band the ramp
+ *  began in) and put a pale rim round every leaf and crown (the same margin, round the
+ *  dark slivers of sky the dark half finds between bright leaves). A wire over open sky
+ *  responds at 0.05 to 0.07 at this grid, the same band, and does not need the guard:
+ *  the saturation stage's second gate (decision 073) takes the boost off its colour and
+ *  the robust sky map (decision 069) keeps its taps out of the sky's colour. So a thin
+ *  response only counts from SKY_THIN_LO, the old ramp's end, and counts in full from
+ *  SKY_THIN_HI, above anything thin cloud reached on the frames read and under what a
+ *  lattice's members reach. The ramp and the fading margin are the fine selection's
+ *  only: the coarse bitmap the sky map is weighted by is cut hard (`subtractThin`) and
+ *  by a stricter test, SKY_PLAIN_LO below (decision 087, Option 12). */
 export const SKY_THIN_RADIUS = 5;
 export const SKY_THIN_SPREAD = 2;
-export const SKY_THIN_LO = 0.05;
-export const SKY_THIN_HI = 0.12;
+export const SKY_THIN_LO = 0.12;
+export const SKY_THIN_HI = 0.25;
+/** THE MAP IS BUILT FROM PLAIN SKY ONLY (decision 087, Option 12). The sky colour map is
+ *  an estimate of the sky's own colour, and an estimate is taken from the pixels known to
+ *  be sky and not from the band where the picture is uncertain: the trimap of image
+ *  matting keeps the colour samples to the definite region and leaves the band between
+ *  regions to the matte. So the coarse bitmap the map is weighted by is cut, beside
+ *  wherever a structure is (SKY_THIN_LO), wherever the sky stops being plain: a window of
+ *  the element's own size in which at least SKY_PLAIN_SHARE of the pixels stand out from
+ *  their surroundings by more than SKY_PLAIN_LO of the frame's own scale. 0.05 sits 6 to
+ *  12 robust sigmas above the held sky's own response (median 0.004 to 0.007 on six
+ *  frames, IR-SCIENCE 9t), the figure the removal began at on 2026-10-13; the window is
+ *  the element, the scale a structure is measured at; and the share is a majority, the
+ *  same structural constant as the map's own five of nine. The per-pixel selection does
+ *  not use it (SKY_THIN_LO and SKY_THIN_HI do), because a per-pixel weight that followed
+ *  every feature left grey between a lattice's members and turned thin cirrus grey. What
+ *  it is for: out-of-focus leaves respond at 0.05 to 0.12 and the selection holds them
+ *  as sky, so a map built from the taps that land on them pulled the sky stages' colour
+ *  onto them (a teal leaf, a pink disc in a gap between leaves); and why a share and not
+ *  every feature: a cut at every feature left holes in thin cloud, which the smoothing
+ *  stage draws as pale patches round them (NIR_1651).
+ *  AND ONLY A PIECE THAT HOLDS A DEFINITE STRUCTURE COUNTS (decision 087, Option 17). Thin
+ *  cloud's own texture responds 0.06 to 0.15 of the scale and passes the share test in
+ *  58 to 82 percent of an element window, so the cut above still cut holes in it, and the
+ *  per-pixel selection holds the cloud, so the saturation stage multiplied the colour a
+ *  hole left unsmoothed into cyan streaks and rimmed patches (NIR_1651, NIR_1716,
+ *  NIR_1824). Out-of-focus foliage and structures sit in connected pieces that reach
+ *  SKY_THIN_HI (0.48 to 1.24 on the frames read); thin cloud's pieces peak at 0.06 to 0.20.
+ *  So the flag keeps a connected piece only when some pixel of it reaches SKY_THIN_HI
+ *  (`keepStrongPieces`, hysteresis thresholding by connection), and clears the rest. */
+export const SKY_PLAIN_LO = 0.05;
+export const SKY_PLAIN_SHARE = 0.5;
 
 /** Maximum (or minimum) filter over a square element, separable.
  *  @param a  one value per pixel, w by h.
@@ -394,20 +440,67 @@ function squareFilter(a: Float32Array, w: number, h: number, R: number, isMax: b
 }
 
 /**
- * Find the thin structures in a selection source.
- * @param src  from prepareSkySource; only its grid (`w`, `h`) and `rgb` are read.
- * @returns one value per source pixel, 0 to 1: 1 on a structure narrower than the
- *   element that stands out from its surroundings by SKY_THIN_HI of the frame's own
- *   95th percentile of luminance or more, 0 on anything else, spread SKY_THIN_SPREAD
- *   pixels (scaled, see above). Luminance is the square root of the mean linear
- *   channel; the larger of the black top-hat (closing minus the picture, for dark
- *   lines) and the white top-hat (the picture minus its opening, for bright ones) is
- *   read. What it must satisfy: it is a function of `rgb` and the grid alone, so every
- *   path that builds the selection from one source finds the same structures; a
- *   uniform picture gives 0 everywhere; a line of one pixel across a flat field gives
- *   1 along it; and a square wider than the element gives 0 inside it.
+ * Spread an array's values outward with a margin that fades (decision 087, Option 6).
+ * @param a  one value per pixel, 0 to 1, w by h.
+ * @param w,h  its size.
+ * @param S  the margin's radius in pixels; the margin reaches every pixel closer than
+ *   S + 1 pixels (straight-line distance) to a pixel with a value, and 0 or less leaves
+ *   the array as it is.
+ * @returns a new array in which each pixel is the largest of `a`'s values over the
+ *   pixels within reach, each times (1 - distance / (S + 1)): a value counts in full
+ *   at its own pixel and fades in a straight line to nothing S + 1 pixels away, round
+ *   and not square. What it must satisfy: never below `a` at a pixel, never above the
+ *   largest value in `a`, equal to `a` for S 0, and 0 wherever no value of `a` lies
+ *   within reach, so a pixel the margin does not reach is exactly as it was; this is
+ *   `thinStructures`' margin, where a hard 5 by 5 square of the largest value in its
+ *   place left blocky islands in a lattice's gaps and a pale rim round every leaf.
  */
-export function thinStructures(src: SkySource): Float32Array {
+export function coneSpread(a: Float32Array, w: number, h: number, S: number): Float32Array {
+  if (S <= 0) return Float32Array.from(a);
+  const dx: number[] = [], dy: number[] = [], kw: number[] = [];
+  for (let j = -S; j <= S; j++) for (let i = -S; i <= S; i++) {
+    const d = Math.hypot(i, j);
+    if (d < S + 1) { dx.push(i); dy.push(j); kw.push(1 - d / (S + 1)); }
+  }
+  const m = dx.length;
+  const ox = Int32Array.from(dx), oy = Int32Array.from(dy), ok = Float64Array.from(kw);
+  const lin = new Int32Array(m);
+  for (let i = 0; i < m; i++) lin[i] = oy[i] * w + ox[i];
+  const o = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const rowInner = y >= S && y < h - S;
+    for (let x = 0; x < w; x++) {
+      const p = y * w + x;
+      const v = a[p];
+      if (!(v > 0)) continue;
+      if (rowInner && x >= S && x < w - S) {
+        // away from every border no offset can leave the picture, so no test per offset
+        for (let i = 0; i < m; i++) { const u = v * ok[i], q = p + lin[i]; if (u > o[q]) o[q] = u; }
+      } else {
+        for (let i = 0; i < m; i++) {
+          const xx = x + ox[i], yy = y + oy[i];
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+          const u = v * ok[i];
+          if (u > o[yy * w + xx]) o[yy * w + xx] = u;
+        }
+      }
+    }
+  }
+  return o;
+}
+
+/** The pieces of the contrast of thin features in a selection source, before any ramp or margin.
+ *  @param src  from prepareSkySource; only its grid (`w`, `h`) and `rgb` are read.
+ *  @returns `L`, luminance (the square root of the mean linear channel) per source pixel;
+ *    `opened` and `closed`, its opening and closing by the square element; `scale`, the
+ *    frame's own 95th percentile of luminance; `S`, the margin's radius at this grid; and
+ *    `R`, the element's radius at this grid. The contrast of a pixel is the larger of `closed - L` (a dark line) and `L - opened`
+ *    (a bright one), over `scale`; it is left to the caller to form it in double
+ *    precision, so that the ramp reads the same numbers it always has.
+ *    Not exported: `thinFlags` is its one caller.
+ *  What it must satisfy: a function of `rgb` and the grid alone; `closed` is never below
+ *  `L` and `opened` never above it; all equal over a uniform picture. */
+function thinResponse(src: SkySource): { L: Float32Array; opened: Float32Array; closed: Float32Array; scale: number; S: number; R: number } {
   const { w, h, rgb } = src;
   const n = w * h;
   const grow = Math.max(w, h) / SKY_FINE_EDGE;
@@ -425,13 +518,118 @@ export function thinStructures(src: SkySource): Float32Array {
   const scale = Math.max(1e-6, (p95 / 511) * top);
   const opened = squareFilter(squareFilter(L, w, h, R, false), w, h, R, true);
   const closed = squareFilter(squareFilter(L, w, h, R, true), w, h, R, false);
-  const thin = new Float32Array(n);
+  return { L, opened, closed, scale, S, R };
+}
+
+/** Keep the connected pieces of a flag that hold a strong response, and nothing else
+ *  (hysteresis thresholding by connection, decision 087 Option 17).
+ *  @param flag  1 where a pixel is flagged, 0 elsewhere, w by h.
+ *  @param resp  the pixel's response, the same grid; a piece is kept when any pixel of it
+ *    has a response of `strong` or more.
+ *  @param w,h  the grid.
+ *  @param strong  the response that makes a piece definite.
+ *  @returns a new array, 1 on every pixel of every 8-connected piece of `flag` in which
+ *    some pixel's response is at least `strong`, and 0 everywhere else, including every
+ *    piece in which none is. What it must satisfy: never above `flag` at a pixel; a piece
+ *    is kept whole or not at all; with `strong` at 0 it equals `flag`; and a flag whose
+ *    every piece holds a strong pixel comes back unchanged. */
+export function keepStrongPieces(flag: Uint8Array, resp: Float32Array, w: number, h: number, strong: number): Uint8Array {
+  const out = new Uint8Array(w * h), seen = new Uint8Array(w * h), stack = new Int32Array(w * h);
+  const piece = new Int32Array(w * h);
+  for (let i0 = 0; i0 < w * h; i0++) {
+    if (!flag[i0] || seen[i0]) continue;
+    let sp = 0, n = 0, hit = false;
+    seen[i0] = 1; stack[sp++] = i0;
+    while (sp) {
+      const i = stack[--sp];
+      piece[n++] = i;
+      if (resp[i] >= strong) hit = true;
+      const x = i % w, y = (i / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const j = yy * w + xx;
+        if (flag[j] && !seen[j]) { seen[j] = 1; stack[sp++] = j; }
+      }
+    }
+    if (hit) for (let k = 0; k < n; k++) out[piece[k]] = 1;
+  }
+  return out;
+}
+
+/** The two flag arrays the removal reads: what is a structure (for the per-pixel
+ *  selection) and where the sky is not plain (for the coarse bitmap the map is built from). */
+export interface ThinFlags {
+  /** 0 to 1, the structure flag `thinStructures` documents. */
+  fine: Float32Array;
+  /** 0 to 1, above 0 wherever the sky is not plain: within the margin's reach (a round
+   *  margin of the same radius) of a pixel in a connected piece, of what is a structure
+   *  (over SKY_THIN_LO) or stands out by more than SKY_PLAIN_LO of the scale inside a
+   *  window of the element's own size in which at least SKY_PLAIN_SHARE of the pixels
+   *  stand out, that holds a pixel of SKY_THIN_HI or more (`keepStrongPieces`); 0 where
+   *  the sky is plain, and in a piece that never reaches SKY_THIN_HI, which is thin cloud's
+   *  own texture. Only whether it is above 0 is read. */
+  plain: Float32Array;
+}
+
+/**
+ * Find the thin structures in a selection source, and where the sky is not plain.
+ * @param src  from prepareSkySource; only its grid (`w`, `h`) and `rgb` are read.
+ * @returns `fine`: one value per source pixel, 0 to 1: 1 on a structure narrower than
+ *   the element that stands out from its surroundings by SKY_THIN_HI of the frame's own
+ *   95th percentile of luminance or more, 0 where nothing stands out by SKY_THIN_LO or
+ *   more within reach, and in between a margin that fades over SKY_THIN_SPREAD + 1 grid
+ *   pixels (scaled, see above; `coneSpread`); and `plain`: 1 where the sky is not plain,
+ *   spread by the same round margin, 0 where it is (decision 087 Options 12 and 17; see
+ *   `ThinFlags` for what not plain is, and `keepStrongPieces` for the piece rule).
+ *   Luminance is the square root of the mean
+ *   linear channel; the larger of the black top-hat (closing minus the picture, for dark
+ *   lines) and the white top-hat (the picture minus its opening, for bright ones) is
+ *   read. What it must satisfy: both are a function of `rgb` and the grid alone, so
+ *   every path that builds the selection from one source finds the same flags; a
+ *   uniform picture gives 0 everywhere in both; a line of one pixel across a flat field
+ *   whose contrast is SKY_THIN_HI of the scale or more gives 1 along it in both; a
+ *   square wider than the element gives 0 inside it in both; a streak of low contrast
+ *   (thin cloud, under SKY_THIN_LO) gives 0 everywhere in `fine`, because a thin cloud
+ *   is sky; `plain` is above 0 only within the margin's reach of a connected piece that
+ *   holds a pixel of SKY_THIN_HI or more, so wherever `fine` is 1 it is above 0, and a
+ *   thin structure or a patch of texture whose connected piece never reaches SKY_THIN_HI
+ *   (thin cloud's own texture, which responds 0.06 to 0.15) leaves `plain` at 0, where
+ *   Option 12 had cut the map's weight there and the smoothing stage drew a hole.
+ */
+export function thinFlags(src: SkySource): ThinFlags {
+  const { w, h } = src;
+  const n = w * h;
+  const { L, opened, closed, scale, S, R } = thinResponse(src);
+  const fine = new Float32Array(n), stands = new Float32Array(n), structure = new Uint8Array(n), resp = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const d = Math.max(closed[i] - L[i], L[i] - opened[i]) / scale;
+    resp[i] = d;
     const t = Math.min(1, Math.max(0, (d - SKY_THIN_LO) / (SKY_THIN_HI - SKY_THIN_LO)));
-    thin[i] = t * t * (3 - 2 * t);
+    fine[i] = t * t * (3 - 2 * t);
+    stands[i] = d > SKY_PLAIN_LO ? 1 : 0;
+    structure[i] = d > SKY_THIN_LO ? 1 : 0;
   }
-  return squareFilter(thin, w, h, S, true);
+  // The share of each element-sized window that stands out, by a summed-area table.
+  const share = new Float32Array(n);
+  boxMean(stands, w, h, R, share, new Float64Array((w + 1) * (h + 1)));
+  const notPlain = new Uint8Array(n);
+  for (let i = 0; i < n; i++) notPlain[i] = structure[i] || (stands[i] && share[i] >= SKY_PLAIN_SHARE) ? 1 : 0;
+  // HYSTERESIS BY CONNECTION (Option 17): only the connected pieces that hold a definite structure count.
+  const kept = keepStrongPieces(notPlain, resp, w, h, SKY_THIN_HI);
+  return { fine: coneSpread(fine, w, h, S), plain: coneSpread(Float32Array.from(kept), w, h, S) };
+}
+
+/**
+ * Find the thin structures in a selection source.
+ * @param src  from prepareSkySource; only its grid (`w`, `h`) and `rgb` are read.
+ * @returns the `fine` array of `thinFlags`, one value per source pixel, 0 to 1.
+ *   What it must satisfy: it equals `thinFlags(src).fine` at every pixel; a uniform
+ *   picture gives 0 everywhere, a line of SKY_THIN_HI contrast gives 1 along it, a
+ *   square wider than the element gives 0 inside it.
+ */
+export function thinStructures(src: SkySource): Float32Array {
+  return thinFlags(src).fine;
 }
 
 /**
@@ -441,15 +639,20 @@ export function thinStructures(src: SkySource): Float32Array {
  * @param thin  from `thinStructures`, on the grid the selection was built from
  *   (`w` by `h`); the refinement is on that grid and the coarse bitmap is on its own.
  * @param w,h  the grid `thin` is on.
+ * @param plain  the flags the coarse bitmap is cut by, on the same grid, from
+ *   `thinFlags`; omitted, `thin` itself.
  * @returns a selection whose refinement is each value times one minus `thin` at the
- *   same place, and whose coarse bitmap is each value times one minus the largest
- *   `thin` over the coarse pixel's footprint, so a coarse pixel that holds a wire
- *   anywhere in it gives the sky map's tap nothing to pull. What it must satisfy: no
- *   value is ever above its input, so the step can only take sky away; with `thin`
- *   all 0 the result equals `sel`; and the turn and the "no sky" answer (null
- *   bitmaps) are unchanged.
+ *   same place (the fading margin), and whose coarse bitmap is each value cut to 0
+ *   wherever `plain` is above 0 anywhere in the coarse pixel's footprint, and left as it
+ *   was where it is 0 everywhere in it: a hard cut, not a fade, because the sky map's
+ *   taps weigh sky by this bitmap alone and a fading weight at a structure's edge let a
+ *   pixel that the structure had coloured pull the map (a grey-pink smudge beside a
+ *   dish, decision 087 Option 6). What it must satisfy: no value is ever above its
+ *   input, so the step can only take sky away; with `thin` and `plain` all 0 the result
+ *   equals `sel`; every coarse value is either its input or 0; and the turn and the "no
+ *   sky" answer (null bitmaps) are unchanged.
  */
-export function subtractThin(sel: SkySelection, thin: Float32Array, w: number, h: number): SkySelection {
+export function subtractThin(sel: SkySelection, thin: Float32Array, w: number, h: number, plain: Float32Array = thin): SkySelection {
   let fine: BrushMask | null = null;
   if (sel.fine) {
     const f = sel.fine;
@@ -472,8 +675,8 @@ export function subtractThin(sel: SkySelection, thin: Float32Array, w: number, h
       for (let x = 0; x < m.w; x++) {
         const x0 = Math.floor((x * w) / m.w), x1 = Math.max(x0 + 1, Math.floor(((x + 1) * w) / m.w));
         let big = 0;
-        for (let yy = y0; yy < Math.min(h, y1); yy++) for (let xx = x0; xx < Math.min(w, x1); xx++) if (thin[yy * w + xx] > big) big = thin[yy * w + xx];
-        data[y * m.w + x] = Math.round(m.data[y * m.w + x] * (1 - big));
+        for (let yy = y0; yy < Math.min(h, y1); yy++) for (let xx = x0; xx < Math.min(w, x1); xx++) if (plain[yy * w + xx] > big) big = plain[yy * w + xx];
+        data[y * m.w + x] = big > 0 ? 0 : m.data[y * m.w + x];
       }
     }
     mask = { w: m.w, h: m.h, data };
@@ -525,10 +728,10 @@ export function buildSkySelectionFrom(src: SkySource, refine = true): SkySelecti
   // included (decision 087): the sky worker the devices use, the page's fallback, the
   // decode worker's held bitmaps, the strip's tiles and the export all build the
   // selection through this function, so they all hold one selection.
-  const thin = thinStructures(src);
-  if (!refine) return subtractThin({ mask: res.mask, fine: null, turn }, thin, w, h);
+  const flags = thinFlags(src);
+  if (!refine) return subtractThin({ mask: res.mask, fine: null, turn }, flags.fine, w, h, flags.plain);
   const guide = buildSkyGuide(sample, w, h, wb);
-  return subtractThin({ mask: res.mask, fine: refineSkyMask(res.mask, guide), turn }, thin, w, h);
+  return subtractThin({ mask: res.mask, fine: refineSkyMask(res.mask, guide), turn }, flags.fine, w, h, flags.plain);
 }
 
 /** Outer colour tolerance for the grow, in units of the sky's own chroma

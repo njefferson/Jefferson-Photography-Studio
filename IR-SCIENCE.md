@@ -5374,10 +5374,11 @@ power lines, and what these frames measured:
   pixels the share of the selection it removes moves by under 2 points of the
   selection, and the places of smooth sky it touches stay at or under 0.1% of the
   smooth sky tested (110 of 218,547 places at 11 pixels on one frame) and grow tenfold
-  at 17 (1,614, 0.74%). The contrast ramp (0.05 to 0.12 of the
-  frame's 95th percentile of luminance) and the spread (2 pixels) are not plateaus.
+  at 17 (1,614, 0.74%). The contrast ramp and the spread (2 pixels) are not plateaus.
   A thin cirrus streak is a line to this test, and so is the sky inside a lattice
-  whose gaps are narrower than the element plus its margin; the renders show both.
+  whose gaps are narrower than the element plus its margin; the renders showed both
+  on staging, and the build of 2026-10-14 changed the ramp and the margin for them:
+  see the last bullet.
 - **The Aerochrome sky is one direction in the plane of red minus luma against blue
   minus luma.** On seven of the reader's raws the median chroma of the map's wholly
   selected blue-quadrant texels points 135 to 139 degrees, and the sky's pixels lie
@@ -5408,9 +5409,65 @@ power lines, and what these frames measured:
 - **A browser database cannot be opened at a version below the stored one.** The
   kept sky maps live in a database of their own so the masks database stays at
   version 1 and a tab running an older build is not locked out of its saved masks.
+- **What the sky itself answers the top-hat with, and what only a structure does
+  (measured 2026-10-14, decision 087 Option 6).** At the 1024 grid, with the response
+  in units of the frame's own 95th percentile of luminance: a thin cirrus streak
+  reads 0.054 to 0.16 (NIR_3471, 344 pixels); a wire over open sky reads 0.05 to 0.07
+  (NIR_3461, 15 pixels, because a wire a pixel wide in the 2800 px copy fills a third
+  of a grid pixel); a wire over cloud reads up to 0.145; the response of the held sky
+  as a whole has a median of 0.004 to 0.007 and a robust sigma of 0.004 to 0.007 on six
+  frames with sky, so 0.05 sat 6 to 12 sigma above the sky's own floor and the cirrus
+  and the wires above it are real features and not noise; and a lattice's members read
+  up to 0.52 with a 90th percentile of 0.29, with 0.05% to 0.15% of the held sky above
+  0.25 on the six frames. What a structure leaks into the sky beside it was read as the
+  chroma the picture's sky pixels differ from the sky's own colour by: 0.048 to 0.075
+  at 1 to 1.5 grid pixels from a member of response 0.25 or more, 0.022 to 0.045 at 2
+  to 2.5, and 0.005 beyond 12, a fade and not a step. So the margin fades (a cone of
+  radius 2) and a thin response counts from 0.12, in full from 0.25. Wires over open
+  sky fall under the ramp and are kept clean by the saturation stage's second gate and
+  the robust sky map, which renders of NIR_3460 and NIR_3461 with the removal switched
+  off show for wires over open sky (no bright red wire and no pink disc in the 2:1
+  crops opened; the members read blue-black and a faint warm-grey glow beside pylon
+  legs that the removal adds is absent, 2026-10-15, decision 087). Not established: a
+  frame with a thin cloud stronger than 0.16 of its scale, which would be partly
+  flagged, and a wire over open sky whose colour points the way the sky's does, which
+  the second gate would not take the boost from.
+- **What an out-of-focus leaf and thin cloud's own texture answer the top-hat with, and
+  why the sky map and the selection are cut differently (measured 2026-10-15, decision 087
+  Options 12 and 17).** Out-of-focus leaves in front of the sky respond at 0.05 to 0.12 of
+  the frame's scale, the band thin cirrus lives in, and the horizon search's border
+  leaves the whole foliage mass inside the selection before any removal (25,952 of 30,800
+  selection pixels in one box of NIR_3471). What painted the teal leaf and the pale discs
+  in the gaps was found by exchanging the two halves of the removal between the builds:
+  the sky colour map and not the per-pixel selection, and inside the map the colour
+  smoothing stage, which pulls a held pixel's small chroma to the sky's colour and lets
+  the taps that land on leaves pollute the texels round a gap. So the map's weight, the
+  coarse bitmap, is cut where the sky is not plain (a window of the element's size, 11
+  grid pixels, in which at least half the pixels stand out by more than 0.05 of the
+  scale; 0.05 is 6 to 12 robust sigma above the held sky's floor), while the per-pixel
+  selection is not, because a weight that followed every feature left grey between a
+  lattice's members and turned cirrus grey. The trimap of image matting is the same split
+  (definite regions give the colour samples, the band between them is left to the matte;
+  Sun, Tang and Tai, CVPR 2021, and the SkyMatte dataset page, read 2026-10-15). A first
+  cut at every feature left holes in thin cloud, drawn as cyan streaks and rimmed
+  patches, because cloud's own texture responds 0.06 to 0.15 and passes the window
+  test in 58 to 82 percent of a window. Only a connected piece of the flag that holds a
+  response of 0.25 or more is kept (hysteresis thresholding by connection, read in an
+  edge-tracing patent and a user guide's page on the same, both named in record 087):
+  thin cloud's pieces peak at 0.06 to 0.20
+  (NIR_1651, NIR_3471's cirrus) and blurred foliage masses and structures sit in pieces
+  peaking at 0.48 to 1.24. Not established: a blurred mass with no response of 0.25
+  anywhere along its connected pixels, and a thin cloud with a piece that reaches 0.25;
+  what stays under it is a light-blue cast in the lit parts of cloud puffs (NIR_1716,
+  NIR_1824, NIR_1667), where the per-pixel selection holds cloud and the saturation stage
+  multiplies the cloud's own chroma.
 
 What the pictures say, with the build's own renders opened on ten of the reader's
 raws: the stage's red falls to nothing on every frame compared, the wires read as
-thin dark lines, and three costs stay and are named in the decisions: the sky inside
-a lattice or between willow strands goes grey with blue patches, thin cirrus goes
-neutral, and foliage the selection used to hold reads dark red and not scarlet.
+thin dark lines, and three costs stayed on staging and are named in the decisions: the
+sky inside a lattice or between willow strands went grey with blue patches, thin
+cirrus went neutral, and foliage the selection used to hold reads dark red and not
+scarlet. The first two were put right on 2026-10-14 (the last is the intended reading),
+and the same ramp and margin change brought two more that the 2026-10-15 builds answered:
+out-of-focus foliage turning teal with pale discs in its gaps (Options 12 and 17), and
+holes in thin cloud (Option 17).

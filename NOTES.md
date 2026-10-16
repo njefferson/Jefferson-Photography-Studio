@@ -54,11 +54,106 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
-**Production, 2026-10-11: the staging head ca7270cc4c17b0e12d65042d2a7f9965bebe8cdc went to main by fast-forward, on the owner's go after the PC and device runs of that head; production serves version 2.65.13, its worker names that build, and Deploy to Cloudflare Pages run 985 for it concluded success.**
+**Production, 2026-10-14: the staging head 4ac12b57382bf19fc93de22510e81a49207deda6 was promoted to main by fast-forward, so main and staging name one commit; production serves version 2.65.15 and its worker names that build (both sites' workers read ips-2.65.15 when this plan was written). That commit is the sky fix described in the second entry below.**
+
+**Blurred foliage, thin cloud and the gaps of a pylon keep the sky's own colour under
+Aerochrome: built 2026-10-15 on the tree of staging's head
+(4ac12b57382bf19fc93de22510e81a49207deda6), not committed yet.** The sky fix in the
+entry below is the commit that staging and production already carry, and it left three
+artefacts on the reader's own frames; the first attempt at them brought two more. Each
+was traced on the reader's raws, every picture opened, before anything was changed
+(record 087, Options 6, 12 and 17). No control and no edit field was added; the
+screen's shader and the export's `compileEdit` are untouched; PREVIEW_PIPELINE went to
+96 so a preview kept by an older build is not served under this one.
+- **Fixed: the sky between a pylon's members keeps its own blue** (087, Option 6). On
+  staging it read grey with blocky blue patches and a grey rim round the members
+  (NIR_3460's lower pylon, NIR_3461, NIR_3463). A thin response now counts from 12% of
+  the frame's own brightness scale and in full from 25% (it was 5% to 12%), and the
+  margin round it fades over 3 px (it was a 5 by 5 square). The lattice reads blue to
+  the members at 2:1 with no grey block and none of staging's grey rim, and the wires stay
+  dark and thin; a faint warm-grey glow remains beside the outer edges of pylon legs,
+  which the same build with the removal switched off lacks (see what is still wrong).
+- **Fixed: leaf edges carry no grey fringe and thin cirrus keeps soft edges** (087,
+  Option 6; NIR_3471, NIR_1703's crowns). At 1:1 the cirrus and the leaf tips read the
+  same in this build and in staging's, which is as far as the sheets read them.
+- **Fixed: out-of-focus foliage in front of the sky keeps its red, with no teal leaves
+  and no pale discs in its gaps** (087, Options 12 and 17; NIR_3471). The first fix
+  counted blurred foliage as sky, and the sky colour map pulled the leaves toward the
+  sky's colour. The map is now built from plain sky only: the coarse bitmap it is
+  weighted by is cut where a window of the element's size has at least half its pixels
+  standing out by more than 5% of the scale, and only a connected piece of that cut
+  which holds a response of 25% or more is kept, so thin cloud's own texture is not
+  cut. The per-pixel selection is not cut by it, so the lattices keep their blue.
+- **Proved in the container** (software graphics, not a device; record 087's section on
+  reach). The built sky worker, asked directly with NIR_3460's 1024 px copy, answers a
+  selection equal to the tree's code in 0 of 698,368 bytes (staging's code differs in
+  90,075) and a coarse bitmap equal to it in 0 of 98,304 (route D's differs in 1,030),
+  and the selection the page uploaded equals the worker's. In this run's picker open
+  the decode lane returned no copy, so the page built the first selection and only the
+  map lane ran; the worker's answer is a direct ask, not the route the photograph took.
+  A half-scale 16-bit TIFF of NIR_3460 and of NIR_3471 carries the same sky as the
+  screen at 2:1 (lattice blue to the members, wires thin, blurred leaves maroon with no
+  teal, cirrus soft, the willow's sky even blue) and differs in sharpness and thin edge
+  colour (mean difference 3.97 and 6.78 levels). With the thin-structure removal
+  switched off, NIR_3460 and NIR_3461 draw their wires over open sky dark and thin with
+  no bright red wire and no pink disc, so the second gate and the robust map are what
+  keep wires clean there. The selection builder takes 2 to 14 percent longer than
+  staging's (a node timing, not a device's). The agreement, Aerochrome and sky-stage
+  walks pass on this build; the tile-truth walk passes every check but E1, which reads
+  red on staging's head build in the container too (Q-JPS-56).
+- **Fixed: pressing Export draws the strip in the frame after the press, and its figure
+  moves from the start** (089). On the iPad the press held the page 9.91 s and 9.95 s with
+  the strip not yet drawn, and the figure then read 0% while the export got ready. The
+  page was building, for nothing, the clarity map, the sky map, the compiled edit and the
+  glow map that every one of its export workers builds again for itself (a trace of the
+  build before this change in the container: the page held 48.99 s, the sky map 46.35 s
+  of it). A pooled export now builds none of that on the page. The strip is written at the
+  press and says "Preparing the export of NAME…", counting the workers' setup as a stage of
+  its own, then "Exporting NAME…" counts the pixels; the report's Last export line names
+  the setup (`setup 0.0s` when the pool ran), so its stages add up to its total. In the
+  container, software graphics and not a device, median of three runs of NIR_3461 under
+  Aerochrome at full size: the strip is drawn 6 ms after the press (it was 41.9 s), the
+  figure moves at 4.3 s (it was 81.5 s), the longest gap between frames is 2.4 s (it was
+  41.9 s; that is the page reading the NEF, 0.5 s on the iPad), and the whole export takes
+  183.2 s against 223.1 s. The exported picture is the same: the JPEG's entropy-coded data
+  is equal byte for byte with the build before the change (the EXIF block's DateTime is
+  the export's own time, so a whole-file hash differs between any two exports).
+- **New: a line says while the look's sky is still being refined** (089). Under a look
+  with sky stages the sky colour arrives after the picture, a coarse map and then the full
+  one. "Refining the sky for this look…" is a standing status region at the stage's top
+  right, empty at rest, written 0.7 s after the sky lane is asked and emptied when its
+  answer lands (0.02 s after the full map's upload on NIR_3461 and on NIR_1651 in the
+  container), with no animation, no colour and no tap. While it is up the picture is not
+  final: on NIR_3461 the wires over the sky read red then and dark after, and nothing
+  shortens that here. The accessibility walk gained a section for it.
+- **What is still wrong.** At 2:1 a faint warm-grey glow sits beside the outer edges of
+  the legs of the right and far pylons on NIR_3460 and NIR_3461, which the same build
+  with the removal switched off lacks, and with the removal off the members read
+  blue-black where this build's read dark maroon; whether the removal still earns its
+  cost on the pylon frames is queued. In the lit parts of cloud puffs on NIR_1716, NIR_1824 and
+  NIR_1667 this build carries a light-blue cast that staging's grey lacks, and a faint
+  smear stays in NIR_1651's cloud; NIR_1763's dead branches carry a cyan edge; dark red
+  specks run along wires and thin red edges along thin lattice members, as they did
+  before; the vivid blue spot at the lower left of NIR_3471's dense foliage is the
+  sky's own colour seen through a real gap and is left as it is; a mass of blurred
+  foliage with no sharp edge in it would be cut less than the frames read show; foliage
+  the selection used to hold reads dark red and not scarlet; on the willow frames the
+  removal still takes 24% (NIR_3471) and 17% (NIR_3472) of the selection the border
+  search holds, against 76% and 73% before this build's ramp and margin. An export of a
+  photograph with stickers or a warp, of an output under two megapixels, in a browser
+  with no module workers, or after a failed pool still builds its setup on the page
+  after the strip is drawn, so it holds the page for as long as that takes; every pooled
+  worker still builds its own sky map; and the page still reads the whole file for its
+  size (2 s in the container, 0.5 s on the iPad). The first device report's export of
+  1392.1 s, against 79.5 s in the second, is not explained: no run in the container came
+  near a spread of that size. All of it is queued under Found queue (Q-JPS-33 to
+  Q-JPS-63 and the lines after them), and whether the cloud cast matters is a look
+  question for the owner with pictures.
 
 **The look's sky stops colouring wires and pylons, reads only the sky's own colour
 direction, and its sky map arrives first as a coarse one: built 2026-10-14 on the
-tree of staging's head (08116a3), not committed yet.** Four parts, each chosen from
+tree of staging's head (08116a3), and committed since as staging's head and
+production's 2.65.15.** Four parts, each chosen from
 renders of the reader's own raws that were opened, none from a number alone (records
 087, 073, 069 and 088). No control and no edit field was added; the screen's shader
 and the export's `compileEdit` carry the same second gate term for term;
@@ -1932,8 +2027,8 @@ Q-JPS-29: the sky map's texel over a wall or a tree the coarse bitmap holds carr
 Q-JPS-30: record 052's Option 1, the look reading the reader's visible Sky mask, was rendered and left every wire, disc, lattice spot and roofline glow and cleared a third of NIR_3467's wall, because the reader's mask holds the same wires; it is not built, and the surface question of showing the reader what the look selects stays open (step 57).
 Q-JPS-31: a scratchpad sheet script lays the look's selection over a portrait frame without the quarter turn it needs; this build's renders do not use it (step 59).
 Q-JPS-32: a compaction in the middle of a step loses which calls already failed, so an agent ran a failed architecture check again unchanged and the reply guard latched its send (step 60).
-Q-JPS-33: between a lattice's struts and between willow strands the sky goes grey with blue patches under the thin-structure removal's margin (NIR_3460's left pylon legs, NIR_3471's upper right); the render sweep of the contrast ramp, 0.03 to 0.2, and of the spread, 0 to 3 px, is queued in record 087 and not done (step 60).
-Q-JPS-34: a thin cirrus streak is a line to the thin-structure removal and goes neutral grey on NIR_3471, and leaf edges there carry a pale grey halo (step 60).
+Q-JPS-33: between a lattice's struts and between willow strands the sky went grey with blue patches under the thin-structure removal's margin (NIR_3460's left pylon legs, NIR_3471's upper right); put right by record 087's Option 6 (a thin response counts from 12% of the frame's scale and in full from 25%, and the margin fades over 3 px), read on NIR_3460, NIR_3461, NIR_3463, NIR_3471 and NIR_3472 at the whole frame and at 2:1, where the lattice reads blue to the members with no grey block and no rim; its figures were taken from the traced causes and not from the render sweep this line queued, and that sweep of the ramp and the spread was not run (steps 60, 74 and 75).
+Q-JPS-34: a thin cirrus streak went neutral grey on NIR_3471 and its leaf edges carried a pale grey halo; put right by Option 6, so at 2:1 the cirrus reads cooler and soft-edged where staging's was grey with hard edges, and NIR_1703's crowns carry no halo; at 1:1 the cirrus of this build and staging's both read soft and no change shows between them, which is as far as the sheets read it; what the build still leaves in cloud is Q-JPS-46 (steps 60, 74 and 75).
 Q-JPS-35: foliage the selection used to hold reads dark red and not scarlet on NIR_1703's crowns and on NIR_3471's and NIR_3472's leaves, which is the intended reading and a loss to anyone who liked the scarlet (step 60).
 Q-JPS-36: step 58 captured no head render for NIR_3464 (stopped) or NIR_3465 (never run), so those two frames are judged on this build's render alone: no dots and no red wires (step 60).
 Q-JPS-37: the plan expected no sky colour reference on the willow frames and one was found on both, so the saturation stage's second gate acts there too; across the seven frames measured the reference came from 116 to 5,033 texels and pointed 135 to 139 degrees (step 60).
@@ -1944,6 +2039,25 @@ Q-JPS-41: on NIR_1651 a thin warm fringe stays along the tree's right edge again
 Q-JPS-42: in the container the full sky map lands before the canvas stands still with the coarse one, so the coarse picture cannot be caught by waiting for it; step 60 held the full answer back at the page in a scratch script to draw it, and a reader's device may show the coarse picture for a different time (step 60).
 Q-JPS-43: a look whose sky saturation is up asks the sky lane for a map even with no smoothing and no depth, so Pink IR through its lift builds one where the head built none, and in the container's software graphics the two landing draws of about 3 s each put the strip's first redraw 6.3 s after a look press against 0.5 s on the head; the cost on a device is not measured, and asking only for the coarse map in that case (record 088, Option 8) needs a key of its own before it can be kept (step 60).
 Q-JPS-44: tools/tile-truth-walk.mjs measured the redraw with a fixed 3.4 s wait, which any extra draw in software graphics defeats; it now waits for the first tile to move (60 s at most) and prints how long that took, and --plant-frozen freezes the strip to prove the wait fails on nothing; its other two arms (A and B) still read after a fixed wait (step 60).
+Q-JPS-45: dark red specks along the wires and thin red edges on thin lattice members stay under Aerochrome in the head and in this build, seen on NIR_3460's far pylon and its wires and on NIR_3463's members at 2:1 (the lattice and far-pylon crops, opened); the red of the saturation stage is 0 on every frame compared, so these are the members' own one pixel edges, record 061's red and blue that do not line up at thin edges, and the dots on wires that the saturation stage's second gate and the robust map leave; the plan was not asked for them (steps 74 and 75).
+Q-JPS-46: under route H (record 087's Option 17) a light-blue cast sits in the lit parts of cloud puffs on NIR_1716, NIR_1824 and NIR_1667 that staging's grey lacks, and a faint light-blue smear stays near the cyan spot of NIR_1651's cloud (the pixels differing from staging went up on the three puffs: 28,590 against 22,583, 158,578 against 148,369 and 25,471 against 22,153); the cause is the per-pixel selection holding cloud from a ramp that starts at 0.12, which only Rejected 14's route would change and which brings back grey cirrus, so whether the cast matters is a look question for the reader with pictures (step 74).
+Q-JPS-47: NIR_1763's dead branches carry a cyan edge under route D and route H that staging lacks, from the same ramp change as Q-JPS-46 (step 74).
+Q-JPS-48: the offline selection-source capture returned no source on NIR_1716, NIR_1824 or NIR_1667 on the head build within 280 s, so those three frames have page renders only and no emulated picture (step 74).
+Q-JPS-49: a mass of blurred foliage in which no response reaches 0.25 anywhere along its connected flagged pixels is no longer cut from the sky map and the map takes its colour again; every blurred leaf mass on the frames read sits inside a piece that reaches 0.48 or more (NIR_3471's pieces of 15,335 and 14,323 pixels peak at 0.48 and 0.56), which is the frames read and not a guarantee (step 74).
+Q-JPS-50: a thin structure of low contrast (a response of 0.12 to 0.25 with nothing stronger joined to it) no longer cuts the sky map's coarse bitmap: 194 of NIR_3460's 199 flagged pieces and 398 of NIR_3461's 400 are of that kind, the small ones (wire crossings, insulators, a far pylon's thin members) and none of the main lattice, and what keeps a polluted tap out there is the robust map of decision 069 (step 74).
+Q-JPS-51: the vivid blue spot at the lower left of NIR_3471's dense blurred foliage is the sky's own colour seen through a real gap (the pixel is within 1.6, 2.9 and 3.6 levels of the open sky above it and passes the saturation stage's gates), so it is left as it is, and staging's paler grey there came from its ramp taking the pixel out of the selection (step 74).
+Q-JPS-52: tools/owner-images.json lists NIR_1805 and NIR_1813 only as camera JPEGs, so a step that names a raw by number from a contact sheet of JPEGs finds two names with no raw: the fetch printed the refusal and the step rendered the JPEG (step 74).
+Q-JPS-53: Bash lines outside a step's Commands list ran again in steps 74 and 75 (a count and a search joined by a semicolon and a pipe before the rules file was read, and a folder listing twice), and no gate refused them, and step 75's re-send read the plan file before the rules file as its first call, which no gate refused either; nothing changed by them (steps 74 and 75).
+Q-JPS-54: the selection builder costs 2 to 14 percent more than staging's head, which already carries the top-hat: timed in node on the container's processor from the captured sources, medians of five alternating runs, the head took 1,463, 1,621, 1,706 and 1,705 ms and this build 1,638, 1,661, 1,951 and 1,733 ms on NIR_3460, NIR_3461, NIR_3471 and NIR_1651 (spreads 139 to 598 ms, a browser render running beside it), the extra being the connected-piece labelling and the second round margin; it runs in the sky worker on a device, so what the reader waits for was left to step 76, which timed whole exports and not the builder: every full-size export of the tree took less time than any export of the build before the sky commit (205.7 to 226.9 s against 250.7 to 273.8 s in the container), so the extra builder time did not show in an export (steps 75 and 76).
+Q-JPS-55: with the thin-structure removal switched off (this build's three bundled copies of the subtraction made to return what they are given), NIR_3460 and NIR_3461 draw their wires over open sky and cloud dark and thin with the same dark red specks and no bright red wire or pink disc, the members blue-black where this build's read dark maroon, and no faint warm-grey glow beside the outer edges of the right and far pylons' legs, which this build has at 2:1; so on those two frames the second gate and the robust map keep wires clean and the removal's visible work is the members' colour and that glow; what it does on NIR_3467's roofline and antennas, NIR_3463 and NIR_1703's crowns, where the prototype of 2026-10-13 showed it, was not rendered with it off, and whether it still earns its cost on the pylon frames is a question for those frames, with pictures, for the reader (step 75).
+Q-JPS-56: check E1 of tools/tile-truth-walk.mjs ("no tile is redrawn while the reader's hand is still moving") reads red in the container on staging's head build as well as on this one (the run prints "2 slider moves over 4s", where the walk's own comment expects about 25, and 1 tile redrawn in the window on the head and 2 on this build), every other check of the walk (A1 to D3 and E2) green on both; the slider moves land about two seconds apart in software graphics, further apart than the app's 1.5 s idle window, so the walk's premise does not hold here and the check cannot tell a build that yields from one that does not; the same family as Q-JPS-44's fixed waits, and the walk's E arm needs the same wait-for-the-first-tile treatment before it can be read in a container (step 75).
+Q-JPS-57: in the container's picker open of NIR_3460 the decode lane was posted with the selection copy switched off and returned none, so the page built the first selection and coarse bitmap on the main thread and the page's own selection worker was never started, while main.ts asks for the copy (sky true) at the head start and at the first photograph's decode; which call posted it off was not read, and the sky worker was exercised by a direct ask of the shipped bundle instead (step 75).
+Q-JPS-58: an export that runs its per-pixel loop on the page (a photograph with stickers or a warp, an output under two megapixels, a browser with no module workers, a pool that failed) still builds its setup on the page after the strip is drawn, so the page is held for that long; the sky map was 95% of the 48.99 s hold in the container's trace of the same function, and only a resumable `buildSkyMap` would let that path yield inside it, which is the shared builder record 089 left alone (step 76).
+Q-JPS-59: every pooled export worker builds its own sky map and its own clarity map from its own copy of the source (three copies of one map side by side, 37 to 47 s each in the container), and the page reads the whole file through `getSource` before it asks them to, only to learn the frame's size and to hold the source for the path where it runs the loop itself (1.92 s of the 2.07 s hold that remains after the press in the container, 0.5 s on the iPad); neither is changed by record 089 (step 76).
+Q-JPS-60: the first iPad report's export took 1392.1 s and the second's 79.5 s for the same 20.9 MP; no run in the container came near a spread of that size (nine full-size exports of NIR_3461 under Aerochrome ran 170.6 to 273.8 s across three builds, and the three of one build never differed by more than 26 s), the report says the page was not hidden, and memory pressure, heat and a different edit are neither excluded nor read; the cause is not traced (step 76).
+Q-JPS-61: on the build before the sky commit the page ran a second main-thread task of 43.1, 36.3 and 41.3 s right after the export pool started, beside three workers on four cores, in all three runs, and the tree's build ran none; its cause is not traced, and it may be why that build's pixel stage was 29 s longer at the median (step 76).
+Q-JPS-62: until the sky map's first answer lands, the picture under Aerochrome shows red wires over the sky and a flatter sky (NIR_3461's screenshot taken when the new line first showed, opened), because the saturation stage's second gate and the smoothing have no map to read; the line now says "refining" for as long as it lasts and nothing shortens it, and in the container the page is held 65 s before it can paint at all, so how long a reader sees that picture is a device's figure and not measured (step 76).
+Q-JPS-63: tools/surfaces.mjs lists pages and dialogs only, so a standing element over the photograph is measured only by a section written for it: the new refining line has section 11 of the accessibility walk, and the export strip's "Preparing" words and the file-kind chip are in no section; the 700 ms before the line is written is a choice, not a measurement (step 76).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -2520,7 +2634,7 @@ user-scalable=no.
   Shipped 2026-09-28 in v2.63.36 (8c7915f on main). Left open: the device pass the v2.63.33 staging entry asks for on the iPad, with no result recorded; and 069's cloud checks on the turned frames.
 
 - [ ] **Wires, pylons and roof fittings sit inside the look's sky selection, and the sky stages colour them** <!-- decision: 087 -->
-  **Shown as:** Under Aerochrome, power lines, pylons and roof fittings stay dark instead of turning red and blue, and the soft pink and blue spots beside them are gone.
+  **Shown as:** Under Aerochrome, power lines, pylons and roof fittings stay dark instead of turning red and blue, and the sky between a pylon's members, thin cloud and the sky beside leaves keep the sky's own colour.
   Seen on both devices 2026-10-11, on production 2.65.13 and staging 2.65.14.
   The look's selection holds a wire, because a wire has the sky's own colour on
   both sides and is a pixel or two wide, which neither the colour grow nor the
@@ -2529,19 +2643,32 @@ user-scalable=no.
   beside it follows (069's option 12), and a pylon member's red and blue fringe
   is multiplied too. The chosen shape takes thin structures out of the selection
   in the one builder every path shares: a black and a white top-hat of luminance,
-  an 11 px square element at the 1024 grid, spread 2 px, which can only take sky
-  away. The element is a plateau (7 to 13 px moves the removed share by under 2
-  points); the contrast ramp and the spread are not, and the record says so.
+  an 11 px element at the 1024 grid, which can only take sky away. The element is
+  a plateau (7 to 13 px moves the removed share by under 2 points). **Changed
+  2026-10-14 for the three artefacts the reader saw on staging:** a thin response
+  counts from 12% of the frame's own brightness scale and in full from 25% (it was
+  5% to 12%, the band thin cloud and a wire over open sky both live in), and the
+  margin round it fades over 3 px (it was a 5 by 5 square, which left blocky
+  islands in a lattice's gaps and a pale rim round every leaf).
   **Built and rendered 2026-10-13 on the reader's raws, software graphics in a
   container, every picture opened:** the red the stage makes is 0 on all the
   frames compared, the wires dark and thin, the discs and blue lattice spots
   gone, the open sky and cloud the same to within 0.3 levels where measured.
-  **What it costs, seen and not fixed:** the sky between a lattice's struts and
-  between willow strands goes grey with blue blobs (NIR_3460's left pylon, NIR_3471's
-  upper right), a thin cirrus streak is a line and goes neutral grey with a pale halo
-  at the leaves (NIR_3471), foliage the selection used to hold reads dark red and not
-  scarlet, and on the willow frames the selection loses 73% to 76%. A render sweep of
-  the ramp and the spread against those costs is queued, not done. See
+  **Changed 2026-10-15 for two more artefacts that change brought:** out-of-focus
+  leaves in front of the sky turned teal and the sky seen through their gaps came out
+  as pale discs, because the sky colour map is weighted by the coarse bitmap and that
+  bitmap held the blurred foliage. The map is now built from plain sky only: the
+  coarse bitmap is cut where a window of the element's size has at least half its
+  pixels standing out by more than 5% of the scale, and only a connected piece of
+  that cut which holds a response of 25% or more is kept, so thin cloud's own texture
+  is not cut. The per-pixel selection is not cut by it.
+  **What it costs, seen and not fixed:** a light-blue cast in the lit parts of cloud
+  puffs on some frames (NIR_1716, NIR_1824, NIR_1667) and a faint smear in NIR_1651's
+  cloud, dark red specks along wires and red edges on thin lattice members as before,
+  foliage the selection used to hold reads dark red and not scarlet, and on the
+  willow frames the selection loses 73% to 76%. The lattice's grey, the grey cirrus
+  and the leaf halo of staging are gone on the frames read (queue lines Q-JPS-33 and
+  Q-JPS-34). See
   `docs/decisions/087-wires-pylons-and-roof-fittings-sit-inside-the-looks-sky-selection-and-the-sky-stages-colour-them.md`.
 - [ ] **The look's sky map lands seconds after the picture, and is built again on every visit** <!-- decision: 088 -->
   **Shown as:** After a look is pressed its sky colour reaches the picture sooner, and coming back to a photograph shows its sky at once.
@@ -2555,6 +2682,17 @@ user-scalable=no.
   localStorage so a first visit is not delayed by a store read. The coarse map is built
   with 069's robust estimate. Not measured on a device. See
   `docs/decisions/088-the-looks-sky-map-lands-seconds-after-the-picture-and-is-built-again-on-every-visit.md`.
+- [ ] **Pressing Export leaves the page held with nothing drawn, and the look's sky refines without saying so** <!-- decision: 089 -->
+  **Shown as:** Pressing Export shows at once that the export has begun, with words and a figure that move from the start, and a line says while a look's sky is still being refined.
+  On the iPad the press held the page 9.91 s and 9.95 s with the strip not yet drawn,
+  and the figure then sat at 0% while the export got ready. The page was building, for
+  nothing, the setup that each of its workers builds again for itself (the sky map is 95%
+  of it in a trace of the build in the container). The chosen shape says "preparing" in
+  the frame after the press, builds that setup only on a thread that will run the
+  per-pixel loop, counts the workers' setup as a stage of its own, names it in the
+  report, and adds one standing line over the photograph that says in words while the
+  sky lane is building the map. Not measured on a device. See
+  `docs/decisions/089-pressing-export-leaves-the-page-held-with-nothing-drawn-and-the-looks-sky-refines-without-saying-so.md`.
 - [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
   **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.
   Sky colour smoothing pulls a white or grey pixel inside the sky toward the

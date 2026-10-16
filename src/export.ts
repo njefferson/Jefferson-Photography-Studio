@@ -243,6 +243,13 @@ export interface ExportProfile {
   megapixels: number;
   total: number;
   source: number;
+  /** THE MAIN THREAD'S OWN SETUP FOR THE PER-PIXEL PASS (the sky map, the
+   *  clarity map, the compiled edit, the glow map): milliseconds, and zero when
+   *  the pool ran, because then the main thread builds none of it. It is its own
+   *  stage so the stages add up to the total: on the two device reports of
+   *  2026-10-14 this setup was the 9.4 s and 9.6 s that no stage named, and the
+   *  same seconds the page spent held with the strip unpainted. */
+  setup: number;
   pixels: number;
   watermark: number;
   encode: number;
@@ -366,10 +373,12 @@ function forTheWire(current: DecodedImage): DecodedImage {
 export function exportImage(
   file: ImportedFile, current: DecodedImage, params: EditParams,
   opts: ExportOptions & { raw: true }, onProgress?: (fraction: number) => void, lens?: LensCurve | null, sky?: BrushMask | null, skyFine?: BrushMask | null,
+  onPrepare?: (fraction: number) => void,
 ): Promise<BandResult>;
 export function exportImage(
   file: ImportedFile, current: DecodedImage, params: EditParams,
   opts: ExportOptions, onProgress?: (fraction: number) => void, lens?: LensCurve | null, sky?: BrushMask | null, skyFine?: BrushMask | null,
+  onPrepare?: (fraction: number) => void,
 ): Promise<ExportResult>;
 export async function exportImage(
   file: ImportedFile,
@@ -394,8 +403,18 @@ export async function exportImage(
   /** Its refinement to the photograph's edges (skyfine.ts), for
    *  `params.skyDepth`; the depth is off without it. */
   skyFine?: BrushMask | null,
+  /** HOW FAR THE SETUP HAS GOT, 0 to 1, called as this thread makes what its own
+   *  per-pixel pass needs (below, `getReady`): 0.05 once a band has read its
+   *  source, a step each time the sky map has read another twentieth of the
+   *  frame's rows (from 0.05 up to 0.95), 1 when it is done. Called only on a
+   *  thread that really does that setup — a band in a worker, or the main thread
+   *  when it runs the pass itself — and never on the main thread of a pooled
+   *  export, which builds none of it. The figure never goes down. Optional: a
+   *  caller with nothing to show passes none and the setup runs exactly as it
+   *  did. */
+  onPrepare?: (fraction: number) => void,
 ): Promise<ExportResult | BandResult> {
-  const __t: ExportProfile = { megapixels: 0, total: 0, source: 0, pixels: 0, watermark: 0, encode: 0, tag: 0, yields: 0, yieldMs: 0, threads: 1 };
+  const __t: ExportProfile = { megapixels: 0, total: 0, source: 0, setup: 0, pixels: 0, watermark: 0, encode: 0, tag: 0, yields: 0, yieldMs: 0, threads: 1 };
   // A NEW EXPORT OWNS ITS OWN ANSWER. Left over from the previous one, a
   // reason would attach itself to a run that succeeded.
   if (!opts.raw) liveFallback = null;
@@ -406,6 +425,12 @@ export async function exportImage(
   let __a = __start;
   const src = getSource(file, current);
   __mark("source", __a);
+  // A BAND HAS READ ITS SOURCE: the first figure a worker can give for its setup,
+  // five hundredths, so the strip's figure moves as soon as the workers are up and
+  // not only after the sky map has read its first twentieth. Only a band says it:
+  // on the main thread of a pooled export the figure is the pool's, and a second
+  // voice would take it backwards.
+  if (opts.raw) onPrepare?.(0.05);
   const srcW = "cfa" in src ? src.cfa.width : src.width;
   const srcH = "cfa" in src ? src.cfa.height : src.height;
   const rot = ((opts.rotate ?? 0) % 4 + 4) % 4;
@@ -542,10 +567,8 @@ export async function exportImage(
   // and dehaze are measured against the background it covers. They are read
   // at the WARPED position, though (mapAt below): warp moves pixels a long way,
   // and the map has to follow the pixel.
-  const localMap =
-    (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0
-      ? buildLocalMap(mapSample, srcW, srcH)
-      : undefined;
+  // (The clarity/dehaze map itself is made in `getReady`, below, with the other
+  // things only the per-pixel pass reads.)
   // The measured lens curve is a PIPELINE stage now, so the export gets it the
   // same way it gets everything else. It used to wrap the raw sampler here,
   // which worked and meant the export had its own copy of a correction the
@@ -658,22 +681,69 @@ export async function exportImage(
   // base is the denoise result, so holding it back must restore that and not
   // undo the denoise with it.
   const sampleLinear = aimedSampler(noiseAimed, detailed, aimGroups, AIM_TEXTURE, srcW, srcH);
-  // THE SKY MAP, from THE SAME PRE-PASSED SAMPLER the pixels come through — not
-  // the raw source. Built from the raw source it targeted a sky 16% more
-  // saturated than the rendered one (skymap.ts has the numbers), because the
-  // bilateral lowers a noisy sky's chroma and a raw render does not know that.
-  // Built here rather than handed in, so a worker band and the main thread each
-  // derive it from the same sampler and the same params. Skipped when the
-  // amount is off or no sky was found, which is what makes it cost nothing on
-  // the frames that do not need it.
-  const skyMap = ((params.skySmooth ?? 0) > 0 || ((params.skyDepth ?? 0) > 0 && skyFine)) && sky
-    ? buildSkyMap(sampleLinear, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, gradeLens, sky, flat, params.warp)
-    : null;
-  // A raw's pixels already carry the flat (above), so the grade gets no curve
-  // for it; an 8-bit source still takes it here. The flat itself goes in as
-  // `srcFlat`, so highlight recovery reads each pixel's clip as the sensor
-  // recorded it — the same division the preview's shader makes.
-  const edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, gradeLens, skyMap, skyFine ?? null, flat);
+  // WHAT ONLY THE PER-PIXEL LOOP READS, MADE WHEN A LOOP IS ABOUT TO RUN ON THIS
+  // THREAD AND NOT BEFORE. The clarity map, the sky map, the compiled edit and
+  // the glow map used to be made here, ahead of everything, on the main thread —
+  // and in a pooled export the main thread never runs the loop: every band
+  // builds its own copy in its worker. So the page sat held for the sky map's
+  // whole build (9.91 s and 9.95 s on the two device reports of 2026-10-14, the
+  // same seconds `ExportProfile` left unlabelled) before it had asked a single
+  // worker for anything, and the progress strip, set a line earlier, could not
+  // be painted. Now a pooled export builds none of it on the page. A band, and
+  // the main thread when the pool did not run or failed, call `getReady` just
+  // before their loop, with the same inputs in the same order as before, so what
+  // the loop reads is the same bytes.
+  let localMap: ReturnType<typeof buildLocalMap> | undefined;
+  let skyMap: ReturnType<typeof buildSkyMap> = null;
+  let edit!: ReturnType<typeof compileEdit>;
+  let gmap: ReturnType<typeof buildGlowMap> | null = null;
+  let isReady = false;
+  /** Make the four things above. Takes nothing and returns nothing; safe to call
+   *  twice. What it must satisfy: after it, `edit` is the compiled edit of
+   *  `params` over exactly the clarity map, sky map and glow map the old inline
+   *  setup made, and `onPrepare` has last been called with 1. */
+  const getReady = (): void => {
+    if (isReady) return;
+    isReady = true;
+    localMap =
+      (params.clarity ?? 0) !== 0 || (params.dehaze ?? 0) !== 0
+        ? buildLocalMap(mapSample, srcW, srcH)
+        : undefined;
+    // THE SKY MAP, from THE SAME PRE-PASSED SAMPLER the pixels come through — not
+    // the raw source. Built from the raw source it targeted a sky 16% more
+    // saturated than the rendered one (skymap.ts has the numbers), because the
+    // bilateral lowers a noisy sky's chroma and a raw render does not know that.
+    // Built here rather than handed in, so a worker band and the main thread each
+    // derive it from the same sampler and the same params. Skipped when the
+    // amount is off or no sky was found, which is what makes it cost nothing on
+    // the frames that do not need it.
+    //
+    // ITS PROGRESS IS READ OFF THE SOURCE ROW IT TAPS. The map is built a row of
+    // texels at a time from the top of the frame down, so the source row of the
+    // tap being read says how far it has got, and counting it here leaves the
+    // shared builder (skymap.ts, which the page and its lane also use) alone.
+    // Twentieths only, so a callback is not made for every tap.
+    let step = -1;
+    const report = onPrepare;
+    const counted = report
+      ? (x: number, y: number) => {
+          const s = Math.floor(((y + 1) / srcH) * 20);
+          if (s > step) { step = s; report(0.05 + 0.9 * Math.min(1, s / 20)); }
+          return sampleLinear(x, y);
+        }
+      : sampleLinear;
+    skyMap = ((params.skySmooth ?? 0) > 0 || ((params.skyDepth ?? 0) > 0 && skyFine)) && sky
+      ? buildSkyMap(counted, srcW, srcH, params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, gradeLens, sky, flat, params.warp)
+      : null;
+    // A raw's pixels already carry the flat (above), so the grade gets no curve
+    // for it; an 8-bit source still takes it here. The flat itself goes in as
+    // `srcFlat`, so highlight recovery reads each pixel's clip as the sensor
+    // recorded it — the same division the preview's shader makes.
+    edit = compileEdit(params, "cfa" in src ? src.cam : undefined, srcW / srcH, localMap, gradeLens, skyMap, skyFine ?? null, flat);
+    // HIE glow map at full resolution (cheap: built on a coarse grid).
+    gmap = params.glow > 0 ? buildGlowMap(mapSample, srcW, srcH) : null;
+    onPrepare?.(1);
+  };
   // Scaled exports (50% / 25%) BOX-FILTER instead of decimating: each output
   // pixel averages an ss×ss grid of source taps placed in OUTPUT space and
   // mapped through toSrcF — so the filter stays correct under crop, rotation,
@@ -716,8 +786,7 @@ export async function exportImage(
     return boxOut;
   };
 
-  // HIE glow map at full resolution (cheap: built on a coarse grid).
-  const gmap = params.glow > 0 ? buildGlowMap(mapSample, srcW, srcH) : null;
+  // (The HIE glow map, `gmap`, is made in `getReady` above.)
   // WHERE A PIXEL CAME FROM under the warp, as image-uv: the glow and the
   // clarity/dehaze maps are built from the UNWARPED source, so they are read at
   // the displaced position — the shader's warpUv(v_uv) — or a pushed highlight
@@ -800,7 +869,7 @@ export async function exportImage(
           // and a lossy-linear DNG, whose tiles only the browser can decode, so
           // its codes travel), which is `sourceIsMosaiced`'s test.
           sourceIsMosaiced(file) ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
-          params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, job, onProgress);
+          params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, job, onProgress, onPrepare);
         // The JPEG path asked for 8-bit bands, so 8-bit bands are what came
         // back; the check is here rather than assumed because `exportBands`
         // now returns one of two shapes and a missing buffer must fall through
@@ -817,6 +886,17 @@ export async function exportImage(
     // DECIDED, either way — whether the pool ran or the export fell through to
     // the loop below, the number is now known and the strip can stop guessing.
     if (!opts.raw) { liveThreads = __t.threads; liveFallback = __t.fallback ?? null; }
+    // THE SETUP THE LOOP BELOW READS, only when the loop will run on this thread:
+    // a band, or an export the pool did not take. Its own stage in the profile; the
+    // `pixels` clock is moved on by what it took, so the two do not overlap and
+    // the time a failed pool attempt spent still counts in `pixels`.
+    if (!ranParallel) {
+      const t0 = performance.now();
+      getReady();
+      const spent = performance.now() - t0;
+      __t.setup += spent;
+      __a += spent;
+    }
     // ADOPTED ABOVE, OR MADE HERE — never both.
     data ??= new Uint8ClampedArray(bandW * bandH * 4);
     for (let oIdx = ranParallel ? to : from; oIdx < to; oIdx++) {
@@ -967,7 +1047,7 @@ export async function exportImage(
         const split = await exportBands(
           file,
           sourceIsMosaiced(file) ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
-          params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, jobT, onProgress);
+          params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, jobT, onProgress, onPrepare);
         if (!split.rgb) throw new Error("the workers returned no 16-bit pixels");
         rgb = split.rgb;   // ADOPTED, not copied into a buffer made in advance
         __t.threads = split.threads;
@@ -978,6 +1058,14 @@ export async function exportImage(
       }
     }
     if (!opts.raw) { liveThreads = __t.threads; liveFallback = __t.fallback ?? null; } // see the JPEG branch above
+    // The setup, only when the loop below runs on this thread — see the JPEG branch.
+    if (!ranParallelT) {
+      const t0 = performance.now();
+      getReady();
+      const spent = performance.now() - t0;
+      __t.setup += spent;
+      __a += spent;
+    }
     rgb ??= new Uint16Array(bandW * bandH * 3);   // adopted above, or made here
     for (let oIdx = ranParallelT ? to : from; oIdx < to; oIdx++) {
       if (oIdx % 16 === 0) {

@@ -43,6 +43,7 @@
 //   8  the busy card while a keep waits for the last session's delete
 //   9  the busy card offering to skip a file that has not finished reading
 //  10  the session strip offering to skip a later file of a set
+//  11  the line that says the look's sky is still being refined
 //
 // Feature-specific a11y probes stay in the scratchpad, per release. What makes
 // this one repo-worthy is the coverage assertion: it is the only thing here
@@ -1005,6 +1006,88 @@ try {
       await Promise.all([...SIZES.map((size) => stalled(size)), ...SIZES.map((size) => stalledTwo(size))]);
       for (const [kind, line] of lines) (kind === "ok" ? ok : kind === "fail" ? fail : note)(line);
     } finally { rmSync(tmp, { recursive: true, force: true }); }
+  }
+  // ── 11 ─────────────────────────────────────────────────
+  // THE LINE THAT SAYS THE LOOK'S SKY IS STILL BEING REFINED (decision 089).
+  // Under Aerochrome the sky colour reaches the picture after it: the sky map
+  // lane builds a coarse map and then the full one, seconds apart on a tablet,
+  // and a standing line in the stage says so in words between the ask and the
+  // answer. It is a surface of its own (a live region over the photograph, in
+  // none of the pages' dialogs), so it joins the sweep here, in the commit that
+  // creates it. The state is the app's own and is reached by the app's own
+  // presses: a practice raw, the Aerochrome button, and the lane's real build,
+  // which takes seconds in a container too. Every check polls the page's TEXT,
+  // synchronous DOM state, never a promise or a worker's answer.
+  if (want(11)) console.log("\n11 — the line that says the look's sky is still being refined");
+  if (want(11)) {
+    // PRESENT AND EMPTY AT PARSE, or its first words are not announced: a live
+    // region created, or revealed, with its text in it is not a change.
+    const html = await fetch(`${BASE}/ir.html`).then((r) => r.text());
+    if (/<p id="skyRefine" role="status" aria-live="polite" aria-atomic="true"><\/p>/.test(html)) ok("the refining line is a live region, present and empty in the page as served");
+    else fail("the refining line is not an empty role=status live region in the page as served");
+    for (const theme of THEMES) for (const size of SIZES) {
+      const where = `[${theme} ${size.name}]`;
+      const page = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
+      page.on("dialog", (d) => d.accept());
+      try {
+        await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+        const standing = await page.evaluate(() => {
+          const el = document.getElementById("skyRefine");
+          return !el ? null : { text: el.textContent, hiddenAncestor: !!el.closest("[hidden]"), live: el.getAttribute("aria-live"), role: el.getAttribute("role"), shown: getComputedStyle(el).display !== "none" };
+        });
+        if (!standing) { fail(`${where} there is no #skyRefine on ir.html`); continue; }
+        if (standing.text !== "" || standing.hiddenAncestor || !standing.shown || standing.live !== "polite" || standing.role !== "status") {
+          fail(`${where} #skyRefine at rest: text "${standing.text}", inside something hidden ${standing.hiddenAncestor}, rendered ${standing.shown}, aria-live ${standing.live}, role ${standing.role}`);
+          continue;
+        }
+        ok(`${where} #skyRefine at rest: empty, rendered, not inside anything hidden, polite status`);
+        await page.setInputFiles("#file", ONE);
+        await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 120000 });
+        await page.waitForTimeout(1500);
+        await page.evaluate(() => { document.querySelector("#ptab-ir")?.click(); document.querySelector("#lookEir")?.click(); });
+        // The words come a moment after the lane is asked, and stay until its full
+        // answer lands. Polled as text.
+        const up = await page.waitForFunction(() => (document.getElementById("skyRefine")?.textContent ?? "").length > 0, null, { timeout: 120000, polling: 200 }).then(() => true).catch(() => false);
+        if (!up) { fail(`${where} the line never said the sky was being refined after Aerochrome was pressed`); continue; }
+        const m = await page.evaluate(() => {
+          const el = document.getElementById("skyRefine");
+          const cs = getComputedStyle(el);
+          const parse = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+          const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+          const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+          const fg = parse(cs.color), bg = parse(cs.backgroundColor);
+          const a = bg.length > 3 ? bg[3] : 1;
+          // THE WORST BACKDROP FOR LIGHT TEXT ON DARK GLASS is a white picture behind it.
+          const worst = [0, 1, 2].map((i) => bg[i] * a + 255 * (1 - a));
+          const L1 = lum(fg), L2 = lum(worst);
+          const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+          const r = el.getBoundingClientRect();
+          // Every control's box, now, and again with the line emptied and refilled in the same task.
+          const boxes = () => [...document.querySelectorAll("button, input, select, textarea, a[href], [role=tab]")].filter((n) => n.getClientRects().length).map((n) => { const b = n.getBoundingClientRect(); return [n.id || n.tagName, Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)].join(":"); });
+          const words = el.textContent;
+          const withLine = boxes();
+          el.textContent = "";
+          const without = boxes();
+          el.textContent = words;
+          const moved = withLine.filter((x, i) => x !== without[i]);
+          // WHAT IS UNDER THE MIDDLE OF THE LINE, by hit test: it must not be the line.
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return { words, fontPx: parseFloat(cs.fontSize), ratio: Math.round(ratio * 100) / 100, position: cs.position, pe: cs.pointerEvents, moved, takesTap: hit === el, inView: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5, scroll: document.documentElement.scrollWidth > innerWidth, anim: cs.animationName, trans: cs.transitionDuration };
+        });
+        note(`${where} the line says: "${m.words}" (${m.fontPx}px, ${m.ratio}:1 over the worst backdrop)`);
+        if (m.words.trim().length >= 12) ok(`${where} the meaning is in words`); else fail(`${where} the line's words are too short to say anything: "${m.words}"`);
+        if (m.fontPx >= 11) ok(`${where} text is ${m.fontPx}px, at or over the 11px floor`); else fail(`${where} text is ${m.fontPx}px, under the 11px floor`);
+        if (m.ratio >= 4.5) ok(`${where} text reads ${m.ratio}:1 over the worst backdrop`); else fail(`${where} text reads ${m.ratio}:1 over the worst backdrop, under 4.5`);
+        if (m.position === "absolute" && m.moved.length === 0) ok(`${where} absolutely placed, and emptying then refilling it moves no control`); else fail(`${where} position ${m.position}; controls moved by it: ${m.moved.join(" ")}`);
+        if (m.pe === "none" && !m.takesTap) ok(`${where} takes no tap (pointer-events none)`); else fail(`${where} pointer-events ${m.pe}, takes a tap ${m.takesTap}`);
+        if (m.inView && !m.scroll) ok(`${where} wholly inside the window, no sideways scroll`); else fail(`${where} line in view ${m.inView}, sideways scroll ${m.scroll}`);
+        if ((m.anim === "none" || m.anim === "") && /^0s(, 0s)*$/.test(m.trans)) ok(`${where} no animation and no transition, so nothing for reduced motion to switch off`); else fail(`${where} animation "${m.anim}", transition "${m.trans}"`);
+        await axeLine(page, `ir.html ${where} the editor while the look's sky is being refined`);
+        // AND IT GOES: the full map lands and the line empties. Polled as text.
+        const gone = await page.waitForFunction(() => (document.getElementById("skyRefine")?.textContent ?? "") === "", null, { timeout: 300000, polling: 500 }).then(() => true).catch(() => false);
+        if (gone) ok(`${where} the line emptied when the sky was done`); else fail(`${where} the line was still up five minutes after Aerochrome was pressed`);
+      } finally { await page.close(); }
+    }
   }
 } finally {
   await browser.close();

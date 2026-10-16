@@ -40,6 +40,11 @@ interface WorkerScope {
 const ctx = self as unknown as WorkerScope;
 ctx.addEventListener("message", (e: MessageEvent) => {
   const req = e.data as BandRequest;
+  // THE FIRST THING THE MAIN THREAD HEARS, before the file is even read: this
+  // worker is up and has begun getting ready. Its setup (the sky map above all)
+  // is seconds long and says nothing until its pixel pass starts, so without
+  // this the strip had no figure to show for the whole of it.
+  ctx.postMessage({ id: req.id, prep: 0 });
   void (async () => {
     try {
       const res: BandResult = await exportImage(
@@ -53,6 +58,9 @@ ctx.addEventListener("message", (e: MessageEvent) => {
         req.lens,
         req.sky,
         req.skyFine,
+        // The setup's own figure, in the same twentieths. A message with `prep` and
+        // none with `progress`, so the pool can tell the two stages apart.
+        (f) => { if (f === 1 || Math.round(f * 20) !== Math.round((f - 0.05) * 20)) ctx.postMessage({ id: req.id, prep: f }); },
       );
       // EITHER SHAPE OF BAND, TRANSFERRED RATHER THAN COPIED. A TIFF band has
       // no `data` — it carries `rgb`, sixteen bits a channel — so this read
