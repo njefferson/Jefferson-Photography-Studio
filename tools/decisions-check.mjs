@@ -148,6 +148,81 @@ for (const item of [...open, ...archived]) {
 }
 if (!bad) ok("every record is about the item that claims it");
 
+// ---- 2c. A RECORD WITH AN OUTCOME WHOSE ITEM IS STILL OPEN SAYS WHAT SURVIVES.
+//
+// WHAT IT COST, 2026-10-17. Record 087 had an Outcome that took the stages it
+// was about out of Aerochrome, and its roadmap item was still open, still telling
+// the in-app reader that the sky stages colour wires and pylons and still ranked
+// among the work to do. 088 and 089 stood beside it describing a map and a line
+// that no built-in look asked for any more; 013's sky half said "shipped" about a
+// stage the look no longer carried; 010 had said "superseded" in its own title
+// for as long as the queue existed. The roadmap in NOTES.md is the index and the
+// rank, and the in-app dialog is built from it, so an item that is open while its
+// record says it is done tells the next session and the reader something false,
+// and nothing could see it: check 1 only asks whether a record EXISTS.
+//
+// THE RULE. An OPEN item whose record carries a heading `## Outcome...` must say,
+// in its own bullet, what survives of it: a paragraph opening `**What survives:**`
+// (a date in brackets after the word is allowed) with at least 40 characters under
+// it. A record with an Outcome that is wholly done is ARCHIVED instead (the archive
+// needs an Outcome, check 3). The marker is a declared shape rather than a pattern
+// for prose, for the reason section 3b's list is: no parser tells a sentence about
+// what survives from a sentence shaped like one, and a marker can at least be
+// required and counted.
+//
+// THE BACKLOG. None. Every open item that had an Outcome when this was written was
+// brought up to date in the same commit. 087 and 088 stay OPEN, as internal items,
+// each with a "What survives" paragraph, because the notes check's freshness rule
+// refuses archiving them (dated the 17th, they would become the newest entries and
+// the rendered window's oldest would then fall outside the fourteen-day limit);
+// 013 (the third open item whose record has an Outcome) carries it too, and so do
+// 052, 069, 073 and 089, whose records have no Outcome section yet; 010, which had said
+// "superseded" in its own title, is the one that was archived. So there is no
+// declared list to shrink. A future case is a refusal, not a row.
+/** The text of one roadmap bullet: its line through the line before the next
+ *  bullet or `## ` heading. Takes an item from `boxes`; returns the block joined
+ *  with newlines. What the caller relies on: it never reaches into the next
+ *  bullet, so one item cannot borrow another's marker. */
+function blockOf(item) {
+  const out = [];
+  for (let i = item.line - 1; i < lines.length; i++) {
+    if (i > item.line - 1 && (/^-\s+\[[ xX]\]\s/.test(lines[i]) || /^##\s/.test(lines[i]))) break;
+    out.push(lines[i]);
+  }
+  return out.join("\n");
+}
+const SURVIVES_MIN = 40;
+/** The words after a `**What survives:**` marker in a bullet block, up to the next
+ *  bold span or the end of the block, or null when there is no marker. Takes the
+ *  block; returns the text with whitespace collapsed. What the caller relies on:
+ *  null means the bullet says nothing of what survives, and a short string means
+ *  it opens the marker and says nothing under it. */
+function survivesOf(block) {
+  const m = /\*\*What survives(?:\s*\([^)]*\))?:\*\*\s*([\s\S]*?)(?=\*\*|$(?![\s\S]))/.exec(block);
+  return m ? m[1].replace(/\s+/g, " ").trim() : null;
+}
+{
+  const withOutcome = [];
+  for (const item of open) {
+    const k = keyOf(item.text);
+    if (!k || !byKey.has(k)) continue;
+    const rec = readFileSync(join(DIR, byKey.get(k)), "utf8");
+    if (!/^##\s+Outcome\b/mi.test(rec)) continue;
+    const said = survivesOf(blockOf(item));
+    withOutcome.push(`${k} ${said && said.length >= SURVIVES_MIN ? "says what survives" : "SAYS NOTHING OF WHAT SURVIVES"}`);
+    if (said === null) {
+      fail(`roadmap line ${item.line}, "${titleOf(item.text)}" is OPEN and docs/decisions/${byKey.get(k)} carries an "## Outcome" section, `
+        + `but the bullet has no "**What survives:**" paragraph. Say what survives of it in the bullet, or archive the item.`);
+    } else if (said.length < SURVIVES_MIN) {
+      fail(`roadmap line ${item.line}, "${titleOf(item.text)}" opens "**What survives:**" and says only ${said.length} character(s) under it (at least ${SURVIVES_MIN}). `
+        + `A marker with nothing under it is the shape of having said it.`);
+    }
+  }
+  console.log(`\n  open items whose record has an Outcome (${withOutcome.length}):${withOutcome.length ? "" : " none"}`);
+  for (const r of withOutcome) console.log(`    ${r}`);
+  if (!bad) ok("every open item whose record has an Outcome says what survives of it");
+}
+
 // ---- 3. EVERY RECORD IS FILLED IN. A heading with nothing under it is the
 // slot this whole system exists to refuse: the shape of having done the
 // thinking, without the thinking.

@@ -1018,6 +1018,10 @@ try {
   // presses: a practice raw, the Aerochrome button, and the lane's real build,
   // which takes seconds in a container too. Every check polls the page's TEXT,
   // synchronous DOM state, never a promise or a worker's answer.
+  // SINCE 2026-10-17 THE AEROCHROME PRESS ALONE BRINGS NO LINE (decision 087,
+  // Outcome): the look carries no sky stage, so the section first asserts the line
+  // stays empty after the press, then moves the Sky colour smoothing slider by hand,
+  // which is the route to the line that is left, and measures the surface there.
   if (want(11)) console.log("\n11 — the line that says the look's sky is still being refined");
   if (want(11)) {
     // PRESENT AND EMPTY AT PARSE, or its first words are not announced: a live
@@ -1045,10 +1049,27 @@ try {
         await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 120000 });
         await page.waitForTimeout(1500);
         await page.evaluate(() => { document.querySelector("#ptab-ir")?.click(); document.querySelector("#lookEir")?.click(); });
-        // The words come a moment after the lane is asked, and stay until its full
-        // answer lands. Polled as text.
+        // AEROCHROME ASKS FOR NO SKY MAP SINCE 2026-10-17 (decision 087, Outcome): the
+        // look carries no Sky saturation and no Sky colour smoothing, so nothing asks
+        // the sky lane for a map and the line stays empty. This is the check that
+        // used to wait for the line to come up; it now asserts the line is GONE after
+        // the press. The window is a time because the absence of a line has no event
+        // to wait for: 20 s, against the seconds this practice raw's lane took to
+        // bring the line up under the build that still asked (the failing line of the
+        // control run prints that time).
+        const goneAfter = 20000;
+        const pressed = Date.now();
+        const cameUp = await page.waitForFunction(() => (document.getElementById("skyRefine")?.textContent ?? "").length > 0, null, { timeout: goneAfter, polling: 200 }).then(() => true).catch(() => false);
+        if (cameUp) { fail(`${where} the line came up ${Date.now() - pressed} ms after Aerochrome was pressed, so the look asks the sky lane for a map again`); continue; }
+        ok(`${where} the line stayed empty for ${goneAfter / 1000} s after Aerochrome was pressed: the look asks for no sky map`);
+        // THE LINE STILL APPEARS FOR A READER WHO MOVES THE SKY COLOUR SMOOTHING (or the
+        // Sky depth) SLIDER BY HAND, because those two stages still read the map, and
+        // the surface is measured there: the same slider the reader has, moved the same
+        // way, and the lane's real build. The words come a moment after the lane is
+        // asked, and stay until its full answer lands. Polled as text.
+        await page.evaluate(() => { const el = document.getElementById("skySmooth"); el.value = "1"; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
         const up = await page.waitForFunction(() => (document.getElementById("skyRefine")?.textContent ?? "").length > 0, null, { timeout: 120000, polling: 200 }).then(() => true).catch(() => false);
-        if (!up) { fail(`${where} the line never said the sky was being refined after Aerochrome was pressed`); continue; }
+        if (!up) { fail(`${where} the line never said the sky was being refined after the Sky colour smoothing slider was moved to 1 by hand`); continue; }
         const m = await page.evaluate(() => {
           const el = document.getElementById("skyRefine");
           const cs = getComputedStyle(el);
@@ -1085,7 +1106,7 @@ try {
         await axeLine(page, `ir.html ${where} the editor while the look's sky is being refined`);
         // AND IT GOES: the full map lands and the line empties. Polled as text.
         const gone = await page.waitForFunction(() => (document.getElementById("skyRefine")?.textContent ?? "") === "", null, { timeout: 300000, polling: 500 }).then(() => true).catch(() => false);
-        if (gone) ok(`${where} the line emptied when the sky was done`); else fail(`${where} the line was still up five minutes after Aerochrome was pressed`);
+        if (gone) ok(`${where} the line emptied when the sky was done`); else fail(`${where} the line was still up five minutes after the Sky colour smoothing slider was moved`);
       } finally { await page.close(); }
     }
   }

@@ -51,7 +51,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP, keepSkyMap, getKeptSkyMap, keptSkyMapHint, photographStamp, digestBytes } from "./maskstore";
-import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, skyReference, type SkyMap } from "./pipeline";
+import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, skyReference, SKY_SAT_SECOND_GATE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache, type HealSolves } from "./heal";
@@ -1979,7 +1979,8 @@ interface Look {
    *  here and not on the hue band (decision 019). Creative; rides a saved look. */
   skySat?: number;
   /** Whether Restore depth may top up this look's Sky saturation. Absent is
-   *  true. False on Bold Pink (decision 078), whose sky stages are off on
+   *  true. False on Bold Pink (decision 078) and, since 2026-10-17, on
+   *  Aerochrome (decision 087, Outcome), whose sky stages are off on
    *  purpose: `solveLift` raises Sky saturation from the look's own value
    *  toward 2 wherever the sky it measures is under the reference. Measured
    *  2026-09-29 with this flag planted off, Bold Pink's 0 became 0.33 on
@@ -2189,20 +2190,49 @@ const LOOKS: Record<string, Look> = {
   // a dark blue sky does not get back the old render's deep cerulean, and dark
   // foliage is short of colour, because the old Contrast added chroma in
   // proportion to darkness and the new one, on luminance, adds none.
-  eir: { swapRB: true, hue: 4, denoise: 0.45, texture: 0.25, skySmooth: 1, skyDepth: 0, skySat: 2, finish: EIR_FINISH,
+  //
+  // THE SKY STAGES ARE OFF IN THIS ROW AND RESTORE DEPTH MAY NOT TOP THE SKY UP
+  // (2026-10-17, the direction of 2026-10-16; record 087, Outcome). The row used to
+  // carry Sky colour smoothing 1 and Sky saturation 2. Measured on NIR_1716's sky
+  // (step 96's trace): the mapping below leaves the sky a colour strength of 17.7 of
+  // 255, Sky saturation raised it to 38.5, which is colour the file does not hold,
+  // and the smoothing, the sky map, the second gate, the thin-structure removal and
+  // the coarse and kept map were each added to clean up after that one. The sky
+  // renders well under every other look because those looks map what the file holds
+  // and add nothing. Sky saturation 0 and `liftSky: false` (the field Bold Pink
+  // carries, decision 078; without it `solveLift` would raise Sky saturation again
+  // toward 2) make this look the same kind of mapping. The foliage's red does not
+  // depend on them: outside the sky selection the colour strength reads 64.19 with
+  // both stages off and 64.38 with both on. The sliders stay in the Colour tab for a
+  // reader who wants the sky's colour raised, by hand.
+  eir: { swapRB: true, hue: 4, denoise: 0.45, texture: 0.25, skySmooth: 0, skyDepth: 0, skySat: 0, liftSky: false, finish: EIR_FINISH,
          mix3: [0.79, -0.05, 0.06, -1.15, 1.10, 0.82, -0.38, 0.65, 0.52],
-         // THE COLOUR GOES WHERE THE COLOUR IS, and to what is a PORTION of the
-         // photograph. Global saturation 1: the 3.0 that used to be here coloured
-         // everything — bare ground, grey walls, an overcast sky — with the
-         // foliage, and the aqua and blue chips' power curve lifted the palest
-         // blues most. Now the foliage BAND carries the foliage's amount (a
-         // population by what it is: the infrared-bright red after the swap),
-         // bandGain's guard keeps it off anything without colour, and the sky's
-         // amount is `skySat` above — where the sky IS, through the selection
-         // built at open, gated the same way, because the sky is a place in the
-         // picture and not a hue. Numbers from the 2026-09-18 population
-         // measurement (IR-SCIENCE.md 4b-vi), chosen from pictures.
-         raw: { sat: 1.0, contrast: 1.28, foliage: [-2, 1.96, 1.05],
+         // GLOBAL SATURATION 2.4 AND THE FOLIAGE BAND 1.3 (2026-10-17, California
+         // time, the owner's yes to this candidate; decision 019, second outcome).
+         // With the sky stages out (above) the sky has only this look's own mapping
+         // to take its colour from, and at global saturation 1 that read grey: 17.7
+         // of 255 on NIR_1716's sky, where Pink IR's mapping of the same frame reads
+         // 43.1. The grey is the global saturation (3.0 taken down to 1.0 is a factor
+         // of 0.29 on its own), not the fitted mixer, which gives 1.6 of it back. 2.4
+         // puts the sky where Pink IR's own mapping puts it (43.05 against 43.07
+         // through the sliders). The file's colour is close to one axis, so the sky
+         // and everything that carries its direction (lit cloud, a pale wall, an
+         // overcast sky, a thin bright edge) rise together, to what the swap gives
+         // them and no further, and the foliage-like ground rises with the
+         // saturation as well; so the foliage band comes down from 1.96 to 1.3, the
+         // value at which NIR_1716's foliage keeps its strength (65.05 against 68.27)
+         // and its red (hue 5 to 7). THE COST, named: the cloud is pale blue and not
+         // white; the ground takes 1.5 to 1.7 times its colour (NIR_3467's field 78.9
+         // to 117.6, NIR_3460's meadow 43.7 to 75.6); and every thin dark edge
+         // against bright sky carries a vivid blue outline with a red rim, the
+         // file's red and blue not lining up there, scaled with the sky's colour. It
+         // is still wrong and decision 061 is next for it. Nothing among this look's
+         // controls acts on a place or an edge, which is why. The band at 1.0 would
+         // hold the ground and take the foliage to a salmon; at 1.96 both go solid
+         // red. Before this the row carried 1.0 and 1.96, and before 2026-09-18 a
+         // 3.0 that coloured bare ground, grey walls and overcast with the foliage
+         // (IR-SCIENCE.md 4b-vi).
+         raw: { sat: 2.4, contrast: 1.28, foliage: [-2, 1.3, 1.05],
                 hsl: [7, 1, 1, 0, 1, 1, 0, 1, 1, 54, 1, 1, 35, 1, 1, 0, 1, 1, 1, 1, 1, 43, 1, 1] },
          jpeg: { sat: 1.49, contrast: 0.96 } },
   // BOLD PINK (decision 078): Aerochrome stopped before its colour mix turns
@@ -2999,10 +3029,13 @@ function syncSkyMap(): void {
     if (skyProfile?.img === img && (skyProfile.how === "page" || skyProfile.how === "none")) skyProfile.built = (skyProfile.built ?? 0) + (performance.now() - r0);
   }
   // The sky saturation stage's second gate (pipeline.ts `skyRefWeight`) reads the sky
-  // colour direction off the map, so the map is built whenever the saturation is up,
-  // not only for smoothing or depth: a reader who takes the smoothing to 0 keeps the
-  // gate that keeps a wall or a wire from being tripled.
-  const satReadsMap = (params.skySat ?? 0) > 0;
+  // colour direction off the map, so while the gate is on (`SKY_SAT_SECOND_GATE`) the
+  // map is built whenever the saturation is up, not only for smoothing or depth. The
+  // gate is OFF since 2026-10-17 (decision 087, Outcome), so Sky saturation alone, from
+  // a reader's slider or from Restore depth under a look that allows it, asks for no
+  // map, no coarse map first, no kept map and no refining line: the build before
+  // 2026-10-14 asked for a map only for smoothing or depth, and so does this.
+  const satReadsMap = SKY_SAT_SECOND_GATE && (params.skySat ?? 0) > 0;
   if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0 && !satReadsMap)) {
     if (skyMapKey) { renderer.setSkyMap(null); forgetSkyMap(); lastSkyMap = null; }
     skyMapHeld = null;
@@ -3162,8 +3195,11 @@ function syncSkyMap(): void {
  *  point (degrees in the red-minus-luma, blue-minus-luma plane) and how many texels it was
  *  read from, or that none was found and the stage runs on its own gate alone. What it
  *  must satisfy: it reads `skyReference`, the function the shader's uniform and the
- *  export's edit are read from, so the line says what the stage used. */
+ *  export's edit are read from, so the line says what the stage used; and while the
+ *  gate is off (`SKY_SAT_SECOND_GATE`) it says so and reads nothing, because the stage
+ *  reads nothing. */
 function skyReferenceNote(m: SkyMap | null): string {
+  if (!SKY_SAT_SECOND_GATE) return "off, the stage runs on its own saturation gate alone";
   const r = m ? skyReference(m) : null;
   if (!r) return "no sky colour found in the map, so the stage runs on its own saturation gate alone";
   const deg = (Math.atan2(r.y, r.x) * 180) / Math.PI;

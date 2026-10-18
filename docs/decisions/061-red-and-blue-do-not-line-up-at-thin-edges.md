@@ -161,6 +161,24 @@ are listed in the plan and were asked for on 2026-09-24.
 - touches 028 — the grey sky inside the lattice is 028's sky-through-an-occluder.
 - touches 042 — on the reported frame the red is the foliage band, and 042's stage for the look's own bands is its remedy.
 
+## Built already
+
+What exists that this item will use, so a second one is not written:
+
+- **The border clamp is fixed.** `src/raw/demosaic.ts` reads a neighbour at the frame edge by
+  reflection and not by clamping, which is this record's first step, already in the code.
+- **The home of the binning offset.** `src/raw/demosaic.ts` also builds the half-size editing
+  copy by collapsing each 2x2 Bayer quad, which is where red and blue come to sit about half a
+  preview pixel apart; co-siting them is done there.
+- **Where per-photograph channel geometry belongs.** `src/lensflat.ts` lays the lens flat on the
+  linear raw at decode, before the matrix, the swap and the mixer, which is the placement this
+  record extends from falloff to channel geometry (decision 021).
+- **The instruments.** `tools/look-sheet.mjs` renders variants of one frame through the real
+  pipeline for the 1:1 edge crops, `tools/owner-images.mjs` lists and fetches the owner's frames
+  (the reported frame and the ones beside it are in `tools/owner-images.json`), and
+  `tools/agreement-walk.mjs` holds the screen to the export, which is where a thin edge differs
+  between the two.
+
 ## Looked at
 
 - The practice frame NIR_3430: the post and lamp-head crops, as shipped, co-sited, co-sited with the lens cancel, and with the offset doubled.
@@ -202,7 +220,22 @@ the cost control for leaf edges.
 
 ## Rank
 
-**Re-ranked 2026-09-25: fifth, below 066 and above 067.** The Aerochrome work
+**First, from 2026-10-17.** Aerochrome's global saturation of 2.4 and foliage band of 1.3 landed that
+day on the owner's yes, with the vivid blue outlines and red rims on thin dark edges against bright
+sky named as still wrong and this record next (record 019, second outcome). Two reasons, and the
+second is this repository's own test for a reported defect, which is dependency and not who
+reported it. First, it is the owner's direction. Second, the records it sat below no longer have to
+come first: 052, 013 and 069 are sky-stage records and Aerochrome carries no sky stage since record
+087's Outcome, so nothing built for them has to be redone once the edge is fixed; and the film model
+(066) is unbuilt, and its colour re-attachment would be tuned against whatever edge this record
+leaves. The outlines also grew since this record was filed, because the global saturation scales
+them with the sky's colour: the share of vivid blue pixels in a pylon lattice's box is 1.60 percent
+under the landed look against 0.001 in the build with the sky stages out (record 019's second
+outcome). The border clamp, this record's first step, is already built; the work left is the
+per-photograph channel correction on the raw with co-siting, then the guided correction only if
+what remains is blur.
+
+**History: re-ranked 2026-09-25: fifth, below 066 and above 067.** The Aerochrome work
 leads the queue. This goes below 052, 013 and 065, which change the sky it is
 seen against, and below 066, because the film model's colour re-attachment
 respects thin edges and nothing in it is tuned against them, while this work

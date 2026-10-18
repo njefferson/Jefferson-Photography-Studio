@@ -67,6 +67,15 @@
 // which is the tonal-only solve. A build that stopped re-solving keeps the
 // at-open state and fails either way.
 //
+// FROM 2026-10-17 THE LOOK CARRIES NO SKY STAGE (decision 087, Outcome): its
+// smoothing and its Sky saturation are 0 and its row says `liftSky: false`, so
+// Restore depth no longer tops the sky up under it. Checks 4a2 and 4a6 assert
+// that the two stages are GONE from the look, 4a4 and 4a5 pin the global
+// saturation and the foliage band that give the sky its colour in their place
+// (decision 019, second outcome), and the stages stay in the app behind their
+// sliders for a reader. Check 8 is read exactly as before, and the line it
+// prints under it says which of its two ways it passed.
+//
 // Check 9 asserts that leaving the look on a photograph you have come back to
 // hands back THAT photograph's measurement, not the one before it -- with 9a as
 // the control that the two frames measure differently enough (0.46 and 0.22,
@@ -131,7 +140,10 @@ const TEXTURE = 0.25;
 // AFTER the amplification and only inside the sky (IR-SCIENCE 4c-xxi's open
 // question, 9k's measurement). Measured on the frames that have the defect:
 // Aerochrome's sky 15.9 -> 4.7 where Pink IR reads 8.7, mean colour held.
-const SKY = 1;
+// 0 SINCE 2026-10-17 (decision 087, Outcome): the look no longer carries the stage,
+// because the stage it cleaned up after, Sky saturation, came out of the look. The
+// slider is still the reader's, and check 4a2 now asserts that the look leaves it at 0.
+const SKY = 0;
 // AND THE SKY'S DEPTH — the value half of the same solve (IR-SCIENCE 4b-iv,
 // 4b-v): one luma multiplier through the sky bitmap refined to the
 // photograph's edges and the map's own keying, so a grey, a cloud, the ground
@@ -148,6 +160,11 @@ const DEPTH = 0;
 // that moves that chroma out of the key's window silences the stage).
 const DEPTH_TRY = 0.5;
 const SKY_VAL_DROP_MIN = 0.25;
+// 10e WAITS FOR THE MAP THE MOVE ASKS FOR: the refining line must come up within
+// REFINE_NEVER_MS of the move (or no ask was made), and the wait ends at the latest
+// after REFINE_CEILING_MS. Measured in this container: up 7.7 s, cleared 24.0 s.
+const REFINE_NEVER_MS = 30000;
+const REFINE_CEILING_MS = 120000;
 // THE FLOOR CHECKS NEED A FRAME THE FLOOR ACTUALLY BINDS ON, which is why they
 // do not use RAW. NIR_0063 measures 0.46 -- above the floor -- so `max(measured,
 // FLOOR)` is just the measurement there and checks 4 and 5 would assert nothing
@@ -182,9 +199,16 @@ const HUE_LIMIT = 60, SAT_RANGE = [0, 2], LUM_RANGE = [0.3, 1.7];
 // sheets (IR-SCIENCE 4b-vi). Sliders: Saturation 0..3, Foliage band 0..2,
 // Sky saturation 0..2.
 // Re-fitted 2026-10-02: the foliage band 1.6 to 1.96, the sky 1.8 to 2.
-const GLOBAL_SAT = 1.0;
-const FOL_SAT = 1.96;
-const SKY_SAT = 2;
+// RE-SET 2026-10-17 (decision 087, Outcome, and decision 019, second outcome): the
+// look's sky amount is 0 (Sky saturation came out of the look, and Restore depth no
+// longer tops it up here), the global saturation is 2.4 and the foliage band 1.3, so
+// the sky takes the colour the look's own mapping gives it. The three constants are
+// the values the look table in src/main.ts carries; check 4a4 to 4a6 read them back
+// off the sliders, and the recipe arm of checks 7 and 8 writes them through the same
+// sliders, so a look table that moves without this file fails here.
+const GLOBAL_SAT = 2.4;
+const FOL_SAT = 1.3;
+const SKY_SAT = 0;
 const GLOBAL_SAT_RANGE = [0, 3], BAND_SAT_RANGE = [0, 2];
 // 10d: the sky's saturation on RAW after the Look press, mean HSV saturation of
 // the same population 10b measures the angle of, READ WITH RESTORE DEPTH OFF.
@@ -322,15 +346,15 @@ try {
   check("3   ...so every one of them survives the slider's 0.01 step",
     MATRIX.every(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9), true);
   check("4a  the look brings its local contrast with it", await tex(a.p), TEXTURE);
-  check("4a2 ...and its sky colour smoothing", await skyv(a.p), SKY);
+  check("4a2 ...and no sky colour smoothing (the stage is gone from the look)", await skyv(a.p), SKY);
   check("4a3 ...and its sky depth", await depthv(a.p), DEPTH);
   // THE LOOK'S OWN AMOUNTS, read with Restore depth OFF: with it on, the lift
   // starts from these and tops them up per frame (019), so the slider can
   // read higher than the look declares and still be right.
   await press(a.p, "irLift");
-  check("4a4 ...its global saturation of 1 (the colour goes where the colour is)", await satv(a.p), GLOBAL_SAT);
-  check("4a5 ...the foliage band's own amount", await folv(a.p), FOL_SAT);
-  check("4a6 ...and the sky's own amount, through the selection", await skyBv(a.p), SKY_SAT);
+  check("4a4 ...its global saturation of 2.4 (the sky takes the colour the mapping gives it)", await satv(a.p), GLOBAL_SAT);
+  check("4a5 ...the foliage band's own amount of 1.3", await folv(a.p), FOL_SAT);
+  check("4a6 ...and no sky amount through the selection (the stage is gone from the look)", await skyBv(a.p), SKY_SAT);
   await press(a.p, "lookAero");
   check("4b  ...and leaving it puts the photograph back to none", await tex(a.p), 0);
   check("4b2 ...the sky smoothing too", await skyv(a.p), 0);
@@ -491,7 +515,35 @@ try {
     await press(p, "irLift");
     const mBare = await measurePops(p);
     await press(p, "irLift");
+    // THE MOVE ITSELF ASKS FOR THE SKY MAP, and the walk waits for it (decision 087,
+    // Outcome). The look used to ask for the map when it was pressed, so by the time
+    // this slider moved the map was already in hand and the depth showed at once. The
+    // look asks for none now (its sky stages are off), so a depth above 0 is the first
+    // ask: the lane builds the map, "Refining the sky for this look" is up while it
+    // does, and the picture shows the depth only when the map lands. Settling on two
+    // equal canvas reads cannot tell that wait from a finished picture, because
+    // nothing is drawn while the lane works: it read 0.907 at depth 0 and 0.907 at
+    // 0.5 on the final build 11 s after the move, and 0.505 once the line had come up
+    // (7.7 s) and cleared (24.0 s). The landed build, which had the map from the
+    // press, read 0.947 and 0.494 at once. So the wait is the line's own come-up and
+    // clear, watched from before the move so a fast come-up is not missed; the
+    // required drop is unchanged. A line that never comes up within REFINE_NEVER_MS
+    // is read as no ask having been made, and the check then measures and fails on
+    // the number, which is the defect it exists to catch.
+    await p.evaluate(() => {
+      const line = document.getElementById("skyRefine");
+      window.__refine = { seen: false, at: performance.now() };
+      new MutationObserver(() => { if (line.textContent.length > 0) window.__refine.seen = true; })
+        .observe(line, { childList: true, characterData: true, subtree: true });
+    });
     await setDepth(p, DEPTH_TRY);
+    const refine = await p.waitForFunction((never) => {
+      const r = window.__refine, txt = document.getElementById("skyRefine")?.textContent ?? "";
+      if (r.seen && txt === "") return "cleared";
+      if (!r.seen && performance.now() - r.at > never) return "never came up";
+      return false;
+    }, REFINE_NEVER_MS, { timeout: REFINE_CEILING_MS, polling: 500 }).then((h) => h.jsonValue()).catch(() => "ceiling");
+    await settle(p);
     const m2 = await measurePops(p);
     await ctx.close();
     const off = (a, b) => { let d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
@@ -513,7 +565,7 @@ try {
     console.log(`        (${mBare.ns} pixels carry the sky's colour, floor ${SKY_POP_MIN})`);
     check("10e the Sky depth slider still deepens the sky (the look ships it at 0)",
       m.skyVal != null && m2.skyVal != null && m.skyVal - m2.skyVal >= SKY_VAL_DROP_MIN, true);
-    console.log(`        (sky value ${m.skyVal == null ? "none" : m.skyVal.toFixed(3)} at depth ${DEPTH}, ${m2.skyVal == null ? "none" : m2.skyVal.toFixed(3)} at ${DEPTH_TRY}; drop floor ${SKY_VAL_DROP_MIN}, n=${m.ns})`);
+    console.log(`        (sky value ${m.skyVal == null ? "none" : m.skyVal.toFixed(3)} at depth ${DEPTH}, ${m2.skyVal == null ? "none" : m2.skyVal.toFixed(3)} at ${DEPTH_TRY}; drop floor ${SKY_VAL_DROP_MIN}, n=${m.ns}; the refining line after the move: ${refine})`);
   }
 
   // ---- 10f. NOTHING WITHOUT COLOUR TAKES ANY. The look's bare mapping (the

@@ -15,7 +15,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer, toHalf } from "./half";
 import { sharpenSigmaTexels } from "./raw/detail";
 export type { EditParams };
@@ -2365,7 +2365,7 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.skyTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     this.skyOn = !!m;
-    this.skyRef = m ? skyReference(m) : null;
+    this.skyRef = SKY_SAT_SECOND_GATE && m ? skyReference(m) : null;
     if (!m) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 0]));
       return;

@@ -241,6 +241,36 @@ below was opened (`## Looked at`).
 the map this record changes when it lands, and 087's selection is what the map is weighted
 by; built after both, each would be measured again against a map that arrived late.
 
+**Nothing left to rank, from 2026-10-17.** See the Outcome below. The roadmap item stays on the
+open list, declared internal and saying what survives, only because archiving it today would trip
+the notes page's freshness check (`tools/notes-check.mjs`); it moves to the archive when that
+check's window can take it.
+
+## Outcome, 2026-10-17: built and shipped, and no built-in look asks for a sky map any more
+
+**What landed.** The coarse map first, the kept map in its own database (`ips-skymaps`), the lane's
+two answers and the report's Last switch and Sky map lines landed in 4ac12b5, which production
+serves from 2026-10-14 (version 2.65.15). In the container, software graphics and not a device, the
+lane built the 32 wide map in 2.4 s against 23.3 s for the full one on NIR_3461, and the coarse
+picture of the built tree carried no crown halo and no disc beside the pylons (Built and measured on
+the page, 2026-10-14). The devices' waits (5.2 s and 7.6 s on the iPad, over 10.55 s on the PC) were
+read before the change and were never re-read after it: no pass on a device recorded a result.
+
+**What changed under it.** The record existed to shorten a wait that Aerochrome, and Pink IR through
+its lift, imposed by asking for a map. Record 087's Outcome of 2026-10-17 took Sky saturation and Sky
+colour smoothing out of Aerochrome's row, Restore depth stopped topping the sky up under it, and
+the saturation stage's second gate was switched off (`SKY_SAT_SECOND_GATE` in `src/pipeline.ts`), so
+no built-in look asks the sky lane for a map. The two landing draws that the cost recorded above
+(the strip's redraw held back after a look press) was made of no longer happen under Pink IR: on one
+frame in the container the strip's first tile moved 6.0 s after the press with no map asked, where
+the build that still asked for one took 15.8 s (record 087's Outcome).
+
+**What survives.** The map still lands coarse first and is kept per photograph for a reader who moves
+the Sky colour smoothing or the Sky depth slider by hand, with the refining line saying so, and the
+lane, the kept database and the robust estimate are used there unchanged. Option 8 (the coarse map
+alone for a look with no smoothing and no depth) has no look left to serve and is not needed. No
+code of this record was deleted.
+
 ## Looked at
 
 - NIR_1651.NEF, 2026-10-14: the whole frame (a portrait) from the run with the lane on and the full map, and 960 by 860 crops at the crown's top and at the tree's right edge against the dark sky, of three pictures: the earlier build's coarse picture, this build's coarse picture with the full answer held back, and this build's full picture. Earlier coarse: scarlet tips at the crown's top, a pink wash in the cloud beside them, a broad warm brown fringe along the right edge. This build's coarse: muted rose and dark red tips, clean cloud, a thin warm fringe at the right edge that the full picture carries too. The clouds read as flat patches in all three, which is not this record's ground.

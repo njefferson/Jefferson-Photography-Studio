@@ -55,3 +55,21 @@ case is the preview and the export becoming one thing.
 
 **Tenth.** Below 009 by construction — it is that item's history, not a separate
 piece of work.
+
+**Archived 2026-10-17 with its Outcome.**
+
+## Outcome, 2026-10-17: retired from the queue as the detail note it always said it was
+
+**What was decided.** The roadmap carried this record as an open item of its own for as long as the
+queue has existed, under a title that begins "(superseded detail)", with the record's first line
+saying it is the earlier form of 009 and its Depends line saying `superseded-by 009`. Nothing in
+it is independent work: the build, the tap scale and the retirement of the proxy-texel footprint
+are 009's, and the export drawn rather than computed is 011's. The open bullet is archived so the
+queue holds work and no history.
+
+**What survives.** The record, unchanged above: the measurement that killed the premise for the
+proxy (a screen-sized frame draws from a full-resolution texture at the cost it draws from the
+proxy, 1418 ms against 1412 in a container, and the memory is 16 MB a megapixel as float32) and
+the reason the case is the preview and the export becoming the same pixels and not speed. 009's
+bullet and record carry the work forward and this record stays on file beside them. Nothing was
+built, and nothing was lost by retiring the bullet.

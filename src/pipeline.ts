@@ -1924,6 +1924,17 @@ export const SKY_REF_ANGLE_LO = Math.PI / 6;
 export const SKY_REF_ANGLE_HI = Math.PI / 3;
 export const SKY_REF_DIR_LO = 0.01;
 export const SKY_REF_DIR_HI = 0.03;
+/** WHETHER THE SKY SATURATION STAGE READS THE SECOND GATE AT ALL. False since
+ *  2026-10-17 (decision 087, Outcome): the gate existed to take the stage's boost off
+ *  the wires, walls and crowns the stage had been multiplying, and no built-in look
+ *  carries that stage any more (Aerochrome's row has it at 0 and Restore depth does
+ *  not top it up there). With it false `skyReference` is not read by the screen
+ *  (`gl.ts` `setSkyMap`) or by `compileEdit`, so the stage is again the one of the
+ *  build before 2026-10-14: its own saturation gate and the selection, no sky map
+ *  needed. The functions below stay, switched off, for a later plan. What it must
+ *  satisfy: the shader and `compileEdit` both read it, or the screen and the export
+ *  disagree; `tools/agreement-walk.mjs` holds them to one picture. */
+export const SKY_SAT_SECOND_GATE = false;
 
 /** A photograph's sky colour direction: a unit vector in (red minus luma, blue minus
  *  luma) and the number of texels it was read from. */
@@ -2710,7 +2721,7 @@ export function compileEdit(
   const skySatAmt = skyFine ? Math.min(2, Math.max(0, p.skySat ?? 0)) : 0;
   // The photograph's sky colour direction for that stage's second gate, read once per
   // edit off the map's bytes (`skyReference`); null leaves the gate at 1.
-  const skyRef = skyMap && skySatAmt > 0 ? skyReference(skyMap) : null;
+  const skyRef = SKY_SAT_SECOND_GATE && skyMap && skySatAmt > 0 ? skyReference(skyMap) : null;
   const grade = p.grade ?? GRADE_DEFAULT;
   const gAmtS = grade[1] ?? 0, gAmtM = grade[3] ?? 0, gAmtH = grade[5] ?? 0;
   const gradeOn = gAmtS !== 0 || gAmtM !== 0 || gAmtH !== 0 || gradeGroups.length > 0;

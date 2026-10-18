@@ -409,6 +409,17 @@ export const SKY_THIN_HI = 0.25;
  *  (`keepStrongPieces`, hysteresis thresholding by connection), and clears the rest. */
 export const SKY_PLAIN_LO = 0.05;
 export const SKY_PLAIN_SHARE = 0.5;
+/** WHETHER `buildSkySelectionFrom` TAKES THE THIN STRUCTURES OUT OF THE SELECTION AT ALL
+ *  (route B, Options 6, 12 and 17 of decision 087, with `thinFlags`, `keepStrongPieces`,
+ *  `coneSpread` and `subtractThin`). False since 2026-10-17 (decision 087, Outcome): the
+ *  removal cleaned wires, pylon members and roof fittings that Sky saturation had painted,
+ *  and the smoothing's discs beside them, and no built-in look carries those two stages any
+ *  more, so the selection is again the one of the build before 2026-10-14. The functions stay
+ *  in this file, switched off, for a later plan. What it must satisfy: every path that builds
+ *  the selection goes through `buildSkySelectionFrom`, so the sky worker, the page, the decode
+ *  worker's bitmaps, the strip's tiles and the export all hold the same selection with it off,
+ *  as they did with it on. */
+export const SKY_THIN_REMOVAL = false;
 
 /** Maximum (or minimum) filter over a square element, separable.
  *  @param a  one value per pixel, w by h.
@@ -725,13 +736,17 @@ export function buildSkySelectionFrom(src: SkySource, refine = true): SkySelecti
   const res = buildSkyMask(sample, w, h, turn, src.cam, wb, BRUSH_MAX_EDGE, 1, 0.5);
   if (!res.found) return { mask: null, fine: null, turn };
   // THE THIN STRUCTURES COME OUT OF EVERY PATH'S SELECTION HERE, the coarse bitmap
-  // included (decision 087): the sky worker the devices use, the page's fallback, the
-  // decode worker's held bitmaps, the strip's tiles and the export all build the
-  // selection through this function, so they all hold one selection.
-  const flags = thinFlags(src);
-  if (!refine) return subtractThin({ mask: res.mask, fine: null, turn }, flags.fine, w, h, flags.plain);
+  // included (decision 087), WHILE `SKY_THIN_REMOVAL` IS ON: the sky worker the devices
+  // use, the page's fallback, the decode worker's held bitmaps, the strip's tiles and
+  // the export all build the selection through this function, so they all hold one
+  // selection, with the removal or without it. It is OFF since 2026-10-17 (decision
+  // 087, Outcome), and then the selection is what it was before 2026-10-14, byte for
+  // byte: the removal cleaned up after Sky saturation, which no built-in look carries.
+  const flags = SKY_THIN_REMOVAL ? thinFlags(src) : null;
+  const cut = (sel: SkySelection): SkySelection => (flags ? subtractThin(sel, flags.fine, w, h, flags.plain) : sel);
+  if (!refine) return cut({ mask: res.mask, fine: null, turn });
   const guide = buildSkyGuide(sample, w, h, wb);
-  return subtractThin({ mask: res.mask, fine: refineSkyMask(res.mask, guide), turn }, flags.fine, w, h, flags.plain);
+  return cut({ mask: res.mask, fine: refineSkyMask(res.mask, guide), turn });
 }
 
 /** Outer colour tolerance for the grow, in units of the sky's own chroma
