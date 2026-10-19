@@ -56,6 +56,16 @@ because they floor temperature at ~2000K.
 
 **Production, 2026-10-14: the staging head 4ac12b57382bf19fc93de22510e81a49207deda6 was promoted to main by fast-forward, so main and staging name one commit; production serves version 2.65.15 and its worker names that build (both sites' workers read ips-2.65.15 when this plan was written). That commit is the sky fix described in the third entry below.**
 
+**Production carries the Aerochrome fix at the commit main names now, 66e050cb5d40812254afcf03c0756e8a4fab6c8b, whose subject opens Fixed.** Read from git log of origin/main; its date prints in UTC as 18 October, the evening of 17 October in California. Nothing after it has been promoted.
+
+**Aerochrome's sky stage asks for a map only when something about it changed, and the report names why it ran: built 2026-10-18 on staging's head after that commit, not yet on a device.**
+- **Fixed: a change of the look or of the sky inputs no longer leaves the first ask's refining words up while a map that will be thrown away is built.** Pressing Aerochrome on a photograph whose stored edit still carried the sky inputs took the words down only when the lane finished that map, 30.8 s in the container and 5 to 7 s on the iPad (container figure only). The words now end when the ask is given up, with its selection in hand.
+- **Fixed: a map that was built and then dropped as stale is kept under the inputs it was built from,** so Undo back to the same inputs reads the store with no line and no wait, where it used to build the same map again.
+- **Changed: a map is requested only when an input to the map changed since the kept map was built.** A look press on a photograph with no sky inputs asks for nothing, as before; a stored Aerochrome edit still asks at its open, because the stored inputs are the old row's Sky colour smoothing 1 and Sky saturation 2. A Restore depth toggle on such a photograph asks again, honestly, because the map key carries the whole colour edit.
+- **Changed: the report names the state.** It gains the look applied by its button's name, every edit value as landed after the automatics and the lift (the multiplier beside each logarithmic slider), the three sky inputs, what Restore depth changed, a Sky map line saying what asks and how the last ask ended, and a Last switch clause saying why the sky stage ran or that none did. The look buttons carry their pressed state.
+- **Not changed, and left to the owner:** laying the current Aerochrome row over an untouched stored grade would take the sky stage out of those photographs and make the sky read greyer; it is a choice about how the owner's stored photographs look, so the report says why the stage ran and the choice is queued.
+- **For the owner's pass on staging.** Open a photograph whose edit was made before the 17 October build, press Aerochrome, and read the report's Last switch and Sky map lines; the Sky map line should name the stored inputs as the reason and no refining line should stay up after the map is dropped.
+
 **Aerochrome's sky keeps the colour its own mapping gives it, and the stages that
 cleaned up after a raised sky are out: built 2026-10-17 on the tree of staging's head
 (716aa67).** Taken up from the direction of 2026-10-16 (California time) that the sky
@@ -2116,6 +2126,25 @@ Q-JPS-60: the first iPad report's export took 1392.1 s and the second's 79.5 s f
 Q-JPS-61: on the build before the sky commit the page ran a second main-thread task of 43.1, 36.3 and 41.3 s right after the export pool started, beside three workers on four cores, in all three runs, and the tree's build ran none; its cause is not traced, and it may be why that build's pixel stage was 29 s longer at the median (step 76).
 Q-JPS-62: until the sky map's first answer lands, the picture under Aerochrome shows red wires over the sky and a flatter sky (NIR_3461's screenshot taken when the new line first showed, opened), because the saturation stage's second gate and the smoothing have no map to read; the line now says "refining" for as long as it lasts and nothing shortens it, and in the container the page is held 65 s before it can paint at all, so how long a reader sees that picture is a device's figure and not measured (step 76). It no longer happens under any built-in look since 2026-10-17: Aerochrome asks for no map, so no moment has a map missing from its picture, and the refining line comes up only after a reader moves the Sky colour smoothing or the Sky depth slider (steps 76 and 97).
 Q-JPS-63: tools/surfaces.mjs lists pages and dialogs only, so a standing element over the photograph is measured only by a section written for it: the new refining line has section 11 of the accessibility walk, and the export strip's "Preparing" words and the file-kind chip are in no section; the 700 ms before the line is written is a choice, not a measurement (step 76).
+Q-JPS-64: the contour lines in the distant forest and the square blocks in the leaves of the first frame of the owner's zip. The synthetic ramp through the stages gives largest output steps of one level at every stage on three of four parameter sets and two-level steps from the saturation and band stage on the fourth, cleared by the denoiser; the two frames Q-JPS-23 names were not run and the origin of their flat cloud is not established (step 113).
+Q-JPS-65: the neutral edit with every stage off reads a linear 1.0 as 8-bit level 247 where the sRGB curve gives 255; not traced (step 113).
+Q-JPS-66: the halo along the treeline; not traced.
+Q-JPS-67: the blue cast on the lit shore; not traced.
+Q-JPS-68: Aerochrome's finishing panel still words its Sky saturation and Restore depth lines for the old sky stages.
+Q-JPS-69: the sky-stage walk's log text is not yet updated to the report's new Last switch clause.
+Q-JPS-70: the notes check's freshness rule refuses an archive entry as new as the newest one, which is why the sky-map item stays open.
+Q-JPS-71: the walks install the offline copy with the sticker library on every run; a walk should install it once.
+Q-JPS-72: a walk runs once on the final build and only where it tests what changed.
+Q-JPS-73: the memory fault named in the editing-copy line of the report; unweighed, and not this item's.
+Q-JPS-74: a stored Aerochrome edit keeps the old row's sky inputs and asks the lane at its open; laying the current row over it is the owner's choice (step 112).
+Q-JPS-75: a look press holds the page's main thread for 24 to 41 seconds in the container; untraced (step 112).
+Q-JPS-76: a revisit to an earlier map key asks the lane again, because the store is read only for a photograph's first map (step 112).
+Q-JPS-77: the Edit values row lists every range control, with one printed by its id; the list is not yet checked against the controls (step 112).
+Q-JPS-78: Q-JPS-13's copy fallback is left because it needs a second box or a changed rule for the report box, which is not a line (step 112).
+Q-JPS-79: the lens correction moves final lit foliage chroma by 1 to 7 percent over the whole frame; a centre-only effect is unmeasured, so it is not the lighter red's cause as a whole (step 113).
+Q-JPS-80: the denoiser strips 44 and 45 percent of lit foliage chroma on two frames and adds 2 on a third; whether that colour is noise or foliage signal is not established (step 113).
+Q-JPS-81: the film model cannot give the film's dark blue sky from this file's infrared-bright sky; the model needs the visible green layer, the sky's true infrared share and the red channel's visible share, which the file does not hold (step 113).
+Q-JPS-82: a white point taken from the clear sky raises lit foliage chroma 1.1 to 3.5 times while taking the sky to neutral; a look choice for the plan's last message (step 113).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -2732,7 +2761,7 @@ user-scalable=no.
   **What survives (2026-10-17):** nothing of this item is left to build. The code of the
   removal, the second gate and the coarse and kept map stays in the source, switched off by
   named constants, and the three sky sliders still use it. Aerochrome's outlines on thin
-  edges, which the global saturation of 2.4 then brought, are 061's. The item stays on the
+  edges, which the global saturation of 2.4 then brought, are 061's. Corrected under the 112 change: a stored Aerochrome edit written before the 17 October build still carries the old row's sky inputs, and laying it over a fresh open asks the lane for a map there; the report's Last switch line says so, and laying the current row over stored grades is left to the owner. The item stays on the
   open list, declared internal, only because archiving it today trips the notes page's
   freshness check (`tools/notes-check.mjs`: seven entries render, the oldest dated
   2026-09-17, and the newest archive date would be 2026-10-11, a span over the check's limit
@@ -2748,7 +2777,7 @@ user-scalable=no.
   database stays at version 1 and a tab on an older build keeps its saved masks. On
   production from 2026-10-14. Not measured on a device. See the Outcome in
   `docs/decisions/088-the-looks-sky-map-lands-seconds-after-the-picture-and-is-built-again-on-every-visit.md`.
-  **What survives (2026-10-17):** since the same day no built-in look asks for a sky map, so
+  **What survives (2026-10-17):** since the same day no built-in look asks for a sky map on a fresh open or a look press, though a stored Aerochrome edit still asks for one at its open, so
   the coarse map and the kept map act behind the Sky colour smoothing and Sky depth sliders
   only, and nothing more is left to build. The item stays on the open list, declared
   internal, for the reason given under the item before it: the notes page's freshness check
@@ -7465,6 +7494,9 @@ read as authoritative, and an invented one is worse than a missing one.
   themselves. The record's Looked at section carries what each of the seven
   frames showed, including two defects it surfaced that are not this item's
   and are now recorded where they belong.
+  **The values that ship under Aerochrome now:** the foliage band at 1.3 (1.96 before),
+  and global saturation 2.4 with Sky saturation 0 in the look's row, so the sky's colour
+  comes from the global saturation and the amounts above no longer describe the look.
 
 - [x] **The lens correction belongs on the linear raw before anything else** <!-- decision: 021 --> —
   raised 2026-09-18: the hot-spot correction is applied inside the compiled
@@ -12045,9 +12077,12 @@ persistent, theme and palette, reduced motion, language, and whether a photo is
 open.
 
 **NOTHING THE READER WROTE IS IN IT.** A session appears as a count — "a photo
-is open in a session of 4" — never a filename, never metadata, never an edit
-value. That is asserted rather than promised: the walk opens a named practice
-file and greps the built report for its name. Copy falls back to selecting the
+is open in a session of 4" — never a filename and never any text a reader chose. That is asserted
+rather than promised: the walk opens a named practice file and greps the built
+report for its name. The look applied by its button's name, the edit values as
+landed, the three sky inputs and what Restore depth changed are the app's own
+diagnostic content: control names and numbers the app sets, never words the
+reader typed, so the report carries them and a trace can be made from it. Copy falls back to selecting the
 text when the clipboard is refused, rather than a button that looks like it
 worked and did not.
 

@@ -200,6 +200,10 @@ what the sky line talks about, and 069's renders do not read either surface. It 
 reported-from-the-device defect with the plainest fix on the queue, and no item above it
 would have to be redone once it is built.
 
+## Outcome after the 112 change
+
+The refining words now end when the ask is given up, not when the lane finishes a map that will be thrown away, so the page's words no longer stand for work nobody will use. The proof runs are the step-112 run outputs under progress/ in the session scratchpad.
+
 ## Looked at
 
 - NIR_3461.NEF, 2026-10-15: the whole window at 1280 by 950 and a 1:1 crop of the stage's top right corner (380 by 130), once while the line was up and once after it had gone, and the crop of a second run in both states. Up: "Refining the sky for this look…" on one line in a dark glass chip under the "NEF · raw" chip, right aligned, legible, on the stage's background above the photograph; the picture at that moment has thin red wires across the sky and red edges on the pylons, and a flatter grey-blue sky. After: the chip is gone, the wires are dark and thin, and the sky is a steadier blue-grey.

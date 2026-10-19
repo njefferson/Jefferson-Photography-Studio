@@ -1,4 +1,28 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git ls-remote:*)",
+      "Bash(git fetch:*)",
+      "Bash(git worktree add:*)",
+      "Bash(git merge --ff-only:*)",
+      "Bash(git pull --ff-only:*)",
+      "Bash(npm --prefix /home/user/Jefferson-Photography-Studio run build:*)",
+      "Bash(npm --prefix /tmp/claude-0/*/scratchpad/hubwt ci)",
+      "Bash(node /home/user/Jefferson-Photography-Studio/tools/:*)",
+      "Bash(node /home/user/noahjefferson/plan-scope-check.mjs:*)",
+      "Bash(node /root/.claude/hub/reply-guard.mjs --read:*)",
+      "Bash(node /tmp/claude-0/:*)",
+      "Bash(node --check:*)",
+      "Bash(python3 -m http.server:*)",
+      "Bash(python3 -I -m zipfile:*)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {

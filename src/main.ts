@@ -2483,6 +2483,13 @@ interface SkyProfile {
    *  building the full map (null from the store and the page). */
   fullAt: number | null;
   fullBuild: number | null;
+  /** WHY THE SKY STAGE RAN FOR THIS OPEN, or that it did not, naming the input
+   *  (`noteSkyStage`): "ran because Sky colour smoothing 1.00 asked for a map". Null
+   *  until the selection is in hand and `syncSkyMap` has looked at the edit. */
+  why: string | null;
+  /** Whether `why` is the account of an ask that was made. An ask settles it for the
+   *  open; a look at an edit that asks for nothing is provisional until one comes. */
+  whyAsked: boolean;
 }
 let skyProfile: SkyProfile | null = null;
 
@@ -2602,9 +2609,13 @@ function seekSky(img: DecodedImage): void {
  *  when something on screen uses either, because a full redraw a second and a
  *  half after every open is a main-thread task the reader did not ask for: a
  *  verdict pressed as the page went away landed behind it and was lost
- *  (verdict-durability-walk check 4, red with the redraw, 2026-09-18). Returns
- *  nothing. */
+ *  (verdict-durability-walk check 4, red with the redraw, 2026-09-18). It also records,
+ *  for the report's Last switch line, what the edit asks of the sky now that the
+ *  selection is in hand (`noteSkyStage`), because with nothing asking `syncSkyMap` is
+ *  not reached here and the line would say "not decided yet" beside a selection that
+ *  had arrived. Returns nothing. */
 function skyLanded(img: DecodedImage): void {
+  noteSkyStage(img, skyMapAskers(params));
   const lifted = resolveLiftWithSky(img);
   if (lifted || (params.skySmooth ?? 0) > 0 || (params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0) {
     syncSkyMap();
@@ -2927,6 +2938,12 @@ let skyMapWarp: WarpField | null = null;
  *  asks for the newest. Rebuilds then follow the lane's pace, one at a time,
  *  instead of queueing a build for every frame of a drag. */
 let skyMapBusy = false;
+/** THE LAST ASK FOR A SKY MAP THE PAGE MADE, for the report: when, because of which
+ *  inputs (`skyMapAskers`), and how it ended. `fate` starts as "in flight" and is
+ *  settled by the place that ends it, so the report's Sky map line can say what became
+ *  of a map that is no longer held. */
+interface SkyAskRecord { at: number; why: string; fate: string }
+let lastSkyAsk: SkyAskRecord | null = null;
 /** THE LINE THAT SAYS THE LOOK'S SKY IS STILL BEING REFINED (`#skyRefine`, ir.html).
  *  Under a look with sky stages the sky colour comes after the picture, from the
  *  lane, a coarse map first and the full one later; until the full one lands the
@@ -2942,29 +2959,55 @@ let skyMapBusy = false;
 const skyRefineLine = $("skyRefine") as HTMLElement;
 const SKY_REFINE_DELAY_MS = 700;
 const SKY_REFINE_WORDS = "Refining the sky for this look…";
-let skyRefineAsks = 0;
+/** The asks the words stand for, by token. A COUNT could not tell an ask that is
+ *  still wanted from one that has been given up, and an ask given up (the inputs
+ *  went to zero under it, so its map will be thrown away) kept the words up until
+ *  the lane finished it: measured 30.8 s in the container after a look press, for
+ *  a map the page then dropped on arrival. */
+const skyRefineLive = new Set<number>();
+let skyRefineSeq = 0;
 let skyRefineTimer: ReturnType<typeof setTimeout> | null = null;
-/** A lane ask for the sky map has just been made. Takes and returns nothing.
- *  What it must satisfy: every call is paired with one `skyRefineEnd` when that
- *  ask settles, so the count never stays above zero after the lane is idle. */
-function skyRefineBegin(): void {
-  skyRefineAsks++;
-  if (skyRefineLine.textContent || skyRefineTimer !== null) return;
+/** A lane ask for the sky map has just been made. Takes nothing. Returns the
+ *  ask's token, which the caller hands to `skyRefineEnd` when the ask settles.
+ *  What it must satisfy: every token returned is ended exactly once by its own
+ *  answer, or dropped by `skyRefineDrop`, so the live set is empty whenever the
+ *  lane has nothing wanted in flight. */
+function skyRefineBegin(): number {
+  const token = ++skyRefineSeq;
+  skyRefineLive.add(token);
+  if (skyRefineLine.textContent || skyRefineTimer !== null) return token;
   skyRefineTimer = setTimeout(() => {
     skyRefineTimer = null;
-    if (skyRefineAsks > 0) skyRefineLine.textContent = SKY_REFINE_WORDS;
+    if (skyRefineLive.size > 0) skyRefineLine.textContent = SKY_REFINE_WORDS;
   }, SKY_REFINE_DELAY_MS);
+  return token;
 }
-/** The lane has answered, or failed, an ask made with `skyRefineBegin`. Takes and
- *  returns nothing. The line is emptied a task later, and only if no other ask was
- *  made in the meantime. */
-function skyRefineEnd(): void {
-  skyRefineAsks = Math.max(0, skyRefineAsks - 1);
+/** Empty the words a task later, but only if no ask is live by then. Takes and
+ *  returns nothing. The task's wait is what lets an answer's own handler ask
+ *  again and keep the words up instead of emptying and writing them. */
+function settleSkyRefine(): void {
   setTimeout(() => {
-    if (skyRefineAsks > 0) return;
+    if (skyRefineLive.size > 0) return;
     if (skyRefineTimer !== null) { clearTimeout(skyRefineTimer); skyRefineTimer = null; }
     skyRefineLine.textContent = "";
   }, 0);
+}
+/** The lane has answered, or failed, the ask that was given `token`. Takes the
+ *  token; returns nothing. A token already dropped is ignored, so a late answer to
+ *  a given-up ask cannot end the words of a newer one. */
+function skyRefineEnd(token: number): void {
+  skyRefineLive.delete(token);
+  settleSkyRefine();
+}
+/** EVERY ASK IN FLIGHT IS GIVEN UP: nothing asks for a sky map any more, so the
+ *  words end now and not when the lane finishes a map that will be thrown away.
+ *  Takes and returns nothing. What it must satisfy: after it the live set is
+ *  empty; the common call, a draw with no sky input on and nothing live, does
+ *  nothing at all. */
+function skyRefineDrop(): void {
+  if (skyRefineLive.size === 0 && skyRefineTimer === null && !skyRefineLine.textContent) return;
+  skyRefineLive.clear();
+  settleSkyRefine();
 }
 /** A DRAW THAT WAS HELD BACK because the lane was building the map it would show
  *  (`drawWithMap`): the lane's answer draws it, and so does the stale-answer path
@@ -2989,6 +3032,70 @@ function forgetSkyMap(): void {
  *  once at open from its working copy. The sky map reads it as the shader does. */
 let localMapNow: LocalMap | null = null;
 
+/** THE THREE SKY INPUTS IN THE WORDS OF THEIR CONTROLS, for the report.
+ *  @param p  an edit.
+ *  @returns "Sky colour smoothing 1.00 · Sky depth 0.00 · Sky saturation 2.00".
+ *  What it must satisfy: the numbers are `p`'s own to the two places the sliders
+ *  hold, and the names are the labels of the three controls in ir.html, so a reader
+ *  of the report can find each. Consumers: `skyMapStateNow`, `noteSkyStage` and the
+ *  report's Sky inputs line. */
+function skyInputsText(p: EditParams): string {
+  return `Sky colour smoothing ${(p.skySmooth ?? 0).toFixed(2)} · Sky depth ${(p.skyDepth ?? 0).toFixed(2)} · Sky saturation ${(p.skySat ?? 0).toFixed(2)}`;
+}
+
+/** WHICH SKY INPUTS ASK THE LANE FOR A MAP.
+ *  @param p  an edit.
+ *  @returns the inputs of `p` that make `syncSkyMap` ask for a sky map, each as its
+ *  control's name and value: Sky colour smoothing or Sky depth above 0, and Sky
+ *  saturation only while `SKY_SAT_SECOND_GATE` is on; an empty list when nothing asks.
+ *  What it must satisfy: it is THE predicate. `syncSkyMap` asks for a map exactly when
+ *  the list is not empty, and the report's Sky map, Sky inputs and Last switch lines are
+ *  written from it, so an account of why a map was or was not asked for cannot
+ *  disagree with what the page did. */
+function skyMapAskers(p: EditParams): string[] {
+  const out: string[] = [];
+  if ((p.skySmooth ?? 0) > 0) out.push(`Sky colour smoothing ${(p.skySmooth ?? 0).toFixed(2)}`);
+  if ((p.skyDepth ?? 0) > 0) out.push(`Sky depth ${(p.skyDepth ?? 0).toFixed(2)}`);
+  if (SKY_SAT_SECOND_GATE && (p.skySat ?? 0) > 0) out.push(`Sky saturation ${(p.skySat ?? 0).toFixed(2)}`);
+  return out;
+}
+
+/** RECORD, ONCE PER OPEN, WHY THE SKY STAGE RAN OR THAT IT DID NOT.
+ *  @param img  the photograph `syncSkyMap` is looking at; ignored unless it is the one
+ *  profiled, and until its selection is in hand.
+ *  @param askers  `skyMapAskers` of the edit as it stands.
+ *  Returns nothing. What it must satisfy: an ask settles the open's account for good
+ *  ("ran because Sky colour smoothing 1.00 asked for a map"), and a look at an edit
+ *  that asks for nothing is provisional until an ask comes, so the first draw of an
+ *  open, which can come before a stored edit is laid over it, cannot leave "none ran"
+ *  beside a map that was built. Consumer: `switchSplit`, the Last switch line. */
+function noteSkyStage(img: DecodedImage, askers: string[]): void {
+  const p = skyProfile;
+  if (!p || p.img !== img || p.how === "waiting" || p.how === "left" || p.whyAsked) return;
+  if (askers.length) {
+    p.why = `ran because ${askers.join(" and ")} asked for a map`;
+    p.whyAsked = true;
+  } else if (p.why === null) {
+    p.why = `none ran, nothing asked for a map (${skyInputsText(params)}; Sky saturation alone asks for none)`;
+  }
+}
+
+/** WHAT THE SKY MAP IS DOING NOW, for the report's Sky map line when the renderer
+ *  holds none. Takes nothing; reads `params`, `lastSkyAsk` and `skyMapBusy`. Returns a
+ *  sentence: what asks for a map and where that stands, or that nothing does, and what
+ *  the last ask came to. What it must satisfy: it is written from `skyMapAskers`, the
+ *  predicate `syncSkyMap` asks by, and from `lastSkyAsk`, the record `syncSkyMap` keeps
+ *  of its own asks, so it cannot disagree with the Last switch line's account of the
+ *  open. */
+function skyMapStateNow(): string {
+  const asks = skyMapAskers(params);
+  const last = lastSkyAsk
+    ? `; the last ask, for ${lastSkyAsk.why}, ${Math.round((performance.now() - lastSkyAsk.at) / 1000)} s ago: ${lastSkyAsk.fate}`
+    : "; none has been asked for since this page opened";
+  if (asks.length) return `${asks.join(" and ")} ask${asks.length === 1 ? "s" : ""} for one${skyMapBusy ? ", and the lane is building it" : ", and it has not landed"}${last}`;
+  return `nothing asks for one (${skyInputsText(params)})${last}`;
+}
+
 /** Keep the renderer's sky chroma map matching the live edit.
  *  Takes nothing; reads `params`, `current` and `skyBitmap`; uploads a fresh
  *  map when the amount is on and the edit moved, clears it when it is off.
@@ -3005,7 +3112,17 @@ let localMapNow: LocalMap | null = null;
  *  minus the spatial-only ones the map does not read, plus the warp's field and
  *  `rev`, so dragging the amount itself costs nothing; and NOT DURING A WARP
  *  STROKE, which changes the field every frame — the map follows when the
- *  stroke ends (endWarpStroke draws once more). */
+ *  stroke ends (endWarpStroke draws once more).
+ *
+ *  AND WHEN NOTHING ASKS (`skyMapAskers` empty) it clears the map and, once the
+ *  selection is in hand, gives up any ask in flight: the refining words end there
+ *  (`skyRefineDrop`) and not when the lane
+ *  finishes a map that will be thrown away, and that map is kept when it does arrive
+ *  (an answer dropped as stale is kept under what it was built from at the ask), so
+ *  the same inputs asked for again are read from the store. It also records, for the
+ *  report, why the sky stage ran or that it did not (`noteSkyStage`) and how each ask
+ *  ended (`lastSkyAsk`). What it must satisfy: the words are up exactly while an ask
+ *  that is still wanted is in flight. */
 function syncSkyMap(): void {
   if (current && skyBitmap && !skyFine && ((params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0)) {
     // THE PAGE'S OWN REFINEMENT, FOR THE ONE CASE THAT IS LEFT. The sky worker's
@@ -3028,17 +3145,33 @@ function syncSkyMap(): void {
     // what the page spent on it (`SkyProfile.built`), beside the coarse bitmap.
     if (skyProfile?.img === img && (skyProfile.how === "page" || skyProfile.how === "none")) skyProfile.built = (skyProfile.built ?? 0) + (performance.now() - r0);
   }
-  // The sky saturation stage's second gate (pipeline.ts `skyRefWeight`) reads the sky
-  // colour direction off the map, so while the gate is on (`SKY_SAT_SECOND_GATE`) the
-  // map is built whenever the saturation is up, not only for smoothing or depth. The
+  // WHICH INPUTS ASK FOR A MAP is `skyMapAskers`, the one predicate the report reads
+  // too. The sky saturation stage's second gate (pipeline.ts `skyRefWeight`) reads the
+  // sky colour direction off the map, so while the gate is on (`SKY_SAT_SECOND_GATE`)
+  // the map is built whenever the saturation is up, not only for smoothing or depth. The
   // gate is OFF since 2026-10-17 (decision 087, Outcome), so Sky saturation alone, from
   // a reader's slider or from Restore depth under a look that allows it, asks for no
   // map, no coarse map first, no kept map and no refining line: the build before
   // 2026-10-14 asked for a map only for smoothing or depth, and so does this.
-  const satReadsMap = SKY_SAT_SECOND_GATE && (params.skySat ?? 0) > 0;
-  if (!current || !skyBitmap || ((params.skySmooth ?? 0) <= 0 && (params.skyDepth ?? 0) <= 0 && !satReadsMap)) {
-    if (skyMapKey) { renderer.setSkyMap(null); forgetSkyMap(); lastSkyMap = null; }
+  const askers = skyMapAskers(params);
+  if (current && skyBitmap) noteSkyStage(current, askers);
+  if (!current || !skyBitmap || askers.length === 0) {
+    if (skyMapKey) { renderer.setSkyMap(null); forgetSkyMap(); }
+    // The report's record of the held map goes whenever nothing asks, and not only when a
+    // key was held: stepping to a photograph forgets the key (`adoptSky`) and left the last
+    // photograph's map here, so the Sky map line described a sky that was not this one's
+    // while the Sky inputs line said nothing asks for one.
+    lastSkyMap = null;
     skyMapHeld = null;
+    // NOTHING ASKS FOR A MAP FROM THE SELECTION IN HAND, so an ask still in flight is given
+    // up: its map is thrown away on arrival (`gen`), and its words end here and not when the
+    // lane finishes. Only with the selection in hand: while the next photograph's selection
+    // is still on its way nothing is known about what it will ask for, and the words stand
+    // for the lane's work until then, as they did.
+    if (current && skyBitmap) {
+      if (lastSkyAsk && lastSkyAsk.fate === "in flight") lastSkyAsk.fate = "given up, nothing asked for a map any more";
+      skyRefineDrop();
+    }
     return;
   }
   const { key, masked, warp } = skyMapKeyNow();
@@ -3050,6 +3183,9 @@ function syncSkyMap(): void {
   if (skyMapBusy) return;
   skyMapKey = key;
   skyMapWarp = warp;
+  // THE REPORT'S RECORD OF THIS ASK (`lastSkyAsk`), settled below by however it ends.
+  const ask: SkyAskRecord = { at: performance.now(), why: askers.join(" and "), fate: "in flight" };
+  lastSkyAsk = ask;
   const img = current;
   const sky = skyBitmap;
   const mapFrom = performance.now();
@@ -3103,17 +3239,27 @@ function syncSkyMap(): void {
     if (asked) {
       const pageSpent = performance.now() - mapFrom;
       skyMapBusy = true;
-      skyRefineBegin();
+      const refine = skyRefineBegin();
       asked.then(endStage, endStage);
       // Registered before the answer's own handler below, so the line is told first
       // and that handler, which may ask again, is the last word on the count.
-      asked.then(skyRefineEnd, skyRefineEnd);
+      asked.then(() => skyRefineEnd(refine), () => skyRefineEnd(refine));
       void asked.then((ans) => {
         skyMapBusy = false;
-        // Left behind: another photograph, a new selection, a turn. What is wanted now is
-        // asked for here, and its answer draws; a draw that was held back for this ask
-        // (`drawWithMap`) is paid when nothing else is asked for.
+        // Left behind: another photograph, a new selection, a turn, or the inputs that
+        // asked going to zero. What is wanted now is asked for here, and its answer draws;
+        // a draw that was held back for this ask (`drawWithMap`) is paid when nothing else
+        // is asked for.
         if (current !== img || gen !== skyMapGen) {
+          // THE MAP IS KEPT ALL THE SAME, under what it was built from at the ask (`keep`),
+          // which is exactly right for those inputs whatever the edit is by now. It was
+          // thrown away here, so a press that took the inputs to zero and an Undo that
+          // brought them back built the same map twice (measured, the stored-edit arm of
+          // step 112).
+          if (ans?.map && keep) void keepSkyMap(keep.id, keep.deps, ans.map);
+          ask.fate = ask.fate === "in flight"
+            ? `answered after the inputs or the photograph had changed; ${ans?.map ? "the map was kept, not drawn" : "it held no map"}`
+            : `${ask.fate}; its answer then arrived and ${ans?.map ? "the map was kept, not drawn" : "held no map"}`;
           syncSkyMap();
           if (!skyMapBusy && skyMapDrawOwed) draw(false);
           return;
@@ -3121,11 +3267,13 @@ function syncSkyMap(): void {
         if (!ans) {
           // The lane could not build it. The page does, now and from here on for this
           // photograph, which is what it did before there was a lane.
+          ask.fate = "the lane could not build it, so the page builds it";
           skyMapPageFor = img;
           skyMapKey = "";
           draw(false);
           return;
         }
+        ask.fate = "landed";
         lastSkyMap = ans.map;
         renderer.setSkyMap(lastSkyMap);
         skyMapHeld = { img, sky };
@@ -3146,6 +3294,7 @@ function syncSkyMap(): void {
     // remaps the source at the very top, before denoise).
     try {
       lastSkyMap = buildOpenSkyMap(img, params, local, lensForEdit(img), srcFlatOf(img), sky, warp, decodePitch);
+      ask.fate = "built on the page";
       renderer.setSkyMap(lastSkyMap);
       skyMapHeld = { img, sky };
       noteSkyMapBuilt(img, mapFrom, "page", performance.now() - mapFrom);
@@ -3170,6 +3319,7 @@ function syncSkyMap(): void {
       // Left behind while the store was read: the same hand-over the lane's answer makes.
       if (current !== img || gen !== skyMapGen) {
         endStage();
+        if (ask.fate === "in flight") ask.fate = "set aside while the store was read, the inputs or the photograph having changed";
         syncSkyMap();
         if (!skyMapBusy && skyMapDrawOwed) draw(false);
         return;
@@ -3178,6 +3328,7 @@ function syncSkyMap(): void {
       // A KEPT MAP, built from exactly these inputs: the sky is on screen with the
       // picture and nothing is built or asked of the lane.
       endStage();
+      ask.fate = "read from the store, nothing built";
       lastSkyMap = kept;
       renderer.setSkyMap(kept);
       skyMapHeld = { img, sky };
@@ -3577,6 +3728,12 @@ const lookButtons: Record<string, HTMLButtonElement> = {
 };
 const lookNoneBtn = $("lookNone") as HTMLButtonElement;
 
+/** BRING THE LOOK BUTTONS TO THE LOOK THE OPEN PHOTOGRAPH WEARS.
+ *  Takes nothing; reads `activeLook`, `params` and the buttons. Returns nothing. For each
+ *  button it sets the highlight (the `active` class) AND `aria-pressed`, and rewrites the
+ *  state printed under its name; the None button is pressed exactly when no look is on.
+ *  What it must satisfy: exactly one of the ten buttons reads pressed, in the class and in
+ *  `aria-pressed` alike, so a screen reader and a harness are told what the screen shows. */
 function updateLookUI() {
   lookState();
   // A built-in Look never touches params.lut (unlike a saved look, which
@@ -3586,6 +3743,9 @@ function updateLookUI() {
   for (const [key, btn] of Object.entries(lookButtons)) {
     const active = activeLook === key;
     btn.classList.toggle("active", active);
+    // WHICH LOOK IS CHOSEN, to assistive technology and to a harness reading the state
+    // (Q-JPS-18): the highlight was a class alone, so the choice was shown and not said.
+    btn.setAttribute("aria-pressed", String(active));
     const sub = btn.querySelector(".look-sub") as HTMLElement | null;
     if (!sub) continue;
     const look = LOOKS[key];
@@ -3617,6 +3777,7 @@ function updateLookUI() {
   // look is on, the same way the others show theirs.
   const none = activeLook === null;
   lookNoneBtn.classList.toggle("active", none);
+  lookNoneBtn.setAttribute("aria-pressed", String(none));
   const noneSub = lookNoneBtn.querySelector(".look-sub") as HTMLElement | null;
   if (noneSub) noneSub.textContent = none ? "no look on" : "take it off";
 }
@@ -4706,10 +4867,133 @@ for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.chroma, ui.despeckl
   el.addEventListener("input", syncFromUI);
 }
 
+/** A CONTROL'S NAME AS A READER SEES IT, for the report.
+ *  @param id  the id of a slider in the editor's panel.
+ *  @returns the text of its label, with the colour band's title and the word band in
+ *  front for the two bands whose three sliders are all called Hue, Saturation and
+ *  Luminance ("Sky band Saturation", which is not the Sky saturation selection
+ *  control), else its aria-label, else the id.
+ *  What it must satisfy: the name is what is printed beside the control on screen, so a
+ *  line of the report can be matched to a control by eye; nothing in it is the reader's.
+ *  Consumers: `editValuesLine`, `liftChangeLine`. */
+function controlName(id: string): string {
+  const el = document.getElementById(id);
+  if (!el) return id;
+  const own = (n: Element | null): string => (n ? Array.from(n.childNodes).filter((c) => c.nodeType === Node.TEXT_NODE).map((c) => c.textContent ?? "").join("").replace(/\s+/g, " ").trim() : "");
+  const name = own(el.closest("label")) || el.getAttribute("aria-label") || "";
+  if (!name) return id;
+  const band = own(el.closest(".band")?.querySelector(".band-title") ?? null);
+  return band ? `${band} band ${name}` : name;
+}
+
+/** EVERY SLIDER OF THE OPEN PHOTOGRAPH'S EDIT BY ITS CONTROL'S NAME, as it landed.
+ *  Takes nothing; reads the editor panel's range controls. Returns "Name value"
+ *  entries joined by " · ", in the panel's order, each control once (a control that
+ *  mirrors another, as the finishing panel's do, is left out), or a short sentence when
+ *  nothing is open. What it must satisfy: the value is the control's own, after the
+ *  automatics at open and the lift have written to it and `syncToUI` has put it on the
+ *  slider's step, which is the number a reader would read off the screen and the number
+ *  the next `syncFromUI` takes back; a name used twice is told apart by its id. The four
+ *  sliders on a logarithmic track (Exposure and the three gains) also print the
+ *  multiplier the pipeline takes, `params` as it stands, because a track position says
+ *  nothing about how much light it is. While a mask is picked the controls that follow
+ *  a mask show its values, not the whole photograph's. It names no file and nothing the
+ *  reader wrote. Consumer: the report's Edit values row. */
+function editValuesLine(): string {
+  if (!current) return "nothing open";
+  const rows: { id: string; name: string; value: string }[] = [];
+  const seen = new Set<string>();
+  const multiplier: Record<string, number> = { expo: params.exposure, wbR: params.wb[0], wbG: params.wb[1], wbB: params.wb[2] };
+  for (const el of Array.from(panelBody.querySelectorAll<HTMLInputElement>("input[type=range]"))) {
+    if (!el.id || seen.has(el.id) || el.dataset.mirror) continue;
+    seen.add(el.id);
+    const m = multiplier[el.id];
+    rows.push({ id: el.id, name: controlName(el.id), value: m === undefined ? el.value : `${el.value} (×${m.toFixed(4)})` });
+  }
+  const used = new Map<string, number>();
+  for (const r of rows) used.set(r.name, (used.get(r.name) ?? 0) + 1);
+  return rows.map((r) => `${(used.get(r.name) ?? 0) > 1 ? `${r.name} [${r.id}]` : r.name} ${r.value}`).join(" · ");
+}
+
+/** WHICH LOOK THE PHOTOGRAPH WEARS, by the name its button prints.
+ *  Takes nothing; reads `activeLook`, `lookMark` and `params.swapRB`. Returns the
+ *  look's button name or "none", whether the grade is still as the look left it, and
+ *  the state of the R⇄B swap. What it must satisfy: the name is read from the button
+ *  the reader pressed (`lookLabel`), not from the key; "as the look left it" is the
+ *  same test `carryLook` uses (`looksUntouched`), so the report says what the app
+ *  believes; and a photograph with no mark says that it has none. Consumer: the
+ *  report's Look applied row. */
+function lookAppliedLine(): string {
+  if (!current) return "nothing open";
+  const swap = `the R⇄B swap is ${params.swapRB ? "on" : "off"}`;
+  if (!activeLook || !LOOKS[activeLook]) return `none — ${swap}`;
+  const grade = !lookMark ? "no record of when it was applied" : looksUntouched(lookMark) ? "the grade is as the look left it" : "the grade has changed since the look was applied";
+  return `${lookLabel(activeLook)} — ${grade}; ${swap}`;
+}
+
+/** THE THREE SKY INPUTS OF THE OPEN PHOTOGRAPH, what the look writes for them, and
+ *  whether they ask for a map. Takes nothing; reads `params` and `activeLook`.
+ *  Returns one sentence. What it must satisfy: the verdict on asking is
+ *  `skyMapAskers`, the predicate the page asks by; and where the inputs are not what
+ *  the look writes it says where else they can come from (a stored edit written by an
+ *  earlier build, an undo step, the sliders, or Restore depth's top-up of Sky
+ *  saturation) and does not claim which, because the page does not record it.
+ *  Consumer: the report's Sky inputs row. */
+function skyInputsLine(): string {
+  if (!current) return "nothing open";
+  const row = activeLook ? LOOKS[activeLook] : null;
+  const written = row ? [row.skySmooth ?? 0, row.skyDepth ?? 0, row.skySat ?? 0] : [0, 0, 0];
+  const now = [params.skySmooth ?? 0, params.skyDepth ?? 0, params.skySat ?? 0];
+  const same = written.every((v, i) => Math.abs(v - now[i]) < 0.005);
+  const rowText = row ? `${lookLabel(activeLook!)} writes ${written.map((v) => v.toFixed(2)).join(" · ")}` : "no look is on, so none are written";
+  const asks = skyMapAskers(params);
+  return `${skyInputsText(params)} — ${rowText}${same ? "" : "; these are not what the look writes, so they come from a stored edit written by an earlier build, an undo step, the sliders, or Restore depth's top-up of Sky saturation"} — ${asks.length ? `asks the lane for a sky map: ${asks.join(" and ")}` : "asks the lane for no sky map"}`;
+}
+
+/** WHAT RESTORE DEPTH CHANGED, by control and amount.
+ *  Takes nothing; reads `liftApplied` (what the lift last wrote and what it replaced) and
+ *  `autoLift`. Returns each control the lift moved as "Name from → to (+change)", the
+ *  tone points in the slider's own units, or why nothing moved. What it must satisfy: the
+ *  amounts are the lift's own writes against the values it replaced (`prevTone`,
+ *  `prevFoliage`, `prevSky`, `prevSkySat`), so they are what the solve did and not what
+ *  the controls read now after a hand move. Consumer: the report's Restore depth changed
+ *  row. */
+function liftChangeLine(): string {
+  if (!current) return "nothing open";
+  if (!autoLift) return "nothing, Restore depth is off";
+  const a = liftApplied;
+  if (!a) return "nothing, it is on and this photograph already measures where it should, or its solve has not run";
+  const list = (s: string) => s.split(",").map(Number);
+  const parts: string[] = [];
+  const move = (name: string, from: number, to: number) => {
+    if (Math.abs(to - from) < 0.005) return;
+    parts.push(`${name} ${from.toFixed(2)} → ${to.toFixed(2)} (${to >= from ? "+" : "−"}${Math.abs(to - from).toFixed(2)})`);
+  };
+  list(a.tone).forEach((v, i) => move(controlName(`tone${i}`), (a.prevTone[i] - TONE_DEFAULT[i]) * 100, (v - TONE_DEFAULT[i]) * 100));
+  move(controlName("folSat"), a.prevFoliage[1], list(a.foliage)[1]);
+  move(controlName("skySat"), a.prevSky[1], list(a.sky)[1]);
+  move(controlName("skySatSel"), a.prevSkySat, Number(a.skySat));
+  return parts.length ? parts.join("; ") : "nothing, the solve landed on the look's own values";
+}
+
 /** The version number is the way in to the two things you need when something
  *  is wrong: the report that says what this device IS, and a page that measures
  *  what it can DO. Both were missing entirely — the version was a dead label,
- *  and every performance question about the real device ended in a guess. */
+ *  and every performance question about the real device ended in a guess.
+ *
+ *  Takes nothing; wires the version tag, the ⓘ's report button and the busy card's to
+ *  one dialog, and returns nothing. When the dialog opens it builds the report from
+ *  `buildDiagnostic` plus the editor's own rows. THE ROWS NAME THE STATE A PICTURE WAS
+ *  MADE IN, so two reports of one photograph can be compared by their lines and not by
+ *  the pictures alone: the look applied by its button's name, every slider by its
+ *  control's name as it landed (Edit values), the three sky inputs and whether they ask
+ *  for a map (Sky inputs), what Restore depth moved by control and amount, and, when no
+ *  sky map is held, what asks for one and what the last ask came to. What it must
+ *  satisfy: every value in those rows is read from the state the page drew with (the
+ *  controls, `params`, `liftApplied`, `lastSkyAsk`), never remembered, and the Sky map
+ *  row and the Last switch row's sky stage clause come from one predicate
+ *  (`skyMapAskers`), so they cannot disagree. It names no file and nothing the reader
+ *  wrote. */
 function wireVersionMenu() {
   const dlg = document.getElementById("verDlg") as HTMLDialogElement | null;
   const tag = document.getElementById("verTag");
@@ -4749,11 +5033,20 @@ function wireVersionMenu() {
       // it, and it is the driver's text alone — nothing of the reader's.
       { k: "Graphics build", v: graphicsBuildLine() },
       { k: "Restore depth", v: autoLift ? `on at ${Math.round(liftAmount * 100)}% strength` : "off" },
+      // WHAT THE LIFT MOVED, which look is on, and what the sky inputs are and whether
+      // they ask for a map: the state a picture was made in, which the report named
+      // none of. Two reports of one photograph can now be compared by their lines and
+      // not by the pictures alone.
+      { k: "Restore depth changed", v: liftChangeLine() },
+      { k: "Look applied", v: lookAppliedLine() },
+      { k: "Sky inputs", v: skyInputsLine() },
       // THE SKY MAP'S TWO NUMBERS. The depth key is decided once per photograph
       // from the sky's mean rendered chroma (skymap.ts); a key of 0 is why a
       // Sky depth slider does nothing, and the chroma beside it says how far
-      // below the window that sky sits.
-      { k: "Sky map", v: lastSkyMap ? `depth key ${lastSkyMap.key.toFixed(2)} from sky chroma ${lastSkyMap.chroma.toFixed(3)} (window ${SKY_DEPTH_CHROMA_LO}–${SKY_DEPTH_CHROMA_HI}) · palest sky texel ${lastSkyMap.paleTexel.toFixed(3)} single ${lastSkyMap.minTexel.toFixed(3)} (grey guard ${SKY_DEPTH_GREY_LO}–${SKY_DEPTH_GREY_HI} of the mean) · sky saturation ${(params.skySat ?? 0).toFixed(2)} · its second gate: ${skyReferenceNote(lastSkyMap)}` : "none built" },
+      // below the window that sky sits. WHEN NONE IS HELD it says what asks for one
+      // and what the last ask came to (`skyMapStateNow`), from the same predicate the
+      // Last switch line's "sky stage" clause is written from.
+      { k: "Sky map", v: lastSkyMap ? `depth key ${lastSkyMap.key.toFixed(2)} from sky chroma ${lastSkyMap.chroma.toFixed(3)} (window ${SKY_DEPTH_CHROMA_LO}–${SKY_DEPTH_CHROMA_HI}) · palest sky texel ${lastSkyMap.paleTexel.toFixed(3)} single ${lastSkyMap.minTexel.toFixed(3)} (grey guard ${SKY_DEPTH_GREY_LO}–${SKY_DEPTH_GREY_HI} of the mean) · sky saturation ${(params.skySat ?? 0).toFixed(2)} · its second gate: ${skyReferenceNote(lastSkyMap)}${lastSkyAsk ? ` · asked for by ${lastSkyAsk.why}, ${lastSkyAsk.fate}` : ""}` : `none held now — ${skyMapStateNow()}` },
       // THE VIEW, because a photograph that fills the screen with no way out
       // looks the same in a screenshot whichever of four states caused it.
       { k: "View", v: viewDiagnostic() },
@@ -4789,6 +5082,8 @@ function wireVersionMenu() {
       // selection read it. The walk reads these two lines back.
       { k: "Correction order", v: current?.linear ? `on the linear raw at decode, before the balance and the selection — ${current.lensApplied?.gains ? `strength ${current.lensApplied.strength} laid on the pixels` : "nothing laid on the pixels (no profile matched, or the strength is set to 0)"}` : current ? "inside the grade — an 8-bit source has no linear copy to correct first" : "nothing open" },
       { k: "Balance", v: current ? `white balance ${params.wb.map((x) => x.toFixed(4)).join(" · ")} — the at-open gray-world unless moved since` : "nothing open" },
+      // EVERY SLIDER BY ITS NAME, as the open and the lift left it (`editValuesLine`).
+      { k: "Edit values", v: editValuesLine() },
       // WHAT THE SHADOWS ARE LIT BY, which one white balance cannot answer: in
       // the infrared a shadow gets almost nothing from the sky and is filled by
       // bounce off foliage, so a lit face and a shaded face are two illuminants
@@ -12498,7 +12793,9 @@ function showDecoded(img: DecodedImage, imported: ImportedFile) {
 }
 
 /** The body of `showDecoded`, which marks its stage around this. Takes what
- *  `showDecoded` takes; returns nothing. */
+ *  `showDecoded` takes; returns nothing. It also starts the photograph's sky profile
+ *  (`skyProfile`), whose `why` stays null, "not decided yet" in the report's Last switch
+ *  line, until `syncSkyMap` has looked at the edit (`noteSkyStage`). */
 function showDecodedNow(img: DecodedImage, imported: ImportedFile) {
   // THE FIRST AND LAST INSTANT OF THIS FUNCTION, so the phases below can be
   // held to the whole rather than to most of it. The five named phases cover
@@ -12576,7 +12873,7 @@ function showDecodedNow(img: DecodedImage, imported: ImportedFile) {
     // A record still waiting belongs to a photograph being left: say so, so its
     // line never claims an answer is on its way for a picture that is gone.
     if (skyProfile?.how === "waiting") skyProfile.how = "left";
-    skyProfile = { img, at: performance.now(), asked: false, how: "waiting", wait: null, built: null, lift: null, map: null, mapBy: null, mapPage: null, coarse: null, coarseAt: null, coarseBuild: null, fullAt: null, fullBuild: null };
+    skyProfile = { img, at: performance.now(), asked: false, how: "waiting", wait: null, built: null, lift: null, map: null, mapBy: null, mapPage: null, coarse: null, coarseAt: null, coarseBuild: null, fullAt: null, fullBuild: null, why: null, whyAsked: false };
     // The sky map lane holds ONE photograph's pixels, the one open; the last one's go.
     releaseSkyMapScene(img);
     seekSky(img);
@@ -16271,7 +16568,14 @@ async function endSession(): Promise<Awaited<ReturnType<typeof resetSessionState
  *  satisfy: the switch's parts add up to its whole; settling's two parts add up
  *  to settling; and each sky part is something the page measured on its own
  *  clock, said as "none made" or "none built yet" where nothing ran, never as a
- *  zero. It names no file and nothing the reader wrote. */
+ *  zero. It names no file and nothing the reader wrote.
+ *
+ *  AND IT ENDS WITH WHY THE SKY STAGE RAN, naming the input ("sky stage: ran because
+ *  Sky colour smoothing 1.00 asked for a map"), or that nothing asked ("none ran,
+ *  nothing asked for a map"), and says "none asked for" for a map that was never
+ *  wanted where it used to say "none built yet". The clause is `SkyProfile.why`, written
+ *  from `skyMapAskers`, the predicate the report's Sky map line and the page's ask are
+ *  both made by, so the two lines agree. */
 function switchSplit(): string {
   const p = lastSwitchProfile;
   if (!p) return "none this session";
@@ -16303,7 +16607,7 @@ function switchSplit(): string {
     ? `a coarse map first, landed ${t(s.coarse)} after the ask and ${t(s.coarseAt ?? 0)} after the picture, the lane's own build ${t(s.coarseBuild ?? 0)}`
     : "no coarse map first";
   const afterwards = s && s.how !== "waiting" && s.how !== "left"
-    ? `, second lift solve ${s.lift === null ? "none made" : t(s.lift)}, sky map ${s.map === null ? "none built yet" : t(s.map)}` +
+    ? `, second lift solve ${s.lift === null ? "none made" : t(s.lift)}, sky map ${s.map === null ? (s.whyAsked ? "none built yet" : "none asked for") : t(s.map)}` +
       // WHERE IT CAME FROM, and what the page itself spent: the lane's own seconds
       // and its queue are in the first number and are not the page's. Said plainly
       // when the sky came out of the store, because then nothing was built at all.
@@ -16313,7 +16617,11 @@ function switchSplit(): string {
           ? ` (from the store, kept from an earlier visit, nothing built; the page spent ${t(s.mapPage ?? 0)} reading it; landed ${t(s.fullAt ?? 0)} after the picture)`
           : s.mapBy === "worker"
             ? ` (built in the sky worker; the page spent ${t(s.mapPage ?? 0)} of it; ${coarse}; the full map landed ${t(s.fullAt ?? 0)} after the picture, the lane's own build ${t(s.fullBuild ?? 0)})`
-            : ` (built on the page; landed ${t(s.fullAt ?? 0)} after the picture)`)
+            : ` (built on the page; landed ${t(s.fullAt ?? 0)} after the picture)`) +
+      // WHY THE STAGE RAN, naming the input, or that nothing asked: from the one
+      // predicate `syncSkyMap` asks by (`noteSkyStage`), so this line and the Sky map line
+      // are written from the same answer and cannot say two things.
+      `; sky stage: ${s.why ?? "not decided yet, the selection had not arrived"}`
     : "";
   return (
     `${p.megapixels.toFixed(1)} MP in ${t(p.total)} — reading ${t(p.getBytes)} over ${p.chunkRows} stored pieces` +

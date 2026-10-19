@@ -5471,3 +5471,140 @@ scarlet. The first two were put right on 2026-10-14 (the last is the intended re
 and the same ramp and margin change brought two more that the 2026-10-15 builds answered:
 out-of-focus foliage turning teal with pale discs in its gaps (Options 12 and 17), and
 holes in thin cloud (Option 17).
+
+### 9u. WHY LIT FOLIAGE COMES OUT PALE ON SOME FRAMES — TRACED STAGE BY STAGE ON FOUR RAWS, AND THE FILM MODEL OF RECORD 066 DRAWN ON THE SAME FRAMES (measured 2026-10-18 and 2026-10-19)
+
+Two phone reports from the reader showed lit conifers coming out light pink-white under
+Aerochrome on one frame and deep red on another. The frames are NIR_3762 (deep red) and
+NIR_3735 (pale), both from the reader's shared zip of 2026-10-17, found among its four
+raws by the lens line, the centre gains and the at-open white balance each report prints;
+NIR_1716 and NIR_3471 are two more frames from the reader's index, run as extra rows. The
+instrument is the app's own pipeline run in node with no browser: its decoders, lens flat,
+balance, sky selection, denoiser and compiled edit, under the Aerochrome row of the look
+table as the build before the 2026-10-18 production commit ships it (Restore depth on at
+full strength, the shipped lens flat laid at decode). Populations come from each frame's
+own data: lit, mid and shaded foliage are the top quarter, the middle fifth and the bottom
+quarter of the foliage region by brightness, and the sky is the app's own selection.
+Every figure is a median of chroma (largest channel minus smallest) or of value (largest
+channel), the share of the population whose chroma is under 12 of 255 (called colourless),
+or the mean hue of its coloured pixels, read at every fourth pixel. The trace tracks the
+page's own render of each frame to a mean difference of 0.002 to 0.010 per channel, where
+the same model with global saturation 1 sits at 0.024 to 0.132 (the control), so the
+stages below are the page's stages. The foliage classes were redrawn twice after their
+class pictures were opened, because the first two definitions left the whitest flooded
+crowns outside every class; the numbers here are the third definition's, and the figures
+of the earlier runs are superseded.
+
+- **The white balance removes four fifths of every population's colour, and what survives
+  is all the look has to work with.** Lit foliage chroma falls from 0.428 to 0.061, from
+  0.408 to 0.053, from 0.377 to 0.061 and from 0.461 to 0.094 (minus 86, 87, 84 and 80
+  percent) on NIR_3762, NIR_3735, NIR_1716 and NIR_3471; mid foliage and sky lose the
+  same order. What survives differs by frame in two ways the median hides. The share of
+  lit foliage left colourless is 27, 45, 37 and 21 percent, and on NIR_3735 5 percent of
+  its pixels sit at or above 1.0 in every channel after the balance and exposure
+  (NIR_3762: 1, 2 and 4 percent in red, green and blue). And the mean hue of its coloured
+  pixels is 229 and 223 degrees on NIR_3762 and NIR_1716, the direction mid and shaded
+  foliage take on every frame (220 to 233), but 84 and 86 degrees on NIR_3735 and
+  NIR_3471: after the balance, those frames' lit foliage does not point the way foliage
+  points.
+- **The look multiplies what survives by 9.3, 4.5, 5.7 and 5.1.** The channel mixer takes
+  x2.3, x1.4, x1.7 and x1.5 of that, hue, saturation and the Foliage band x3.4, x2.9, x3.2
+  and x3.2, contrast, tone curve and Restore depth x1.2, x1.1, x1.0 and x1.0; the swap and
+  the eight-band mixer change nothing. On NIR_3735 the hue runs 84, 156, 243, 248 and 286
+  through the swap, the mixer, the band and the eight-band stage, and the foliage ends
+  pink-violet; on NIR_3762 it runs 229, 11, 332, 327 and 6 and ends red.
+- **The denoiser then takes 44 and 45 percent of lit foliage chroma on NIR_3735 and
+  NIR_3471, and little or nothing on the other two** (plus 2 percent on NIR_3762, minus 6
+  on NIR_1716). Final lit foliage: chroma 0.578, 0.133, 0.326, 0.264; colourless 2, 23, 7
+  and 11 percent; value 0.953, 0.813, 0.820, 0.770; hue 6, 297, 5 and 315. What was
+  measured is what the stage removes, not whether it was noise or foliage signal.
+- **The ratio of NIR_3762's lit foliage chroma to NIR_3735's, 4.35, is three factors
+  multiplied:** the residual after the balance x1.15, the amplification x2.08, the
+  denoiser x1.82 (against NIR_1716: 1.77 = x1.00 times x1.62 times x1.09; against
+  NIR_3471: 2.19 = x0.65 times x1.81 times x1.87). No one stage is the lighter red; the
+  stage that differs most between the frames that came out pale and the ones that did not
+  is the denoiser, and the one that decides how much the look has to amplify is the
+  balance's residual and its direction.
+- **The suspects, one at a time, as multiples of the look before the denoiser (lit
+  foliage chroma, on the four frames in order).** The Foliage band at 1.96: x1.6, x1.3,
+  x1.8, x1.3. Global saturation 1.0: x0.4 on all four. Contrast 1: x1.0, x0.9, x1.0, x1.0.
+  Restore depth off: x0.9, x1.0, x1.0, x1.0. So the band is the one lever that moves lit
+  foliage on every frame, and on NIR_3735 it reaches 0.307 where NIR_3762 sits at 0.564
+  without it; neither Restore depth nor contrast is the lighter red.
+- **A white point taken from the frame's clear sky puts the colour back into the foliage
+  and takes it out of the sky.** Balances 0.998/1.974/3.726, 0.998/1.948/3.628,
+  0.998/1.935/3.371 and 0.998/1.988/4.092 raise lit foliage chroma x1.8, x3.5, x2.1 and
+  x1.1 (to 0.996, 0.832, 0.727, 0.527) and take the sky to chroma 0.080, 0.059, 0.086 and
+  0.162 with 33, 43, 31 and 17 percent of it colourless. The colour is in the file; the
+  gray-world balance, which is set on the whole frame and so on mostly foliage, spends
+  it. This is a trade between two populations and so a choice about how photographs look,
+  not a defect with one remedy, and no picture of it was made in this step.
+- **The lens correction as a stage (strength 1 against 0, the balance reopened with no
+  flat laid) is small on the whole population.** Final lit foliage chroma 0.578 against
+  0.584, 0.133 against 0.141, 0.326 against 0.344, 0.264 against 0.283 (minus 1, 6, 5 and
+  7 percent); sky 0.482 against 0.512, 0.475 against 0.551, 0.160 against 0.143 and 0.121
+  against 0.133 (minus 6 and 14, plus 12, minus 9). The colour profile both phone reports
+  name is the shipped table's raw-measured one, not a measurement made on the phone: the
+  lens line carries no match note and no stand-down text, and the container computes the
+  reports' centre gains from it to three places (red 1.010 and blue 0.971 for NIR_3762,
+  red 1.019 and blue 0.969 for NIR_3735). Record 085's claim, a per-colour radial gain
+  that whitens bright centre foliage, is neither confirmed nor contradicted: the
+  population here is the whole frame, which would dilute an effect confined to the centre.
+- **A synthetic gradient through the same stages (Q-JPS-23's measurement).** A ramp of
+  4096 steps through each frame's own balance, exposure, look and Restore depth, with no
+  camera matrix, read at 8 bits. The control reads as known: the staircase planted in the
+  measurer reads 16 levels, steps of 16 and a run of 4; the neutral edit with every stage
+  off reads a ramp from 0 to 1 as levels 0 to 247, contiguous, steps of 1 (so a linear
+  1.0 shows as level 247 and not 255, not traced here). Over the whole range after the
+  balance, and over a cloud-like 0.30 to 0.45 with every camera channel rounded to whole
+  raw levels (one raw level taken as 1 over 15375, the 14-bit convention, which is an
+  assumption of the gradient and not read from these frames), the largest step is 1 level
+  at every stage on the parameters of NIR_3762, NIR_3735 and NIR_1716. On NIR_3471's
+  (exposure 10.177) a raw level becomes a step of 2 levels from the hue, saturation and
+  band stage on (red, 40 of its steps; green, 6) and at the eight-band stage (red 35, blue
+  18), and the denoiser then the look reads 1 everywhere: the stages make no flat patch
+  from a smooth ramp in three of four parameter sets, and where a raw level is large
+  enough they turn it into a two-level step that the denoiser clears. Not established:
+  the origin of the flat cloud on NIR_1651 and NIR_1703, whose parameters were not run.
+- **The film model of record 066, drawn on the same frames, does not give the look
+  back.** It synthesises the film's three layer exposures from the file's infrared
+  brightness and its one colour axis, runs them through the layers' curves and dyes of
+  4b-viii, smooths the axis with an edge-aware filter guided by the infrared (7 by 7), and
+  scans the slide at Kodak's own balance (neutrals read cyan) and at a balance that reads
+  a grey card neutral. White point from the frame's own sky (a visible-to-infrared ratio
+  of 3.5) and its mid and shaded foliage (0.1): red gain 0.539, 0.547, 0.552, 0.526; blue
+  gain 1.747, 1.466, 1.700, 1.907; visible share of the red channel 0.025, 0.028, 0.027,
+  0.018 (one constant fitted to two ratios). The 90th percentile of non-sky infrared is
+  anchored at 3.5 times a grey card. Both are assumptions of this scratch model, and no
+  sweep of either was run.
+  At Kodak's balance the sky is cyan on all four (hue 181 to 182, chroma 0.297 to 0.474)
+  and lit foliage is light cyan on NIR_3735 and NIR_3471 (chroma 0.279 and 0.317, hue 183
+  and 185) or near-black on NIR_3762 and NIR_1716 (value 0.081 and 0.077). At the grey
+  balance the sky is red or dark red (hue 280 to 349) and lit foliage is red on NIR_3735
+  (chroma 0.456, value 0.599, 2 percent colourless, hue 347, against the app's 0.133,
+  0.813, 23 percent, 297) and partly on NIR_3471 (0.246, 0.375, hue 342, against the app's
+  0.264, 0.770, 315, so redder and half as bright), but near-black on NIR_3762 and
+  NIR_1716 (value 0.109 and 0.086). Mid and shaded foliage are black at both balances
+  (value 0.026 or less) except mid foliage on NIR_3735 at Kodak's (chroma 0.220, value
+  0.233). The renders were opened on all four frames at both balances.
+  What decides it is the sign of a small residual. The model's red-over-infrared ratio
+  minus 1, median over lit foliage, reads -0.069, +0.055, -0.040 and +0.036 on the four
+  frames, which it turns into a visible-to-infrared ratio of 0.04, 2.95, 0.04 and 3.00:
+  residuals of five hundredths either way make the layers see foliage (dense in all
+  three layers, so near-black) or sky (light cyan, or red at the grey balance). That the
+  positive sign falls on NIR_3735 and NIR_3471 is the same two frames whose lit foliage
+  has mean hue 84 and 86 after the balance. The sky is not the film's darkest region
+  here: median infrared brightness over a grey card is 2.52, 1.45, 1.86 and 0.89 for the
+  sky against 3.31, 3.12, 2.77 and 2.19 for lit foliage, so the sky is 0.76, 0.46, 0.67
+  and 0.41 of the foliage's, and the film's dark blue sky cannot come from this axis at
+  either balance.
+- **Not established.** What the file lacks for the model: a visible green layer, the
+  sky's true infrared share and the red channel's visible share (the model assumes the
+  last from the frame's own sky and foliage). Anything on a device: every render here
+  is a container render with software graphics, the sky lane switched off (so the
+  report reads Sky map none built), the copy of the shipped build served on its own
+  port with the worker blocked. Whether the lens correction's effect confined to the
+  centre of the frame is larger than its effect on the whole population. Whether the
+  colour the denoiser removes from lit foliage is noise. The lit bare ground class lands
+  on pale crown foliage in NIR_3762 and on dark ground in NIR_3735, so its figures are
+  not used here.
