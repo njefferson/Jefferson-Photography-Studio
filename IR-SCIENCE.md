@@ -5608,3 +5608,91 @@ of the earlier runs are superseded.
   colour the denoiser removes from lit foliage is noise. The lit bare ground class lands
   on pale crown foliage in NIR_3762 and on dark ground in NIR_3735, so its figures are
   not used here.
+
+### 9v. PER-PHOTOGRAPH CHANNEL ALIGNMENT ON THE RAW, AND RED AND BLUE CO-SITED IN THE WORKING COPY (record 061, built 2026-10-20)
+
+Aerochrome's mixer turns a small misregistration of red and blue against green into a
+vivid blue outline with a red rim on every thin dark edge against bright sky, because this
+camera records one colour axis and an edge's colour error lands on the axis that separates
+foliage from sky (4b-ix, 4c-iv). Two offsets add: the working copy's 2x2 binning put blue
+about half a preview pixel up and to the left of red, the same everywhere, and the lens
+adds a lateral term that grows toward the corners and changes sign between lenses.
+
+- **The method is a published family, and these are its sources.** Every raw converter
+  that corrects lateral colour does it on the mosaic before the colour transforms.
+  darktable's order (`src/common/iop_order.c`, version 5) runs white balance, raw
+  chromatic aberration, demosaic, the lens and guided corrections, the input profile, the
+  channel mixer and the defringe, so channel geometry is corrected before any colour
+  transform; its guided correction (`cacorrectrgb.c`) models two defects, channels that
+  are misaligned and one channel that is blurrier than another. dcraw's `-C` rescales red
+  and blue about the centre after white balance and before demosaic, with fixed numbers.
+  RawTherapee (`CA_correct_RT.cc`) estimates red's and blue's shift per tile against
+  interpolated green, on the raw, and fits a polynomial over the frame. Kolari Vision's
+  articles say fringing with infrared can be more pronounced because most lenses are not
+  designed for it, and worse around foliage when the channel mixer is involved. These
+  were read on 2026-09-24 and are the sources record 061 names; the 20 October work
+  restated the method as the family it implements and its measurement report names no
+  further source, so none is added here.
+- **What the app does with it.** One estimate per photograph at decode: a window per
+  tile of 128 photosites, about 330 tiles read whatever the frame's size, each tile fitting
+  red's or blue's sites as a gain times green plus an offset, shifted by a Gauss-Newton
+  step on a bilinear read of green (a real green site keeps its value; a red or blue site
+  takes the mean of its four green neighbours); a robust fit over the frame of a constant
+  term and a radial polynomial; a shift under 0.08 photosite left alone, one over 1.5 not
+  believed. Red and blue are then moved by a bilinear read of their own lattices, in place
+  on the linear raw, before the lens flat, the camera matrix, the swap and the mixer, and
+  the binned working copy reads red and blue at the quad's centre from their own lattices
+  (weights 9, 3, 3 and 1 sixteenths). The two ship together: co-siting alone turned the
+  other side of a post blue, because the binning offset had been partly cancelling the
+  lens's.
+- **What it read on four frames.** Proved on exact plants first: a scene whose blue
+  reaches +1 photosite at the corners and whose red reaches -0.6 reads +1.01 and -0.59, the
+  same frame measured twice differs by 0.000, and a plane moved by one blue-plane pixel
+  reads 1.96 to 2.00. In photosites of the full mosaic the blue corner offset reads -0.01 on
+  NIR_3461 (the lens adds almost nothing there), +0.19 on NIR_3463 (about 0.27 by the
+  earlier reading), -0.36 on NIR_1703 (inward) and +0.52 on NIR_3430 (about 0.6 by the
+  earlier reading); red reads +0.02, -0.04, +0.10 and -0.09. The estimate takes 0.5 to 0.9 s
+  on a 5600 by 3728 frame in a container and the alignment up to 0.4 s; a device figure is
+  not measured.
+- **A sparse lattice costs something on every read.** Red and blue each sit on a lattice of
+  spacing 2, and a bilinear read of it moves a sharp edge by less than asked (about half
+  on NIR_1703, about three quarters on NIR_3430, about 60 percent at NIR_3430's post) and
+  softens the colour it moves: the steadier 25 to 75 percent width of blue at that post
+  went from 2.39 and 1.93 to 2.60 and 2.25 photosites against green's 2.51 and 2.11. The
+  co-sited working copy softens red and blue more: the root-mean-square gradient of the
+  displayed red plane after, as a fraction of before, is 0.53 to 0.91 at thin-edge and leaf
+  places, and displayed green and blue lose 1 to 20 percent. A cubic read would move an
+  edge further and can overshoot at it, and the Aerochrome mixer amplifies an overshoot.
+- **How to measure a shift without fooling yourself.** Take each colour's edge crossing on
+  that colour's own sample sites, with the green samples on the same row beside it, so the
+  edge's tilt cancels in the difference; take the 50 percent crossing, interpolated, and the
+  median over hundreds of rows; a shift is the same sign at both edges of a post and blur is
+  opposite signs. The 10 to 90 percent width of a low-signal channel is noise-limited (blue
+  at that post ran from 5 to 24 photosites between quartiles) and the 25 to 75 percent width
+  is the steadier one. Do not read it on the displayed picture: under the Aerochrome mixer
+  each displayed plane is a mixture of sensor planes (the displayed red plane carries the
+  sensor's blue and the displayed blue plane the sensor's red, because the swap runs before
+  the mixer), and a bright fringe makes a displayed plane non-monotone across an edge. A
+  first reading of the plants on the displayed picture ran the wrong way round for exactly
+  this reason.
+- **What it left, and what it did not explain.** At NIR_3430's post blue is still 0.15 to
+  0.22 photosite from green (it was 0.43 to 0.46) and red 0.10 (it was 0.16): a small
+  shift, not blur, so a guided correction of a blurrier channel is not what is missing. The
+  frame renders darker after the change, by 1 to 6 levels across most of its grid in the
+  editing view and visibly in the export, and three causes were measured and ruled out: the
+  alignment's effect on the sensor planes' means (0.012 percent at most), any binned pixel
+  at the clip test's pin (none, on all four frames), and the open's gray-world balance and
+  auto exposure (under 0.05 percent in the gains and 0.22 percent in the exposure). What
+  moves it was then read from the page itself, in three arms of one build: it is the Restore
+  depth lift. The lift measures the look's median brightness on the undenoised binned copy,
+  which red and blue now leave with less noise (the open's Denoise strength falls from 0.40
+  to 0.33 with the co-sited read alone), reads 0.456 before and 0.474 after, and pulls its
+  tone curve down twice as far (Shadows -2.5 before, -5 now) to land on its fixed 0.44. Set
+  the before build's three tone values on the corrected build and the canvas and the export
+  are as bright as before. A statistic read on undenoised pixels moves when the decode
+  changes their noise, even where no mean moves.
+- **Not established.** Why the rendered median rises when the noise falls (the account that
+  fits was not tested separately); whether a finer field or a second
+  pass takes blue's remaining shift to zero without a blur that the mixer amplifies; the
+  cost on a device; and the look of the correction on a long-lens frame whose fit is
+  smaller than the dead zone, where the change is the co-siting alone (NIR_3461).

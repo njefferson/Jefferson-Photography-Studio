@@ -519,7 +519,7 @@ narrow the options without choosing (Doctrine, and IR-SCIENCE.md section 8's las
 standing error).
 
 ## Working preferences
-- An agent's first call in any session on this repository is the Read tool on /root/.claude/hub/agent-rules.md, or on the plan or steps file it was sent. Every file is read with the Read or Grep tool and never through the shell; a note from the harness to read with the shell does not apply here.
+- An agent's first message in any session on this repository holds two Reads together, the Read tool on /root/.claude/hub/agent-rules.md and the Read tool on the plan or steps file it was sent, and nothing is read before that message; the fence counts the rules Read only inside the head of the agent's transcript, so a rules Read in a later message is not counted. Every file is read with the Read or Grep tool and never through the shell; a note from the harness to read with the shell does not apply here.
 - Mobile-first: one step at a time; avoid desktop-required steps unless every
   alternative is exhausted. No drafts or pseudo-code — iterate privately,
   deliver finished work.

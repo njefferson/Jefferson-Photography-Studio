@@ -27,6 +27,7 @@ import { startupLine, holdsLine, holdWatchLine } from "./startup";
 import { adoptAnswer, type AdoptAnswer } from "./swupdate";
 import { device } from "./platform";
 import type { TileTimings } from "./tile";
+import { cornerShifts, lastChromatic, type ChannelFit, type ChromaticShifts } from "./raw/chromatic";
 
 export interface DiagLine { k: string; v: string }
 
@@ -58,6 +59,37 @@ export function tileLine(last: LastTile | null): string {
   const t = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)}s`);
   const rest = m.total - (m.decode + m.selection + m.lift + m.pixels + m.encode);
   return `drawn ${where}, ${t(m.total)} in all — decode ${t(m.decode)}, selection ${t(m.selection)}, lift ${t(m.lift)}, pixels ${t(m.pixels)}, encode ${t(m.encode)}, rest ${t(rest)}`;
+}
+
+/** WHERE RED AND BLUE WERE MEASURED TO SIT AGAINST GREEN on the last raw photograph
+ *  this page opened, in one line a reader can paste (decision 061).
+ *  @param s  what the decode measured (`DecodedImage.chromatic`, noted by
+ *  decodeClient.ts), or null when this session has opened no raw.
+ *  @returns "none this session" when there is none, else for each colour the
+ *  offset at the four corners of the frame (top-left, top-right, bottom-left,
+ *  bottom-right, each x then y), the mean of the part along the outward
+ *  direction, and whether the colour was moved onto green or left alone and
+ *  why; then how many tiles were read and how long the measurement took. A
+ *  frame with no mosaic says why nothing was measured. What the line must
+ *  satisfy: it is in photosites of the full frame, a positive figure meaning
+ *  the colour lies right of or below green, it prints the same polynomial the
+ *  alignment applies (raw/chromatic.ts `cornerShifts`), and it names no file,
+ *  no edit value and nothing the reader wrote. */
+export function chromaticLine(s: ChromaticShifts | null): string {
+  if (!s) return "none this session";
+  if (!s.red && !s.blue) return `not measured — ${s.why ?? "nothing to fit"}`;
+  const sg = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`;
+  const one = (name: string, f: ChannelFit | null): string => {
+    if (!f) return `${name} not measured`;
+    const cs = cornerShifts(f, s.width, s.height).map(([x, y]) => `(${sg(x)}, ${sg(y)})`).join(" ");
+    const verdict = f.applied
+      ? "moved onto green"
+      : f.used < 12 ? "left alone, too few tiles with detail to fit"
+      : "left alone, under the smallest offset worth moving or over the largest believed";
+    return `${name} corners ${cs}, mean outward ${sg(f.corner)}, ${verdict}`;
+  };
+  const ms = s.ms < 1000 ? `${Math.round(s.ms)} ms` : `${(s.ms / 1000).toFixed(1)}s`;
+  return `${one("red", s.red)}; ${one("blue", s.blue)}; photosites of the full frame, positive is right of or below green; ${s.tiles} tiles read in ${ms}`;
 }
 
 const yes = (b: boolean) => (b ? "yes" : "no");
@@ -386,6 +418,10 @@ export async function buildDiagnostic(
     // The line that turns an origin-wide number into something actionable.
     { k: "App is holding", v: await holdingsLine() },
     { k: "Durable writes", v: durableLine() },
+    // Where red and blue sat against green on the last raw opened, and what the
+    // measurement cost on this device (decision 061): a number no container can
+    // give, and the one that says whether the edge colour is the lens or the camera.
+    { k: "Channel alignment", v: chromaticLine(lastChromatic()) },
     { k: "Colours", v: `${document.documentElement.getAttribute("data-theme") ?? "dark"} · palette ${document.documentElement.getAttribute("data-palette") ?? "instrument"}` },
     { k: "Reduced motion", v: yes(window.matchMedia("(prefers-reduced-motion: reduce)").matches) },
     { k: "Language", v: navigator.language },

@@ -32,6 +32,7 @@ import { skyTurn } from "./sky";
 import { applyLensPlan, type LensPlan } from "./lensflat";
 import { requestSkySelection } from "./skyClient";
 import { decode as decodeHere, type DecodedImage, type SkySelection } from "./decode";
+import { noteChromatic } from "./raw/chromatic";
 import type { TileInputs, TileTimings } from "./tile";
 import type { ImportedFile } from "./import";
 
@@ -170,6 +171,9 @@ function spawn(): Lane | null {
     p.onTiming?.({ queued: p.startedAt - p.queuedAt, run: performance.now() - p.startedAt, depth: p.depth, offThread: true });
     if (e.data.ok && e.data.img) {
       const img = e.data.img;
+      // What the lane measured between red, blue and green, for the report (the
+      // lane's own copy of that module never reaches the page).
+      noteChromatic(img.chromatic);
       // The copy the selection is built from came back beside the picture;
       // the sky worker builds it while the picture is already on screen.
       if (e.data.skySrc) img.skySelReady = askFirstSelection(img, e.data.skySrc);
@@ -387,7 +391,7 @@ function decodeOnThisThread(
   file: ImportedFile, onTiming: ((t: DecodeTiming) => void) | undefined, queuedAt: number, depth: number, sky?: boolean, lens?: LensPlan | null,
 ): Promise<DecodedImage> {
   const startedAt = performance.now();
-  const p = decodeHere(file).then((img) => { applyLensPlan(img, lens ?? null); return img; }).then((img) => { if (sky) img.skySelReady = askFirstSelection(img, prepareSkySource(img, img.rotate ?? 0)); return img; });
+  const p = decodeHere(file).then((img) => { noteChromatic(img.chromatic); applyLensPlan(img, lens ?? null); return img; }).then((img) => { if (sky) img.skySelReady = askFirstSelection(img, prepareSkySource(img, img.rotate ?? 0)); return img; });
   if (onTiming) {
     const done = () => onTiming({ queued: startedAt - queuedAt, run: performance.now() - startedAt, depth, offThread: false });
     p.then(done, done);

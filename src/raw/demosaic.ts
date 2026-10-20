@@ -3,9 +3,16 @@
 // For the live editing proxy we use 2x2-quad binning: each Bayer quad collapses
 // to one linear RGB pixel (R, average of the two greens, B). This demosaics for
 // free and halves each dimension (keeping GPU memory sane on the iPad). It is
-// NOT free of artefacts: red and blue each come from one photosite, a diagonal
-// site apart, so the two channels misregister by about half a proxy pixel at
-// every edge (decision 061 measured it on the pylon frames).
+// NOT free of artefacts, and it was not co-sited until decision 061: red and
+// blue each come from one photosite, a diagonal site apart, and the averaged
+// green sits at the centre of the quad, so read plainly the three channels
+// misregister by a quarter of a proxy pixel each way at every edge (blue about
+// half a proxy pixel up and to the left of red, measured on the pylon frames).
+// So red and blue are READ AT THE QUAD'S CENTRE, interpolated from their own
+// lattice (three parts own site to one part the neighbour toward the centre, in
+// each direction), which puts all three channels where the green is. That is
+// half of the fix and the lens's part is the other (chromatic.ts); either alone
+// turned the other side of a post blue, so the two ship together.
 //
 // Full resolution — the export, and the native-resolution working copy that
 // replaces the proxy once it is built — demosaics with RCD, Ratio Corrected
@@ -67,10 +74,15 @@ export interface RawCfa {
  * @param white   white level (maps to 1.0)
  * @returns a LinearImage of floor(width/2) x floor(height/2) RGBA floats, alpha
  *   1, each channel max(0, (v - black) / (white - black)) with the two greens
- *   averaged. Consumers: the decode paths (nef.ts, dngRaw.ts) hand it to the
- *   renderer as the working copy, and the at-open automatics measure it, so
- *   its scale must be the same normalised linear one the full-resolution
- *   demosaic below produces.
+ *   averaged, and red and blue READ AT THE QUAD'S CENTRE (see the file's
+ *   opening comment and `atQuadCentre`), so all three channels sit where the
+ *   averaged green does. Consumers: the decode paths (nef.ts, dngRaw.ts) hand
+ *   it to the renderer as the working copy, and the at-open automatics measure
+ *   it, so its scale must be the same normalised linear one the
+ *   full-resolution demosaic below produces. What it must satisfy: on a frame
+ *   whose three channels are one smooth picture, each output pixel is the
+ *   picture at the quad's centre in every channel; and a channel read at its
+ *   own site is a blend whose weights sum to 1, so a flat frame is unchanged.
  */
 export function demosaicBinned(
   cfa: Uint16Array,
@@ -90,14 +102,19 @@ export function demosaicBinned(
   const bPos = pattern.indexOf(2);
   const gPos: number[] = [];
   for (let i = 0; i < 4; i++) if (pattern[i] === 1) gPos.push(i);
+  // Which way the quad's centre lies from each colour's site: a site on the
+  // quad's left or top edge has it toward +x or +y, one on the right or bottom
+  // edge toward -x or -y. The neighbour on that side is two photosites away.
+  const rdx = (rPos & 1) === 0 ? 2 : -2, rdy = (rPos >> 1) === 0 ? 2 : -2;
+  const bdx = (bPos & 1) === 0 ? 2 : -2, bdy = (bPos >> 1) === 0 ? 2 : -2;
 
   const norm = (v: number) => Math.max(0, (v - black) * scale);
 
   for (let y = 0; y < oh; y++) {
     for (let x = 0; x < ow; x++) {
       const base = (y * 2) * width + x * 2;
-      const r = norm(cfa[base + quadOffset[rPos]]);
-      const b = norm(cfa[base + quadOffset[bPos]]);
+      const r = atQuadCentre(cfa, width, height, x * 2 + (rPos & 1), y * 2 + (rPos >> 1), rdx, rdy, black, scale);
+      const b = atQuadCentre(cfa, width, height, x * 2 + (bPos & 1), y * 2 + (bPos >> 1), bdx, bdy, black, scale);
       const g = (norm(cfa[base + quadOffset[gPos[0]]]) + norm(cfa[base + quadOffset[gPos[1]]])) * 0.5;
       const o = (y * ow + x) * 4;
       out[o] = r;
@@ -107,6 +124,30 @@ export function demosaicBinned(
     }
   }
   return { width: ow, height: oh, linear: out };
+}
+
+/** ONE COLOUR READ AT THE CENTRE OF ITS QUAD, from that colour's own lattice.
+ *
+ *  Takes the frame `cfa` (`width` by `height`), the site (`px`, `py`) of this
+ *  colour in the quad, `dx` and `dy` (each +2 or -2: the way, in photosites, to
+ *  the same colour's neighbouring site on the side the quad's centre lies), and
+ *  `black` and `scale` of the normalisation. Returns the normalised value of
+ *  that colour at the quad's centre, half a photosite from the site in each
+ *  direction, which is a quarter of the way to the neighbouring site: 3 parts
+ *  the site to 1 part the neighbour in each direction, so the four sites weigh
+ *  9, 3, 3 and 1 sixteenths. A neighbour beyond the frame is replaced by the
+ *  site itself (the lattice repeats its edge). What it must satisfy: the
+ *  weights sum to 1, so a flat frame is returned unchanged, and every sample is
+ *  clamped at 0 before it is blended, as the plain read did. */
+function atQuadCentre(cfa: Uint16Array, width: number, height: number, px: number, py: number, dx: number, dy: number, black: number, scale: number): number {
+  const i = py * width + px;
+  const inX = px + dx >= 0 && px + dx < width;
+  const inY = py + dy >= 0 && py + dy < height;
+  const a = Math.max(0, (cfa[i] - black) * scale);
+  const bx = inX ? Math.max(0, (cfa[i + dx] - black) * scale) : a;
+  const by = inY ? Math.max(0, (cfa[i + dy * width] - black) * scale) : a;
+  const bxy = inX && inY ? Math.max(0, (cfa[i + dy * width + dx] - black) * scale) : inX ? bx : inY ? by : a;
+  return 0.5625 * a + 0.1875 * (bx + by) + 0.0625 * bxy;
 }
 
 /** A COARSE POINT ESTIMATE, NOT THE EXPORT'S PIXELS: bilinear, the average of

@@ -17,6 +17,7 @@ import type { ImportedFile } from "./import";
 import { Tiff, type Ifd } from "./raw/tiff";
 import { binRaw, findDngRaw, rawFromLossyCodes, readDngRaw, withPreMatrix, type DngRaw, type DngRawFind } from "./raw/dngRaw";
 import { decodeNef } from "./raw/nef";
+import { alignToGreen, type ChromaticShifts } from "./raw/chromatic";
 import { camToSrgbLinear, dngCalibration, dngCameraToSrgb, nikonColorMatrix } from "./color";
 import { srgbToLinear } from "./icc";
 import { lensGeom, lensRadius, lensLerp, SENSOR_PIN, type BrushMask } from "./pipeline";
@@ -62,6 +63,12 @@ export interface DecodedImage {
    *  decision 021), so a later strength re-applies as a ratio against it.
    *  Absent on 8-bit sources, which take the correction inside the grade. */
   lensApplied?: import("./lensflat").LensApplied;
+  /** Where red and blue sat against green on this photograph's raw mosaic,
+   *  measured once at decode and already removed from `linear` (decision 061,
+   *  raw/chromatic.ts). Kept because the export re-reads the file and must move
+   *  the same colours by the same amounts, without measuring again: it rides to
+   *  every export worker (export.ts). Absent on a source with no mosaic. */
+  chromatic?: ChromaticShifts;
   /** Camera-native -> linear sRGB 3x3 (row-major), applied after white balance.
    *  Present for every camera-native raw (NEF, and every DNG raw image, lossy
    *  LinearRaw included — the DNG spec calls LinearRaw camera-native); absent
@@ -490,6 +497,7 @@ export async function decode(file: ImportedFile): Promise<DecodedImage> {
         width: img.width,
         height: img.height,
         linear: img.linear,
+        chromatic: img.chromatic,
         camMatrix: camToSrgbLinear(nikonColorMatrix(cameraModel(ifds))),
         isRaw: true,
         rotate: orientationToRotate(ifds),
@@ -645,11 +653,15 @@ async function decodeDng(bytes: Uint8Array, file?: ImportedFile): Promise<Decode
     // Lossy LinearRaw: the browser decodes the baseline-JPEG tiles to codes.
     const lossyCodes = found.kind === "lossy" ? (await decodeTiledJpeg(bytes, found.ifd!)).pixels : undefined;
     const { cfa, cam } = readDngSource(bytes, ifds, found, lossyCodes);
+    // RED AND BLUE ONTO GREEN, on the full mosaic, before it is binned (decision
+    // 061). A LinearRaw frame has no mosaic and comes back with nothing to move.
+    const chromatic = alignToGreen(cfa);
     const img = binRaw(cfa);
     return {
       width: img.width,
       height: img.height,
       linear: img.linear,
+      chromatic,
       lossyCodes,
       camMatrix: cam,
       isRaw: true,

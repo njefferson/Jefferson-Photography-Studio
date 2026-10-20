@@ -7,6 +7,7 @@ import { compileEdit, toLinear8, cropToDisplayUvInto, CROP_DEFAULT, applyCreativ
 import { makeDemosaicSampler, demosaicPixelLinearInto, type RawCfa } from "./raw/demosaic";
 import { findDngRaw } from "./raw/dngRaw";
 import { readNefCfa } from "./raw/nef";
+import { alignChannels } from "./raw/chromatic";
 import { Tiff } from "./raw/tiff";
 import { camToSrgbLinear, nikonColorMatrix } from "./color";
 import { cameraModel, readDngSource } from "./decode";
@@ -364,6 +365,7 @@ function forTheWire(current: DecodedImage): DecodedImage {
     rotate: current.rotate,
     lensApplied: current.lensApplied,
     previewNotice: current.previewNotice,
+    chromatic: current.chromatic,
   };
 }
 
@@ -868,7 +870,7 @@ export async function exportImage(
           // whole only when the decode IS the source (JPEG, HEIC, a preview,
           // and a lossy-linear DNG, whose tiles only the browser can decode, so
           // its codes travel), which is `sourceIsMosaiced`'s test.
-          sourceIsMosaiced(file) ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
+          sourceIsMosaiced(file) ? { width: current.width, height: current.height, isRaw: current.isRaw, chromatic: current.chromatic } : forTheWire(current),
           params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, job, onProgress, onPrepare);
         // The JPEG path asked for 8-bit bands, so 8-bit bands are what came
         // back; the check is here rather than assumed because `exportBands`
@@ -1046,7 +1048,7 @@ export async function exportImage(
       try {
         const split = await exportBands(
           file,
-          sourceIsMosaiced(file) ? { width: current.width, height: current.height, isRaw: current.isRaw } : forTheWire(current),
+          sourceIsMosaiced(file) ? { width: current.width, height: current.height, isRaw: current.isRaw, chromatic: current.chromatic } : forTheWire(current),
           params, opts, lens ?? null, sky ?? null, skyFine ?? null, w, h, jobT, onProgress, onPrepare);
         if (!split.rgb) throw new Error("the workers returned no 16-bit pixels");
         rgb = split.rgb;   // ADOPTED, not copied into a buffer made in advance
@@ -1271,18 +1273,28 @@ export function parallelJob(file: ImportedFile, srcW: number, srcH: number, w: n
  * @returns `{ cfa, cam }` for every raw — NEF, and any DNG raw image `findDngRaw`
  *   can read, LinearRaw included — built by the same functions as the preview
  *   (`readNefCfa`; decode.ts `readDngSource`), so the export's size, levels,
- *   crop and colour are the preview's; otherwise the decoded 8-bit pixels.
- *   Throws when neither exists.
+ *   crop and colour are the preview's, and with red and blue moved onto green by
+ *   the numbers the decode measured and stored (`current.chromatic`, applied by
+ *   raw/chromatic.ts `alignChannels`; never measured here, so an export does
+ *   not pay for the estimate again); otherwise the decoded 8-bit pixels.
+ *   Throws when neither exists. What it must satisfy: the mosaic it returns is
+ *   the one the editing copy was binned from, photosite for photosite.
  */
 export function getSource(file: ImportedFile, current: DecodedImage): Source {
   if (file.kind === "nef") {
     const ifds = new Tiff(file.bytes).allIfds();
-    return { cfa: readNefCfa(file.bytes), cam: camToSrgbLinear(nikonColorMatrix(cameraModel(ifds))) };
+    const cfa = readNefCfa(file.bytes);
+    if (current.chromatic) alignChannels(cfa, current.chromatic);
+    return { cfa, cam: camToSrgbLinear(nikonColorMatrix(cameraModel(ifds))) };
   }
   if (file.kind === "dng" || file.kind === "tiff") {
     const ifds = new Tiff(file.bytes).allIfds();
     const found = findDngRaw(ifds);
-    if (found.kind) return readDngSource(file.bytes, ifds, found, current.lossyCodes);
+    if (found.kind) {
+      const src = readDngSource(file.bytes, ifds, found, current.lossyCodes);
+      if (current.chromatic) alignChannels(src.cfa, current.chromatic);
+      return src;
+    }
   }
   // Non-raw (JPEG/PNG/preview): the decode is already full-resolution 8-bit.
   if (!current.pixels) throw new Error("No full-resolution source available to export.");

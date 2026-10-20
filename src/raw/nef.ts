@@ -8,6 +8,7 @@
 
 import { Tiff } from "./tiff";
 import { demosaicBinned, type LinearImage, type RawCfa } from "./demosaic";
+import { alignToGreen, type ChromaticShifts } from "./chromatic";
 
 // Predefined Huffman trees (dcraw `nikon_tree`): first 16 bytes are the count of
 // codes per bit-length, the rest are the symbol values (symbol = shl<<4 | len).
@@ -64,10 +65,22 @@ function buildHuffLut(tree: number[]): HuffLut {
   return { sym, len, maxlen };
 }
 
-/** Demosaiced half-res linear proxy for live editing. */
-export function decodeNef(bytes: Uint8Array): LinearImage {
+/**
+ * Demosaiced half-res linear proxy for live editing, with red and blue first
+ * moved onto green on the full mosaic (decision 061).
+ * @param bytes  the whole NEF.
+ * @returns the binned image `demosaicBinned` makes from the aligned frame
+ *   (width, height, linear), and `chromatic`: what was measured on THIS frame
+ *   and applied to it (raw/chromatic.ts), which the caller stores with the
+ *   photograph so the export applies the same numbers to the frame it re-reads
+ *   from the file and never measures again. What it must satisfy: the aligned
+ *   frame is `readNefCfa`'s plus `alignChannels` of `chromatic`, exactly what
+ *   export.ts `getSource` builds.
+ */
+export function decodeNef(bytes: Uint8Array): LinearImage & { chromatic: ChromaticShifts } {
   const c = readNefCfa(bytes);
-  return demosaicBinned(c.cfa, c.width, c.height, c.pattern, c.black, c.white);
+  const chromatic = alignToGreen(c);
+  return { ...demosaicBinned(c.cfa, c.width, c.height, c.pattern, c.black, c.white), chromatic };
 }
 
 /**
