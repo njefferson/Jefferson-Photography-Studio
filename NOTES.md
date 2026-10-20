@@ -58,6 +58,8 @@ because they floor temperature at ~2000K.
 
 **Production carries the Aerochrome fix at the commit main names now, 66e050cb5d40812254afcf03c0756e8a4fab6c8b, whose subject opens Fixed.** Read from git log of origin/main; its date prints in UTC as 18 October, the evening of 17 October in California. Nothing after it has been promoted.
 
+**Production carries the commit main names now, a7f4fb9e298f1b4e409bc8280460f0807cc0123e, whose subject opens Fixed.** Read as the first line of `git log -1 origin/main`; promoted on 19 October California, by the choice of that day that edits stored by earlier builds are not a concern.
+
 **Aerochrome's sky stage asks for a map only when something about it changed, and the report names why it ran: built 2026-10-18 on staging's head after that commit, not yet on a device.**
 - **Fixed: a change of the look or of the sky inputs no longer leaves the first ask's refining words up while a map that will be thrown away is built.** Pressing Aerochrome on a photograph whose stored edit still carried the sky inputs took the words down only when the lane finished that map, 30.8 s in the container and 5 to 7 s on the iPad (container figure only). The words now end when the ask is given up, with its selection in hand.
 - **Fixed: a map that was built and then dropped as stale is kept under the inputs it was built from,** so Undo back to the same inputs reads the store with no line and no wait, where it used to build the same map again.
@@ -2136,7 +2138,6 @@ Q-JPS-70: the notes check's freshness rule refuses an archive entry as new as th
 Q-JPS-71: the walks install the offline copy with the sticker library on every run; a walk should install it once.
 Q-JPS-72: a walk runs once on the final build and only where it tests what changed.
 Q-JPS-73: the memory fault named in the editing-copy line of the report; unweighed, and not this item's.
-Q-JPS-74: a stored Aerochrome edit keeps the old row's sky inputs and asks the lane at its open; laying the current row over it is the owner's choice (step 112).
 Q-JPS-75: a look press holds the page's main thread for 24 to 41 seconds in the container; untraced (step 112).
 Q-JPS-76: a revisit to an earlier map key asks the lane again, because the store is read only for a photograph's first map (step 112).
 Q-JPS-77: the Edit values row lists every range control, with one printed by its id; the list is not yet checked against the controls (step 112).
