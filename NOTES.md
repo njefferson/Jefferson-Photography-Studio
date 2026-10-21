@@ -60,12 +60,7 @@ because they floor temperature at ~2000K.
 
 **Production carries the commit main names now, a7f4fb9e298f1b4e409bc8280460f0807cc0123e, whose subject opens Fixed.** Read as the first line of `git log -1 origin/main`; promoted on 19 October California, by the choice of that day that edits stored by earlier builds are not a concern.
 
-**Red and blue are lined up on the raw, one photograph at a time, before anything else touches the picture: built 2026-10-20 on staging's head, not yet on a device.** Record 061's chosen option, built in the decode: no control and no edit field was added, and PREVIEW_PIPELINE went to 98 so a preview kept by an older build is not served under this one. Measured on the reader's own raws in the container, every sheet opened (the record's Outcome section holds the figures).
-- **Fixed: the vivid-blue outline and red rim along thin dark edges against the sky are largely gone from the editing view.** On NIR_3430's post the strongly red and vivid-blue pixels over 400 rows fell from 239 and 462 to 16 and 5, at NIR_3461's near pylon from 632 and 428 to 282 and 5, and at NIR_1703's tall tree the vivid blue fell from 832 to 247. The editing copy's red and blue now sit where its green sits, and each photograph's own lens shift of red and blue is measured once when it opens and taken out before the colour is mixed. The export carried far less of this already and reads the same; the editing view now agrees with it (container figures).
-- **Changed: red and blue read softer on fine edges in the editing view.** On NIR_1703 the tall tree's dark branch lines are lighter and the pines' needles smoother, the price of reading red and blue from four photosites each; the export is not softened by it.
-- **Changed: opening a raw photograph now measures it.** The estimate took 0.5 to 0.9 s and the alignment up to 0.4 s on a frame of 20 megapixels in the container, in the quick-look strip's jobs too; the copied report's Channel alignment line states what was done and the time for each photograph on the device.
-- **What is still wrong.** Blue is still 0.15 to 0.22 photosite from green at NIR_3430's post, a shift and not blur. NIR_3430 opens about 2.3 percent darker with Aerochrome pressed, in the editing view and in the export (2.9, 2.5 and 2.6 levels of 255 on the canvas), and it is the Restore depth lift's own answer and nothing else: the lift measures the look's median brightness on the undenoised working copy, read 0.456 before and 0.474 after because red and blue now carry less noise, and it pulls its tone curve down twice as far (Shadows -2.5 before, -5 now) to bring the median back to its fixed reference. Put the before build's three tone values on this build and the frame is as bright as before, in the editing view and the export. Left as it is, and the fall in the fringe counts does not depend on it. The wires against cloud and the thin braces stay red, which is the foliage band's colour and not this item's. Grass and foliage read redder on NIR_3461 and NIR_3463 because the look's foliage amount moved with the change, from 1.32 to 1.34 and from 1.44 to 1.51. Not measured on a device.
-- **For the owner's pass on staging.** On the iPad open the two pylon frames and a tree frame at 1:1, press Aerochrome, and look at the wires and the post edges: the vivid-blue beads along the pylon lattice and the blue-and-red outline along thin dark edges should be gone or faint. Say whether the leaf edges on the tree frame read too soft and whether the jet frame opens too dark (about 2.3 percent darker than before, the depth lift's doing), then copy the report and read its Channel alignment line.
+**Production carries the commit main names now, 58e8bac090810b62a6e0e4bee03d619b71b390ed, whose subject opens Fixed.** Read as the first line of `git log -1 origin/main`; promoted on 20 October California, on the go the release rules require for a product change. It is record 061's per-photograph alignment of red and blue on the raw, and its entry has left this section for the archive.
 
 **Aerochrome's sky stage asks for a map only when something about it changed, and the report names why it ran: built 2026-10-18 on staging's head after that commit, not yet on a device.**
 - **Fixed: a change of the look or of the sky inputs no longer leaves the first ask's refining words up while a map that will be thrown away is built.** Pressing Aerochrome on a photograph whose stored edit still carried the sky inputs took the words down only when the lane finished that map, 30.8 s in the container and 5 to 7 s on the iPad (container figure only). The words now end when the ask is given up, with its selection in hand.
@@ -2153,6 +2148,17 @@ Q-JPS-79: the lens correction moves final lit foliage chroma by 1 to 7 percent o
 Q-JPS-80: the denoiser strips 44 and 45 percent of lit foliage chroma on two frames and adds 2 on a third; whether that colour is noise or foliage signal is not established (step 113).
 Q-JPS-81: the film model cannot give the film's dark blue sky from this file's infrared-bright sky; the model needs the visible green layer, the sky's true infrared share and the red channel's visible share, which the file does not hold (step 113).
 Q-JPS-82: a white point taken from the clear sky raises lit foliage chroma 1.1 to 3.5 times while taking the sky to neutral; a look choice for the plan's last message (step 113).
+Q-JPS-83: the estimator reads blue's corner radial offset at +0.19 on NIR_3463 and +0.52 on NIR_3430, where record 061's earlier measurement gave about 0.27 and about 0.6; the gap of 0.07 to 0.08 photosite is unexplained (step 130).
+Q-JPS-84: the foliage amount the look reads from each decode moved with the alignment, from 1.32 to 1.34 on NIR_3461 and from 1.44 to 1.51 on NIR_3463, so grass and foliage read redder on those two frames and the red counts at foliage edges move with it; before and after are comparable on one frame only (steps 130 and 132).
+Q-JPS-85: NIR_1703's blue corner residual is 0.177 and NIR_3430's 0.119 photosite after the alignment (against estimates of -0.35 and +0.52), because a bilinear read of a sparse lattice moves a sharp edge by less than asked, about half on the first and three quarters on the second; a second pass or a cubic read would move it further and was not built, since a cubic read can overshoot at an edge and the Aerochrome mixer amplifies an overshoot (steps 131 and 132).
+Q-JPS-86: every decode now pays the estimate, 0.5 to 0.9 s, and up to 0.4 s of alignment on a frame that moves, for a 20-megapixel frame in the container, in the quick-look strip's tile jobs too; the device's cost is not measured and is owed to the test page, and the copied report's Channel alignment line states it per photograph (steps 131 and 135).
+Q-JPS-87: the alignment's dead zone of 0.08 photosite and its limit of 1.5 were set from reasoning about the fit's noise (tile residual rms 0.04 to 0.22), not measured on a population of frames; NIR_3461 and the red of NIR_3463 are left alone because of the dead zone (step 131).
+Q-JPS-88: tools/lens-order-walk.mjs and tools/film-reference.mjs call readNefCfa and demosaicBinned directly, so they read the co-sited binning without the lens alignment; lens-order-walk passed with its independent balance within its 0.5 percent tolerance, and film-reference was not run (steps 131 and 135).
+Q-JPS-89: the practice DNGs in public/examples are half-size rebuilt mosaics, and the decode now fits and applies a near-constant offset of about a quarter photosite to red and blue on all 44 of them (NIR_0063 reads red -0.26 and blue +0.57 mean outward), so their estimates describe those files and not a 20-megapixel frame (steps 131 and 135).
+Q-JPS-90: NIR_3430 opens about 2.3 percent darker with Aerochrome pressed, in the editing view and in the export, because the Restore depth lift's reference of 0.44 was calibrated on the noisier decode and the lift reads undenoised binned pixels while the picture shows denoised ones, so any change to the decode's noise moves its pull; re-measuring the reference on the corrected decode is a change to a look and was not made (steps 132 and 140).
+Q-JPS-91: the editing view's red and blue lose 1 to 47 percent of root-mean-square gradient at thin-edge places (displayed red 0.53 at NIR_3461's far pylon) and 11 to 20 percent at the leaf places of NIR_1703, the cost of the co-sited read; the export is unchanged at 0.99 to 1.02, and whether the softer fine leaf edges are acceptable waits on the device pass (step 132).
+Q-JPS-92: NIR_3463's and NIR_1703's half-scale exports were not made before or after the alignment, so the export's agreement with the editing view is measured on NIR_3461 and NIR_3430 only, and no full-size export was made (step 132).
+Q-JPS-93: only NIR_3430's Restore depth lift was traced; the lift's pulls on NIR_3461, NIR_3463 and NIR_1703 were not read, and their skies and centres move 1.6 levels at most (step 140).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -2656,33 +2662,6 @@ user-scalable=no.
 > CREATIVE RELEASE, which the owner has declared an IDENTITY change: it
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
-
-- [ ] **Red and blue do not line up at thin edges, and Aerochrome paints the difference** <!-- decision: 061 -->
-  **Shown as:** Thin dark edges against the sky, such as posts, branches and leaf edges, stop carrying a blue outline with a red edge in Aerochrome.
-  **Ranked first from 2026-10-17.** Aerochrome now carries a global saturation of 2.4, which
-  scales this defect with the sky's colour: every thin dark edge against bright sky (leaf
-  edges, branches, lattice members) carries a vivid blue outline with a red rim on the other
-  side. The landing of that look named it as still wrong, with this item next. The border
-  clamp, the first step, is already built; the work left is the per-photograph channel
-  correction on the raw together with co-siting.
-  Reported from the device 2026-09-24 against a full-resolution export of
-  pylons and wires. It is not the metal's reflectance: one black post is blue
-  on one edge and red on the other. Red and blue sit about half a preview
-  pixel apart after the editing copy's 2x2 binning, and the lens adds lateral
-  chromatic aberration toward the corners. Aerochrome's mixer turns a blue
-  error red at about 2.1x, where the swap passes it at 1x. Co-siting plus a
-  lens cancel took a post's edge from 469 red and 667 blue pixels to 149 and
-  0. The round spots along the wires are 013's Sky colour smoothing. The thin
-  red border lines are a demosaic clamp defect, fixed first. Then comes
-  per-photograph CA correction on the raw together with co-siting.
-  **Measured on the reported frame's raw, NIR_3461, the same day, and it moves
-  that frame's answer:** its red wires and pylons are the foliage band
-  selecting by colour, not the channels. Foliage at 0 takes strongly red
-  pixels above the horizon from 16,430 to 0; co-siting takes none. That
-  frame's remedy is the foliage band limited to a place, which is 042's. The
-  channel work still answers edges like NIR_3430's posts. See
-  `docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md`.
-  **What survives:** the per-photograph correction and the co-sited working copy are built on staging and wait on a device pass, so what is left of this item is that pass and one small thing: blue is still 0.15 to 0.22 photosite from green at NIR_3430's post, a shift and not blur, so the record's third step, a guided correction of the blurrier channel, is not owed. Found, and left as it is: NIR_3430 renders about 2.3 percent darker because the Restore depth lift measures a higher median on the corrected decode and pulls its tone curve twice as far (record 061's Outcome has the numbers); and still open, the device's cost of the per-photograph estimate, which the test page is to measure.
 
 - [ ] **The lens correction whitens bright centre foliage** <!-- decision: 085 -->
   **Shown as:** Every photo with a matched lens opens with the lens correction at full strength, and a double tap on its slider goes back there.
@@ -6559,6 +6538,35 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **Red and blue do not line up at thin edges, and Aerochrome paints the difference** <!-- decision: 061 -->
+  **Shown as:** Thin dark edges against the sky, such as posts, branches and leaf edges, stop carrying a blue outline with a red edge in Aerochrome.
+  Reported from the device 2026-09-24 against a full-resolution export of
+  pylons and wires. It is not the metal's reflectance: one black post is blue
+  on one edge and red on the other. Red and blue sit about half a preview
+  pixel apart after the editing copy's 2x2 binning, and the lens adds lateral
+  chromatic aberration toward the corners. Aerochrome's mixer turns a blue
+  error red at about 2.1x, where the swap passes it at 1x. Co-siting plus a
+  lens cancel took a post's edge from 469 red and 667 blue pixels to 149 and
+  0. The round spots along the wires are 013's Sky colour smoothing. The thin
+  red border lines are a demosaic clamp defect, fixed first. Then comes
+  per-photograph CA correction on the raw together with co-siting.
+  **Measured on the reported frame's raw, NIR_3461, the same day, and it moves
+  that frame's answer:** its red wires and pylons are the foliage band
+  selecting by colour, not the channels. Foliage at 0 takes strongly red
+  pixels above the horizon from 16,430 to 0; co-siting takes none. That
+  frame's remedy is the foliage band limited to a place, which is 042's. The
+  channel work still answers edges like NIR_3430's posts. See
+  `docs/decisions/061-red-and-blue-do-not-line-up-at-thin-edges.md`.
+  **Ranked first from 2026-10-17, as it stood before the build.** Aerochrome now carries a global saturation of 2.4, which
+  scales this defect with the sky's colour: every thin dark edge against bright sky (leaf
+  edges, branches, lattice members) carries a vivid blue outline with a red rim on the other
+  side. The landing of that look named it as still wrong, with this item next. The border
+  clamp, the first step, is already built; the work left is the per-photograph channel
+  correction on the raw together with co-siting.
+  **What survives:** the per-photograph correction and the co-sited working copy are built on staging and wait on a device pass, so what is left of this item is that pass and one small thing: blue is still 0.15 to 0.22 photosite from green at NIR_3430's post, a shift and not blur, so the record's third step, a guided correction of the blurrier channel, is not owed. Found, and left as it is: NIR_3430 renders about 2.3 percent darker because the Restore depth lift measures a higher median on the corrected decode and pulls its tone curve twice as far (record 061's Outcome has the numbers); and still open, the device's cost of the per-photograph estimate, which the test page is to measure.
+  Promoted to production on 20 October, California time, at the commit named in the production paragraph of the staging section, whose subject opens Fixed; the What survives paragraph above is as it stood while the build waited on staging.
+  Archived on 20 October with its Outcome (decision 061).
 
 - [x] **(superseded detail) The live view at full resolution** — <!-- decision: 010 -->
   **Shown as:** internal
