@@ -5696,3 +5696,235 @@ adds a lateral term that grows toward the corners and changes sign between lense
   pass takes blue's remaining shift to zero without a blur that the mixer amplifies; the
   cost on a device; and the look of the correction on a long-lens frame whose fit is
   smaller than the dead zone, where the change is the co-siting alone (NIR_3461).
+
+### 9w. THE STAGES RAW PROCESSORS RUN, SET AGAINST THIS APP STAGE BY STAGE (October 2026)
+
+**The question.** Which stages do dcraw, LibRaw, darktable, RawTherapee and the DNG
+specification run on a raw file that this app does not, and what does each processor
+set by default? Answered from documents read in one run, by web search and by fetching
+the documents found, each named under Sources below with its address, and from this
+app's source read in the same run. No photograph was opened and no render was made, so a
+verdict here says whether a stage exists in the app and what the references do with it.
+The ranking at the end is an ordering of reach from each stage's description and the
+defaults, not a measurement.
+
+**How a source was read.** Every web page was read through the fetch tool, which
+answers through a small summarising model, so a list or a number from a page (darktable's
+order list, RawTherapee's profile keys) is as that tool returned it and is marked
+(summary). A pdf was saved by the tool and read page by page, which is the reading
+itself. Where a host refused or failed it is listed under Not read.
+
+**Is lateral chromatic aberration correction on by default for a raw file?**
+
+- **dcraw: no.** Only with `-C` and two scale numbers, in `scale_colors`.
+- **LibRaw: no.** The aberration scaling in `scale_colors` runs only if the `aber`
+  setting is not 1.
+- **darktable: no.** The raw chromatic aberrations module's source sets
+  `default_enabled` to false only and has no auto-apply preset; the guided correction
+  on RGB likewise; and the version 4.0 manual marks neither it nor the lens correction
+  module as on by default. The lens module corrects transverse chromatic aberration from
+  Lensfun only when switched on.
+- **RawTherapee: yes for a raw file.** The bundled default raw profile "Auto-Matched
+  Curve - ISO Low" sets the Raw tab's automatic correction on (RAW section, CA true) and
+  the lens profile's own chromatic correction off (UseCA false). It is the profile the
+  program assigns to raw images by default.
+- **Adobe Camera Raw and Lightroom: not settled from Adobe's own pages**, which answered
+  HTTP 403. On Adobe's community host, Remove Chromatic Aberration is on after import for
+  some camera and lens sets in Lightroom Classic (Canon RF and adapted lenses), an Adobe
+  employee called it as designed, and the lens profile is applied at import for most
+  mirrorless models. Nothing read names Nikon. The default for the Nikon Z 50 is unread.
+
+**The stages, in the order a raw file meets them.** One line each: what the references do,
+whether this app does it, and one verdict. A record number after "missing" is the roadmap
+record that holds it.
+
+- **Container parse and format detection.** All four read the file first. App:
+  `src/raw/tiff.ts` and `decode()` in `src/decode.ts`. Present.
+- **Decompression of the samples.** App: Nikon Huffman with a two-back predictor (dcraw's
+  method), uncompressed DNG at 8 to 16 bits, lossless JPEG, and lossy LinearRaw through
+  the browser's decoder. Present.
+- **Formats the references open and this app refuses or only previews.**
+  High-Efficiency NEF, X-Trans, floating-point DNG (defined from 1.4.0.0, page 15), JPEG XL
+  and VC-5. Missing as formats and not as a stage; X-Trans does not apply to the Bayer
+  bodies on record. No record: a whole file that does not open as a raw.
+- **Linearisation.** The DNG model's first step (LinearizationTable, page 84); dcraw does it
+  in `load_raw`; darktable's `rawprepare` is position 1. App: the NEF curve, the DNG table.
+  Present.
+- **Black subtraction.** DNG: the sum of BlackLevel and its two deltas per pixel (pages 84
+  and 26). App: one black per site from the NEF MakerNote, the repeat pattern and both
+  deltas for a DNG. Present. MaskedAreas, which the specification lets a reader use to
+  measure black, is optional and unread.
+- **White level, rescale and clip.** DNG: rescale by the white level and clip (page 84);
+  LibRaw adjusts the maximum with a 0.75 threshold. App: top of the curve or the bit
+  ceiling; the clip is measured as a test and drives highlight recovery. Present
+  differently.
+- **Active area, masked-pixel crop and default crop.** Present.
+- **Zero and bad-pixel removal from a map or a list.** dcraw and LibRaw with a map;
+  RawTherapee with a list named for the camera (search summary); DNG FixBadPixelsConstant
+  and FixBadPixelsList in the first opcode list. App: named at open and not applied.
+  Missing, record 092.
+- **An automatic hot and dead pixel filter on the mosaic.** darktable's hot pixels
+  (position 6) and RawTherapee's two checkboxes with a threshold starting at 100, both off
+  by default. App: none on the mosaic; the heal tool works on the finished picture.
+  Missing, record 093.
+- **Dark-frame subtraction.** dcraw and LibRaw with a file; RawTherapee's panel, nothing
+  set by default. App: none. Missing, record 097; it needs a frame the reader would shoot.
+- **Flat field and lens shading on linear data.** RawTherapee's flat-field panel and the
+  DNG GainMap in the second opcode list. App: `src/lensflat.ts`, a stored radial profile
+  for the hot spot laid right after the decode, and the GainMap opcode applied. Present
+  differently. RawTherapee's clip control has no equivalent here (9c).
+- **DNG per-row, per-column and trim opcodes.** DeltaPerRow, DeltaPerColumn, ScalePerRow,
+  ScalePerColumn and TrimBounds (pages 97 and 100 to 103). No other reference read has an
+  equivalent. App: named at open and not applied. Missing for files that carry them,
+  record 099.
+- **White balance multipliers on the mosaic.** dcraw and LibRaw `scale_colors` (camera
+  multipliers by default, auto balance optional); darktable `temperature`, on by default;
+  RawTherapee camera or auto; DNG AsShotNeutral. App: found from the data and applied in
+  the grade, and applied to the photosites and divided back out for the demosaic. Not
+  applicable as the source of the default (the recorded balance is a 5200 K default,
+  section 3); the stage itself is present, differently.
+- **Green equilibration.** LibRaw `green_matching` (default 0) and RawTherapee's adjuster
+  (starts at 0); DNG BayerGreenSplit hint (page 36). App: none. Missing, off by default
+  where it exists, record 095.
+- **Line-noise filter and autofocus rows.** RawTherapee only, starting at 0, with an
+  autofocus-lines checkbox. App: `equalisePdafRows` on the Z 50 and Z fc, on by default.
+  Present differently for the autofocus rows; missing for a general filter, record 096.
+- **Highlight handling before the demosaic.** darktable `highlights` (position 4, on by
+  default); dcraw and LibRaw clip by default and blend or recover with `-H`; RawTherapee
+  HLRecovery Coloropp; DNG LinearResponseLimit hint (page 36). App: after the demosaic, in
+  the grade, automatic only on a clipped frame (9s). Present differently; the hint is
+  unread.
+- **Chromatic aberration correction on the mosaic.** See the answer above. App:
+  `src/raw/chromatic.ts`, one estimate per photograph, always on (9v). Present.
+- **Noise reduction on the mosaic.** dcraw `-n`, LibRaw `fbdd` when set, darktable raw
+  denoise (position 7, off by default); DNG BaselineNoise, NoiseProfile and
+  NoiseReductionApplied (pages 35, 57 and 47). App: none on the mosaic; the tags are
+  unread. Missing as a mosaic stage, record 098.
+- **Demosaic.** dcraw's default is AHD; LibRaw offers AHD, DCB, DHT and AAHD among others;
+  darktable runs it at position 8; RawTherapee has a Bayer panel. App: RCD from darktable
+  at full resolution. Present; the editing copy collapses each quad and is not a demosaic,
+  present differently.
+- **The mosaic scaled by the balance and divided back for the demosaic.** The references
+  demosaic after `scale_colors`, so the mosaic is already balanced. App: `demosaicBalance`
+  scales and divides back. Present differently.
+- **Median and chroma smoothing after the demosaic.** dcraw `-m` and LibRaw `med_passes`,
+  off by default. App: a three-by-three decision median per channel in the shader and a
+  chroma stage (4c-x). Present.
+- **Noise reduction after the demosaic.** darktable's profiled denoise (position 9, off
+  by default). App: `src/raw/denoise.ts`, automatic at open and measured from the frame,
+  the only spatial stage on a default open (4c-xxiii, the passage on a default open).
+  Present differently.
+- **Lens correction from a profile: distortion and lateral colour.** darktable's lens
+  module (Lensfun, off by default in 4.0); RawTherapee's default profile applies distortion
+  through Lensfun with its own chromatic correction off; DNG WarpRectilinear, WarpFisheye
+  and WarpRectilinear2 in the third opcode list. App: none; a DNG with a warp opcode is
+  told at open. Missing, record 090. Applicable to infrared (section 2); 9v built only the
+  lateral-colour half, measured from the raw.
+- **Lens correction from a profile: vignetting.** darktable's lens module, off by default;
+  RawTherapee UseVignette true; DNG FixVignetteRadial (page 94). App: applied for a DNG;
+  none for a NEF, whose measured flat is a hot-spot correction and not a vignette (section
+  1). Present differently for a DNG; missing for a NEF, record 100.
+- **Defringe.** darktable's, deprecated and off; RawTherapee's, nothing set in the default
+  profile. App: none. Missing, record 094; IR-SCIENCE.md 4b-ix records that swaps fringe
+  at foliage against sky.
+- **Exposure.** DNG BaselineExposure moves the zero point of the control per camera;
+  darktable `exposure` is on by default. App: automatic exposure at open as a visible
+  baseline; BaselineExposure unread. Present differently.
+- **Camera space to working space.** DNG chapter 6; darktable's input profile on by
+  default; dcraw and LibRaw `convert_to_rgb`. App: `src/color.ts` for NEF and DNG. Present.
+- **Blend of calibrations by correlated colour temperature.** Required by the DNG
+  specification from 1.2.0.0 (page 85). App: one calibration, the daylight one. Present
+  differently; not applicable to the two infrared profiles on record, which share a
+  ForwardMatrix (section 4, route 2); unmeasured for other DNGs. Part of record 091.
+- **Profile hue and saturation map and look table.** DNG pages 88 and 55. App: not read.
+  Missing, record 091; section 4, route 2 already says the tables are not applied.
+- **Default tone curve.** DNG ProfileToneCurve (page 49); RawTherapee's default profile
+  turns histogram matching on, which matches the curve to the camera's preview (the fitting
+  itself is unread); darktable defaults to filmic or sigmoid; dcraw and LibRaw use a fixed
+  BT.709 curve. App: a display-referred
+  grade. Present differently. A curve matched to the camera's preview does not apply to
+  infrared on this reading of section 3; that half is an inference and not a statement in
+  a source.
+- **Sharpening after the demosaic.** RawTherapee's default profile enables it; darktable's
+  is off. App: the control exists and is zero at open. Present differently.
+- **Orientation and pixel-shape rotation.** Orientation present; `fuji_rotate` exists for
+  Fujifilm layouts and does not apply, since X-Trans is refused.
+- **Non-square pixels.** DNG DefaultScale (page 28). Not applicable to any camera this app
+  opens.
+- **Output encoding.** Present: ICC embedded, JPEG in Display-P3, 16-bit TIFF in sRGB.
+- **A camera-made look in the default render.** The references each open a raw file already
+  looking like a photograph. App: four visible, undoable automatics and a hold control that
+  shows the bare decode. Present differently, as the instructions record under what opens.
+- **DNG tags read by no part of the rendering.** BaselineExposure, BaselineNoise,
+  BaselineSharpness, BayerGreenSplit, LinearResponseLimit, AntiAliasStrength,
+  ChromaBlurRadius, NoiseProfile, NoiseReductionApplied, ProfileHueSatMap, ProfileLookTable,
+  ProfileToneCurve, AsShotNeutral, AsShotWhiteXY, DefaultScale and BestQualityScale. Each
+  has its verdict on its stage above. The profile ones are in record 091, BayerGreenSplit in
+  095 and the three noise tags in 098; the others belong to stages marked present. The
+  hint tags are advice the specification gives a reader and none is required (pages 35 to
+  38).
+
+**The stages marked missing, ranked by how much a reader's picture would change.** An
+estimate from the descriptions and the defaults above; no render was made.
+
+- **1. Lens distortion and the per-plane lateral colour of the DNG warp opcodes**, record
+  090. It moves pixels, by the most at the corners.
+- **2. The DNG profile's hue and saturation map, look table and tone curve, with the
+  calibration blend**, record 091.
+- **3. The DNG bad-pixel opcodes (092) and an automatic hot and dead pixel filter (093).**
+- **4. Defringe**, record 094; the alignment of 9v is built.
+- **5. Green equilibration (095), a general line-noise filter (096), dark-frame subtraction
+  (097) and noise reduction on the mosaic (098).** Off by default where the default was
+  read; none needs an infrared-specific reason.
+- **6. The per-row and per-column opcodes and TrimBounds**, record 099. Only for files that
+  carry them.
+- **Outside the ranked list: the NEF half of the vignetting stage**, record 100.
+- **Not ranked, not applicable to infrared:** the camera's balance as the default source,
+  the curve matched to the camera's preview (inference), `fuji_rotate` and non-square
+  pixels.
+
+**Sources.** Each with its address; (summary) means through the fetch tool's summary.
+
+- dcraw, https://raw.githubusercontent.com/ncruces/dcraw/master/dcraw.c (a GitHub mirror;
+  www.dechifro.org answered HTTP 503) (summary).
+- LibRaw, https://raw.githubusercontent.com/LibRaw/LibRaw/master/src/postprocessing/dcraw_process.cpp
+  and `postprocessing_utils_dcrdefs.cpp` in the same folder (summary), and
+  https://www.libraw.org/docs/API-datastruct.html (summary). The page API-notes.html carries
+  no stage order.
+- darktable, https://raw.githubusercontent.com/darktable-org/darktable/master/src/common/iop_order.c
+  (summary), `src/iop/cacorrect.c`, `src/iop/cacorrectrgb.c` and `src/iop/lens.cc` in the
+  same repository (summary; lens.cc read to its first 200000 characters), and the manual
+  pages https://docs.darktable.org/usermanual/stable/en/preferences-settings/processing/,
+  https://docs.darktable.org/usermanual/4.0/en/special-topics/module-order/ (the page that
+  settles which modules are on by default),
+  https://docs.darktable.org/usermanual/development/en/darkroom/pixelpipe/the-pixelpipe-and-module-order/,
+  and the module pages for raw chromatic aberrations and lens correction (summary).
+- RawTherapee, on github.com pages of the dev branch: `rtgui/options.h`, `rtgui/options.cc`,
+  `rtdata/profiles/Auto-Matched Curve - ISO Low.pp3`, the tree pages `rtgui/tools` and
+  `rtdata/profiles`, and the panel files `preprocess.cc`, `bayerpreprocess.cc`,
+  `rawcacorrection.cc`, `flatfield.cc`, `darkframe.cc`, `rawexposure.cc` and
+  `preprocesswb.cc` under `rtgui/tools` (summary). RawPedia text is a search summary only.
+- The DNG specification, version 1.6.0.0, December 2021, 109 pages, at
+  https://paulbourke.net/dataformats/dng/dng_spec_1_6_0_0.pdf, read as pdf pages 2 to 7, 13
+  to 15, 25 to 29, 34 to 38, 42 and 43, 47 to 49, 54 to 57, 84 to 99 and 100 to 106. The
+  address was taken from https://www.adobe.com/support/downloads/dng/dng_sdk.html and
+  https://www.adobe.com/au/products/dng/, which link only to helpx.adobe.com copies.
+- Eric Chan, FixBadPixels README, 16 February 2012, https://people.csail.mit.edu/ericchan/tmp/FixBadPixels.pdf
+  (pdf pages 1 to 5). A utility README and not part of the specification.
+- Adobe's community host, two threads (summary):
+  https://community.adobe.com/questions-675/p-develop-module-lens-corrections-remove-chromatic-aberration-default-965321
+  and the Lightroom Classic thread on turning off lens corrections on import.
+- Secondary, search results only: a discussion-forum thread on lens correction being
+  applied only when a preset says so (https://discuss.pixls.us/t/lens-correction-not-working/19724)
+  and one on the pp3 key CA (https://discuss.pixls.us/t/auto-ca-correction-settings-in-pp3-files/5136).
+
+**Not read, because no reachable host served it whole.** RawTherapee's
+`rtengine/procparams.cc` defaults for the Raw tab (github.com stops at 1000 of 5496 lines
+and the raw host was held); the end of darktable's `lens.cc` (the manual settles the
+default); RawPedia (every host held or failing); Adobe's own help pages and the 1.7.1.0
+specification (helpx.adobe.com answered HTTP 403); Camera Raw 12.3's raw defaults
+(blogs.adobe.com failed on a lookup error); and the specification's compression,
+depth-map and enhanced-image chapters. Hosts that failed on a lookup error and were
+tried for the same documents: codesearch.debian.net, fossies.org, sources.debian.org and
+rawpedia.pixls.us. web.archive.org was refused by the fetch tool and api.github.com
+answered HTTP 403.

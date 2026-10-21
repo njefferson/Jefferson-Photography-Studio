@@ -46,7 +46,7 @@ platform rather than about this app.
 photograph taken right after keeping a quick look's pictures into a session shows
 the photograph occupying a shallow horizontal band at the top of the screen with
 its top and bottom CUT OFF rather than scaled down, the session strip below it,
-and the zoom control reading **100% with a Fit button beside it**.
+and **the zoom control reading 100% with a Fit button beside it**.
 
 Two branches die on that reading. Leftover view zoom is out — 100% is fit, and
 the zoom transform is not what is cropping it. Page zoom is unlikely for the same

@@ -3792,6 +3792,110 @@ user-scalable=no.
   byte-identical to today's, because a graphics chip computes in float where the
   processor uses doubles. It would match the PREVIEW instead.
 
+- [ ] **Lens distortion is never corrected, and a DNG that says how is told it was left out** <!-- decision: 090 -->
+  **Shown as:** A DNG that carries its lens's shape has it corrected on open, with a switch to turn the correction off.
+  Found in October 2026 by setting the stages dcraw, LibRaw, darktable, RawTherapee and
+  the DNG specification run on a raw file against this app's decode (IR-SCIENCE.md 9w).
+  No photograph was opened and no render made, so every rank in this block is an ordering
+  of reach and not a measurement. Nothing here moves pixels to undo the lens's shape; a DNG
+  with a distortion opcode is told at open that it was left out. RawTherapee applies it by
+  default to every raw file and darktable leaves it off. Chosen: apply the file's own
+  shared term after the demosaic, on the editing copy and on the export, leave the colour
+  half to 061's measured alignment, and give it a switch. It sits behind 009 and 011,
+  whose shapes it must land on, and ahead of 084. See
+  `docs/decisions/090-lens-distortion-is-never-corrected-and-a-dng-that-says-how-is-told-it-was-left-out.md`.
+
+- [ ] **A DNG profile's colour tables are read by nothing, and its two calibrations are not blended** <!-- decision: 091 -->
+  **Shown as:** Colour adjustments inside a DNG's profile are used when the file carries them, with a switch to turn them off.
+  The profile's hue and saturation map, look table and tone curve are not applied;
+  IR-SCIENCE.md section 4 already says so for the two infrared profiles on record.
+  Whether those profiles carry any table is not known, so the first act is a read-only
+  line in the diagnostic and a count over the reader's own DNGs. Chosen: apply the map and
+  the look table where a profile has them, with a switch, and not the tone curve; the
+  calibration blend is not built, because the white point is found from the data and the
+  two profiles read share one ForwardMatrix. Second of the block. See
+  `docs/decisions/091-a-dng-profiles-colour-tables-are-read-by-nothing-and-its-two-calibrations-are-not-blended.md`.
+
+- [ ] **A DNG's bad-pixel opcodes are named to the reader and not applied** <!-- decision: 092 -->
+  **Shown as:** A DNG that lists its own dead or stuck pixels has them repaired on open.
+  The two opcodes are named in the notice at open and skipped, so a file that lists its
+  defects renders them. Chosen: count the reader's own DNGs that carry either opcode, and
+  if any do, repair the listed photosites at the start of the DNG path, ahead of the
+  channel alignment and the lens flat, with a diagnostic line and no control. If none
+  does, the record closes as not owed. Third of the block. See
+  `docs/decisions/092-a-dngs-bad-pixel-opcodes-are-named-to-the-reader-and-not-applied.md`.
+
+- [ ] **No filter looks for hot and dead photosites on the mosaic** <!-- decision: 093 -->
+  **Shown as:** internal
+  Every reference read leaves an automatic hot and dead pixel filter off by default, and
+  the app has only the heal tool, which works on the finished picture. IR-SCIENCE.md 4c-x
+  measured the pale pepper in a deep sky as not impulse noise, but after the demosaic.
+  Chosen: count isolated outliers on the mosaic of the reader's own raws, look at the
+  pictures with and without, and build the filter only if a defect shows. Fourth of the
+  block. See `docs/decisions/093-no-filter-looks-for-hot-and-dead-photosites-on-the-mosaic.md`.
+
+- [ ] **Colour fringes at thin edges have no remover beyond the alignment** <!-- decision: 094 -->
+  **Shown as:** internal
+  No defringe exists. The alignment 061 built is the stage the references run first, and
+  its Outcome left a small shift of blue, not blur. Record 061's Rejected section rules
+  out a defringe in the grade and a hue-keyed one, and this record keeps those
+  boundaries. Chosen: decide on pictures after 061's device pass, and build, before the
+  matrix, the swap and the mixer, only what the pictures show is left. Fifth of the block.
+  See `docs/decisions/094-colour-fringes-at-thin-edges-have-no-remover-beyond-the-alignment.md`.
+
+- [ ] **The two greens of a Bayer quad are never matched** <!-- decision: 095 -->
+  **Shown as:** internal
+  LibRaw's green matching and RawTherapee's green equilibration are both off by default,
+  and the DNG tag BayerGreenSplit is a hint. Nothing was measured on the reader's raws.
+  Chosen: take the ratio between the two greens per frame first, and build a per-photograph
+  gain on the mosaic only if the ratio departs from 1 and a pattern shows. Sixth of the
+  block, first of the tier the comparison lists in an order nothing read separates. See
+  `docs/decisions/095-the-two-greens-of-a-bayer-quad-are-never-matched.md`.
+
+- [ ] **Row and column banding has no filter beyond the autofocus rows** <!-- decision: 096 -->
+  **Shown as:** internal
+  The autofocus rows are equalised on the Z 50 and the Z fc; a general line-noise filter
+  exists in one reference and starts at 0 there. The starved blue channel under a mixer is a
+  reason to look and not a measurement of banding. Chosen: measure row and column offsets
+  in noise units on the reader's raws, then look at the amplified picture, and build only if
+  banding shows. Seventh of the block. See
+  `docs/decisions/096-row-and-column-banding-has-no-filter-beyond-the-autofocus-rows.md`.
+
+- [ ] **No dark frame can be subtracted from a photograph** <!-- decision: 097 -->
+  **Shown as:** internal
+  dcraw, LibRaw and RawTherapee can subtract a reader-supplied dark frame; the app cannot.
+  It needs a frame the reader would have to shoot, for a defect nobody has shown at
+  daylight exposures. Chosen: build nothing now, run the counts in 093 and 096 first, and
+  close the record as not owed if both come back empty. Eighth of the block. See
+  `docs/decisions/097-no-dark-frame-can-be-subtracted-from-a-photograph.md`.
+
+- [ ] **Noise is reduced after the demosaic and never before it** <!-- decision: 098 -->
+  **Shown as:** internal
+  darktable, LibRaw and dcraw have a noise stage before the demosaic, off by default in the
+  one whose default was read. The app's denoiser is after the demosaic, and IR-SCIENCE.md
+  4c-xxii fixed the speckle that suggested a mosaic stage from that side. Chosen: look at the
+  reader's frames for structure the shipped denoiser leaves, and prototype a mosaic pass only
+  if some remains; reading the DNG noise tags is a narrower, separate step. Ninth of the
+  block. See `docs/decisions/098-noise-is-reduced-after-the-demosaic-and-never-before-it.md`.
+
+- [ ] **A DNG's per-row and per-column corrections and its trim are not applied** <!-- decision: 099 -->
+  **Shown as:** A DNG's own row and column corrections are applied on open when the file carries them.
+  Five opcodes are named at open and skipped: four per-row and per-column corrections and
+  TrimBounds. No reference read has an equivalent. Chosen: count the reader's DNGs that
+  carry any, apply them where the file's lists put them if some do, with TrimBounds last
+  and alone because it changes the rectangle, and close the record if none does. Tenth of
+  the block. See
+  `docs/decisions/099-a-dngs-per-row-and-per-column-corrections-and-its-trim-are-not-applied.md`.
+
+- [ ] **A NEF's lens vignetting is never corrected** <!-- decision: 100 -->
+  **Shown as:** internal
+  The DNG half is applied. For a NEF the measured hot-spot flat is the only lens
+  correction, and a hot spot is not a vignette; whether the flat already lifts the corners is
+  not known, and for a lens with no profile nothing is corrected. darktable leaves the
+  correction off and RawTherapee turns it on. Chosen: measure corner fall-off with the flat
+  on and off on the reader's NEFs first. Last of the block, for its own reasons in the
+  record. See `docs/decisions/100-a-nefs-lens-vignetting-is-never-corrected.md`.
+
 - [ ] **HSL adjustments and channel swaps, for making infrared looks** <!-- decision: 084 -->
   **Shown as:** One panel for making a look: pick a channel swap from a row of named ones, adjust the colours on top of it, set its strength, and save it as a look.
   Asked 2026-09-29, for later. Making a look is a remap and then colour-band

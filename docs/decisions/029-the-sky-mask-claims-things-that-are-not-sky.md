@@ -107,7 +107,7 @@ Do not write a second one of any of these.
 spreads by colour and connectivity rather than by a coarse bitmap — and its
 remaining defect is a band of genuine sky missed on NIR_1651. That band is
 missed because `skyGrowKey` fits its target to a seed which on that frame is
-**100% cloud deck**: of 211,602 seeded guide pixels, zero sit below the cloud's
+**entirely cloud deck (100%)**: of 211,602 seeded guide pixels, zero sit below the cloud's
 lower edge. So 023's residual and this item have the same root, and it is the
 seed rather than the grow.
 
