@@ -112,6 +112,97 @@ Two slots holding no measured value both fall back to 5200 K, which is why they
 agree. These files do not settle whether the camera can store an infrared
 preset at all: none of them was shot on a slot that holds one.
 
+**Four more raws, a maintained tool and the camera's own previews — read
+2026-10-23.** Four raws from the reader's shared zip of 2026-10-17 (NIR_3762,
+NIR_3738, NIR_3736 and NIR_3735) were read three ways, to ask whether any tag in a
+Z 50 NEF holds a balance the camera measured. None of the four was shot on a slot
+known to hold a measurement, and no raw that was is available, so that question is
+still open after this.
+
+- **The plain tag, on four more raws.** All four record WhiteBalance `PRESET6`,
+  fine-tune 0 and 0, and tag 12 reads red 1.8574 and blue 1.4668 on each, to four
+  places: the pair `NIR_1376` records on `PRESET4` above (951/512 and 751/512). Tag
+  61, the one the app reads, is present in the same maker-note directory on all
+  four, so the right directory was read. Five raws on two slots now give one pair.
+- **The maintained tool, and its keys.** ExifTool, in its npm packaging
+  `exiftool-vendored.pl`, version 13.59.3
+  (https://www.npmjs.com/package/exiftool-vendored.pl), fetched with the registry's
+  pack command and unpacked outside every repository; Perl 5.38 ran it. Its Nikon
+  module decrypts the maker note's encrypted blocks with two keys read from the
+  same maker note, the camera's serial number and its shutter count, and warns
+  "Can't decrypt Nikon information" when either is missing. Neither key's value is
+  recorded in this file, in any record or in any report.
+- **What the tool decodes from the colour-balance block on this body: no levels.**
+  The block is tag 151. On all four raws it is 3316 bytes (counted from the
+  maker-note directory by a scratch walker that was made to fail on a planted
+  612-byte entry) and opens with the version text 0801. The module's table for tag
+  151 sends every version opening 08 to an entry named `ColorBalanceUnknown2`, with a
+  comment beside it listing the Z6 and Z7 at version 0800, and that entry's table
+  defines one field, the four-byte version. The entries that decrypt and name red
+  and blue levels are for the D-series versions. So the tool prints the version and
+  no levels, keys or not. Its unknown-tags flag changed nothing on any of the four,
+  and a second use of the flag would add nothing either: the unknown-tag scan in
+  `ExifTool.pm` (line 9906) needs the table to name a first entry, and this table
+  names none. The Z 50's ShotInfo block, also version 0801, does decode, and its
+  table holds firmware, interval, portrait and orientation entries, not balance
+  levels.
+- **The tool's auto colour temperature.** Tag 79, `ColorTemperatureAuto` (the module
+  marks its source as a D850), reads 0 on all four. A zero is not a temperature. It
+  is read here as nothing recorded on a manual preset, which is a reading of the
+  value alone: the tool's table gives the tag no print conversion, and no page read
+  says what a zero means.
+- **The previews.** Each raw carries three embedded JPEGs and a small TIFF
+  thumbnail. The largest, `JpgFromRaw` at 5568 by 3712, was extracted with the
+  tool's binary flag and decoded with jpeg-js 0.4.4
+  (https://www.npmjs.com/package/jpeg-js) by a scratch script that was made to fail
+  on planted images of known ratios (a solid 200, 100, 50 printed red over green
+  2.010 and blue over green 0.495, so the JPEG round trip reads red over green about
+  0.01 high). Mean red over green and mean blue over green, on the preview's own
+  sRGB-coded levels, over the whole frame and then over the middle half of each
+  side:
+  - NIR_3762: 3.274 and 1.329 whole; 2.919 and 1.289 centre.
+  - NIR_3738: 2.868 and 1.201 whole; 2.325 and 1.187 centre.
+  - NIR_3736: 3.283 and 1.335 whole; 2.938 and 1.421 centre.
+  - NIR_3735: 3.478 and 1.452 whole; 3.170 and 1.464 centre.
+- **What the previews say.** Opened whole, all four are one rendering: a coral-red
+  sky, conifers pale pink running to white where brightest, water and shadow deep
+  crimson, bare ground light pink, and nothing neutral, green or blue anywhere. Red
+  over green of 2.3 to 3.5 with blue over green of 1.2 to 1.5 is what the preset's
+  daylight pair looks like applied to a raw whose red channel carries the infrared
+  flood. The reading rule this measurement was set up with is that a ratio far above
+  one is the daylight pair and a ratio near one is a balance measured on foliage;
+  the two frames that are mostly foliage (NIR_3736 and NIR_3735) read 2.9 to 3.5. So
+  the camera's own rendering agrees with the plain tag: the pair the camera applied
+  is the preset's pair.
+- **What this settles, and what it does not.** Nothing reachable in these files
+  carries a balance the camera measured: not the plain tag, not tag 61, not the
+  colour-balance block as the tool names it, not the auto temperature, not the
+  previews. The paragraph below stands on five raws instead of one, and the app still
+  has to find the white point from the data. It does not settle whether the camera
+  can store an infrared measurement in a preset at all. Limits: the plain tag is one
+  tag; the tool's decoding is as version 13.59.3 names it, and a later version may
+  define the 08 block; a preview carries the camera's matrix, tone curve and Picture
+  Control, and a frame's mean depends on its scene, so the ratios read appearance
+  and are no decode of the multipliers; and a raw shot on a slot known to hold a
+  foliage measurement has not been read. Record 101 carries the chosen route.
+- **Sources, and how each was read.**
+  - exiftool-vendored.pl 13.59.3, https://www.npmjs.com/package/exiftool-vendored.pl:
+    run on the four raws, with `Nikon.pm` and `ExifTool.pm` read as text in the
+    unpacked package (the tag 151 conditions, the `ColorBalanceUnknown2` table, tag
+    79, `ProcessNikonEncrypted` and its warning, the first-entry test).
+  - jpeg-js 0.4.4, https://www.npmjs.com/package/jpeg-js: run on the four previews.
+  - The tool's tag documentation for Nikon,
+    https://exiftool.sourceforge.net/TagNames/Nikon.html: named by one web search on
+    2026-10-23, whose result says the serial number and the shutter count are the
+    decryption keys and that the colour-balance block comes in several versions with
+    an unknown one. The page itself was not fetched, the plan recording the host as
+    denied in this container, so the module's source above is what was read.
+  - The exiftool.org forum thread on an unknown Nikon body's encrypted maker notes:
+    named by the same search, its address was not kept, and the page was not fetched
+    for the same reason.
+  - The Z 50 Online Manual and darktable's preset table: as cited in the paragraph
+    above.
+
 **So an infrared raw converter has to find the white point from the data.**
 That is what gray-world does here and what this app's "no 2000K floor" claim has
 always meant. The floor belongs to KELVIN sliders on stock profiles, because no

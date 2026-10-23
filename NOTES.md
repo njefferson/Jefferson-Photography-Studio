@@ -2159,6 +2159,13 @@ Q-JPS-90: NIR_3430 opens about 2.3 percent darker with Aerochrome pressed, in th
 Q-JPS-91: the editing view's red and blue lose 1 to 47 percent of root-mean-square gradient at thin-edge places (displayed red 0.53 at NIR_3461's far pylon) and 11 to 20 percent at the leaf places of NIR_1703, the cost of the co-sited read; the export is unchanged at 0.99 to 1.02, and whether the softer fine leaf edges are acceptable waits on the device pass (step 132).
 Q-JPS-92: NIR_3463's and NIR_1703's half-scale exports were not made before or after the alignment, so the export's agreement with the editing view is measured on NIR_3461 and NIR_3430 only, and no full-size export was made (step 132).
 Q-JPS-93: only NIR_3430's Restore depth lift was traced; the lift's pulls on NIR_3461, NIR_3463 and NIR_1703 were not read, and their skies and centres move 1.6 levels at most (step 140).
+Q-JPS-94: the export's bytes were hashed on the new build tools only, and the one older hash in the scratchpad is from an earlier pipeline state, so nothing says whether the move to vite 6 changed an export byte; a before and after hash on one source would settle it and was not made (step 144).
+Q-JPS-95: tools/typecheck.mjs, tools/palette-spec-check.mjs and the roadmap-copy, pool-budget, patch-note and scope checks default the repository to the start directory, so run by absolute path from anywhere but the repository root they fail or read the wrong tree; tools/contract-check.mjs and tools/fresh-dist.mjs find it from their own file location, which is the shape to copy (step 144).
+Q-JPS-96: GitHub's alert count of 10 is of main and stays until the dependency change is promoted; the vite 6 move is on staging only and waits on the device pass (step 144).
+Q-JPS-97: tools/decisions-check.mjs reads a bold span that opens with a three-digit percentage as a citation of the record with that number, so 100 could not be a record key until two older records were reworded; the bold-citation pattern should refuse a following percent sign (step 145).
+Q-JPS-98: the commit hook's output for a documents-only commit runs to about 35 thousand characters because it re-runs the lens, mask, keep-file and picker walks, and it has to be read whole from the file the harness saves it to (step 145).
+Q-JPS-99: the four raws step 130 fetched were absent from the scratchpad when step 148 looked, only derived files of them remain, so where the owner-images tool put them is not known; the four raws read in step 155 (NIR_3762, NIR_3738, NIR_3736 and NIR_3735) sit under the folder step 113 unpacked and are in no entry of tools/owner-images.json, so the decisions check's rule that a "Looked at" entry names a file listed in that json cannot hold record 101's entries on them (steps 130, 148 and 155).
+Q-JPS-100: the plain white balance tag reads the daylight pair, red 1.8574 and blue 1.4668, on NIR_3762, NIR_3738, NIR_3736 and NIR_3735, all on slot six, the pair the one earlier raw records on slot four; the maintained tool decodes no levels from the encrypted block for this body, so no source read in this session carries a measured balance, and a raw shot on a slot known to hold one has not been read (steps 151 and 155).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -2662,6 +2669,19 @@ user-scalable=no.
 > CREATIVE RELEASE, which the owner has declared an IDENTITY change: it
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
+
+- [ ] **The balance the camera applied cannot be read from its raw file** <!-- decision: 101 -->
+  **Shown as:** A raw opens on a white balance found from its own pixels, because nothing in the file says what balance the camera used; one raw shot on a measured preset would show whether that can change.
+  Research of 2026-10-23 (IR-SCIENCE.md section 3, last subsection; record 101). Four
+  more raws on slot six read the same pair as the earlier one on slot four, 1.8574 and
+  1.4668, in the plain tag. The maintained tool (ExifTool 13.59.3) names the
+  colour-balance block unknown for this body and decodes no levels from it, and its
+  auto colour temperature reads 0. The camera's embedded previews read red over green
+  2.3 to 3.5, the preset's daylight pair applied. So nothing reachable in the file
+  carries a measured balance. **Chosen:** change nothing at open and read one raw shot
+  on a preset slot set from a foliage measurement the same three ways; the record's
+  other options, a gain control that takes a number and a named balance for a set, wait
+  on that reading. Left open: that raw has not been shot.
 
 - [ ] **The lens correction whitens bright centre foliage** <!-- decision: 085 -->
   **Shown as:** Every photo with a matched lens opens with the lens correction at full strength, and a double tap on its slider goes back there.
