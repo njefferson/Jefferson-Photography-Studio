@@ -203,6 +203,47 @@ still open after this.
   - The Z 50 Online Manual and darktable's preset table: as cited in the paragraph
     above.
 
+**The published infrared method for setting a balance, read 2026-10-23, and the
+scale the app builds on it.** Two pages of Rob Shea's site, robsheaphotography.com,
+were read on 23 October 2026. The plan that read them kept each page's title and
+dates and not its full path, so each is cited here by host, title and the dates the
+page carries, and no address is written down that was not read.
+
+- *White Balancing Color Infrared Photography* (robsheaphotography.com; published
+  3 June 2025, updated 21 September 2026). Lightroom, Lightroom Classic, Camera Raw,
+  DxO, Exposure and Luminar need a custom camera profile to reach an infrared white
+  point. Capture One, darktable, ON1, Photomator, Pixelmator, RawTherapee and
+  Affinity do not. The profile pack's Infrared Temp -50 and Infrared Temp -100
+  profiles shift the temperature scale; the white balance picker goes on a neutral
+  element, such as clouds or pavement; and the page says the shifted figures no
+  longer stand for real Kelvin values. The aim it gives is a balance that cleanly
+  separates the colours of sky and foliage. It says nothing about carrying a balance
+  from one photograph to another.
+- *Do I need custom profiles for infrared photography* (robsheaphotography.com;
+  published 26 December 2024). The Kelvin sliders run from 2000 to 50000, and
+  infrared light has a colour temperature of around 900 Kelvin below that scale. A
+  custom profile shifts the scale to lower values, and the editors that need none set
+  a good balance without it. The profiles are made in the Adobe DNG Profile Editor,
+  which the page calls thirteen years old and unsupported.
+
+What follows for this app, and what does not. The slider floor is a property of the
+stock profiles' Kelvin scale and not of raw development (the paragraph below says so
+for Lightroom, darktable and RawTherapee). Lightroom gets past it with a shifted
+profile and the picker on a neutral; darktable, one of the editors that need no
+profile, takes raw channel gains directly (above). The pages do not say how the other
+profile-free editors define their sliders, so this file does not claim that all of
+them are channel controls. This app has no profile to shift, so its Temperature and
+Tint are defined on the camera's own three channels: Temperature is the red gain
+against the blue and Tint is the green gain against the other two, each counted in
+steps of the gain sliders' own track, and a move holds the gains' geometric mean
+(`src/balancestore.ts`). They are the app's own scale and are never called Kelvin,
+the way the page says its shifted figures are no longer Kelvin; one setting names one
+set of ratios, so one white point, on every raw from this camera, whatever the frame.
+A Kelvin and tint pair through the camera matrix was not built: these raws' white
+points lie below the scale the stock profiles cover, which is the limit the shifted
+profile exists to get round. The two pages do not settle whether the camera can store
+a measured balance; section 3's paragraphs above still stand on that.
+
 **So an infrared raw converter has to find the white point from the data.**
 That is what gray-world does here and what this app's "no 2000K floor" claim has
 always meant. The floor belongs to KELVIN sliders on stock profiles, because no

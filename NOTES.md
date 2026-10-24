@@ -62,6 +62,15 @@ because they floor temperature at ~2000K.
 
 **Production carries the commit main names now, 58e8bac090810b62a6e0e4bee03d619b71b390ed, whose subject opens Fixed.** Read as the first line of `git log -1 origin/main`; promoted on 20 October California, on the go the release rules require for a product change. It is record 061's per-photograph alignment of red and blue on the raw, and its entry has left this section for the archive.
 
+**Temperature and Tint sit above the three gains, and a white balance can be held for every raw, put on the whole set and kept under a name: built 24 October on staging's head after the commit that records the camera's own balance cannot be read from a raw, not yet on a device.**
+- **New: a Temperature slider and a Tint slider above the three gain sliders, each with a number that can be typed.** They are the same three gains read two more ways, so moving one moves the others on screen, and a tap on foliage or a cloud lands all five. Temperature is the red gain against the blue and Tint is the green gain against the other two, counted in steps of the gain sliders' own track; a move changes the white point and keeps the overall level, so the picture is as bright as it was. They are the app's own scale and never Kelvin, and the Help and the information panel say so in a sentence.
+- **New: Hold this balance for every raw.** The balance on the open photograph is kept under the name in the box beside it (the date and time when nobody typed one), and every raw opened afterwards starts at it in place of its own automatic one. It shows on the five sliders, can be undone, and Reset returns to where the photograph opened. A line under the top bar, there whatever tab is open, says a balance is held and names it, with Back to the automatic beside it, and the change is announced. Photographs the camera developed (JPEG, HEIC) are never touched.
+- **New: Put the held balance on every photo in this set.** The photographs already open take the held gains as one undo step each, keeping the overall level of what they had, and their tiles in the strip are drawn again.
+- **New: kept balances.** Held balances are kept on this device under their names, so a reload, a new session or a different memory card can use one; the list sits in the Basic tab to pick from or to forget.
+- **Changed: the report names the held balance,** its gains, its Temperature and Tint, and what the open photograph reads.
+- **What is still wrong.** The tiles of photographs not yet opened are still drawn at their own automatic balance, because the tile worker is untouched; opening one lands it at the held balance. A typed number lands on the nearest balance the gain sliders' grid has, which can sit half a step from the number typed.
+- **For the device pass on staging.** Open a raw, tap foliage or a cloud, press Hold this balance for every raw, then open a second raw and read the five sliders. Open a set of raws, move one by hand, press Put the held balance on every photo in this set, and press Undo on each.
+
 **Aerochrome's sky stage asks for a map only when something about it changed, and the report names why it ran: built 2026-10-18 on staging's head after that commit, not yet on a device.**
 - **Fixed: a change of the look or of the sky inputs no longer leaves the first ask's refining words up while a map that will be thrown away is built.** Pressing Aerochrome on a photograph whose stored edit still carried the sky inputs took the words down only when the lane finished that map, 30.8 s in the container and 5 to 7 s on the iPad (container figure only). The words now end when the ask is given up, with its selection in hand.
 - **Fixed: a map that was built and then dropped as stale is kept under the inputs it was built from,** so Undo back to the same inputs reads the store with no line and no wait, where it used to build the same map again.
@@ -2166,6 +2175,16 @@ Q-JPS-97: tools/decisions-check.mjs reads a bold span that opens with a three-di
 Q-JPS-98: the commit hook's output for a documents-only commit runs to about 35 thousand characters because it re-runs the lens, mask, keep-file and picker walks, and it has to be read whole from the file the harness saves it to (step 145).
 Q-JPS-99: the four raws step 130 fetched were absent from the scratchpad when step 148 looked, only derived files of them remain, so where the owner-images tool put them is not known; the four raws read in step 155 (NIR_3762, NIR_3738, NIR_3736 and NIR_3735) sit under the folder step 113 unpacked and are in no entry of tools/owner-images.json, so the decisions check's rule that a "Looked at" entry names a file listed in that json cannot hold record 101's entries on them (steps 130, 148 and 155).
 Q-JPS-100: the plain white balance tag reads the daylight pair, red 1.8574 and blue 1.4668, on NIR_3762, NIR_3738, NIR_3736 and NIR_3735, all on slot six, the pair the one earlier raw records on slot four; the maintained tool decodes no levels from the encrypted block for this body, so no source read in this session carries a measured balance, and a raw shot on a slot known to hold one has not been read (steps 151 and 155).
+Q-JPS-101: while a balance is held the tiles of photographs not yet opened are still drawn at their own gray-world balance, because tile.ts, which the preview-version check hashes, is untouched; opening such a photograph lands it at the held balance, so the tile and the photograph differ until then (step 161).
+Q-JPS-102: a typed Temperature or Tint lands on the nearest balance the gain track's grid has with the geometric mean held, so a typed number can read half a step from what was typed (typing -70 where the red and blue places differ by an odd number reads -70.5); the box prints the balance's real value (step 161).
+Q-JPS-103: putting the held balance on a photograph that is not open keeps its overall level (gain times exposure) because it cannot be measured without decoding it, so its brightness can sit off from the measured exposure the open photograph gets; how far off, on the device, is not measured (step 161).
+Q-JPS-104: the held balance's name is the reader's own text and the report prints it, while the opening comment of src/diagnostic.ts still says nothing the reader wrote goes in the report; the comment was left as written (step 161).
+Q-JPS-105: under a look with a white balance bias (Red, Goldie) the sliders show the held gains times that bias, because the bias is multiplied back on after the held balance is laid; the held balance itself is stored without it (step 161).
+Q-JPS-106: of three spots tried on NIR_4027, a tap on lit foliage changed the balance by under 5 Temperature steps at one and not at all at another (the app refuses a spot with a clipped channel, and whether that toast was the cause was not read); every proof ran in software graphics in a container with the sky lane off, not on a device (step 161).
+Q-JPS-107: a DNG that opened only as the camera's own preview and then had a look pressed carries gains other than 1, so the put-on-the-set control cannot tell it from a raw by its gains and exposure and would change it; a DNG preview with no look is told by its gains of exactly 1 and exposure of exactly 1 and is left alone (step 161).
+Q-JPS-108: the two pages of the published infrared method are cited in IR-SCIENCE.md by site, title and dates, because the plan that read them kept no full address; nothing was fetched again (step 161).
+Q-JPS-109: the full accessibility walk exits 1 on macro.html alone, four variants, one serious label-content-name-mismatch on #verTag (its fixed accessible name does not contain its visible version text); the same failure is recorded above as red on staging's head, macro.html and src/verstamp.ts are untouched by step 161, and every other part of the walk, the balance controls' part 12 included, passed in both themes and both shapes (step 161).
+Q-JPS-110: on a 402 px phone the held-balance strip is about 105 px tall (the sentence takes three lines and the exit wraps under it), so a held balance costs the photograph that much height while it is held; the wording was not shortened because that is a copy choice (step 161).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -2669,19 +2688,6 @@ user-scalable=no.
 > CREATIVE RELEASE, which the owner has declared an IDENTITY change: it
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
-
-- [ ] **The balance the camera applied cannot be read from its raw file** <!-- decision: 101 -->
-  **Shown as:** A raw opens on a white balance found from its own pixels, because nothing in the file says what balance the camera used; one raw shot on a measured preset would show whether that can change.
-  Research of 2026-10-23 (IR-SCIENCE.md section 3, last subsection; record 101). Four
-  more raws on slot six read the same pair as the earlier one on slot four, 1.8574 and
-  1.4668, in the plain tag. The maintained tool (ExifTool 13.59.3) names the
-  colour-balance block unknown for this body and decodes no levels from it, and its
-  auto colour temperature reads 0. The camera's embedded previews read red over green
-  2.3 to 3.5, the preset's daylight pair applied. So nothing reachable in the file
-  carries a measured balance. **Chosen:** change nothing at open and read one raw shot
-  on a preset slot set from a foliage measurement the same three ways; the record's
-  other options, a gain control that takes a number and a named balance for a set, wait
-  on that reading. Left open: that raw has not been shot.
 
 - [ ] **The lens correction whitens bright centre foliage** <!-- decision: 085 -->
   **Shown as:** Every photo with a matched lens opens with the lens correction at full strength, and a double tap on its slider goes back there.
@@ -6662,6 +6668,32 @@ reason it is a footnote rather than a finding — a list of known limitations is
 read as authoritative, and an invented one is worse than a missing one.
 
 ## Shipped (roadmap archive)
+
+- [x] **The balance the camera applied cannot be read from its raw file** <!-- decision: 101 -->
+  **Shown as:** A white balance you set once on a raw can now be held for every raw you open next, put on the photographs already open, and kept under a name for another day or another card.
+  Research of 23 October (IR-SCIENCE.md section 3; record 101). Six raws on three
+  preset slots, the newest of them NIR_4027 on slot one, record the same daylight pair
+  in the plain tag, 1.8574 and 1.4668. The maintained tool (ExifTool 13.59.3) and both
+  published raw readers decode no levels from the colour-balance block for this body,
+  its auto colour temperature reads 0, and the camera's embedded previews are the same
+  coral-red rendering of that pair. So nothing reachable in a raw's file carries a
+  balance the camera measured, and the app still finds its white point from the pixels.
+  **Chosen and built, on staging:** the record's third option, a named balance for a
+  set across sessions and cards, with its second option, the gains, beneath it. A
+  Temperature slider and a Tint slider sit above the three gain sliders, each with a
+  typed number, and are the same three gains read two other ways: Temperature is the red
+  gain against the blue and Tint is the green gain against the other two, counted in
+  steps of the gain sliders' own track, and a move holds the gains' overall level. They
+  are the app's own scale and never Kelvin. Hold keeps the balance on the open
+  photograph for every raw opened next, in place of that raw's own automatic one; one
+  control puts it on the photographs already in the set, as one undo step on each; a
+  name keeps it on this device across sessions and cards; and one control returns the
+  open photograph to its automatic balance and ends the hold. Photographs the camera
+  developed are never touched. Left open: whether the camera can store a measured
+  balance in a preset at all (one raw shot on a slot set from foliage would say), and
+  the device pass on staging.
+  See `docs/decisions/101-camera-balance-at-open.md`.
+  Archived on 24 October with its Outcome (decision 101).
 
 - [x] **Red and blue do not line up at thin edges, and Aerochrome paints the difference** <!-- decision: 061 -->
   **Shown as:** Thin dark edges against the sky, such as posts, branches and leaf edges, stop carrying a blue outline with a red edge in Aerochrome.

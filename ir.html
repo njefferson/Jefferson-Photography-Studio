@@ -137,6 +137,21 @@
         <button id="swStripLater" type="button" class="sw-strip-later">Not now</button>
       </div>
 
+      <!-- THE HELD BALANCE'S STANDING LINE, WITH THE WAY OUT BESIDE IT (decision 101). A mode
+           announces itself and offers an obvious exit, and this one changes what every raw
+           opens at, so it has to be read from every tab of the panel and from the stage, not
+           from the one tab that holds the Hold button. It therefore has a row of its own
+           under the top bar, the update strip's precedent, spanning the stage and the panel;
+           it is hidden until a balance is held. It is NOT a live region: the hold's changes
+           are announced through #balLive below, and a second region here would say each of
+           them twice. It is NOT a .note either, because "Explanations off" hides every
+           .note and a state is not an explanation. src/main.ts writes the sentence and shows
+           the strip. -->
+      <div id="balStrip" class="bal-strip" hidden>
+        <p id="balHeld" class="bal-held"></p>
+        <button id="balBack" type="button">Back to the automatic</button>
+      </div>
+
       <!-- ONE LIVE REGION FOR EVERY TOGGLETIP IN THE APP (decision 024), and it
            is here rather than in the panel because #panel is `hidden` until a
            photograph opens and a region inside a hidden ancestor is not in the
@@ -145,6 +160,12 @@
            whole reason the pattern needs one standing. src/toggletip.ts writes
            the revealed sentence into it and clears it again on dismiss. -->
       <p id="tipLive" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+      <!-- THE HELD BALANCE'S OWN LIVE REGION (decision 101), standing here for the reason
+           the one above stands here: #panel is `hidden` until a photograph opens, and a
+           region inside a hidden ancestor is not in the accessibility tree. Present from
+           parse and empty at rest; src/main.ts writes into it when a balance is held,
+           let go, put on the set, picked or forgotten. -->
+      <p id="balLive" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
 
       <main id="stage">
         <h1 class="sr-only">Infrared photo editor</h1>
@@ -688,10 +709,43 @@
                  point (042), so while a mask is picked this takes the place of
                  the three gains below. -->
             <label id="maskWarmthRow" hidden>Warmth <input id="maskWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+            <!-- TEMPERATURE AND TINT ARE THE THREE GAINS BELOW, READ TWO OTHER WAYS (decision
+                 101): one state, so moving either one moves the gain sliders on screen and
+                 moving a gain slider moves these. Each has its number beside it, typeable. They
+                 are the app's own scale and not Kelvin (src/balancestore.ts says how they are
+                 read off the gain track), and they hide with the gains while a mask is picked,
+                 because a mask gets a warmth of its own and never a whole-photo white point.
+                 No input here carries a placeholder: a hint inside a box is gone the moment
+                 something is typed in it, and the typed number is the answer. -->
+            <div class="bal-row" id="balRowT">
+              <label>Temperature <small>red against blue</small> <input id="balT" type="range" min="-300" max="300" step="1" value="0" /></label>
+              <input id="balTNum" class="bal-num" type="number" inputmode="decimal" step="any" aria-label="Temperature, typed" />
+            </div>
+            <div class="bal-row" id="balRowTi">
+              <label>Tint <small>magenta against green</small> <input id="balTi" type="range" min="-200" max="200" step="1" value="0" /></label>
+              <input id="balTiNum" class="bal-num" type="number" inputmode="decimal" step="any" aria-label="Tint, typed" />
+            </div>
             <label>Red gain <input id="wbR" type="range" min="0" max="1300" step="1" value="585" /></label>
             <label>Green gain <input id="wbG" type="range" min="0" max="1300" step="1" value="585" /></label>
             <label>Blue gain <input id="wbB" type="range" min="0" max="1300" step="1" value="585" /></label>
             <p class="note">Tip: tap foliage in the image to set white balance.</p>
+            <!-- HOLD A BALANCE FOR EVERY RAW (decision 101). While one is held the standing
+                 line under the top bar (#balStrip) says so and names it, with the way out
+                 beside it; every raw opened after that opens at the held gains, on the five
+                 sliders above, undoable, with Reset going back to where the photograph opened.
+                 Camera-rendered files are not touched. The list of kept balances is inline on
+                 purpose: a new dialog would be a new surface for the walk's list, and nothing
+                 here needs one. -->
+            <div class="bal-hold" id="balHold">
+              <button id="balHoldBtn" type="button" class="toggle full-btn" aria-pressed="false">Hold this balance for every raw</button>
+              <label class="bal-name">Name for the balance <input id="balName" type="text" maxlength="40" autocomplete="off" /></label>
+              <button id="balApply" type="button" class="full-btn" disabled>Put the held balance on every photo in this set</button>
+              <div id="balKeptRow" hidden>
+                <h3 class="mask-saved-title">Kept balances</h3>
+                <div id="balKept" class="mask-list"></div>
+              </div>
+              <p class="note">Temperature and Tint are this app's own scale, not Kelvin. Temperature is the red gain against the blue and Tint is the green gain against the other two, each counted in equal steps of the gain sliders, and moving either leaves the picture as bright as it was. Hold keeps the balance you have for every raw you open next. Put it on the set applies it to the photographs already open, as one step you can undo on each. A held balance is kept under its name, here and on the next day, whatever card the photographs come from. Photographs the camera has already developed (JPEG, HEIC) are never touched.</p>
+            </div>
             <label>Recover highlights <input id="recover" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <p class="note">Takes the false colour out of genuinely blown (sensor-clipped) areas for your current white balance, keeping their brightness &mdash; where every colour clipped the area goes clean neutral, and where only one did, the colour the others recorded stays. It re-aims live as you rebalance. Set automatically at open when the frame has clipping; 0 = untouched.</p>
             <!-- A DIAGNOSTIC, NOT A PROMISE — misdescribed until that was pointed out.
@@ -1516,7 +1570,7 @@
            src/raw/nef.ts and src/raw/dngRaw.ts (levels from the file's own
            tags), color.ts sensorPitchMicrons
            (diffraction.cam) and hotspotProfiles.ts (the app's own lens rig). -->
-      <p class="note">Where the numbers come from: a DNG's colour is converted with the camera matrix it carries; a Nikon NEF carries none, so the Z&nbsp;50 uses Adobe's published matrix and the D5300 the one Rob Shea's <em>Infrared Temp &minus;100</em> profile writes. Black and white levels are read from the file itself. The diffraction limits are from Rob Shea's <a href="https://diffraction.cam" target="_blank" rel="noopener">diffraction.cam</a>, and the lens profiles that ship were measured with this app's own lens rig.</p>
+      <p class="note">Where the numbers come from: a DNG's colour is converted with the camera matrix it carries; a Nikon NEF carries none, so the Z&nbsp;50 uses Adobe's published matrix and the D5300 the one Rob Shea's <em>Infrared Temp &minus;100</em> profile writes. Black and white levels are read from the file itself. Temperature and Tint on the Basic tab are this app's own scale, not Kelvin. The diffraction limits are from Rob Shea's <a href="https://diffraction.cam" target="_blank" rel="noopener">diffraction.cam</a>, and the lens profiles that ship were measured with this app's own lens rig.</p>
       <p class="more-row">
         <a href="./fonts/OFL.txt" target="_blank" rel="noopener">Fonts &mdash; SIL Open Font License &rarr;</a>
       </p>
@@ -1755,6 +1809,7 @@
           sends them straight into an editable session.</li>
           <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, blown-highlight recovery when the frame needs it, and <strong>Restore depth</strong>); JPEG/HEIC open as the camera rendered them, with measured denoise only &mdash; until you pick a Look, which balances them first, because a false-colour look needs colours something has already pulled apart. A camera file with all its colour in ONE band is the exception: balancing it invents the second band by crushing red, so the app leaves it alone, says so beside the looks, and offers <strong>Balance it anyway</strong> if you want that rendering on that photograph. Every one of those lands on a slider you can see and undo, your original file is never changed, and <strong>Hold: the bare decode</strong> on the Basic tab shows the photograph with those automatics off any time.</li>
           <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move. Tapping a blown-out spot is refused and says so: there is no colour recorded in it to balance from.</li>
+          <li><strong>Hold a balance for every raw.</strong> Once a photograph looks right, press <strong>Hold this balance for every raw</strong> on the Basic tab and each raw you open next starts there instead of at its own automatic balance. While one is held, a line under the top bar says so and names it, on every tab, with <strong>Back to the automatic</strong> beside it to end it. The Temperature, Tint and gain sliders show the held balance, and Undo and Reset work on it. <strong>Put the held balance on every photo in this set</strong> does the same for the photographs already open. A held balance is kept under a name on this device, so another day or another card can use it. Temperature and Tint are this app's own scale, not Kelvin.</li>
           <li><strong>The usual shortcuts work.</strong> <strong>Cmd/Ctrl&#8202;+&#8202;Z</strong> undoes and <strong>Cmd&#8202;+&#8202;Shift&#8202;+&#8202;Z</strong> (or <strong>Ctrl&#8202;+&#8202;Y</strong>) redoes. You can <strong>drag photos onto the window</strong> or <strong>paste</strong> one to open it. <strong>Esc</strong> closes any panel, and on a home-screen install the <strong>Back</strong> gesture closes the panel instead of leaving the app.</li>
           <li><strong>Double-tap any slider</strong> to put it back where the photo opened. Most of them don't start at zero — white balance, exposure and denoise open at values measured from your frame — so this returns that one slider to its opening value, the way <strong>Reset</strong> does for all of them at once. Quality goes back to its usual setting instead, since that one is yours rather than the photo's. Restore depth strength goes back to 100% — the full correction worked out for the frame in front of you, which is where every photo opens. Lens correction strength goes back to 1, the full correction, for the same reason, or to 0 on a photo whose lens has no profile.</li>
           <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>

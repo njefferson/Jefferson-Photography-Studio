@@ -77,6 +77,7 @@ import { findTilt } from "./straighten";
 import { getPreview, putPreview, prunePreviews, clearPreviews, previewStats, PREVIEW_PIPELINE } from "./previewcache";
 import { fnv1a } from "./stamp";
 import * as LensStore from "./lensstore";
+import * as Balance from "./balancestore";
 import { readExifSubset, type ExifSubset } from "./exif";
 import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
 import {
@@ -642,6 +643,34 @@ const ui = {
   lookSepia: $("lookSepia") as HTMLButtonElement,
   lookHie: $("lookHie") as HTMLButtonElement,
 };
+
+/** THE BALANCE CONTROLS' ELEMENTS (decision 101): Temperature and Tint with their typed numbers, the hold, its name, the standing strip
+ *  with its sentence and its exit, the set button, the kept list and the standing live region. Declared here, beside `ui`, because
+ *  `syncToUI` reaches them and runs early. The strip is outside the panel (a row of its own under the top bar), so every tab and the
+ *  stage show it. */
+const balUi = {
+  t: $("balT") as HTMLInputElement,
+  tNum: $("balTNum") as HTMLInputElement,
+  ti: $("balTi") as HTMLInputElement,
+  tiNum: $("balTiNum") as HTMLInputElement,
+  rowT: $("balRowT") as HTMLElement,
+  rowTi: $("balRowTi") as HTMLElement,
+  hold: $("balHoldBtn") as HTMLButtonElement,
+  name: $("balName") as HTMLInputElement,
+  apply: $("balApply") as HTMLButtonElement,
+  back: $("balBack") as HTMLButtonElement,
+  strip: $("balStrip") as HTMLElement,
+  held: $("balHeld") as HTMLElement,
+  keptRow: $("balKeptRow") as HTMLElement,
+  kept: $("balKept") as HTMLElement,
+  live: $("balLive") as HTMLElement,
+};
+
+/** WHAT THE BALANCE CONTROLS REMEMBER BETWEEN PRESSES. `held` is the kept balance every raw opens at (null when none), read from the
+ *  store by `refreshHeld`; `keep` is the slider the reader's hand is on, which `updateBalanceUI` leaves alone so a thumb under a finger is
+ *  not moved to the nearest grid point mid-drag; `nameDefault` is the date-and-time name the box was last given, so a name the reader typed
+ *  is told from one the app wrote. An object rather than three `let`s, because `syncToUI` reads it before the module has run its way down. */
+const balState: { held: Balance.KeptBalance | null; keep: HTMLInputElement | null; nameDefault: string } = { held: null, keep: null, nameDefault: "" };
 
 const hsUi = {
   card: $("hsCard") as HTMLElement,
@@ -1735,6 +1764,7 @@ function syncFromUI() {
   updateToneWidget();
   updateToneChanUI(); // the "adjusted" badge tracks live slider drags
   updateBandLabels();
+  updateBalanceUI(); // Temperature and Tint are views of the gains just read (decision 101)
   draw();
 }
 
@@ -1753,6 +1783,7 @@ function syncToUI() {
   ui.wbR.value = String(toPos(params.wb[0], WB_LO, WB_HI, WB_STEPS));
   ui.wbG.value = String(toPos(params.wb[1], WB_LO, WB_HI, WB_STEPS));
   ui.wbB.value = String(toPos(params.wb[2], WB_LO, WB_HI, WB_STEPS));
+  updateBalanceUI(); // and the two numbers they stand for, with the hold's state
   ui.expo.value = String(toPos(params.exposure, EX_LO, EX_HI));
   ui.dn.value = String(params.denoise);
   ui.chroma.value = String(params.chroma ?? 0);
@@ -1844,6 +1875,340 @@ ui.irAutoWb.addEventListener("click", () => {
   draw();
   flushRecord();
 });
+
+// --- TEMPERATURE, TINT AND THE HELD BALANCE (decision 101, option 3 with option 2 beneath it) ---------------------------------
+// The camera's own balance cannot be had from its raw file (IR-SCIENCE.md section 3), so the one that suits a scene is found by the
+// reader, on one photograph, and then wanted on the next. These controls are that: Temperature and Tint are the gains read two more
+// ways, a balance can be HELD so every raw that opens afterwards starts at it, put on the photographs already open, and kept under a
+// name that survives a reload, a new session and another card. src/balancestore.ts has the scale and the store; this is the page's side.
+
+/** Read the held balance from the store into `balState`. Takes nothing and returns nothing. What it must satisfy: after it,
+ *  `balState.held` is null or a kept balance that passed `balanceProblem`, so the open path can put its gains straight on a photograph. */
+function refreshHeld(): void {
+  balState.held = Balance.heldBalance();
+}
+
+/** Say something through the standing live region, so a reader on a screen reader hears the hold's state change.
+ *  @param words  the sentence. Returns nothing. The region is emptied first so the same sentence said twice is still heard. */
+function announceBalance(words: string): void {
+  balUi.live.textContent = "";
+  window.requestAnimationFrame(() => { balUi.live.textContent = words; });
+}
+
+/** A number as the typed boxes show it: one decimal, and never a minus sign on a zero. @param v  the number. @returns its text. */
+function balText(v: number): string {
+  return (Math.abs(v) < 0.05 ? 0 : v).toFixed(1);
+}
+
+/** A reading as the thumb shows it: the nearest whole number, with a half going up and the float noise of a logarithm (a reading that is
+ *  half a step away to twelve places) not deciding which way. @param v  the reading. @returns a whole number. What it must satisfy: the
+ *  thumb is set from it (`updateBalanceUI`) and a move is measured from it (`balanceInput`), so the two cannot disagree. */
+function balRound(v: number): number {
+  return Math.round(v + 1e-6);
+}
+
+/** Put the three gain sliders where `params.wb` stands, and nothing else. Takes nothing and returns nothing. What it must satisfy: the
+ *  same three writes `syncToUI` makes, so a Temperature or Tint move shows on the gains without waiting for the whole panel to be rewritten. */
+function syncWbSliders(): void {
+  ui.wbR.value = String(toPos(params.wb[0], WB_LO, WB_HI, WB_STEPS));
+  ui.wbG.value = String(toPos(params.wb[1], WB_LO, WB_HI, WB_STEPS));
+  ui.wbB.value = String(toPos(params.wb[2], WB_LO, WB_HI, WB_STEPS));
+}
+
+/** Show the open photograph's balance as Temperature and Tint, and show the hold. Takes nothing and returns nothing.
+ *  What it must satisfy: the two sliders and their numbers are the gains in `params.wb` read by `readBalance`, so they agree with the three
+ *  gain sliders whatever last moved them (a tap, Undo, a look, a slider); the slider in `balState.keep` is left where the hand put it,
+ *  and a number box with the focus is left to be typed in; the standing strip (its sentence and its exit, outside the panel so every tab
+ *  and the stage show it), the hold button's pressed state and the set button follow `balState.held`. */
+function updateBalanceUI(): void {
+  const r = Balance.readBalance(params.wb);
+  const place = (v: number, lim: number) => String(Math.max(-lim, Math.min(lim, balRound(v))));
+  if (balState.keep !== balUi.t) balUi.t.value = place(r.t, Balance.TEMPERATURE_LIMIT);
+  if (balState.keep !== balUi.ti) balUi.ti.value = place(r.ti, Balance.TINT_LIMIT);
+  if (document.activeElement !== balUi.tNum) balUi.tNum.value = balText(r.t);
+  if (document.activeElement !== balUi.tiNum) balUi.tiNum.value = balText(r.ti);
+  const held = balState.held;
+  balUi.hold.setAttribute("aria-pressed", String(!!held));
+  balUi.strip.hidden = !held;
+  balUi.held.textContent = held ? `A balance is held: ${held.name}. Every raw you open now starts at it.` : "";
+  balUi.apply.disabled = !held || !current;
+}
+
+/** A Temperature or Tint move by the reader's hand: the slider, or a number typed into its box.
+ *  @param axis  "t" for Temperature, "ti" for Tint.
+ *  @param source  "slider" for the range input's own events, "number" for the typed box's change.
+ *  Returns nothing. Writes `params.wb` through `moveBalance`, so the gains land on whole track positions with their geometric mean
+ *  unchanged and the exposure untouched.
+ *  What it must satisfy: a control pressed at the value it already shows moves nothing (the rule `slider-own-value-walk` holds for every
+ *  slider); the other axis keeps its exact reading, so moving Temperature never drags Tint; and the move is drawn at once, with the
+ *  slider's drag coalesced into one undo step by `draw` and a typed number recorded as its own step.
+ *  A SLIDER MOVES THE BALANCE BY HOW FAR IT WAS MOVED, a typed number says where the balance goes. The thumb shows the reading rounded
+ *  to a whole number, and a reading can sit half a step away from it (Temperature is half a track step wherever the red and blue
+ *  positions differ by an odd number), so asking for the thumb's new whole number outright would sometimes ask for a point as near the
+ *  old one as the new one and move nothing. The move is the thumb's distance from the value it was showing, added to the reading, which
+ *  lands on a grid point whenever the reading is on one. A typed number is an absolute ask and lands on the nearest point the grid has. */
+function balanceInput(axis: "t" | "ti", source: "slider" | "number"): void {
+  const slider = axis === "t" ? balUi.t : balUi.ti;
+  const box = axis === "t" ? balUi.tNum : balUi.tiNum;
+  if (!current) { updateBalanceUI(); return; }
+  const cur = Balance.readBalance(params.wb);
+  const here = axis === "t" ? cur.t : cur.ti;
+  const lim = axis === "t" ? Balance.TEMPERATURE_LIMIT : Balance.TINT_LIMIT;
+  const typed = source === "number";
+  if (typed && box.value.trim() === "") { updateBalanceUI(); return; }
+  const raw = Number(typed ? box.value : slider.value);
+  if (!Number.isFinite(raw)) { updateBalanceUI(); return; }
+  const shown = typed ? Number(balText(here)) : Math.max(-lim, Math.min(lim, balRound(here)));
+  if (raw === shown) return; // pressed at the value it already shows
+  const target = typed ? raw : here + (raw - shown);
+  params.wb = Balance.moveBalance(axis === "t" ? { t: target, ti: cur.ti } : { t: cur.t, ti: target }, params.wb);
+  balState.keep = typed ? null : slider;
+  syncWbSliders();
+  updateBalanceUI();
+  balState.keep = null;
+  if (typed) box.value = balText(Balance.readBalance(params.wb)[axis]);
+  draw();
+  if (typed) flushRecord();
+}
+for (const [axis, slider, box] of [["t", balUi.t, balUi.tNum], ["ti", balUi.ti, balUi.tiNum]] as const) {
+  slider.addEventListener("input", () => balanceInput(axis, "slider"));
+  box.addEventListener("change", () => balanceInput(axis, "number"));
+}
+
+/** The open photograph's balance WITHOUT any look's bias, on the gain sliders' grid.
+ *  Takes nothing. Returns the three gains `params.wb` holds divided by the bias the active look baked in (`lookBias`), each put on the
+ *  track. What it must satisfy: it is what a hold keeps, so a balance held while Red or Goldie is on is the white point under the look,
+ *  and opening a raw under that look multiplies the bias back on (`applyLook`). */
+function currentBaseGains(): Balance.Gains {
+  return [0, 1, 2].map((i) => snapGain(clamp(params.wb[i] / lookBias[i], WB_LO, WB_HI))) as Balance.Gains;
+}
+
+/** The name a hold will be kept under.
+ *  Takes nothing. Returns what the reader typed in the name box, cut to the longest name allowed, or, when the box still holds the name the
+ *  app gave it (or nothing), a fresh one from the device's date and time, which it also remembers as the box's default.
+ *  What it must satisfy: never empty. */
+function nameForHold(): string {
+  const typed = balUi.name.value.trim();
+  if (typed && typed !== balState.nameDefault) return typed.slice(0, Balance.NAME_MAX);
+  balState.nameDefault = Balance.defaultBalanceName(new Date());
+  return balState.nameDefault;
+}
+
+/** Put a held balance's gains on the OPEN photograph, as one undoable step.
+ *  @param gains  the held gains, without any look's bias.
+ *  Returns nothing, and does nothing for a photograph the camera developed (the hold never touches those). The look's bias is multiplied
+ *  back on; the exposure is re-measured so the frame's own grey keeps the brightness it had (`exposureHoldingNeutral`, as the tap and
+ *  the IR tab's Auto do), then put on its slider's grid.
+ *  What it must satisfy: afterwards the five sliders show the gains, Undo returns to the balance before, and Reset still returns to
+ *  where the photograph opened. */
+function applyBalanceToOpen(gains: Balance.Gains): void {
+  if (!current || !current.isRaw) return;
+  flushRecord();
+  const next = gains.map((g, i) => snapGain(clamp(g * lookBias[i], WB_LO, WB_HI))) as Balance.Gains;
+  params.exposure = snapExposure(clamp(exposureHoldingNeutral(current, grayWorldMeans(current), params.wb, params.exposure, next), EX_LO, EX_HI));
+  params.wb = next;
+  syncToUI();
+  draw();
+  flushRecord();
+}
+
+/** Redraw the list of kept balances. Takes nothing and returns nothing. What it must satisfy: the row of the held balance says so in words
+ *  ("Held") as well as by its fill, a row's second button forgets only that balance and says whose in its name, and the whole list is
+ *  hidden while nothing is kept, so the panel carries no empty heading for a feature nobody has used. */
+function renderBalanceKept(): void {
+  const list = Balance.listBalances();
+  balUi.keptRow.hidden = list.length === 0;
+  balUi.kept.replaceChildren(
+    ...list.map((b) => {
+      const isHeld = balState.held?.id === b.id;
+      const row = document.createElement("div");
+      row.className = "mask-row";
+      const use = document.createElement("button");
+      use.type = "button";
+      use.className = "mask-pick" + (isHeld ? " active" : "");
+      use.setAttribute("aria-pressed", String(isHeld));
+      use.textContent = isHeld ? `Held · ${b.name}` : b.name;
+      use.title = "Hold this balance and put it on the open photograph";
+      use.addEventListener("click", () => useKeptBalance(b.id));
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "mask-del";
+      del.textContent = "×";
+      del.setAttribute("aria-label", `Forget ${b.name}`);
+      del.addEventListener("click", () => forgetKeptBalance(b.id));
+      row.append(use, del);
+      return row;
+    }),
+  );
+}
+
+/** Pick a kept balance: hold it, and put it on the open photograph if that is a raw.
+ *  @param id  the kept balance's id. Returns nothing; a balance that has gone from the store since the list was drawn redraws the list and
+ *  says nothing else. What it must satisfy: one undo step on the open photograph at most, and the hold, the list and the standing line
+ *  agree afterwards. */
+function useKeptBalance(id: string): void {
+  const rec = Balance.listBalances().find((b) => b.id === id);
+  if (!rec) { renderBalanceKept(); return; }
+  Balance.setHeld(id);
+  refreshHeld();
+  balUi.name.value = rec.name;
+  applyBalanceToOpen(rec.gains);
+  updateBalanceUI();
+  renderBalanceKept();
+  announceBalance(`Holding ${rec.name}. Every raw you open now starts at it.`);
+}
+
+/** Forget a kept balance; if it is the held one the hold ends with it. @param id  the kept balance's id. Returns nothing; says what it did. */
+function forgetKeptBalance(id: string): void {
+  const rec = Balance.listBalances().find((b) => b.id === id);
+  const wasHeld = balState.held?.id === id;
+  Balance.removeBalance(id);
+  refreshHeld();
+  updateBalanceUI();
+  renderBalanceKept();
+  announceBalance(rec ? `Forgot ${rec.name}.${wasHeld ? " It was the held balance, so raws open at their own automatic balance again." : ""}` : "That balance was already gone.");
+}
+
+balUi.hold.addEventListener("click", () => {
+  if (balState.held) {
+    Balance.setHeld(null);
+    refreshHeld();
+    updateBalanceUI();
+    renderBalanceKept();
+    announceBalance("No balance is held now. Raws open at their own automatic balance again.");
+    return;
+  }
+  if (!current) { toast("Open a raw photograph first, then hold the balance you set on it.", 3600); return; }
+  if (!current.isRaw) {
+    toast("This photograph was developed by the camera, so its balance is not an infrared white point. Hold a balance set on a raw.", 4600);
+    return;
+  }
+  const rec = Balance.keepBalance(nameForHold(), currentBaseGains());
+  if (!rec) { toast("This browser would not keep the balance, so it cannot be held.", 4200); return; }
+  Balance.setHeld(rec.id);
+  refreshHeld();
+  balUi.name.value = rec.name;
+  updateBalanceUI();
+  renderBalanceKept();
+  announceBalance(`Holding ${rec.name}. Every raw you open now starts at it.`);
+});
+
+balUi.back.addEventListener("click", () => {
+  const was = balState.held;
+  Balance.setHeld(null);
+  refreshHeld();
+  if (current && current.isRaw) {
+    flushRecord();
+    // The automatic for THIS photograph, as it opens without a hold: gray-world gains and the exposure measured for them, each put on
+    // its slider's grid so the sliders read back exactly what the open wrote.
+    const next = grayWorldWB(current).map(snapGain) as Balance.Gains;
+    params.wb = next;
+    params.exposure = snapExposure(clamp(autoExposure(current, next), EX_LO, EX_HI));
+    lookBias = [1, 1, 1];
+    lookWb = null;
+    syncToUI();
+    draw();
+    flushRecord();
+  } else updateBalanceUI();
+  renderBalanceKept();
+  // The strip this button sat in is hidden now. Hand the focus to the Hold button when the Basic tab is showing it, so the focus is not
+  // dropped on the page; from any other tab there is nothing of this feature on screen to hand it to.
+  if (balUi.hold.getClientRects().length > 0) balUi.hold.focus({ preventScroll: true });
+  announceBalance(`${was ? `Stopped holding ${was.name}. ` : ""}The open photograph is back at its automatic balance, and raws open at their own again.`);
+});
+
+/** The edit JSON a photograph that is not open is stored as, rebuilt from its in-memory edit.
+ *  @param live  the photograph's live edit.
+ *  @returns the same text `editToJson` writes for the open photograph (masks, an imported LUT and a warp left out, the LUT named by its
+ *  reference). What it must satisfy: `activateCurrentNow` reads it back as it reads any stored edit, so a resumed session and a return to
+ *  the photograph agree. Consumer: `rewriteBalance`. */
+function editJsonFromLive(live: LiveEdit): string {
+  const s = live.snapshot;
+  return JSON.stringify({
+    params: { ...s.params, masks: [], lut: null, warp: null },
+    lutRef: s.params.lut ? { id: s.params.lut.id, strength: s.params.lut.strength } : null,
+    activeLook: s.activeLook, lookBias: s.lookBias, lookMark: live.lookMark ?? null,
+    rot: live.rot, flip: live.flip,
+  });
+}
+
+/** Put the held gains on a photograph that is not open, if it is a raw with an edit.
+ *  @param v  the photograph's place in the strip.
+ *  @param held  the held gains, without any look's bias.
+ *  @returns true when its edit changed, false when it has none yet (it will open at the held balance on its own), has no usable balance,
+ *  or already stands at it. The photograph cannot be measured without decoding it, so its exposure keeps the OVERALL level it had
+ *  (`levelHeldExposure`): gain times exposure holds its geometric mean, and the look's bias is multiplied back on.
+ *  What it must satisfy: a photograph with a live edit gets ONE undo step (the settled state goes onto its history, the new one becomes
+ *  settled, its redo future is dropped), Reset still returns it to where it opened, and its stored copy is rewritten so a resumed session
+ *  agrees. A photograph with only a stored edit takes the change in that copy, as a resumed edit does. */
+function rewriteBalance(v: SessionPhoto, held: Balance.Gains): boolean {
+  const aim = (was: number[], exposure: number, bias: number[]): { wb: Balance.Gains; exposure: number } | null => {
+    if (was.length !== 3 || !was.every((g) => Number.isFinite(g) && g > 0) || !Number.isFinite(exposure)) return null;
+    // A DNG that opened only as the camera's own preview opens at gains of exactly 1 and an exposure of exactly 1, which no raw's gray-world
+    // balance is; that photograph is camera-developed and the hold never touches it.
+    if (was.every((g) => Math.abs(g - 1) < 1e-9) && Math.abs(exposure - 1) < 1e-9) return null;
+    const next = held.map((g, i) => snapGain(clamp(g * (bias[i] ?? 1), WB_LO, WB_HI))) as Balance.Gains;
+    if (next.every((g, i) => Math.abs(g / was[i] - 1) < 1e-9)) return null; // already there
+    return { wb: next, exposure: snapExposure(clamp(Balance.levelHeldExposure([was[0], was[1], was[2]], exposure, next), EX_LO, EX_HI)) };
+  };
+  const live = liveEdits.get(v.id);
+  if (live) {
+    const s = live.snapshot;
+    const to = aim(s.params.wb, s.params.exposure, s.lookBias);
+    if (!to) return false;
+    live.undo.push(live.settled);
+    if (live.undo.length > HISTORY_MAX) live.undo.shift();
+    live.redo.length = 0;
+    live.snapshot = { ...s, params: { ...s.params, wb: to.wb, exposure: to.exposure } };
+    live.settled = { ...live.snapshot };
+    v.edit = editJsonFromLive(live);
+    Session.setEdit(v.id, v.edit).catch(() => {});
+    return true;
+  }
+  if (!v.edit) return false;
+  try {
+    const o = JSON.parse(v.edit) as { params?: { wb?: number[]; exposure?: number }; lookBias?: number[] };
+    const p = o.params;
+    if (!p || !Array.isArray(p.wb) || typeof p.exposure !== "number") return false;
+    const to = aim(p.wb, p.exposure, Array.isArray(o.lookBias) ? o.lookBias : [1, 1, 1]);
+    if (!to) return false;
+    p.wb = to.wb;
+    p.exposure = to.exposure;
+    v.edit = JSON.stringify(o);
+    Session.setEdit(v.id, v.edit).catch(() => {});
+    return true;
+  } catch {
+    return false; // a corrupt stored edit is left as it is, as the restore leaves it
+  }
+}
+
+balUi.apply.addEventListener("click", () => {
+  const held = balState.held;
+  if (!held || !current) return;
+  const openIsRaw = current.isRaw;
+  applyBalanceToOpen(held.gains);
+  let others = 0;
+  for (const v of sessionPhotos) {
+    if (v.id === activePhotoId || v.id === "lone") continue;
+    if (v.kind !== "dng" && v.kind !== "nef") continue; // camera-developed files are never touched
+    if (rewriteBalance(v, held.gains)) { v.thumbState = "waiting"; others++; }
+  }
+  // THE STRIP IS REDRAWN. A tile is a claim about what opening that photograph shows, and the tiles of the photographs just changed are now
+  // wrong; marking them waiting hands them to the same quiet-gated pass a look press uses, which leaves the old picture up until the new lands.
+  const mine = sessionPhotos.find((p) => p.id === activePhotoId);
+  const redraw = others + (openIsRaw && mine && mine.id !== "lone" ? 1 : 0);
+  if (openIsRaw && mine && mine.id !== "lone") mine.thumbState = "waiting";
+  if (redraw) { thumbIdleGate = true; void realThumbnails(); }
+  const parts = [openIsRaw ? "the open photograph" : "", others ? `${others} other photograph${others === 1 ? "" : "s"} in this set` : ""].filter(Boolean);
+  announceBalance(parts.length
+    ? `${held.name} is now on ${parts.join(" and ")}. Each can be undone.`
+    : "Nothing needed changing: no other raw in this set has been edited yet, and each opens at the held balance on its own.");
+});
+
+refreshHeld();
+balUi.name.value = balState.nameDefault = Balance.defaultBalanceName(new Date());
+renderBalanceKept();
+updateBalanceUI();
 
 // One-tap looks. Tuned on real Z50-IR files; raw (camera-native) sources take
 // the full-strength recipe, JPEGs a gentler one — camera JPEGs already carry
@@ -4915,6 +5280,23 @@ function editValuesLine(): string {
   return rows.map((r) => `${(used.get(r.name) ?? 0) > 1 ? `${r.name} [${r.id}]` : r.name} ${r.value}`).join(" · ");
 }
 
+/** THE HELD BALANCE, FOR THE REPORT (decision 101).
+ *  Takes nothing; reads `balState.held`, the store's list and the open photograph's gains. Returns one sentence: "none held" with the
+ *  count kept, or the held balance's name, its three gains and its Temperature and Tint, each followed by what the open photograph reads
+ *  now, in the app's own scale (never Kelvin). A kept record the store had to set aside as unusable is counted, never hidden.
+ *  What it must satisfy: the five numbers it prints are the ones the sliders show, so a report can be matched to the screen by eye, and it
+ *  holds no photograph's name. The balance's own name is the reader's text and is printed on purpose. Consumer: the report's Held balance row. */
+function heldBalanceLine(): string {
+  const kept = Balance.listBalances().length;
+  const dropped = Balance.droppedBalances ? `; ${Balance.droppedBalances} unusable record${Balance.droppedBalances === 1 ? "" : "s"} set aside` : "";
+  const r = Balance.readBalance(params.wb);
+  const now = current ? `the open photograph reads Temperature ${balText(r.t)} and Tint ${balText(r.ti)}` : "nothing open";
+  const h = balState.held;
+  if (!h) return `none held, so raws open at their own automatic balance; ${kept} kept; ${now}${dropped}`;
+  const hr = Balance.readBalance(h.gains);
+  return `"${h.name}" — red ${h.gains[0].toFixed(4)} · green ${h.gains[1].toFixed(4)} · blue ${h.gains[2].toFixed(4)}, Temperature ${balText(hr.t)} and Tint ${balText(hr.ti)} (the app's own scale, not Kelvin); every raw opens at it; ${kept} kept; ${now}${dropped}`;
+}
+
 /** WHICH LOOK THE PHOTOGRAPH WEARS, by the name its button prints.
  *  Takes nothing; reads `activeLook`, `lookMark` and `params.swapRB`. Returns the
  *  look's button name or "none", whether the grade is still as the look left it, and
@@ -5081,7 +5463,10 @@ function wireVersionMenu() {
       // gray-world balance, the exposure, the denoise measurement and the sky
       // selection read it. The walk reads these two lines back.
       { k: "Correction order", v: current?.linear ? `on the linear raw at decode, before the balance and the selection — ${current.lensApplied?.gains ? `strength ${current.lensApplied.strength} laid on the pixels` : "nothing laid on the pixels (no profile matched, or the strength is set to 0)"}` : current ? "inside the grade — an 8-bit source has no linear copy to correct first" : "nothing open" },
-      { k: "Balance", v: current ? `white balance ${params.wb.map((x) => x.toFixed(4)).join(" · ")} — the at-open gray-world unless moved since` : "nothing open" },
+      { k: "Balance", v: current ? `white balance ${params.wb.map((x) => x.toFixed(4)).join(" · ")} — the balance it opened at (gray-world, or the held one) unless moved since` : "nothing open" },
+      // THE HELD BALANCE (decision 101): whether raws open at one, which, its name, its gains and its Temperature and Tint, and what the
+      // open photograph reads now. The name is the reader's own text, printed on purpose so the report says which balance was held.
+      { k: "Held balance", v: heldBalanceLine() },
       // EVERY SLIDER BY ITS NAME, as the open and the lift left it (`editValuesLine`).
       { k: "Edit values", v: editValuesLine() },
       // WHAT THE SHADOWS ARE LIT BY, which one white balance cannot answer: in
@@ -8113,6 +8498,9 @@ function applyMaskTargetUI(): void {
   updateGradeUI();
   maskWarmthRow.hidden = !m;
   for (const r of wbGainRows) r.hidden = !!m;
+  // Temperature and Tint are the same three gains read two other ways, so they stand down on the same condition (decision 101).
+  balUi.rowT.hidden = !!m;
+  balUi.rowTi.hidden = !!m;
   // Inert: undo whatever the last pick set, then set it again for this one.
   document.querySelectorAll("[data-mask-inert]").forEach((el) => {
     (el as HTMLElement).inert = false;
@@ -12931,6 +13319,16 @@ function establishFreshEdit() {
   params.exposure = base.exposure;
   params.recover = base.recover;
   params.swapRB = base.swapRB;
+  // A HELD BALANCE REPLACES THE AUTOMATIC ONE FOR A RAW (decision 101). With none held a raw opens exactly as it always has, at the
+  // gray-world gains; with one held it opens at the held gains and the exposure measured for them, so the gains the sliders show are the
+  // held ones, the reader can undo them, and Reset (taken at the end of this function) returns to where the photograph opened. This runs
+  // BEFORE the sliders round the measurements to their grids and before the session's look is applied, so the look and the lift solve
+  // against the balance the photograph will really show. A camera-developed file is never touched: its balance is not an infrared one.
+  refreshHeld();
+  if (src.isRaw && balState.held) {
+    params.wb = [...balState.held.gains];
+    params.exposure = autoExposure(src, params.wb);
+  }
   params.denoise = estimateDenoise(src);
   // A photograph opens with no lens picked by hand: a pick is this edit's, and
   // the last photograph's must not reach this one (085's follow-through).

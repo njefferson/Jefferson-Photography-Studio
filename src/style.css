@@ -76,12 +76,16 @@ body {
 #app {
   display: grid;
   grid-template-columns: 1fr 352px;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   /* The update strip is its own ROW rather than something floating over the
      photo: §7h wants the reader told, and a notice laid over the picture in a
      photo editor is a notice that gets dismissed without being read. Hidden it
-     is display:none, so the row measures 0 and the layout is unchanged. */
-  grid-template-areas: "bar bar" "swstrip swstrip" "stage panel";
+     is display:none, so the row measures 0 and the layout is unchanged.
+     THE HELD BALANCE'S LINE (decision 101) IS A ROW OF ITS OWN BENEATH IT, for
+     the same reason, and it is declared in all three templates below (this one,
+     the phone one and the full-view one) because an area missing from the
+     template in force sends its item into the implicit grid. */
+  grid-template-areas: "bar bar" "swstrip swstrip" "balstrip balstrip" "stage panel";
   height: 100dvh;
 }
 /* Placement only — the strip's look is src/swstrip.css, shared by all three
@@ -482,6 +486,68 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   color: var(--txt);
   font: 500 0.9375rem/1.2 var(--ui);
 }
+/* THE BALANCE CONTROLS (decision 101): Temperature and Tint with a typed number beside each, and the hold.
+   Calibrated tokens only, so nothing here adds a pairing the palette spec does not already list, and type
+   in rem. The number boxes are 16px or larger on purpose: a smaller one makes iOS zoom the page on focus. */
+.bal-row { display: flex; align-items: center; gap: 8px; }
+#panel .bal-row label { flex: 1; min-width: 0; }
+.bal-num {
+  flex: none;
+  width: 5.5rem;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--txt);
+  font: 500 1rem/1.2 var(--ui);
+  text-align: center;
+}
+.bal-name input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--txt);
+  font: 500 1rem/1.2 var(--ui);
+}
+.bal-hold { margin: 6px 0 4px; }
+.bal-hold > button { margin: 6px 0; }
+/* THE HELD BALANCE'S STANDING LINE (decision 101), in a row of its own under the top bar so every tab and the
+   stage show it. It takes the update strip's look (the text token on the second surface with the second rail
+   under it, a pill button of 44px) and so adds no pairing the palette spec does not already list. The sentence
+   is the ordinary text token and never a .note, which "Explanations off" hides. The button states `width: auto`
+   because the base `button` rule above makes every button full width. */
+.bal-strip {
+  grid-area: balstrip;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-2);
+  color: var(--txt);
+  font: 0.8125rem/1.3 var(--ui);
+}
+.bal-held { flex: 1 1 14rem; min-width: 0; margin: 0; font: 600 0.8125rem/1.4 var(--ui); color: var(--txt); text-align: left; overflow-wrap: anywhere; }
+.bal-strip button {
+  flex: none;
+  width: auto;
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font: inherit;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--txt);
+  touch-action: manipulation;
+}
+.bal-strip button:active { background: var(--surface-3); }
 .look-hint { color: var(--txt-2); }
 .look-code {
   display: block;
@@ -3071,7 +3137,9 @@ button.toggletip {
      turn off rotation lock and rotate: past 760px this query stops applying
      and the template that DOES declare the area takes over. It needed a
      waiting worker to show at all, which is why it took until now to meet. */
-  #app { grid-template-columns: 1fr; grid-template-areas: "bar" "swstrip" "stage" "panel"; grid-template-rows: auto auto 1fr auto; }
+  /* The `balstrip` row is declared here too, for the reason above: the held balance's strip is placed with
+     `grid-area: balstrip` and would otherwise fall into the implicit grid exactly as the update strip once did. */
+  #app { grid-template-columns: 1fr; grid-template-areas: "bar" "swstrip" "balstrip" "stage" "panel"; grid-template-rows: auto auto auto 1fr auto; }
   #app:has(#panel[hidden]) { grid-template-columns: 1fr; }
   #panel { border-left: none; border-top: 1px solid var(--line); max-height: 45dvh; }
   /* min-width:0 on BOTH levels: the nowrap action row's min-content would
@@ -3475,9 +3543,9 @@ small { font-size: max(0.6875rem, 0.8em); }
   /* Anything whose whole job is a colour — swatches, the palette miniature —
      has to keep painting, or the picker becomes a list of identical boxes. */
   .pal-sw, .swatch, .grade-wheel { forced-color-adjust: none; }
-  /* The update strip and the lost-graphics card are notices: give them an edge
+  /* The update strip, the held balance's line and the lost-graphics card are notices: give them an edge
      so they read as separate from the page rather than dissolving into it. */
-  .sw-strip, .unsupported-card { border: 1px solid CanvasText; }
+  .sw-strip, .bal-strip, .unsupported-card { border: 1px solid CanvasText; }
 }
 
 /* ---- selection: was browser default, i.e. unverified in every palette ---- */
@@ -3650,10 +3718,11 @@ body.dbg { margin: 0; background: var(--bg); color: var(--txt); font: 400 1rem/1
    panel column rather than repositioning anything. */
 #app[data-full="1"] {
   grid-template-columns: 1fr 0;
-  grid-template-rows: 0 0 1fr;
+  grid-template-rows: 0 0 0 1fr;
 }
 #app[data-full="1"] .bar,
 #app[data-full="1"] .sw-strip,
+#app[data-full="1"] .bal-strip,
 #app[data-full="1"] #panel { display: none; }
 #app[data-full="1"] #stage {
   padding: 0;

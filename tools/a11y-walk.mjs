@@ -44,6 +44,7 @@
 //   9  the busy card offering to skip a file that has not finished reading
 //  10  the session strip offering to skip a later file of a set
 //  11  the line that says the look's sky is still being refined
+//  12  Temperature and Tint, the hold, the standing line and the way out of it
 //
 // Feature-specific a11y probes stay in the scratchpad, per release. What makes
 // this one repo-worthy is the coverage assertion: it is the only thing here
@@ -1107,6 +1108,196 @@ try {
         // AND IT GOES: the full map lands and the line empties. Polled as text.
         const gone = await page.waitForFunction(() => (document.getElementById("skyRefine")?.textContent ?? "") === "", null, { timeout: 300000, polling: 500 }).then(() => true).catch(() => false);
         if (gone) ok(`${where} the line emptied when the sky was done`); else fail(`${where} the line was still up five minutes after the Sky colour smoothing slider was moved`);
+      } finally { await page.close(); }
+    }
+  }
+  // ── 12 ─────────────────────────────────────────────────
+  // THE BALANCE CONTROLS (decision 101): Temperature and Tint above the three gains, a typed number beside
+  // each, the hold, the standing line that says a balance is held and names it, and the exit beside it. A
+  // new surface joins the sweep in the commit that creates it, so this section is that commit's share.
+  //
+  // WHAT IT ASSERTS, each as a standing claim. The controls exist in the Basic tab, named in words, 44px or
+  // more where a finger lands; the typed boxes and the name box paint from the calibrated tokens (the text,
+  // the ground and the rail are the tokens' own values, and clear 4.5 and 3 to 1); no input among them
+  // carries a placeholder; the hold's announcements go to a live region that is in the page as served,
+  // empty, and outside anything hidden; and Temperature moves the gains the way the claim says (red up and
+  // blue down by the same number of steps, green untouched, so the sum of the three track positions, which
+  // is their geometric mean, stays put).
+  //
+  // THE STANDING LINE IS ASSERTED WHERE EVERY TAB AND THE STAGE SHOW IT, which is the claim a first build
+  // got wrong by putting it inside the Basic tab: a state that changes what every raw opens at, visible from
+  // one of twelve tabs, is not standing. So the strip that holds the sentence and the exit is asserted to be
+  // in the page as served before both the stage and the panel, hidden at rest, and, once a balance is held,
+  // outside the panel and the stage, spanning both, above the photograph and not over it, readable (the text
+  // token, 4.5 to 1), and still SHOWN with a different tab open and the Basic section not showing, with the
+  // exit on the screen and the topmost thing at its centre (reachable by TOUCH on the phone shape: a tap, not
+  // a click). The exit is pressed from that other tab and the gains are asserted back at the positions the
+  // photograph opened at. Run in both themes and both shapes.
+  if (want(12)) console.log("\n12 — Temperature and Tint, the hold, the standing line and the way out of it");
+  if (want(12)) {
+    const html = await fetch(`${BASE}/ir.html`).then((r) => r.text());
+    if (/<p id="balLive" class="sr-only" role="status" aria-live="polite" aria-atomic="true"><\/p>/.test(html)) ok("the hold's announcements go to a live region, present and empty in the page as served");
+    else fail("the hold's live region is not an empty role=status live region in the page as served");
+    const tags = [...html.matchAll(/<(?:input|button)\b[^>]*\bid="(?:balT|balTi|balTNum|balTiNum|balName|balHoldBtn|balApply|balBack)"[^>]*>/g)].map((m) => m[0]);
+    if (tags.length === 8 && !tags.some((t) => /\bplaceholder\s*=/.test(t))) ok("the eight balance controls are in the page as served and none carries a placeholder");
+    else fail(`the balance controls in the page as served: ${tags.length} of 8 found, ${tags.filter((t) => /\bplaceholder\s*=/.test(t)).length} with a placeholder`);
+    const stripAt = html.indexOf('<div id="balStrip" class="bal-strip" hidden>');
+    const stageAt = html.indexOf('<main id="stage">');
+    const panelAt = html.indexOf('<aside id="panel"');
+    const sentenceAt = html.indexOf('<p id="balHeld"');
+    const exitAt = html.indexOf('<button id="balBack"');
+    if (stripAt > 0 && stageAt > stripAt && panelAt > stageAt && sentenceAt > stripAt && exitAt > sentenceAt && exitAt < stageAt) ok("the standing strip is in the page as served before the stage and the panel, hidden, and holds the sentence and then the exit");
+    else fail(`the standing strip in the page as served: strip at ${stripAt}, sentence at ${sentenceAt}, exit at ${exitAt}, stage at ${stageAt}, panel at ${panelAt}`);
+    for (const theme of THEMES) for (const size of SIZES) {
+      const where = `[${theme} ${size.name}]`;
+      const page = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
+      page.on("dialog", (d) => d.accept());
+      const press = (sel) => (size.name === "phone" ? page.tap(sel) : page.click(sel));
+      try {
+        await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+        const standing = await page.evaluate(() => {
+          const el = document.getElementById("balLive");
+          return !el ? null : { text: el.textContent, hiddenAncestor: !!el.closest("[hidden]"), live: el.getAttribute("aria-live"), role: el.getAttribute("role"), shown: getComputedStyle(el).display !== "none" };
+        });
+        if (!standing || standing.text !== "" || standing.hiddenAncestor || !standing.shown || standing.live !== "polite" || standing.role !== "status") { fail(`${where} #balLive at rest: ${JSON.stringify(standing)}`); continue; }
+        ok(`${where} #balLive at rest: empty, rendered, outside anything hidden, a polite status`);
+        await page.setInputFiles("#file", ONE);
+        await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+        await page.waitForTimeout(1500);
+        await page.evaluate(COMPOSITE);
+        await page.evaluate(() => document.getElementById("ptab-basic")?.click());
+        await page.waitForTimeout(300);
+        const gains = () => page.evaluate(() => ["wbR", "wbG", "wbB"].map((i) => Number(document.getElementById(i).value)));
+        const opened = await gains();
+        // 1 — present, named in words, and big enough to land on.
+        const at = await page.evaluate(() => {
+          const q = (id) => document.getElementById(id);
+          const label = (id) => (q(id)?.closest("label")?.textContent ?? "").replace(/\s+/g, " ").trim();
+          const box = (id) => { const r = q(id).getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), fontPx: parseFloat(getComputedStyle(q(id)).fontSize) }; };
+          return {
+            inBasic: ["balT", "balTi", "balTNum", "balTiNum", "balHoldBtn", "balName", "balApply"].every((id) => !!q(id)?.closest("#sec-basic")),
+            sliderNames: [label("balT"), label("balTi")],
+            typedNames: [q("balTNum").getAttribute("aria-label") ?? "", q("balTiNum").getAttribute("aria-label") ?? ""],
+            nameLabel: label("balName"),
+            buttons: ["balHoldBtn", "balApply"].map((id) => [id, (q(id).textContent ?? "").trim(), box(id)]),
+            boxes: ["balTNum", "balTiNum", "balName"].map((id) => [id, box(id)]),
+            sliders: ["balT", "balTi"].map((id) => [id, box(id)]),
+            exitHiddenAtRest: q("balStrip").hidden && q("balStrip").getClientRects().length === 0 && q("balHeld").textContent === "" && q("balHoldBtn").getAttribute("aria-pressed") === "false" && q("balApply").disabled,
+            keptHiddenAtRest: q("balKeptRow").hidden,
+            numbers: q("balTNum").type === "number" && q("balTiNum").type === "number",
+          };
+        });
+        if (at.inBasic) ok(`${where} Temperature, Tint, their boxes, the hold, the name and the set button are all in the Basic tab`); else fail(`${where} some balance control is outside the Basic tab`);
+        if (at.sliderNames.every((n) => n.length >= 8) && at.typedNames.every((n) => n.length >= 10) && at.nameLabel.length >= 10) ok(`${where} named in words: "${at.sliderNames.join('", "')}", boxes "${at.typedNames.join('", "')}", "${at.nameLabel}"`);
+        else fail(`${where} a balance control's name is too short to say what it is: ${JSON.stringify([at.sliderNames, at.typedNames, at.nameLabel])}`);
+        const small = [...at.buttons.filter(([, , b]) => b.w < 44 || b.h < 44).map(([id, , b]) => `#${id} ${b.w}x${b.h}`), ...at.boxes.filter(([, b]) => b.h < 44).map(([id, b]) => `#${id} ${b.w}x${b.h}`), ...at.sliders.filter(([, b]) => b.h < 28).map(([id, b]) => `#${id} ${b.w}x${b.h}`)];
+        if (small.length) fail(`${where} under the floor: ${small.join(" · ")}`); else ok(`${where} buttons and boxes are 44px or more, the sliders have the app's own 28px track`);
+        const tiny = at.boxes.filter(([, b]) => b.fontPx < 16).map(([id, b]) => `#${id} ${b.fontPx}px`);
+        if (tiny.length) fail(`${where} type under 16px, which makes iOS zoom the page on focus: ${tiny.join(" · ")}`); else ok(`${where} the boxes' type is 16px or more`);
+        if (at.exitHiddenAtRest && at.keptHiddenAtRest && at.numbers) ok(`${where} at rest nothing is held: the standing strip is hidden and takes no row, the hold is unpressed, the set button is off, the kept list is hidden`);
+        else fail(`${where} the controls at rest: ${JSON.stringify({ exitHiddenAtRest: at.exitHiddenAtRest, keptHiddenAtRest: at.keptHiddenAtRest, numbers: at.numbers })}`);
+        // 2 — painted from the calibrated tokens, and clearing the floors.
+        const paint = await page.evaluate(() => {
+          const rgb = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+          const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+          const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+          const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+          const token = (prop, name) => { const p = document.createElement("span"); p.style[prop] = `var(${name})`; document.body.append(p); const v = rgb(getComputedStyle(p)[prop]); p.remove(); return v; };
+          const same = (a, b) => a.length === 3 && b.length === 3 && a.every((v, i) => Math.abs(v - b[i]) <= 1);
+          const out = [];
+          for (const id of ["balTNum", "balTiNum", "balName"]) {
+            const el = document.getElementById(id), cs = getComputedStyle(el);
+            const fg = rgb(cs.color), bg = rgb(cs.backgroundColor), rail = rgb(cs.borderTopColor), ground = window.__composited(el.parentElement);
+            out.push({ id, text: same(fg, token("color", "--txt")), ground: same(bg, token("backgroundColor", "--surface-2")), rail: same(rail, token("borderTopColor", "--line-2")), textRatio: Math.round(ratio(fg, bg) * 100) / 100, railRatio: Math.round(ratio(rail, ground) * 100) / 100 });
+          }
+          for (const id of ["balT", "balTi"]) {
+            const lab = document.getElementById(id).closest("label"), cs = getComputedStyle(lab);
+            out.push({ id: `${id} label`, text: same(rgb(cs.color), token("color", "--txt-2")), ground: true, rail: true, textRatio: Math.round(ratio(rgb(cs.color), window.__composited(lab)) * 100) / 100, railRatio: 99 });
+          }
+          return out;
+        });
+        for (const p of paint) {
+          if (p.text && p.ground && p.rail) ok(`${where} #${p.id} paints from the tokens (text, ground, rail)`); else fail(`${where} #${p.id} paints a colour of its own: token text ${p.text}, ground ${p.ground}, rail ${p.rail}`);
+          if (p.textRatio >= 4.5 && p.railRatio >= 3) ok(`${where} #${p.id} text ${p.textRatio}:1 and rail ${p.railRatio === 99 ? "n/a" : p.railRatio + ":1"}`); else fail(`${where} #${p.id} text ${p.textRatio}:1 (floor 4.5), rail ${p.railRatio}:1 (floor 3)`);
+        }
+        // 3 — one state: Temperature moves red up and blue down by the same steps, green not at all.
+        await page.evaluate(() => { const el = document.getElementById("balT"); el.value = String(Number(el.value) + 5); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
+        await page.waitForTimeout(300);
+        const moved = await gains();
+        const typed = await page.evaluate(() => [document.getElementById("balTNum").value, document.getElementById("balTiNum").value]);
+        const wantT = ((moved[0] - moved[2]) / 2).toFixed(1).replace(/^-0\.0$/, "0.0");
+        if (moved[0] - opened[0] === 5 && moved[2] - opened[2] === -5 && moved[1] === opened[1]) ok(`${where} Temperature +5 moved red +5 and blue -5 steps and left green alone (${opened.join("/")} to ${moved.join("/")}); the three positions still sum to ${moved[0] + moved[1] + moved[2]}`);
+        else fail(`${where} Temperature +5 moved the gains ${opened.join("/")} to ${moved.join("/")}`);
+        if (typed[0] === wantT) ok(`${where} the typed Temperature box follows the gains (${typed[0]})`); else fail(`${where} the typed Temperature box reads ${typed[0]}, the gains say ${wantT}`);
+        // 4 — hold it, and the standing line, the exit, the set button and the announcement all follow.
+        await press("#balHoldBtn");
+        const heldUp = await page.waitForFunction(() => document.getElementById("balHoldBtn").getAttribute("aria-pressed") === "true" && !document.getElementById("balStrip").hidden && (document.getElementById("balLive").textContent ?? "").length > 0, null, { timeout: 10000 }).then(() => true).catch(() => false);
+        if (!heldUp) { fail(`${where} pressing Hold did not show the standing strip and announce`); continue; }
+        const held = await page.evaluate(() => {
+          const q = (id) => document.getElementById(id);
+          const rgb = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+          const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+          const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+          const line = q("balHeld"), cs = getComputedStyle(line);
+          const fg = rgb(cs.color), bg = window.__composited(line);
+          const x = lum(fg), y = lum(bg);
+          const probe = document.createElement("span"); probe.style.color = "var(--txt)"; document.body.append(probe); const txt = rgb(getComputedStyle(probe).color); probe.remove();
+          const row = q("balKept").querySelector("button.mask-pick");
+          const strip = q("balStrip"), sr = strip.getBoundingClientRect(), gr = q("stage").getBoundingClientRect(), pr = q("panel").getBoundingClientRect();
+          return {
+            stripOutside: !strip.closest("#panel") && !strip.closest("#stage") && strip.getClientRects().length > 0,
+            stripSpans: sr.left <= gr.left + 1 && sr.right >= Math.max(gr.right, pr.right) - 1,
+            stripAbove: sr.bottom <= gr.top + 1 && sr.height > 0,
+            stripBox: `${Math.round(sr.left)},${Math.round(sr.top)} ${Math.round(sr.width)}x${Math.round(sr.height)} against the stage at ${Math.round(gr.left)},${Math.round(gr.top)} and the panel's right edge at ${Math.round(pr.right)}`,
+            words: line.textContent, fontPx: parseFloat(cs.fontSize), ratio: Math.round(((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)) * 100) / 100, token: fg.every((v, i) => Math.abs(v - txt[i]) <= 1),
+            live: q("balLive").textContent, exitShown: !strip.hidden && q("balBack").getClientRects().length > 0, exitLabel: (q("balBack").textContent ?? "").trim(),
+            applyOn: !q("balApply").disabled, nameKept: q("balName").value, keptShown: !q("balKeptRow").hidden, keptRow: row ? { text: row.textContent, pressed: row.getAttribute("aria-pressed") } : null,
+          };
+        });
+        note(`${where} the standing line says: "${held.words}" (${held.fontPx}px, ${held.ratio}:1), announced: "${held.live}"`);
+        if (held.words.trim().length >= 12 && held.words.includes(held.nameKept)) ok(`${where} the standing line is words and names the balance`); else fail(`${where} the standing line is "${held.words}", the name box says "${held.nameKept}"`);
+        if (held.stripOutside && held.stripSpans && held.stripAbove) ok(`${where} the standing strip is outside the panel and the stage, spans both, and sits above the photograph (${held.stripBox})`);
+        else fail(`${where} the standing strip is not where every tab and the stage show it: outside ${held.stripOutside}, spans both ${held.stripSpans}, above the stage ${held.stripAbove} (${held.stripBox})`);
+        if (held.ratio >= 4.5 && held.token && held.fontPx >= 11) ok(`${where} the standing line is the --txt token, ${held.ratio}:1, ${held.fontPx}px`); else fail(`${where} the standing line reads ${held.ratio}:1 at ${held.fontPx}px, token text ${held.token}`);
+        if (held.exitShown && held.exitLabel.length >= 12 && held.applyOn && held.keptShown && held.keptRow && held.keptRow.pressed === "true" && /^Held/.test(held.keptRow.text)) ok(`${where} held: the exit "${held.exitLabel}" is shown, the set button is on, the kept list says Held in words`);
+        else fail(`${where} held, the controls read ${JSON.stringify({ exitShown: held.exitShown, exitLabel: held.exitLabel, applyOn: held.applyOn, keptShown: held.keptShown, keptRow: held.keptRow })}`);
+        const inside = await page.evaluate(HIT);
+        if (inside.small.length) fail(`${where} held, under 44: ${inside.small.join(" · ")}`); else ok(`${where} held: every button, the exit and the kept rows included, is 44 or more`);
+        await axeLine(page, `ir.html ${where} the Basic tab with a balance held`);
+        // 4b — FROM ANOTHER TAB. The Basic section is not showing, and the strip with its sentence and its exit still is,
+        // the exit is on the screen, and the topmost thing at its centre is the exit itself (so a finger lands on it).
+        await page.evaluate(() => document.getElementById("ptab-color")?.click());
+        await page.waitForTimeout(300);
+        const away = await page.evaluate(() => {
+          const q = (id) => document.getElementById(id);
+          const btn = q("balBack"), r = btn.getBoundingClientRect();
+          const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return {
+            basicShowing: q("sec-basic").getClientRects().length > 0,
+            tabNow: document.querySelector('#panelTabs [aria-selected="true"]')?.id ?? "",
+            stripShown: !q("balStrip").hidden && q("balStrip").getClientRects().length > 0,
+            words: q("balHeld").textContent ?? "",
+            onScreen: r.width > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth,
+            topmostIsExit: !!top && (top === btn || btn.contains(top)),
+            box: `${Math.round(r.width)}x${Math.round(r.height)}`,
+          };
+        });
+        if (!away.basicShowing && away.tabNow === "ptab-color" && away.stripShown && away.words.includes(held.nameKept)) ok(`${where} with the Color tab open and the Basic section not showing, the strip still says: "${away.words}"`);
+        else fail(`${where} from the Color tab the strip is not standing: ${JSON.stringify({ basicShowing: away.basicShowing, tabNow: away.tabNow, stripShown: away.stripShown, words: away.words })}`);
+        if (away.onScreen && away.topmostIsExit) ok(`${where} from the Color tab the exit is on the screen (${away.box}) and is the topmost thing at its centre`);
+        else fail(`${where} from the Color tab the exit is out of reach: on screen ${away.onScreen}, topmost at its centre ${away.topmostIsExit} (${away.box})`);
+        // 5 — the way out, from that other tab and by finger on the phone: the gains go back to where the photograph opened.
+        await press("#balBack");
+        const out = await page.waitForFunction(() => document.getElementById("balHoldBtn").getAttribute("aria-pressed") === "false" && document.getElementById("balStrip").hidden && document.getElementById("balHeld").textContent === "", null, { timeout: 10000 }).then(() => true).catch(() => false);
+        await page.evaluate(() => document.getElementById("ptab-basic")?.click());
+        await page.waitForTimeout(200);
+        const back = await gains();
+        if (out && back.join("/") === opened.join("/")) ok(`${where} the exit (${size.name === "phone" ? "tapped" : "clicked"}) ended the hold and put the gains back at ${back.join("/")}, where the photograph opened`);
+        else fail(`${where} after the exit: hold ended ${out}, gains ${back.join("/")} against ${opened.join("/")} at open`);
+        // 6 — forgetting the kept balance empties the list.
+        const forget = await page.evaluate(() => { const b = document.querySelector('#balKept button.mask-del'); if (!b) return null; const name = b.getAttribute("aria-label"); b.click(); return name; });
+        const listGone = await page.waitForFunction(() => document.getElementById("balKeptRow").hidden, null, { timeout: 5000 }).then(() => true).catch(() => false);
+        if (forget && /^Forget /.test(forget) && listGone) ok(`${where} the kept row's forget button ("${forget}") empties the list`); else fail(`${where} forgetting the kept balance: button "${forget}", list hidden ${listGone}`);
       } finally { await page.close(); }
     }
   }

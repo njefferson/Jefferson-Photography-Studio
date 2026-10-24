@@ -108,9 +108,12 @@ Do not write a second one of any of these.
 ## Options
 
 1. **Keep the balance found from the data, change nothing at open, and get the one
-   reading that is missing.** Chosen. One raw is shot on a preset slot set from a foliage
-   measurement in sunlight, and read the same three ways as the four here: the plain tag,
-   the tool's block, the preview's ratios. Then:
+   reading that is missing.** Done as far as it can go, and still the default: a raw
+   opens at the balance found from its data unless one is held (see Outcome). The one
+   missing reading is not taken: NIR_4027 was read the same three ways and was shot on
+   slot one with nothing known to be stored there. One raw is shot on a preset slot set
+   from a foliage measurement in sunlight, and read the same three ways as the four
+   here: the plain tag, the tool's block, the preview's ratios. Then:
    - If tag 12 differs from the daylight pair on that raw, a measured balance does reach
      the file. The next record offers it at open as a visible, undoable choice beside the
      data-found one, never as the default, and starts from that raw's numbers.
@@ -118,14 +121,15 @@ Do not write a second one of any of these.
      tool reads it, and this record closes as not owed.
    Nothing in the app changes first, because every reading so far says the file carries
    no measured balance and a change made now would be made on no data.
-2. **A per-channel gain control that takes a number.** Open, not chosen here. It serves a
-   reader with a balance in mind, whatever the file says, and does not wait on the
-   camera. It is a control with a visible value and one undo step, so it can be built
-   without this record's reading; whether it is built before or after is a ranking
-   question for the next plan.
-3. **A named balance that applies to a set across sessions and cards.** Open, not chosen
-   here. It is option 2's number kept under a name, and shares its dependency on the
-   control existing first.
+2. **A per-channel gain control that takes a number.** Built, beneath the new sliders:
+   the three gain sliders already took the gains and are the exact state; Temperature and
+   Tint are two more readings of them, defined on the camera's own channels (see
+   Outcome). It serves a reader with a balance in mind, whatever the file says, and does
+   not wait on the camera. It is a control with a visible value and one undo step.
+3. **A named balance that applies to a set across sessions and cards.** Chosen, and built
+   on staging (see Outcome). It is option 2's gains kept under a name, with a hold that
+   makes every raw open at them, a control that puts them on the photographs already
+   open, and a way back to the automatic.
 
 ## Rejected
 
@@ -158,6 +162,55 @@ is blocked on it today, because option 1 changes nothing until the reading arriv
 rank is about doing the cheap question before more colour work is tuned, and not about
 severity, since no reader sees a defect from it.
 
+## Outcome
+
+Built and on staging for a device pass on 24 October 2026; nothing is promoted.
+
+**What NIR_4027 read.** It was shot on preset slot one. Its plain white balance tag reads
+the daylight pair again to four places (red 1.8574, blue 1.4668), the maintained tool and
+both published raw readers decode no levels from the colour-balance block for this body,
+its auto colour temperature reads 0, and its embedded preview is the same coral-crimson
+rendering of that pair, redder than the other four (red over green 5.467 and blue over
+green 1.886 over the whole frame). Nothing in the file carries a measured balance, and
+the file cannot say whether slot one held one when it was shot. So option 1's one missing
+reading is still not taken, the camera side stays open, and a raw opens at the balance
+found from its data unless one is held.
+
+**The option built is the third, with the second beneath it.** Above the three gain
+sliders the Basic tab gains Temperature and Tint, each with a number that can be typed.
+They are the same three gains read two more ways, on the camera's own channels and never
+Kelvin: Temperature is half the gap between the red and blue gains' places on the gain
+sliders' own track and Tint is a third of how far the red and blue places' mean sits above
+green's. Moving either lands on the nearest balance the track has with the sum of the
+three places unchanged, which is the gains' geometric mean, so a move changes the white
+point and not the overall level. Hold keeps the open raw's balance under a name, and
+every raw opened afterwards starts at it in place of its own automatic balance, on the
+five sliders, undoable, with Reset going back to where the photograph opened; one control
+puts the held balance on the photographs already in the set, as one undo step on each,
+and one control returns the open photograph to its automatic balance and ends the hold.
+The names are kept on this device (a store modelled on the lens profiles') so a reload, a
+new session or another card can use one. Camera-developed files are never touched.
+NIR_4027 at its own balance reads Temperature -72.5 and Tint -5.2 in that scale, and NIR_3762
+at its own reads -86.5 and -2.8; held at the foliage-tapped balance (Temperature -62.6, Tint
+-5.7) NIR_3762 opened at the held gains and not at its own.
+
+The commit is the staging commit of this plan, whose subject opens New and reads: a white
+balance you set once now holds for every photo that follows, can be put on the whole set and
+kept under a name, with Temperature and Tint sliders above the gains.
+
+**What turned out wrong on the way.** A first slider handler asked for the thumb's new
+whole number outright and moved nothing when the reading sat half a track step from the
+thumb (Temperature is a half step wherever the red and blue places differ by an odd number);
+a slider now moves the balance by how far the thumb moved. A tap on a cloud of NIR_4027
+barely moves the balance because gray-world has already made a cloud nearly neutral. The
+tiles of photographs not yet opened are still drawn at their own automatic balance, because
+the tile worker is untouched; opening one lands it at the held balance. The first build put the
+line that says a balance is held inside the Basic tab, where none of the other tabs and not the
+stage could show it, and a state that changes what every raw opens at is not standing if it is
+visible from one tab of twelve; it has a row of its own under the top bar now, the update
+strip's precedent, with the way back to the automatic beside it, and the accessibility walk
+reads it with another tab open.
+
 ## Depends
 
 - touches 085 — its centre colour readings are taken at the balance the app opens with, so a camera balance that could be had would change what they are measured against.
@@ -166,11 +219,13 @@ severity, since no reader sees a defect from it.
 
 ## Looked at
 
-The four raws are the reader's own, from the shared zip of 2026-10-17. They are in no
-entry of `tools/owner-images.json`, so each entry below names its frame by number in the
-body and not as a listed file. Each preview was extracted from its raw and OPENED whole
-before any line of this record or of IR-SCIENCE.md was written about it; the ratios beside
-each are a pointer to where to look, and the picture is what was read.
+The four raws are the reader's own, from the shared zip of 2026-10-17, and NIR_4027 is the
+reader's own from the shared folder. None is in an entry of `tools/owner-images.json`, so
+each entry below names its frame by number in the body and not as a listed file. Each
+preview was extracted from its raw and OPENED whole before any line of this record or of
+IR-SCIENCE.md was written about it, and NIR_4027's renderings in the app were opened whole
+before the Outcome was written; the ratios beside each are a pointer to where to look, and
+the picture is what was read.
 
 - The bird in flight over a conifer slope, with a branch across the right, NIR_3762: the
   preview is a coral-red sky, pale pink conifers running to white at their brightest
@@ -188,6 +243,19 @@ each are a pointer to where to look, and the picture is what was read.
   coral sky shows at the top. The same rendering as the three above. Red over green 3.478
   and blue over green 1.452 whole frame.
 
-None of the four looks like a balance taken on foliage, which would bring the foliage
-toward neutral and the sky toward blue. All four look like the preset's daylight pair
-applied to an infrared raw.
+- A cloud sky over conifers and bare trees above a car park, NIR_4027: not a preview but
+  the app's own rendering of the raw, opened whole through the page in the container's
+  software graphics and then compared with itself after a tap. At the balance it opens at
+  (red 0.9985, green 1.7981, blue 2.6320) the clouds run white to grey over a slate sky,
+  the lit foliage is cream with a faint peach-pink cast, the tarmac is blue-grey and
+  nothing is strongly red or saturated. After a tap on foliage (Temperature -72.5 to
+  -62.6, Tint -5.2 to -5.7) the same frame is plainly cooler: the clouds read bluer white,
+  the sky slate-teal, the foliage nearer a neutral grey-cream and the tarmac bluer. A tap
+  on a cloud barely moved it (Temperature -72.5 to -70.8), and the two pictures cannot be
+  told apart, which is why the picture of a tap is the foliage one. The same balance
+  held on NIR_3762 draws a cyan-blue sky over silver-white conifers with the bird dark;
+  its own automatic balance was a different one (Temperature -86.5, Tint -2.8).
+
+None of the four previews looks like a balance taken on foliage, which would bring the
+foliage toward neutral and the sky toward blue. All four look like the preset's daylight
+pair applied to an infrared raw.

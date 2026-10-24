@@ -1,12 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=eaa8f9f71e31b98a
-diffhash=8cb858a560985a52
-verdict=IN-SCOPE: the app diff is the step 155 research and record only, IR-SCIENCE.md, NOTES.md and the new record 101, all on the plan's Files line
-# IN-SCOPE: The app diff is the plan's step 155 and nothing else: two edited files, IR-SCIENCE.md and NOTES.md, and one new record, docs/decisions/101-camera-balance-at-open.md, every path on the plan's app Files line.
+planhash=c0fb8c38778abd1f
+diffhash=34990666928c3156
+verdict=IN-SCOPE: the ten changed paths are the step 161 build, each on the plan's Files line, with the hold, the Temperature and Tint sliders, the kept store and the walk section all as the plan asked and nothing outside it changed
+# IN-SCOPE: The app's uncommitted changes are the build of step 161 and nothing beyond it. There are ten changed paths: nine tracked files and the new store module src/balancestore.ts, each named on the plan's Files line.
 # 
-# What was judged. The approved plan, read by the path the app's plan pointer names. The check-mode run exited 1 because the recorded verdict was rendered against an earlier plan text, and it was run once and not again. The status, the whole tracked diff, the log head and the new record file were read in full. The added lines carry no long hexadecimal run and no figure of seven or more digits. Staging is level with its remote, and main is not touched.
+# What was judged. The approved plan, read by the path the app's plan pointer names. The check-mode run exited 1 because the recorded verdict was rendered against an earlier plan text, and it was run once and not again. The status, the log head, the diffstat, the whole tracked diff of the app source, the style sheet, the page, the version and the architecture map, the notes, the science file, the decision record and the accessibility walk, and the new store module read whole.
 # 
-# The changed paths against the Files line. IR-SCIENCE.md gains one subsection in section 3 on the plain balance tag, the encrypted colour-balance block read with the maintained tool, the auto colour temperature tag and the preview ratios, with each source and how it was read. NOTES.md gains the roadmap bullet for record 101 at the head of the open items, with its decision key and a reader line, and the Found queue entries Q-JPS-94 to Q-JPS-100. The record gives the six required sections, Depends and Looked at. No source, tool, control, look, allow-list, workflow or package file changed.
+# What the build does against the plan. Temperature and Tint sit above the three gain sliders as views of the same gains, each with a typed number. A hold keeps the open raw's balance under a name and every raw opened after it starts there, in the open path after the decode. A control puts the held balance on the other photographs of the set as one undo step each. The kept balances are stored on the device, the list is inline in the Basic panel, and the standing line with its way back sits in a row of its own under the top bar. The decode, the shader and the tile worker are not in the diff, so the preview-version record does not move. The walk gains a section 12 for the new controls.
 # 
-# Reading for shape: no table, no set-apart quotation, no quotation or attribution of the owner, no chat link and no pronoun for a person. The record's Looked at entries name the four raws by frame number in their bodies, as the plan's research step allowed. Nothing was committed by this verdict.
+# Reading for shape. No table, no set-apart quotation, no quotation or attribution of the owner, no chat link and no trailer in any added line. The record's Looked at entries name the raws by frame number in their bodies, as the plan allowed. Nothing was committed by this verdict.
