@@ -106,3 +106,7 @@ device check, while those are measured work that each wait on renders, and
 putting a small independent fix behind them would hold it for no reason the
 queue can state. It sits behind 012 and 053 because those change what a reader
 sees on every photograph, and this changes one secondary route.
+
+## Outcome
+
+Shipped. The commit whose subject reads "Fixed: a look someone sends you as a file opens on an iPad, from Open on the start screen and from My looks" (940b799, dated 2 October) is on main, read from the log of origin/main on 24 October. It was first staged in the v2.65.3 build of 3 October and is on production by the promotion of 14 October (v2.65.15). A shared look is written as `.ipslook.json`, a name iOS types and offers; the pickers for Open and for My looks accept `json` beside `.ipslook`; a file written earlier as `.ipslook` is still read; and the content sniff keeps deciding what a picked file is. The source carries it in the share control and the accept lists in `ir.html` and in the head-sniff and the openable-extension list in `src/main.ts`, and `tools/openable-check.mjs` holds the picker lists to that extension list on every commit. The defect behind it was found by reading and was not seen on a device.

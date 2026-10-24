@@ -65,3 +65,7 @@ photograph was one app switch away from gone.
 **Directly after 071, above 052 (2026-09-28).** Everything from 052 down that
 touches the look's sky waits on 069's research, and this destroys the reader's
 work; it invalidates nothing above it and nothing below it measures it.
+
+## Outcome
+
+Shipped. The commit whose subject reads "Fixed: your edits to the open photo are kept if the page reloads, the tab is closed or the iPad discards it" (b83e813) is on main, read from the log of origin/main on 24 October. It was staged in v2.63.33 on 28 September and reached production the same day as v2.63.36. The open photograph's edit is written when the page is hidden, with the page-hide event as a second chance, and a second after each edit settles, so a reload, a closed tab or an iPad that discards the page keeps it. The source carries it in `persistOpenEditSoon` and the visibility and page-hide listeners in `src/main.ts`. Still owed: the device pass the v2.63.33 staging entry asks for, on the iPad (edit, switch app, close the tab, resume), with no result recorded.

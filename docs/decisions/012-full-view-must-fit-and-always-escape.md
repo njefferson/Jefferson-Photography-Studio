@@ -159,3 +159,9 @@ first step — an instrument, not a refactor. Placed above the splotchy Aerochro
 item because that one degrades a rendering while this one removes access to it,
 and above the quick-look item because that one is bounded by memory rather than
 by being stuck.
+
+## Outcome
+
+Shipped, in the half this record calls unconditional. The commit whose subject reads "Fixed: Fit always works, and if part of the photo is ever hidden at 100% a Show the whole photo button appears in the middle of the screen" (eac4f7a, dated 2 October) is on main, read from the log of origin/main on 24 October. It was first staged in the v2.65.3 build of 3 October and is on production by the promotion of 14 October (v2.65.15). Fit always works, and when part of the photograph is hidden at 100% a Show the whole photo button appears in the middle of the screen; a second commit, whose subject reads "Fixed: when the strip of photos leaves no room for the photograph on a small phone screen, Show the whole photo appears and says the photo is hidden" (a881076), makes the button appear, and say the photograph is hidden, when the strip leaves no room on a small phone. The source carries it in the button (`#viewEscape` in `ir.html`), and the control sweep reaches it at phone size.
+
+Left open, and not established: the cause of the original iPad report. The record's first option, an instrument that names the state behind the report, ran, and named a state other than the one the record predicted, so which of the candidate states produced the full view with no way back is still unknown. The share of a phone's height that the strip of photos takes belongs to the open record on the session strip taking the stage on a phone, which this one does not discharge.

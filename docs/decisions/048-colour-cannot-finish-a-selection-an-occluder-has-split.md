@@ -212,3 +212,7 @@ join is the general remedy, which may leave 028 smaller than it looks.
 
 Being reported today does not privilege it, and nothing ranked above it has to
 be redone once it lands.
+
+## Outcome
+
+Shipped. The commit whose subject reads "New: a mask can add to the one above it, so a colour can finish a sky" (eb5ca31, dated 24 September) is on main, read from the log of origin/main on 24 October. It was first staged in v2.63 on 25 September and reached production in v2.63.7 on 26 September. A mask now has the joins On its own, Add to it, Subtract from it and Only where both. The union is the inclusive operator, a third fold case beside the multiply and never in place of it, so Only where both is kept, and `tools/join-fold-check.mjs` holds all three on every commit. A Colour mask joined with Add to it can finish a Sky mask that a wing or a branch has split, with no hand brushing. The source carries it in `src/gl.ts` (the mask operator list, with the union marked with this record's number) and in the join options in `ir.html`. By the record's own boundary it does not move the sky's border, which belongs to the open record on showing the border and letting it be moved.

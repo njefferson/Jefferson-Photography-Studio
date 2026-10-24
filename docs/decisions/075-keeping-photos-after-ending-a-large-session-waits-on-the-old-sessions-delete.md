@@ -128,3 +128,9 @@ model of Firefox's storage puts 222 deletes at about 5 s.
 a large session has been ended in Firefox, and 015's pass needs sessions to
 open. It changes nothing that any item above it measures, and nothing below it
 measures anything it changes, so it declares no edge to them.
+
+## Outcome
+
+Shipped. The commit whose subject reads "Fixed: keeping photos straight after Done says what it is waiting for, and never waits in silence" (1b1ea0a) is on main, read from the log of origin/main on 24 October. It was staged in v2.63.26 on 27 September and reached production on 28 September as v2.63.36. Keep right after ending a session puts a card up at once; the wait happens only when the browser says the set will not fit, and says so with a count; a photo refused for room meanwhile is stored again; a slow file is offered to be skipped; and a second open is refused in words. A saved photo dropped together with photos deleted an open session without asking, which was found and fixed with it. The source carries it in `src/main.ts`, where the card and the wait are marked with this record's number.
+
+Still owed: the device pass the v2.63.33 staging entry asks for, in Firefox on the PC, with no result recorded, and the reason the old session's delete runs for minutes on that PC, which is not established.

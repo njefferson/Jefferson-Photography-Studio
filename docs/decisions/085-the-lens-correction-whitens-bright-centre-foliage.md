@@ -901,3 +901,9 @@ touches `applyLensFlat` or `lensGainsFor` (read in their diffs).
 - All six, 2026-09-30: as opened and at 1 after the slider look the same by
   eye. The skies of NIR_1651, NIR_1661 and NIR_1703 carry stepped banding at
   every strength, 0 included.
+
+## Outcome
+
+Shipped. The commit whose subject reads "Changed: every photo opens with the lens correction at full strength, and a double tap goes back there" (d6f4dda) is on main, read from the log of origin/main on 24 October. It was staged as v2.64.26 on 30 September and went to production the same day as v2.64.31 (3bb7e37 on main). A photograph with a matched lens opens at strength 1 and one with none at 0; nothing is remembered per lens and the stored per-lens strengths are removed at start-up; a strength set on one photograph stays with that photograph's own edit; a double tap on the slider goes back to where the photograph opens, as one undo step; and the range stays 0 to 1.5. The source carries it in `lensStrengthAtOpen` (`src/lensflat.ts`, `src/main.ts`, `src/tile.ts`), and `tools/lens-order-walk.mjs` holds it.
+
+Two costs came with it: every quick-look preview stored on a device is rendered once more, because the preview version moved, and a raw with a matched lens whose own strength is not 1 takes one correction pass at each open. One thing turned out wrong and was put right by a later commit (69bbe66): a lens picked by hand was not kept with the photograph. Still owed: the device pass on the iPad (move the strength, open the next photograph, double-tap, Undo), with no result recorded.

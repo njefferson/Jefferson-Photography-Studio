@@ -172,3 +172,9 @@ on: waiting for the tiles moves when the build starts, and 071's readings of
 the build's length are timed from the build's own start. It sits beside 071 because both are the start-up path on the same device,
 and a route chosen there may remove this defect altogether. It can still be
 built first: nothing 071 chooses later would undo it.
+
+## Outcome
+
+Shipped. The commit whose subject reads "Fixed: on a PC in Firefox, the practice photographs on the start card show their pictures while the editor gets ready, instead of empty boxes" (7161e4a, dated 2 October) is on main, read from the log of origin/main on 24 October. It was first staged in the v2.65.3 build of 3 October and is on production by the promotion of 14 October (v2.65.15). Where the browser cannot build the editor off the page, the practice tiles in the first view load eagerly and the build waits for them to decode and for two frames to paint, for at most two seconds; where the browser can, nothing waits. The source carries it in `practicePicturesPainted` and `beforeBuild` in `src/main.ts`, and `tools/build-wait-walk.mjs` models a browser that holds the page and checks that the pictures are painted before the hold.
+
+Still owed: the record asks for one load on the PC in Firefox, since no source promises the paint, and these notes record no result for it.

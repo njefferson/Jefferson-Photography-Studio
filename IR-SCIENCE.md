@@ -205,12 +205,14 @@ still open after this.
 
 **The published infrared method for setting a balance, read 2026-10-23, and the
 scale the app builds on it.** Two pages of Rob Shea's site, robsheaphotography.com,
-were read on 23 October 2026. The plan that read them kept each page's title and
-dates and not its full path, so each is cited here by host, title and the dates the
-page carries, and no address is written down that was not read.
+were read on 23 October 2026 through the summaries a web search returned for them,
+and the pages themselves were not fetched. Each is cited here by title, dates and
+full address; the addresses come from that search's listing of 23 October, and no
+address here is called read.
 
-- *White Balancing Color Infrared Photography* (robsheaphotography.com; published
-  3 June 2025, updated 21 September 2026). Lightroom, Lightroom Classic, Camera Raw,
+- *White Balancing Color Infrared Photography*
+  (https://www.robsheaphotography.com/2025/06/03/white-balancing-color-infrared-photography.html;
+  published 3 June 2025, updated 21 September 2026). Lightroom, Lightroom Classic, Camera Raw,
   DxO, Exposure and Luminar need a custom camera profile to reach an infrared white
   point. Capture One, darktable, ON1, Photomator, Pixelmator, RawTherapee and
   Affinity do not. The profile pack's Infrared Temp -50 and Infrared Temp -100
@@ -219,7 +221,8 @@ page carries, and no address is written down that was not read.
   longer stand for real Kelvin values. The aim it gives is a balance that cleanly
   separates the colours of sky and foliage. It says nothing about carrying a balance
   from one photograph to another.
-- *Do I need custom profiles for infrared photography* (robsheaphotography.com;
+- *Do I need custom profiles for infrared photography*
+  (https://robsheaphotography.com/2024/12/26/custom-profiles-infrared-photography.html;
   published 26 December 2024). The Kelvin sliders run from 2000 to 50000, and
   infrared light has a colour temperature of around 900 Kelvin below that scale. A
   custom profile shifts the scale to lower values, and the editors that need none set

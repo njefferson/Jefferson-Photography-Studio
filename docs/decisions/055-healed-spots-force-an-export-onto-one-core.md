@@ -218,3 +218,9 @@ capability items below carry no edge to this one either. The first draft of this
 section argued the order from how much each one costs a reader — that is
 severity, which this repository's ranking rule excludes on purpose, and it read
 as a dependency argument while being nothing of the kind.
+
+## Outcome
+
+Shipped, except the part named below. The commit whose subject reads "Faster: a photograph with dust spots healed exports on every core" (f3f182c, dated 23 September) is on main, read from the log of origin/main on 24 October, in the 2.61 release whose base commit follows it in the log. Healed spots are priced, not refused: `canRunParallel` in `src/exportparallel.ts` no longer returns false for a photograph with healed spots, and `perWorkerMb` is billed for them through `healBytes`, so a frame with many large spots is held back by the budget and three dust marks are not. Stickers and a warp are still refused, as the record chose, because a helper would render the photograph without them. `tools/tiff-threads-walk.mjs` carries a healed arm held to the byte-identical standard.
+
+Not built, and left open from this record's chosen option: the memory budget's last part, which was to subtract a term for the main thread, halve the pool and retry once on a catchable allocation failure, and record a marker before the pool starts so that a later launch learns a tab was killed. None of the three is in `src/exportparallel.ts`. It is queued in the Found queue.

@@ -51,3 +51,7 @@ session loaded. A batch in a browser that has not been asked yet sits at
 
 **Third, after 075 (2026-09-27).** Same path, smaller cost, and it invalidates
 nothing above it. It ships first, as its own commit, because it is two lines.
+
+## Outcome
+
+Shipped. The commit whose subject reads "Fixed: a batch no longer sits at Processing 0 until you answer the browser's question about keeping data, and adding photos no longer waits on it either" (e5ef790) is on main, read from the log of origin/main on 24 October. It was staged in v2.63.26 on 27 September and reached production on 28 September as v2.63.36. The browser is asked to keep the data and the answer is never waited on, so a batch starts at once and a set finishes with no prompt in the way; the source marks the request as asked and never awaited, in `src/main.ts`. Still owed: the device pass the v2.63.33 staging entry asks for, a batch started in Firefox before the storage question is answered, with no result recorded.

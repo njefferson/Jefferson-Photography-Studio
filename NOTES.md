@@ -2072,6 +2072,12 @@ mask's offsets for the selected band; the drag tool is put down and goes inert.
 the whole photo, and two of its new cases failed on the pipeline without the
 change. Black and white left stage 2b for the whole-photo list (record 042).
 
+## Reported from the device, not yet researched
+
+Reports that came from the device and have had no research, no record and no rank. Each is written down as it came, with no cause named; it gets a record and a rank before anything is built.
+
+- **24 October: a set opened from a cloud store stopped part way through its download.** The message said that the download had failed before its time limit. A limit of the app's own is suspected behind the opens that fail on the tablet. Nothing else is written about it: no cause is named and no source has been searched.
+
 ## Found queue
 
 Findings recorded for the next plan. A finding that was not put right and does not stop the plan it was found in is queued here, one line each, opening with its key and ending with where it was found. A later plan whose Files names this file answers each line. The build and release parsers of this file read only the checkbox lines under the roadmap and its archive, so this section is outside them. Q-JPS-1 onward were recorded on 2026-10-14 by the plan that examined the look's sky on the reader's own frames.
@@ -2145,7 +2151,7 @@ Q-JPS-66: the halo along the treeline; not traced.
 Q-JPS-67: the blue cast on the lit shore; not traced.
 Q-JPS-68: Aerochrome's finishing panel still words its Sky saturation and Restore depth lines for the old sky stages.
 Q-JPS-69: the sky-stage walk's log text is not yet updated to the report's new Last switch clause.
-Q-JPS-70: the notes check's freshness rule refuses an archive entry as new as the newest one, which is why the sky-map item stays open.
+Q-JPS-70: the notes check's freshness rule refuses an archive entry as new as the newest one, which is why the sky-map item stays open. Step 188 read the window again on 24 October: it archived thirteen shipped items whose first dated lines fall on or before the archive's newest date (2026-10-01), and the window refused 087, 088 and 089, whose first dated lines are 2026-10-11, 2026-10-14 and 2026-10-17 (spans of 24, 27 and 30 days against the limit of 14); each of the three carries a line saying so (step 188).
 Q-JPS-71: the walks install the offline copy with the sticker library on every run; a walk should install it once.
 Q-JPS-72: a walk runs once on the final build and only where it tests what changed.
 Q-JPS-73: the memory fault named in the editing-copy line of the report; unweighed, and not this item's.
@@ -2182,9 +2188,13 @@ Q-JPS-104: the held balance's name is the reader's own text and the report print
 Q-JPS-105: under a look with a white balance bias (Red, Goldie) the sliders show the held gains times that bias, because the bias is multiplied back on after the held balance is laid; the held balance itself is stored without it (step 161).
 Q-JPS-106: of three spots tried on NIR_4027, a tap on lit foliage changed the balance by under 5 Temperature steps at one and not at all at another (the app refuses a spot with a clipped channel, and whether that toast was the cause was not read); every proof ran in software graphics in a container with the sky lane off, not on a device (step 161).
 Q-JPS-107: a DNG that opened only as the camera's own preview and then had a look pressed carries gains other than 1, so the put-on-the-set control cannot tell it from a raw by its gains and exposure and would change it; a DNG preview with no look is told by its gains of exactly 1 and exposure of exactly 1 and is left alone (step 161).
-Q-JPS-108: the two pages of the published infrared method are cited in IR-SCIENCE.md by site, title and dates, because the plan that read them kept no full address; nothing was fetched again (step 161).
+Q-JPS-108: the two pages of the published infrared method are cited in IR-SCIENCE.md by site, title and dates, because the plan that read them kept no full address; nothing was fetched again (step 161). Put right in step 188: IR-SCIENCE.md now carries the two full addresses, taken from the search listing of 23 October, and its sentence about addresses says that the pages were read that day through the search's own summaries and that no address is called read (step 188).
 Q-JPS-109: the full accessibility walk exits 1 on macro.html alone, four variants, one serious label-content-name-mismatch on #verTag (its fixed accessible name does not contain its visible version text); the same failure is recorded above as red on staging's head, macro.html and src/verstamp.ts are untouched by step 161, and every other part of the walk, the balance controls' part 12 included, passed in both themes and both shapes (step 161).
 Q-JPS-110: on a 402 px phone the held-balance strip is about 105 px tall (the sentence takes three lines and the exit wraps under it), so a held balance costs the photograph that much height while it is held; the wording was not shortened because that is a copy choice (step 161).
+Q-JPS-111: record 055's last part is not built: the memory budget was to subtract a term for the main thread, halve the pool and retry once on a catchable allocation failure, and record a marker before the pool starts so that a later launch learns a tab was killed, and none of the three is in `src/exportparallel.ts`; the item was archived on its shipped removal of the spot refusal, the billing of heal and the byte-identical walk (step 188).
+Q-JPS-112: the cause of the iPad report behind record 012 is not established: the instrument the record chose ran and named a state other than the one the record predicted, and the item was archived on its unconditional Show the whole photo button (step 188).
+Q-JPS-113: two items shipped inside commits whose subjects name other work, 088's coarse and kept sky map inside the commit whose subject reads "Fixed: the look's sky leaves wires, pylons and roof fittings their own colour and no longer speckles open sky", and 089's Export strip and refining line inside the commit whose subject reads "Fixed: blurred foliage keeps its red, and the sky between pylons keeps its blue" (named only in its message body), so an audit that matches subjects cannot tell them from open work; the code carries both and neither needs building (step 188).
+Q-JPS-114: notes.html renders the first 12 archived entries that carry a Shown as line, and with this archive there are 22 of them, so ten sit outside the window and render nowhere, among them 062, 048 and 055, which this step archived, the other seven being older entries; the window size is in vite.config.ts and was not changed (step 188).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -2689,77 +2699,6 @@ user-scalable=no.
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
-- [ ] **The lens correction whitens bright centre foliage** <!-- decision: 085 -->
-  **Shown as:** Every photo with a matched lens opens with the lens correction at full strength, and a double tap on its slider goes back there.
-  015's next half. At lens strength 1 the sunlit leaves in the middle of the reported
-  frame go white and pale pink where strength 0 keeps them red. Clip control, the
-  reference guard the outside research named, was chosen and then not confirmed by
-  its own first check (2026-09-29): on three of the owner's raws the whitening
-  foliage passes white less often at 1, not more. Its colour is flattened from white
-  balance onward by the correction's colour half, which cuts blue against red by
-  about 5 to 6.5% at the centre. The second check (2026-09-30) says that cut is the
-  lens's own cast coming off. On the same three raws, neutral things at the centre
-  move toward the same material at the frame's edge and never cross it, and the
-  field's standard correction removes a hot spot's colour the same way. The third
-  check (2026-09-30) measured brightness on whole frames of six raws at strengths 0
-  to 1.5, which the second did not. In the rendered picture under Aerochrome the
-  middle brightens and the outer frame darkens on all six. On the four tree frames,
-  at strength 1, 43 to 56% of the darkest third within radius 0.2 is more than 5%
-  darker than at 0. On one frame a cloud at the middle turns from neutral toward
-  blue from 1, plainly at 1.25 and 1.5. The recommendation to leave it rested on colour alone and is withdrawn.
-  **Chosen 2026-09-30, after the six raws were looked at whole: the correction stays as it is.**
-  At 1 the hot spot's colour comes off the middle; above 1 the middle washes out.
-  What was wrong was the slider's memory: a strength set for a lens became every
-  later photograph's opening strength, and a double tap went back to it. On
-  production from 2026-09-30 in v2.64.31 (3bb7e37), every photograph opens at 1 (0 with no profile), nothing is remembered per lens,
-  a double tap goes back to 1 with a matched or hand-picked lens and to 0 without
-  one, and the range stays 0 to 1.5.
-  Shipped 2026-09-30 in v2.64.31 (3bb7e37 on main). Left open: the device pass the v2.64.26 staging entry asks for on the iPad (move the strength, open the next photograph, double-tap, Undo), with no result recorded.
-
-- [ ] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
-  **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.
-  Reported 2026-09-26 from a PC in Firefox: after ending a session of 222
-  photos, Keep on 22 more did nothing for minutes, and the report said nothing
-  was in progress. Keep waited on the old session's delete with nothing on
-  screen, and a second press added the set twice. On production from 2026-09-28:
-  the card rises at once; the wait happens only when the browser
-  says the set will not fit, and says so with a count; a photo refused for room
-  meanwhile is stored again; a slow file is offered to be skipped; a second open
-  is refused in words. Found and fixed with it: a saved photo dropped together
-  with photos deleted an open session without asking.
-  See `docs/decisions/075-keeping-photos-after-ending-a-large-session-waits-on-the-old-sessions-delete.md`.
-  Shipped 2026-09-28 in v2.63.36 (1b1ea0a on main). Left open: the device pass the v2.63.33 staging entry asks for, in Firefox on the PC, with no result recorded; and why the old session's delete runs for minutes on that PC, not established.
-
-- [ ] **Batch export and adding photos wait for the browser's storage permission** <!-- decision: 076 -->
-  **Shown as:** A batch starts, and a set finishes, without waiting for you to answer the browser's question about keeping data.
-  Firefox answers the storage request with a prompt, and a batch sat at
-  "Processing 0" until it was answered. On production from 2026-09-28:
-  the request is made and never waited on.
-  See `docs/decisions/076-batch-export-and-adding-photos-wait-for-the-browsers-storage-permission.md`.
-  Shipped 2026-09-28 in v2.63.36 (e5ef790 on main). Left open: the device pass the v2.63.33 staging entry asks for, a batch started in Firefox before answering the storage question, with no result recorded.
-
-- [ ] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
-  **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
-  `buildSkySelectionFrom` passes rotation 0 to the detector, so on a turned
-  photograph the look's own sky is seeded from a side of the picture: NIR_1651
-  reads 18.2% of the frame against 52.2% at its rotation. The reader's Sky mask
-  already passes the renderer's rotation. The chosen shape builds the look's
-  selection at the turn the picture is shown at, mirror included, on every
-  path: the open photograph and its export, `skyMaskFor`'s cache and
-  `shadowCastFor`'s for tiles, the lift and the shadow cast, a batch, and the
-  main-thread build for a photo picked on its own or opened from the gallery;
-  and again when the turn changes. With it go the audit's four places: a
-  vertical flip, the at-open solves run before the turn was set, Undo after
-  Rotate, and a new Gradient's default direction. First (2026-09-27): upright
-  photographs already take their cloud under the sky stages, so fixing the
-  turn makes turned ones behave as upright ones do, never worse, and 069, 052,
-  013 and 066 all tune or measure over turned frames. It touches the white
-  guard (069) rather than needing it, and 052's Option 1 would retire the path
-  only for the three sky stages on the open photograph, so it touches 052
-  rather than being superseded by it. See
-  `docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md`.
-  Shipped 2026-09-28 in v2.63.36 (8c7915f on main). Left open: the device pass the v2.63.33 staging entry asks for on the iPad, with no result recorded; and 069's cloud checks on the turned frames.
-
 - [ ] **Wires, pylons and roof fittings sit inside the look's sky selection, and the sky stages colour them** <!-- decision: 087 -->
   **Shown as:** internal
   Seen on both devices 2026-10-11, on production 2.65.13 and staging 2.65.14: under
@@ -2780,6 +2719,7 @@ user-scalable=no.
   freshness check (`tools/notes-check.mjs`: seven entries render, the oldest dated
   2026-09-17, and the newest archive date would be 2026-10-11, a span over the check's limit
   of 14 days); it moves to the archive when that check's window can take it.
+  Audited on 24 October against the commit log of main and the code: the commits whose subjects read "Fixed: the look's sky leaves wires, pylons and roof fittings their own colour and no longer speckles open sky" (4ac12b5) and "Fixed: Aerochrome's sky keeps the colour of the scene instead of a made one, its foliage stays red, and the other looks no longer wait on the sky" (66e050c) are on main, and `SKY_THIN_REMOVAL` set false in `src/skyfine.ts` carries the removal, so the work is shipped. The notes check's window refused the archive on this date: with this entry archived the check printed a newest archive date of 2026-10-11 against a window whose oldest entry is dated 2026-09-17, a span of 24 days against the limit of 14, so it stays open.
 
 - [ ] **The look's sky map lands seconds after the picture, and is built again on every visit** <!-- decision: 088 -->
   **Shown as:** internal
@@ -2796,6 +2736,7 @@ user-scalable=no.
   only, and nothing more is left to build. The item stays on the open list, declared
   internal, for the reason given under the item before it: the notes page's freshness check
   refuses an archive entry that new while it renders entries from September.
+  Audited on 24 October against the commit log of main and the code: no commit subject on main names the coarse map or the kept map (the commit whose subject reads "Fixed: the look's sky leaves wires, pylons and roof fittings their own colour and no longer speckles open sky" (4ac12b5) has a subject and nothing more), and the kept map's database `ips-skymaps` in `src/maskstore.ts` and the coarse map in `src/sky.worker.ts` carry the work on main, so nothing is left to build. The notes check's window would refuse the archive on this date in any case: with this entry archived the check printed a newest archive date of 2026-10-14 against a window whose oldest entry is dated 2026-09-17, a span of 27 days against the limit of 14, so it stays open.
 
 - [ ] **Pressing Export leaves the page held with nothing drawn, and the look's sky refines without saying so** <!-- decision: 089 -->
   **Shown as:** Pressing Export shows at once that the export has begun, with words and a figure that move from the start, and a line says while a sky slider you moved is still being worked out.
@@ -2815,6 +2756,7 @@ user-scalable=no.
   95% of the page's setup hold only for an export of a photograph that carries one of those
   two sliders; for a built-in look the hold is the rest of the setup. Nothing of this item was
   deleted.
+  Audited on 24 October against the commit log of main and the code: no commit subject on main names this item. The message body of the commit whose subject reads "Fixed: blurred foliage keeps its red, and the sky between pylons keeps its blue" (716aa67) says that pressing Export draws its progress strip at once and that a line says while the look's sky is still being refined, and `Preparing the export of` in `src/main.ts` carries the export half on main, so nothing is left to build. The notes check's window would refuse the archive on this date in any case: with this entry archived the check printed a newest archive date of 2026-10-17 against a window whose oldest entry is dated 2026-09-17, a span of 30 days against the limit of 14, so it stays open.
 - [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
   **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.
   Sky colour smoothing pulls a white or grey pixel inside the sky toward the
@@ -2959,28 +2901,6 @@ user-scalable=no.
   context back, and the report's Holds line says how much of each hold the page
   was hidden and names the start-up's own stages; the PC's next two runs choose
   the masked build's route and the warm reload's hold.
-- [ ] **On Firefox the practice photographs stay empty while the editor builds** <!-- decision: 086 -->
-  **Shown as:** The practice photographs on the start card show their pictures straight away, even while the editor is still getting ready.
-  Reported from the PC on the evening of 2026-09-30, Pacific: every practice
-  tile on the start card was an empty box with its name, for the 44 seconds
-  the editor took to build in Firefox. There the build holds the page at every
-  load, so by the same code path the tiles stay empty each time. The pictures
-  are small files the device already
-  holds, and nothing in the code holds them back: the build holds the whole
-  page, and by Firefox's source, as read, a newly arrived picture needs the
-  page's own thread to be drawn. The tiles also load lazily, which adds steps
-  before their pictures can be drawn. Chosen: where the browser cannot build off the page, the
-  tiles in view load first and are painted before the build starts, with a
-  ceiling on the wait. Directly below 071, whose build this is.
-  See `docs/decisions/086-on-firefox-the-practice-photographs-stay-empty-while-the-editor-builds.md`.
-- [ ] **The open photo's edits are lost on a reload or a closed tab** <!-- decision: 077 -->
-  **Shown as:** Your edits to the open photo are kept if the page reloads or the tab is closed.
-  The edit was written only when you moved to another photo, went Home or
-  applied a LUT. On production from 2026-09-28: it is also written when the page
-  is hidden and a second after each edit settles.
-  See `docs/decisions/077-the-open-photos-edits-are-lost-on-a-reload-or-a-closed-tab.md`.
-  Shipped 2026-09-28 in v2.63.36 (b83e813 on main). Left open: the device pass the v2.63.33 staging entry asks for on the iPad (edit, switch app, close the tab, resume), with no result recorded.
-
 - [ ] **The look's sky adjustments read a selection you cannot see** <!-- decision: 052 -->
   **Shown as:** Aerochrome's sky sliders work on the sky you selected, not one you cannot see.
   **Fourth from 2026-09-26, below the white guard (069), the update-path record
@@ -3235,22 +3155,6 @@ user-scalable=no.
   luma, under gray-world gains, which its own contract says does not move as
   the photograph is graded. See
   `docs/decisions/032-a-mask-keys-the-photograph-not-the-grade.md`.
-- [ ] **The radial mask turns** <!-- decision: 027 -->
-  **Shown as:** Turn an oval mask to any angle.
-  filed 2026-09-19 beside the mask-combining item: the circle mask needs to
-  be rotated. It is the only selection in the app whose orientation cannot be
-  set — a radial mask is an axis-aligned ellipse, `cx`/`cy`/`rx`/`ry` with no
-  angle in either weight function, so it can be made wide or tall and never
-  tilted. The linear gradient does not have the problem because it is defined
-  by two POINTS and its direction is already free. Lightroom rotates from the
-  shape's own edge, between the four handles, with a 15-degree snap under
-  Shift; darktable uses Ctrl-drag on a node or Shift-Ctrl-scroll. **Neither
-  gesture survives a tablet** — Lightroom's whole affordance is the cursor
-  changing shape on hover, and a finger does not hover. What carries over is
-  the MODEL: the angle belongs to the shape, is adjusted on the shape, and has
-  a coarse snap, with a visible grip at the 44 px target this app is held to
-  and a panel route beside it. Ranked below 024, because a rotation grip that
-  nothing names is the failure 024 exists to fix.
 - [ ] **While you straighten: finer guides you can turn off, and a picture you can zoom and pan** <!-- decision: 025 --> —
   **Shown as:** Zoom and move the photograph while you straighten it, with finer guides you can turn off.
   filed 2026-09-19 from the PC. The overlay draws twelfths; the need is
@@ -3277,42 +3181,6 @@ user-scalable=no.
   card) are rendered and chosen from as pictures. `tools/bar-fit-walk.mjs`
   holds the two properties and fails today. See
   `docs/decisions/060-the-top-bar-wraps-and-the-start-card-has-become-a-noticeboard.md`.
-- [ ] **Choosing a colour file means leaving the photograph, eighteen times** <!-- decision: 062 -->
-  **Shown as:** Tap through your colour files and watch each one on your photograph, without leaving it.
-  Reported from the device 2026-09-24. The LUT manager is a full-screen list,
-  and comparing eighteen files means Apply, close, look and reopen eighteen
-  times. The convention (Lightroom on iPad, Apple Photos, Instagram) is a
-  browser beside the photograph with None first: a tap applies live, a second
-  tap gives strength, and Manage sits at the end. Its tiles are drawn from the
-  reader's own photograph, which is the only honest source here, because a
-  swap-type file undoes the app's own swap. Browsing must be one undo step, and
-  a file must survive the tab closing. Four layouts are rendered for choosing.
-  See `docs/decisions/062-choosing-a-colour-file-means-leaving-the-photograph.md`.
-- [ ] **A look cannot be taken off** <!-- decision: 064 -->
-  **Shown as:** Take a look off your photograph with a None button, and open the next photos without it.
-  Found by reading, 2026-09-24. No look button takes a look off: a second press
-  flips the swap on four looks and applies the same look again on the other
-  four. Reset returns to the photograph as it opened, which includes the
-  session look, and every photograph opened afterwards wears it; the one way
-  out is Settings, Default look, None, which is described as a preference for
-  new sets and leaves the photograph on screen alone. The convention is None
-  first among the looks, as 062 puts it first among colour files. See
-  `docs/decisions/064-a-look-cannot-be-taken-off.md`.
-- [ ] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
-  **Shown as:** Always get back to the whole photograph from the full view.
-  from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
-  neither zooming out nor scrolling brought the rest of it back. Two failures, and
-  the second is the serious one — a reader who cannot get back to the whole
-  photograph has lost it, with nothing on screen saying so. On the code as
-  written this should not be reachable: `#view` is absolutely positioned with
-  `max-width`/`max-height` and `margin: auto`, which is contain; `applySize` sets
-  only the canvas's intrinsic size; view zoom is clamped to `[1, 8]` with 1 as
-  fit, and there is a Fit button. So something measured is wrong, and the
-  candidates — zoom carried over from the previous photograph, `--session-h`
-  measuring against a box bigger than what is visible, a crop changing the
-  canvas's aspect, or the PAGE being zoomed rather than the canvas — cannot be
-  told apart in a screenshot. Instrument first; make the escape unconditional
-  either way. See `docs/decisions/012-full-view-must-fit-and-always-escape.md`.
 - [ ] **The session strip takes the stage on a phone** <!-- decision: 053 -->
   **Shown as:** On a phone the photograph gets room instead of the strip of thumbnails taking most of it.
   reported from an iPhone 2026-09-22 in the same sentence as the black screen,
@@ -3334,15 +3202,6 @@ user-scalable=no.
   where it naturally goes and only dependency privileges it. Nothing above needs
   this first, and the graph puts this ground at 012's rank. See
   `docs/decisions/053-the-session-strip-takes-the-stage-on-a-phone.md`.
-- [ ] **A shared look file cannot be picked on an iPad** <!-- decision: 063 -->
-  **Shown as:** Open a look someone sent you as a file, from Files on an iPad.
-  Found by reading, 2026-09-24, and not yet seen on the device. A shared look is
-  saved as `.ipslook`, an extension nothing on iOS declares, which is the exact
-  shape 056 measured for `.cube`: the file sits greyed out in every picker that
-  should take it. The remedy is 043's: write it as `.ipslook.json`, which the
-  platform does type, add `json` to what Open accepts, and let the content
-  sniff keep deciding. See
-  `docs/decisions/063-a-shared-look-file-cannot-be-picked-on-an-ipad.md`.
 - [ ] **The mask system is short of standard convention** <!-- decision: 050 -->
   **Shown as:** Draw a box or circle to work inside, and add, subtract and combine masks.
   filed 2026-09-22: a drawn box or circle that ISOLATES part of the
@@ -3402,36 +3261,6 @@ user-scalable=no.
   a control that grows a special case per outcome ends up doing several things
   approximately instead of one thing exactly. See
   `docs/decisions/049-show-the-border-and-let-it-be-moved.md`.
-- [ ] **Colour cannot finish a selection an occluder has split** <!-- decision: 048 -->
-  **Shown as:** Bring in sky that a wing or a branch has cut off from the rest.
-  reported from the device 2026-09-22: the sky selection stops at a jet's wing
-  and the sky visible under the wing cannot be brought in. Two things are
-  needed and neither exists. **A mask cannot add to the mask above it** — driven in
-  the app with real presses, the join control offers only **On its own**,
-  **Subtract from it** and **Only where both**, so a second mask can shrink or
-  intersect the one above it and nothing grows it. And **nothing moves the sky's
-  border**: `skyhorizon.ts` computes one border depth per display column, so in
-  every column the wing crosses the border lands at the wing's top edge, which
-  is also why one slider could never fix it.
-  **Colour cannot reach it either.** Follow the sky's colour grows out of what
-  was found into pixels that match **and join** it — a 4-connected fill that
-  refuses to cross a hard edge — and the hole-fill only re-adds enclosed pixels
-  no deeper than the sky already reaches. Sky below a wing is both detached and
-  deeper, so it is excluded twice by rules that are each correct on their own.
-  **The remedy is the half of the algebra this repo already claims to ship.**
-  Record 040 names darktable's exclusive/inclusive algebra; what shipped is
-  subtract and exclusive. Inclusive — the union — is missing, and it is what
-  lets a Colour mask complete the Sky mask, which is the field's answer in
-  Lightroom (Select Sky, then Add → Color Range, which is deliberately not
-  contiguous) and in darktable alike. **Hand-brushing the region in is not the
-  route** and is rejected on the report.
-  **THE UNION IS ADDITIVE AND MUST NOT COST THE INTERSECTION** — both are
-  wanted and both ship. `groupWeight` folds with `w *= op === 1 ? 1 - c : c`, so
-  intersect is the DEFAULT branch and a session adding union there is one edit
-  from making union the default and losing **Only where both** with nothing
-  going red. Union lands as a third fold case, darktable's inclusive operator
-  `w + c - w*c`, beside the existing multiply and never in place of it. See
-  `docs/decisions/048-colour-cannot-finish-a-selection-an-occluder-has-split.md`.
 - [ ] **Sky seen through a canopy takes no sky adjustment** <!-- decision: 028 -->
   **Shown as:** Sky showing between leaves takes the sky adjustments too.
   — the Sky mask spreads only through pixels that are JOINED to the sky, which
@@ -3482,35 +3311,6 @@ user-scalable=no.
   tidying. **The sweep is red until this is done, on purpose** — it was red
   before today and the only change is that it is now visible. See
   `docs/decisions/046-the-control-sweep-reaches-two-thirds-of-the-controls.md`.
-- [ ] **Healed spots force an export onto one core** <!-- decision: 055 -->
-  **Shown as:** Photographs with dust spots healed export on every core, like everything else.
-  Reported from the device 2026-09-23. `canRunParallel` refuses any export whose
-  spot list is non-empty (`src/exportparallel.ts:133`), so three healed dust
-  spots take a 21-megapixel export from four threads to one. The frame was shot
-  at f/9, past this body's infrared diffraction limit — and stopping down is
-  what makes sensor dust visible, so the exclusion targets exactly the
-  photographs most likely to need it.
-  The stated reason does not survive reading: the header excludes stickers, heal
-  spots and warp together as "bitmaps the worker cannot be handed cheaply",
-  which is true of the other two and false of a spot — five numbers that already
-  travel inside the edit.
-  **The route that looks obvious is a trap and the record says so.** Heal is a
-  CLONE: every spot reads a second rectangle elsewhere in the frame, up to 4.6
-  radii away or wherever it was dragged. Bands work only because each helper
-  decodes the whole source, so slicing the source per helper — the obvious way
-  to cut the memory that gates the pool — bakes the slice edge into the spot.
-  Three things land in the same commit as the removal: heal billed into
-  `perWorkerMb` (forty spots is ~75 MB a helper, 300 MB across four, over the
-  600 MB ceiling on its own), a healed-spot arm on `tools/tiff-threads-walk.mjs`
-  held to 036's byte-identical standard, and a new way for
-  `tools/export-bytes-walk.mjs` to force one thread — it currently uses heal to
-  do it, so removing the gate would leave that plant passing while testing
-  nothing.
-  Then the budget, which cannot be measured: Safari exposes no memory reading of
-  any kind and gives a page no exception when it is killed, so the only honest
-  shapes left are billing the whole page, halving the pool on a catchable
-  failure, and a one-way marker that learns a tab died. See
-  `docs/decisions/055-healed-spots-force-an-export-onto-one-core.md`.
 - [ ] **The export panel says "save" twice and means two different things** <!-- decision: 054 -->
   **Shown as:** The export panel says plainly which button makes a picture to send and which one saves work you can come back to.
   Reported from the device 2026-09-23. Four controls sit on that panel and the
@@ -6723,6 +6523,253 @@ read as authoritative, and an invented one is worse than a missing one.
   **What survives:** the per-photograph correction and the co-sited working copy are built on staging and wait on a device pass, so what is left of this item is that pass and one small thing: blue is still 0.15 to 0.22 photosite from green at NIR_3430's post, a shift and not blur, so the record's third step, a guided correction of the blurrier channel, is not owed. Found, and left as it is: NIR_3430 renders about 2.3 percent darker because the Restore depth lift measures a higher median on the corrected decode and pulls its tone curve twice as far (record 061's Outcome has the numbers); and still open, the device's cost of the per-photograph estimate, which the test page is to measure.
   Promoted to production on 20 October, California time, at the commit named in the production paragraph of the staging section, whose subject opens Fixed; the What survives paragraph above is as it stood while the build waited on staging.
   Archived on 20 October with its Outcome (decision 061).
+
+- [x] **A shared look file cannot be picked on an iPad** <!-- decision: 063 -->
+  **Shown as:** Open a look someone sent you as a file, from Files on an iPad.
+  Found by reading, 2026-09-24, and not yet seen on the device. A shared look is
+  saved as `.ipslook`, an extension nothing on iOS declares, which is the exact
+  shape 056 measured for `.cube`: the file sits greyed out in every picker that
+  should take it. The remedy is 043's: write it as `.ipslook.json`, which the
+  platform does type, add `json` to what Open accepts, and let the content
+  sniff keep deciding. See
+  `docs/decisions/063-a-shared-look-file-cannot-be-picked-on-an-ipad.md`.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "Fixed: a look someone sends you as a file opens on an iPad, from Open on the start screen and from My looks" (940b799, dated 2 October) is on main, first staged in the v2.65.3 build of 3 October and on production by the promotion of 14 October (v2.65.15), and the `.ipslook.json` file name with `json` in the pickers' accept lists (`ir.html`, `src/main.ts`) carries it.
+  Archived on 24 October with its Outcome (decision 063).
+
+- [x] **A photograph that fills the screen with no way back out** <!-- decision: 012 --> — reported
+  **Shown as:** Always get back to the whole photograph from the full view.
+  from the iPad 2026-09-17: a photograph in the full view appeared zoomed in, and
+  neither zooming out nor scrolling brought the rest of it back. Two failures, and
+  the second is the serious one — a reader who cannot get back to the whole
+  photograph has lost it, with nothing on screen saying so. On the code as
+  written this should not be reachable: `#view` is absolutely positioned with
+  `max-width`/`max-height` and `margin: auto`, which is contain; `applySize` sets
+  only the canvas's intrinsic size; view zoom is clamped to `[1, 8]` with 1 as
+  fit, and there is a Fit button. So something measured is wrong, and the
+  candidates — zoom carried over from the previous photograph, `--session-h`
+  measuring against a box bigger than what is visible, a crop changing the
+  canvas's aspect, or the PAGE being zoomed rather than the canvas — cannot be
+  told apart in a screenshot. Instrument first; make the escape unconditional
+  either way. See `docs/decisions/012-full-view-must-fit-and-always-escape.md`.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "Fixed: Fit always works, and if part of the photo is ever hidden at 100% a Show the whole photo button appears in the middle of the screen" (eac4f7a, dated 2 October) is on main, first staged in the v2.65.3 build of 3 October and on production by the promotion of 14 October (v2.65.15), and the Show the whole photo button (`#viewEscape` in `ir.html`) carries it; the commit whose subject reads "Fixed: when the strip of photos leaves no room for the photograph on a small phone screen, Show the whole photo appears and says the photo is hidden" (a881076) carries it for a small phone. The cause of the original report is not established, and the Outcome says so.
+  Archived on 24 October with its Outcome (decision 012).
+
+- [x] **The radial mask turns** <!-- decision: 027 -->
+  **Shown as:** Turn an oval mask to any angle.
+  filed 2026-09-19 beside the mask-combining item: the circle mask needs to
+  be rotated. It is the only selection in the app whose orientation cannot be
+  set — a radial mask is an axis-aligned ellipse, `cx`/`cy`/`rx`/`ry` with no
+  angle in either weight function, so it can be made wide or tall and never
+  tilted. The linear gradient does not have the problem because it is defined
+  by two POINTS and its direction is already free. Lightroom rotates from the
+  shape's own edge, between the four handles, with a 15-degree snap under
+  Shift; darktable uses Ctrl-drag on a node or Shift-Ctrl-scroll. **Neither
+  gesture survives a tablet** — Lightroom's whole affordance is the cursor
+  changing shape on hover, and a finger does not hover. What carries over is
+  the MODEL: the angle belongs to the shape, is adjusted on the shape, and has
+  a coarse snap, with a visible grip at the 44 px target this app is held to
+  and a panel route beside it. Ranked below 024, because a rotation grip that
+  nothing names is the failure 024 exists to fix.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "New: an oval mask turns to any angle: drag the round knob past its edge, which settles every 15 degrees so level is easy to find, or use the Turn slider and its tenth-degree buttons" (a8ec21f, dated 2 October) is on main, first staged in the v2.65.3 build of 3 October and on production by the promotion of 14 October (v2.65.15), and the turn grip and the Turn slider (`#mTurn` in `ir.html`, `src/main.ts`) carry it, held by `tools/mask-turn-check.mjs` on every commit.
+  Archived on 24 October with its Outcome (decision 027).
+
+- [x] **On Firefox the practice photographs stay empty while the editor builds** <!-- decision: 086 -->
+  **Shown as:** The practice photographs on the start card show their pictures straight away, even while the editor is still getting ready.
+  Reported from the PC on the evening of 2026-09-30, Pacific: every practice
+  tile on the start card was an empty box with its name, for the 44 seconds
+  the editor took to build in Firefox. There the build holds the page at every
+  load, so by the same code path the tiles stay empty each time. The pictures
+  are small files the device already
+  holds, and nothing in the code holds them back: the build holds the whole
+  page, and by Firefox's source, as read, a newly arrived picture needs the
+  page's own thread to be drawn. The tiles also load lazily, which adds steps
+  before their pictures can be drawn. Chosen: where the browser cannot build off the page, the
+  tiles in view load first and are painted before the build starts, with a
+  ceiling on the wait. Directly below 071, whose build this is.
+  See `docs/decisions/086-on-firefox-the-practice-photographs-stay-empty-while-the-editor-builds.md`.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "Fixed: on a PC in Firefox, the practice photographs on the start card show their pictures while the editor gets ready, instead of empty boxes" (7161e4a, dated 2 October) is on main, first staged in the v2.65.3 build of 3 October and on production by the promotion of 14 October (v2.65.15), and `practicePicturesPainted` in `src/main.ts` carries it.
+  Archived on 24 October with its Outcome (decision 086).
+
+- [x] **The lens correction whitens bright centre foliage** <!-- decision: 085 -->
+  **Shown as:** Every photo with a matched lens opens with the lens correction at full strength, and a double tap on its slider goes back there.
+  015's next half. At lens strength 1 the sunlit leaves in the middle of the reported
+  frame go white and pale pink where strength 0 keeps them red. Clip control, the
+  reference guard the outside research named, was chosen and then not confirmed by
+  its own first check (2026-09-29): on three of the owner's raws the whitening
+  foliage passes white less often at 1, not more. Its colour is flattened from white
+  balance onward by the correction's colour half, which cuts blue against red by
+  about 5 to 6.5% at the centre. The second check (2026-09-30) says that cut is the
+  lens's own cast coming off. On the same three raws, neutral things at the centre
+  move toward the same material at the frame's edge and never cross it, and the
+  field's standard correction removes a hot spot's colour the same way. The third
+  check (2026-09-30) measured brightness on whole frames of six raws at strengths 0
+  to 1.5, which the second did not. In the rendered picture under Aerochrome the
+  middle brightens and the outer frame darkens on all six. On the four tree frames,
+  at strength 1, 43 to 56% of the darkest third within radius 0.2 is more than 5%
+  darker than at 0. On one frame a cloud at the middle turns from neutral toward
+  blue from 1, plainly at 1.25 and 1.5. The recommendation to leave it rested on colour alone and is withdrawn.
+  **Chosen 2026-09-30, after the six raws were looked at whole: the correction stays as it is.**
+  At 1 the hot spot's colour comes off the middle; above 1 the middle washes out.
+  What was wrong was the slider's memory: a strength set for a lens became every
+  later photograph's opening strength, and a double tap went back to it. On
+  production from 2026-09-30 in v2.64.31 (3bb7e37), every photograph opens at 1 (0 with no profile), nothing is remembered per lens,
+  a double tap goes back to 1 with a matched or hand-picked lens and to 0 without
+  one, and the range stays 0 to 1.5.
+  Shipped 2026-09-30 in v2.64.31 (3bb7e37 on main). Left open: the device pass the v2.64.26 staging entry asks for on the iPad (move the strength, open the next photograph, double-tap, Undo), with no result recorded.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "Changed: every photo opens with the lens correction at full strength, and a double tap goes back there" (d6f4dda) is on main, and `lensStrengthAtOpen` in `src/lensflat.ts` and `src/main.ts` carries it. The device pass named above is still owed.
+  Archived on 24 October with its Outcome (decision 085).
+
+- [x] **The open photo's edits are lost on a reload or a closed tab** <!-- decision: 077 -->
+  **Shown as:** Your edits to the open photo are kept if the page reloads or the tab is closed.
+  The edit was written only when you moved to another photo, went Home or
+  applied a LUT. On production from 2026-09-28: it is also written when the page
+  is hidden and a second after each edit settles.
+  See `docs/decisions/077-the-open-photos-edits-are-lost-on-a-reload-or-a-closed-tab.md`.
+  Shipped 2026-09-28 in v2.63.36 (b83e813 on main). Left open: the device pass the v2.63.33 staging entry asks for on the iPad (edit, switch app, close the tab, resume), with no result recorded.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "Fixed: your edits to the open photo are kept if the page reloads, the tab is closed or the iPad discards it" (b83e813) is on main, and `persistOpenEditSoon` with the page-hidden listeners in `src/main.ts` carries it. The device pass named above is still owed.
+  Archived on 24 October with its Outcome (decision 077).
+
+- [x] **The look's sky is found on the wrong edge of a turned photograph** <!-- decision: 070 -->
+  **Shown as:** On a photo turned on its side, Aerochrome's sky sliders find the sky from the edge that is up on screen.
+  `buildSkySelectionFrom` passes rotation 0 to the detector, so on a turned
+  photograph the look's own sky is seeded from a side of the picture: NIR_1651
+  reads 18.2% of the frame against 52.2% at its rotation. The reader's Sky mask
+  already passes the renderer's rotation. The chosen shape builds the look's
+  selection at the turn the picture is shown at, mirror included, on every
+  path: the open photograph and its export, `skyMaskFor`'s cache and
+  `shadowCastFor`'s for tiles, the lift and the shadow cast, a batch, and the
+  main-thread build for a photo picked on its own or opened from the gallery;
+  and again when the turn changes. With it go the audit's four places: a
+  vertical flip, the at-open solves run before the turn was set, Undo after
+  Rotate, and a new Gradient's default direction. First (2026-09-27): upright
+  photographs already take their cloud under the sky stages, so fixing the
+  turn makes turned ones behave as upright ones do, never worse, and 069, 052,
+  013 and 066 all tune or measure over turned frames. It touches the white
+  guard (069) rather than needing it, and 052's Option 1 would retire the path
+  only for the three sky stages on the open photograph, so it touches 052
+  rather than being superseded by it. See
+  `docs/decisions/070-the-looks-sky-is-found-on-the-wrong-edge-of-a-turned-photograph.md`.
+  Shipped 2026-09-28 in v2.63.36 (8c7915f on main). Left open: the device pass the v2.63.33 staging entry asks for on the iPad, with no result recorded; and 069's cloud checks on the turned frames.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "Fixed: a photo turned on its side or flipped gets the look's sky at the top of the picture as shown" (8c7915f) is on main, and the sky found at the turn shown, marked with this record's number across `src/main.ts`, carries it. The device pass and the cloud checks named above are still owed.
+  Archived on 24 October with its Outcome (decision 070).
+
+- [x] **Keeping photos after ending a large session waits on the old session's delete, with nothing on screen** <!-- decision: 075 -->
+  **Shown as:** Keep right after ending a session shows at once what it is doing, and waits only when the device needs the space.
+  Reported 2026-09-26 from a PC in Firefox: after ending a session of 222
+  photos, Keep on 22 more did nothing for minutes, and the report said nothing
+  was in progress. Keep waited on the old session's delete with nothing on
+  screen, and a second press added the set twice. On production from 2026-09-28:
+  the card rises at once; the wait happens only when the browser
+  says the set will not fit, and says so with a count; a photo refused for room
+  meanwhile is stored again; a slow file is offered to be skipped; a second open
+  is refused in words. Found and fixed with it: a saved photo dropped together
+  with photos deleted an open session without asking.
+  See `docs/decisions/075-keeping-photos-after-ending-a-large-session-waits-on-the-old-sessions-delete.md`.
+  Shipped 2026-09-28 in v2.63.36 (1b1ea0a on main). Left open: the device pass the v2.63.33 staging entry asks for, in Firefox on the PC, with no result recorded; and why the old session's delete runs for minutes on that PC, not established.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "Fixed: keeping photos straight after Done says what it is waiting for, and never waits in silence" (1b1ea0a) is on main, and the card and the wait in `src/main.ts`, marked with this record's number, carry it. The device pass and the open question named above are still owed.
+  Archived on 24 October with its Outcome (decision 075).
+
+- [x] **Batch export and adding photos wait for the browser's storage permission** <!-- decision: 076 -->
+  **Shown as:** A batch starts, and a set finishes, without waiting for you to answer the browser's question about keeping data.
+  Firefox answers the storage request with a prompt, and a batch sat at
+  "Processing 0" until it was answered. On production from 2026-09-28:
+  the request is made and never waited on.
+  See `docs/decisions/076-batch-export-and-adding-photos-wait-for-the-browsers-storage-permission.md`.
+  Shipped 2026-09-28 in v2.63.36 (e5ef790 on main). Left open: the device pass the v2.63.33 staging entry asks for, a batch started in Firefox before answering the storage question, with no result recorded.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "Fixed: a batch no longer sits at Processing 0 until you answer the browser's question about keeping data, and adding photos no longer waits on it either" (e5ef790) is on main, and the storage request that is asked and never awaited in `src/main.ts` carries it. The device pass named above is still owed.
+  Archived on 24 October with its Outcome (decision 076).
+
+- [x] **A look cannot be taken off** <!-- decision: 064 -->
+  **Shown as:** Take a look off your photograph with a None button, and open the next photos without it.
+  Found by reading, 2026-09-24. No look button takes a look off: a second press
+  flips the swap on four looks and applies the same look again on the other
+  four. Reset returns to the photograph as it opened, which includes the
+  session look, and every photograph opened afterwards wears it; the one way
+  out is Settings, Default look, None, which is described as a preference for
+  new sets and leaves the photograph on screen alone. The convention is None
+  first among the looks, as 062 puts it first among colour files. See
+  `docs/decisions/064-a-look-cannot-be-taken-off.md`.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "New: a None button takes a look off your photograph" (6e79997, dated 24 September) is on main, first staged in v2.63 on 25 September and on production from v2.63.7 on 26 September, and `takeLookOff` in `src/main.ts` with the None button in `ir.html` carries it.
+  Archived on 24 October with its Outcome (decision 064).
+
+- [x] **Choosing a colour file means leaving the photograph, eighteen times** <!-- decision: 062 -->
+  **Shown as:** Tap through your colour files and watch each one on your photograph, without leaving it.
+  Reported from the device 2026-09-24. The LUT manager is a full-screen list,
+  and comparing eighteen files means Apply, close, look and reopen eighteen
+  times. The convention (Lightroom on iPad, Apple Photos, Instagram) is a
+  browser beside the photograph with None first: a tap applies live, a second
+  tap gives strength, and Manage sits at the end. Its tiles are drawn from the
+  reader's own photograph, which is the only honest source here, because a
+  swap-type file undoes the app's own swap. Browsing must be one undo step, and
+  a file must survive the tab closing. Four layouts are rendered for choosing.
+  See `docs/decisions/062-choosing-a-colour-file-means-leaving-the-photograph.md`.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "New: tap through your LUTs on the Grade tab and see each one on your photograph" (ba9a3cc, dated 24 September) is on main, first staged in v2.63 on 25 September and on production from v2.63.7 on 26 September, and the grid on the Grade tab (`#lutGrid` in `ir.html`, built by `buildLutGrid` in `src/main.ts`) carries it.
+  Archived on 24 October with its Outcome (decision 062).
+
+- [x] **Colour cannot finish a selection an occluder has split** <!-- decision: 048 -->
+  **Shown as:** Bring in sky that a wing or a branch has cut off from the rest.
+  reported from the device 2026-09-22: the sky selection stops at a jet's wing
+  and the sky visible under the wing cannot be brought in. Two things are
+  needed and neither exists. **A mask cannot add to the mask above it** — driven in
+  the app with real presses, the join control offers only **On its own**,
+  **Subtract from it** and **Only where both**, so a second mask can shrink or
+  intersect the one above it and nothing grows it. And **nothing moves the sky's
+  border**: `skyhorizon.ts` computes one border depth per display column, so in
+  every column the wing crosses the border lands at the wing's top edge, which
+  is also why one slider could never fix it.
+  **Colour cannot reach it either.** Follow the sky's colour grows out of what
+  was found into pixels that match **and join** it — a 4-connected fill that
+  refuses to cross a hard edge — and the hole-fill only re-adds enclosed pixels
+  no deeper than the sky already reaches. Sky below a wing is both detached and
+  deeper, so it is excluded twice by rules that are each correct on their own.
+  **The remedy is the half of the algebra this repo already claims to ship.**
+  Record 040 names darktable's exclusive/inclusive algebra; what shipped is
+  subtract and exclusive. Inclusive — the union — is missing, and it is what
+  lets a Colour mask complete the Sky mask, which is the field's answer in
+  Lightroom (Select Sky, then Add → Color Range, which is deliberately not
+  contiguous) and in darktable alike. **Hand-brushing the region in is not the
+  route** and is rejected on the report.
+  **THE UNION IS ADDITIVE AND MUST NOT COST THE INTERSECTION** — both are
+  wanted and both ship. `groupWeight` folds with `w *= op === 1 ? 1 - c : c`, so
+  intersect is the DEFAULT branch and a session adding union there is one edit
+  from making union the default and losing **Only where both** with nothing
+  going red. Union lands as a third fold case, darktable's inclusive operator
+  `w + c - w*c`, beside the existing multiply and never in place of it. See
+  `docs/decisions/048-colour-cannot-finish-a-selection-an-occluder-has-split.md`.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "New: a mask can add to the one above it, so a colour can finish a sky" (eb5ca31, dated 24 September) is on main, first staged in v2.63 on 25 September and on production from v2.63.7 on 26 September, and the third join, Add to it, in the mask panel (`ir.html`) with the union fold in the shader (`src/gl.ts`) carries it, held by `tools/join-fold-check.mjs` on every commit.
+  Archived on 24 October with its Outcome (decision 048).
+
+- [x] **Healed spots force an export onto one core** <!-- decision: 055 -->
+  **Shown as:** Photographs with dust spots healed export on every core, like everything else.
+  Reported from the device 2026-09-23. `canRunParallel` refuses any export whose
+  spot list is non-empty (`src/exportparallel.ts:133`), so three healed dust
+  spots take a 21-megapixel export from four threads to one. The frame was shot
+  at f/9, past this body's infrared diffraction limit — and stopping down is
+  what makes sensor dust visible, so the exclusion targets exactly the
+  photographs most likely to need it.
+  The stated reason does not survive reading: the header excludes stickers, heal
+  spots and warp together as "bitmaps the worker cannot be handed cheaply",
+  which is true of the other two and false of a spot — five numbers that already
+  travel inside the edit.
+  **The route that looks obvious is a trap and the record says so.** Heal is a
+  CLONE: every spot reads a second rectangle elsewhere in the frame, up to 4.6
+  radii away or wherever it was dragged. Bands work only because each helper
+  decodes the whole source, so slicing the source per helper — the obvious way
+  to cut the memory that gates the pool — bakes the slice edge into the spot.
+  Three things land in the same commit as the removal: heal billed into
+  `perWorkerMb` (forty spots is ~75 MB a helper, 300 MB across four, over the
+  600 MB ceiling on its own), a healed-spot arm on `tools/tiff-threads-walk.mjs`
+  held to 036's byte-identical standard, and a new way for
+  `tools/export-bytes-walk.mjs` to force one thread — it currently uses heal to
+  do it, so removing the gate would leave that plant passing while testing
+  nothing.
+  Then the budget, which cannot be measured: Safari exposes no memory reading of
+  any kind and gives a page no exception when it is killed, so the only honest
+  shapes left are billing the whole page, halving the pool on a catchable
+  failure, and a one-way marker that learns a tab died. See
+  `docs/decisions/055-healed-spots-force-an-export-onto-one-core.md`.
+  Audited on 24 October against the commit log of main and the code: the commit whose subject reads "Faster: a photograph with dust spots healed exports on every core" (f3f182c, dated 23 September) is on main, in the 2.61 release whose base commit follows it in the log, and `canRunParallel` in `src/exportparallel.ts`, which no longer refuses healed spots, with `perWorkerMb` billed for them through `healBytes`, carries it. The memory budget's last part is not built, and the Outcome and the Found queue say so.
+  Archived on 24 October with its Outcome (decision 055).
 
 - [x] **(superseded detail) The live view at full resolution** — <!-- decision: 010 -->
   **Shown as:** internal

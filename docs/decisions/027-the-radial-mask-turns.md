@@ -146,3 +146,7 @@ above 024, so nothing can be below one and above the other.
 **Not urgent enough to precede the reported defects** (013, 016, 014, 015):
 those are frames the owner is looking at that come out wrong, and this is a
 shape that comes out square when it should come out tilted.
+
+## Outcome
+
+Shipped. The commit whose subject reads "New: an oval mask turns to any angle: drag the round knob past its edge, which settles every 15 degrees so level is easy to find, or use the Turn slider and its tenth-degree buttons" (a8ec21f, dated 2 October) is on main, read from the log of origin/main on 24 October. It was first staged in the v2.65.3 build of 3 October and is on production by the promotion of 14 October (v2.65.15). The radial mask carries an angle: a round knob on a stem past the oval's edge turns it by drag and settles on every 15 degrees as it passes, and a Turn slider from -90 to 90 degrees with tenth-degree buttons turns it without a drag; 0 degrees is level as the photograph is shown. This is the record's model: the angle belongs to the shape, is adjusted on the shape, has a coarse snap, and has a panel route beside the grip. The source carries it in `ir.html` and `src/main.ts` (`mTurn`, `syncTurnUI` and the turn grip), and `tools/mask-turn-check.mjs` runs on every commit.

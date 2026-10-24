@@ -149,3 +149,7 @@ browser does, and until 060's layout is chosen that door stays 059's "Manage
 your LUTs" button, unchanged. The grid lives inside the Grade tab and claims no
 second place in the panel column, so it touches neither 060's bar nor 042's
 stage 2.
+
+## Outcome
+
+Shipped. The commit whose subject reads "New: tap through your LUTs on the Grade tab and see each one on your photograph" (ba9a3cc, dated 24 September) is on main, read from the log of origin/main on 24 October. It was first staged in v2.63 on 25 September and reached production in v2.63.7 on 26 September. The Grade tab holds a grid with None first, one tile per stored colour file in between, each drawn from the photograph that is open, and Manage last, which opens the same dialog as the start screen and the information panel. A tap applies the file live, a second tap on the chosen tile goes to its strength, a run of taps is one undo step, and the chosen tile carries a check mark in its name so that the choice survives greyscale. The source carries it in `buildLutGrid` and `lutTile` in `src/main.ts` and in `#lutGrid` in `ir.html`.

@@ -87,3 +87,7 @@ with the same idiom. Nothing above 062 reads the session look, so nothing above
 has to be redone. It sits ahead of 012 because 012 is still a diagnosis while
 this is a known remedy, and because a look you cannot take off changes every
 photograph opened after it.
+
+## Outcome
+
+Shipped. The commit whose subject reads "New: a None button takes a look off your photograph" (6e79997, dated 24 September) is on main, read from the log of origin/main on 24 October. It was first staged in v2.63 on 25 September and reached production in v2.63.7 on 26 September. None is the first of the look buttons. Pressing it takes the look off the open photograph as one undo step, undoing what a look wrote and nothing else: a white balance set by hand survives, a camera-made file the look balanced goes back to how the camera made it, and the channel swap goes to what a photograph opens with when no look is on. An imported colour file stays, Reset keeps meaning the photograph as it opened, and the session look becomes none so that the next photographs open without one; Settings' Default look is not touched. The button is pressed, with its state in words, when no look is on. The source carries it in `takeLookOff` in `src/main.ts` and the None button in `ir.html`.
