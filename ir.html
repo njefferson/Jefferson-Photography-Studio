@@ -616,6 +616,7 @@
               <div class="mask-editor-actions">
                 <button id="mSkyFixAdd" type="button" class="toggle" aria-pressed="false">Add by hand</button>
                 <button id="mSkyFixCut" type="button" class="toggle" aria-pressed="false">Take out by hand</button>
+                <button id="mSkyFixFill" type="button" class="toggle" aria-pressed="false">Fill by hand</button>
                 <button id="mSkyFixClear" type="button">Clear by hand</button>
               </div>
               <!-- THE SLIDER IS A POSITION, NOT THE RADIUS. It maps
@@ -628,6 +629,12 @@
                    saved before this keep their size. -->
               <label id="mSkyFixSizeRow">Hand size <input id="mSkyFixSize" type="range" min="0" max="1" step="0.01" value="0.59" /></label>
               <small id="mSkyFixNote" class="note">Turn one on and drag on the photo to add the sky it missed or take back what is not sky. Your corrections are kept separately, so Reach, Feather and the colour toggle keep working and your hand work stays where you put it. Turn both off to pan and zoom again.</small>
+              <!-- FILL BY HAND (065). Its Tolerance is read when a stroke starts and
+                   STORED on the stroke, so moving the slider later changes only the
+                   next fill. A tap is a stroke of one point, which is the path
+                   that is not a drag. -->
+              <label id="mSkyFillTolRow">Tolerance <input id="mSkyFillTol" type="range" min="0" max="1" step="0.01" value="0.5" aria-describedby="mSkyFillTolNote" /></label>
+              <small id="mSkyFillTolNote" class="note">Fill by hand: drag a line through the gaps the sky was missed in, or tap one. Every point it crosses grows into the connected pixels of similar colour and brightness, and they are added to the selection. Keep the line in the gaps: a point that lands on something that is not sky fills that instead. Tolerance sets how alike they must be: a higher one reaches further, so lower it if the fill spills onto something that is not sky. Turn it off to pan and zoom again.</small>
             </div>
             <!-- A RADIAL MASK TURNS (027). The grip on the photograph is the
                  direct route; this is the same angle without a gesture, in

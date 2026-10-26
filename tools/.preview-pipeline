@@ -1,3 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
 version=101
-hash=de14cd7e6ecf073d
+hash=a411f261e16d4d87
+# Recorded WITHOUT a version bump. The evidence the pictures did not change:
+proven=Lane 192 piece 01 (Fill by hand): rebuildFix old and new compared byte for byte on 40 random stroke lists with no tolerance, 0 differing bytes, and growSkyByColour is not touched by this patch. Recorded on the integrated tree after the three curve, luminance and shadow patches of lane 191, which moved the version.

@@ -142,7 +142,7 @@ function req<T>(rq: IDBRequest): Promise<T> {
  *  cannot do. */
 export function shapeOf(m: MaskLayer): MaskShape {
   const { brush: _b, fine: _f, eff: _e, effFine: _ef, name: _n, ...rest } = m;
-  return { ...rest, fix: m.fix ? m.fix.map((s) => ({ pts: new Float32Array(s.pts), r: s.r, add: s.add })) : undefined };
+  return { ...rest, fix: m.fix ? m.fix.map((s) => ({ pts: new Float32Array(s.pts), r: s.r, add: s.add, ...(s.tol !== undefined ? { tol: s.tol } : {}) })) : undefined };
 }
 
 /** SAVE A MASK, or refuse a type that cannot travel.

@@ -1,10 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=60c8d4c065d5a851
-diffhash=9192a5ae8e7bcd46
+diffhash=128074a290d1214a
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 05 builds record 042's stage 2b part for Shadow colour per mask: an optional offset on the group head, added to the whole photo's amount and to the term a saved aim leaves, held to 0..1, with the shader and compileEdit holding the same rule. It also keeps a saved aim on its own rule, shows the "here only" aim switch only on a mask that already carries the aim, and declares that switch in .control-allow with the state that reveals it. The files touched are the ones the step's Files list names for this work: .control-allow, src/gl.ts, src/pipeline.ts, src/main.ts, src/debug.ts, src/previewcache.ts, ir.html, docs/ARCHITECTURE.md, docs/decisions/042, NOTES.md, tools/.preview-pipeline, tools/join-fold-check.mjs and tools/walk-input.mjs. The preview pipeline version moves by its own record. The record gained a built line for this part and the two earlier parts' built lines, which the record's own list asks for. No whole-photo look value was chosen.
+# IN-SCOPE: Sequence patch 06 builds record 065's chosen option, Fill by hand on the Sky mask: a stroke grows from every point it crosses into the connected pixels of similar colour and brightness, with a Tolerance control beside it, stored among the mask's hand corrections and replayed like the other two. It touches only the areas the step's Files list names: a new module under src/ (skyfill.ts), src/main.ts, src/maskstore.ts, src/pipeline.ts, ir.html, docs/ARCHITECTURE.md, NOTES.md and tools/.preview-pipeline. The stored tolerance is optional on the stroke and absent on every earlier stroke, so saved edits are unchanged. Nothing outside the Sky mask's own hand corrections is altered, and the whole-photo look values are untouched. The preview pipeline version is recorded by its own tool with its evidence line.
 # 
-# What was judged: the approved plan's Files and step 191 text, and the whole patch read in full. The status shows the fourteen staged files named above and nothing else.
+# What was judged: the approved plan's Files and step 192 text, which name these areas and this record, and the whole patch read in full. The status shows the eight staged paths and nothing else.
 # 
-# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new control text is written in the app's existing voice.
+# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new control's note is written in the app's existing voice and says what the control does.

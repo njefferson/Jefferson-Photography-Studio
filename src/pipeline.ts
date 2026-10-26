@@ -626,7 +626,21 @@ export interface FixStroke {
   r: number;
   /** true adds to the selection; false takes out of it. */
   add: boolean;
+  /** FILL BY HAND (065): present only on a stroke made with that tool, and then
+   *  the chroma radius, in the refinement guide's units, its fill matched colour
+   *  within. A fill stroke is not stamped as dabs: `rebuildFix` hands it to the
+   *  caller's fill, which grows it from every point of `pts` on the guide, and
+   *  `r` is unused. Absent on every stroke from before this field and on both
+   *  dab tools, so saved edits and undo snapshots migrate by doing nothing.
+   *  A fill stroke always has `add` true. */
+  tol?: number;
 }
+
+/** What `rebuildFix` calls for a fill stroke: take the stroke and the bitmap
+ *  being rebuilt, and add the stroke's fill to that bitmap in place. Supplied by
+ *  the caller because a fill reads the photograph's guide, which this file does
+ *  not know. */
+export type FixFill = (stroke: FixStroke, bm: BrushMask) => void;
 
 /** Solid inner fraction of a dab before it falls off to its edge. Lifted from
  *  `stampBrush` in main.ts so a correction dab feels exactly like a paint dab —
@@ -697,18 +711,25 @@ export function stampSegment(
  * Replay a stroke list over a generated bitmap.
  * @param base  the automatic bitmap; NOT modified.
  * @param fix  the strokes, in the order they were made.
+ * @param fill  what to call for a stroke that carries a tolerance (a fill by
+ *   hand); omitted when the photograph's guide is not to hand, and then such a
+ *   stroke is skipped.
  * @returns a fresh bitmap of `base`'s size, or `base` itself when there is
  *   nothing to replay.
  * What the result must satisfy: it is what `maskWeight` and both GPU atlases
  * read, so it is allocated fresh on every call and the caller must not mutate
  * it afterwards — undo snapshots share it by reference. Dabs are interpolated
  * along each stroke at a third of the radius, which is the spacing the paint
- * brush uses, so a fast drag does not come out as beads.
+ * brush uses, so a fast drag does not come out as beads. Strokes are applied in
+ * the order they were made whichever tool made them, so a Take out by hand cuts
+ * into an earlier fill and a later fill restores what a Take out removed. A
+ * list with no fill stroke gives exactly what it gave before fills existed.
  */
-export function rebuildFix(base: BrushMask, fix: readonly FixStroke[] | undefined): BrushMask {
+export function rebuildFix(base: BrushMask, fix: readonly FixStroke[] | undefined, fill?: FixFill): BrushMask {
   if (!fix || !fix.length) return base;
   const out: BrushMask = { w: base.w, h: base.h, data: new Uint8Array(base.data) };
   for (const st of fix) {
+    if (st.tol !== undefined) { if (fill) fill(st, out); continue; }
     const n = st.pts.length >> 1;
     if (!n) continue;
     stampFix(out, st.pts[0], st.pts[1], st.r, st.add);

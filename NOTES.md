@@ -3075,6 +3075,14 @@ user-scalable=no.
   colour and brightness, with a Tolerance, replayed like Add by hand. Under
   Aerochrome it reaches the look's own sky only with 052. See
   `docs/decisions/065-sky-inside-a-lattice-cannot-be-filled-into-the-sky-mask.md`.
+  **Built on staging, 2026-10-24: Fill by hand, and it waits on the device pass.**
+  It sits beside Add by hand and Take out by hand with a Tolerance slider, in
+  `src/skyfill.ts`. A stroke grows from every point it crosses into the
+  connected pixels of similar colour and brightness on the grow's own guide, is
+  stored with its tolerance among the mask's hand corrections and is replayed in
+  order with the other two, so Reach and Feather keep it. Not yet measured: how
+  the default Tolerance and the luma-to-colour ratio suit a lattice, and how a
+  drag feels on the tablet.
 - [ ] **Aerochrome is rendered from a model of the film, not tuned toward it** <!-- decision: 066 -->
   **Shown as:** Aerochrome built the way the film worked, so the sky goes dark and foliage stays red without the halos.
   Measured at full resolution 2026-09-25: tuning the look toward the film's

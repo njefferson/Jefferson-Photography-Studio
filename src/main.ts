@@ -51,7 +51,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP, keepSkyMap, getKeptSkyMap, keptSkyMapHint, photographStamp, digestBytes } from "./maskstore";
-import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, MASK_CURVE_LEN, maskCurvesStraight, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, skyReference, SKY_SAT_SECOND_GATE, type SkyMap } from "./pipeline";
+import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, MASK_CURVE_LEN, maskCurvesStraight, radialLocal, radialPoint, type MaskLayer, type FixStroke, type CropRect, BRUSH_MAX_EDGE, skyReference, SKY_SAT_SECOND_GATE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache, type HealSolves } from "./heal";
@@ -65,6 +65,7 @@ import { buildLocalMap } from "./localmap";
 import { buildOpenSkyMap, SKY_DEPTH_CHROMA_LO, SKY_DEPTH_CHROMA_HI, SKY_DEPTH_GREY_LO, SKY_DEPTH_GREY_HI } from "./skymap";
 import { requestSkyMap, releaseSkyMapScene } from "./skyClient";
 import { prepareSkySource, buildSkySelectionFrom, buildSkyGuide, refineSkyMask, growSkyByColour, type SkyGuide } from "./skyfine";
+import { startSkyFill, extendSkyFill, takeFillDirty, stampSkyFill, replaySkyFill, rememberSkyFill, fillToleranceAt, type SkyFill } from "./skyfill";
 import { measuredStrength } from "./raw/denoise";
 import { buildSkyMask, skyPrepare, skyTurn, SKY_MIN_COVERAGE, type SkyPrep } from "./sky";
 import { measureShadowCast, type ShadowCast } from "./shadowcast";
@@ -8324,8 +8325,10 @@ const mUI = {
   skyStatus: $("mSkyStatus") as HTMLElement,
   fixAdd: $("mSkyFixAdd") as HTMLButtonElement,
   fixCut: $("mSkyFixCut") as HTMLButtonElement,
+  fixFill: $("mSkyFixFill") as HTMLButtonElement,
   fixClear: $("mSkyFixClear") as HTMLButtonElement,
   fixSize: $("mSkyFixSize") as HTMLInputElement,
+  fillTol: $("mSkyFillTol") as HTMLInputElement,
   // A radial mask's turn without a gesture (027): the slider, its readout and
   // a tenth of a degree either side, the Straighten idiom.
   turnRow: $("mTurnRow") as HTMLElement,
@@ -8927,11 +8930,19 @@ function regenerateSkyMask(m: MaskLayer) {
  * snapshot by reference; and they are cleared, not left stale, when the stroke
  * list is empty — a composite outliving its strokes would be a correction
  * nothing could undo.
+ *
+ * A FILL BY HAND (065) is a stroke that carries a tolerance, and it is replayed
+ * on the photograph's guide, so the guide is looked up only when the list holds
+ * one. A list with none takes exactly the path it took before fills existed. A
+ * fill that cannot be replayed because the guide cannot be built is skipped, not
+ * guessed at, and the rest of the list still lands.
  */
 function applyMaskFix(m: MaskLayer) {
   if (!m.fix || !m.fix.length) { m.eff = undefined; m.effFine = undefined; return; }
-  m.eff = m.brush ? rebuildFix(m.brush, m.fix) : undefined;
-  m.effFine = m.fine ? rebuildFix(m.fine, m.fix) : undefined;
+  const guide = m.fix.some((s) => s.tol !== undefined) && current ? skyGuideFor(current) : null;
+  const fill = guide ? (st: FixStroke, bm: BrushMask) => stampSkyFill(bm, replaySkyFill(st, guide)) : undefined;
+  m.eff = m.brush ? rebuildFix(m.brush, m.fix, fill) : undefined;
+  m.effFine = m.fine ? rebuildFix(m.fine, m.fix, fill) : undefined;
 }
 
 /** Sky-mask status line, read straight from the generated bitmap so it is
@@ -9855,10 +9866,14 @@ wireRepeat(mUI.turnUp, () => { const m = currentMask(); if (m) turnPickedMask(fo
 // photograph whenever Reach, Feather or the colour toggle moves, so paint in it
 // would not survive the next drag; the stroke list does, because
 // regenerateSkyMask replays it. ---
-/** 0 = off, 1 = add to the selection, 2 = take out of it. */
-let skyFixMode: 0 | 1 | 2 = 0;
+/** 0 = off, 1 = add to the selection, 2 = take out of it, 3 = fill by hand (065):
+ *  the stroke is a seed, and the colour decides where the fill stops. */
+let skyFixMode: 0 | 1 | 2 | 3 = 0;
 let fixing = false;
 let fixPts: number[] = [];
+/** The fill under the finger while a Fill by hand stroke is being made, or null
+ *  for the two dab tools and between strokes. */
+let fillLive: SkyFill | null = null;
 
 function skyFixOn(): boolean {
   const m = currentMask();
@@ -9867,10 +9882,17 @@ function skyFixOn(): boolean {
   // photograph that will not move under the finger for no visible reason.
   return !!m && m.type === 4 && skyFixMode !== 0 && masksTabInFront();
 }
-function setSkyFixMode(mode: 0 | 1 | 2) {
+function setSkyFixMode(mode: 0 | 1 | 2 | 3) {
+  // A FILL READS THE PHOTOGRAPH'S GUIDE. Without one it cannot judge colour, so
+  // it says so and stays off rather than arming a tool that would do nothing.
+  if (mode === 3 && !(current && skyGuideFor(current))) {
+    toast("Fill by hand needs the photograph's colours, and they could not be read for this one.", 3200);
+    mode = 0;
+  }
   skyFixMode = mode;
   mUI.fixAdd.setAttribute("aria-pressed", String(mode === 1));
   mUI.fixCut.setAttribute("aria-pressed", String(mode === 2));
+  mUI.fixFill.setAttribute("aria-pressed", String(mode === 3));
   if (mode !== 0) {
     // Arming this owns the canvas, the same way Paint does — and the reader is
     // about to judge a selection, so bring the overlay back with it.
@@ -9884,7 +9906,7 @@ function setSkyFixMode(mode: 0 | 1 | 2) {
   // once; turning one on shows it immediately at the centre of the picture, so
   // the size is known BEFORE the first mark rather than discovered by making
   // one — which is the whole of the 2026-09-20 report.
-  if (skyFixMode === 0) hideFixBrush();
+  if (skyFixMode === 0 || skyFixMode === 3) hideFixBrush(); // a fill has no brush size to show
   else {
     showFixBrush();
     clearTimeout(fixBrushHideTimer);
@@ -9910,6 +9932,10 @@ function startFix(e: PointerEvent) {
   const baseFine = m.effFine ?? m.fine;
   m.eff = base ? { w: base.w, h: base.h, data: new Uint8Array(base.data) } : undefined;
   m.effFine = baseFine ? { w: baseFine.w, h: baseFine.h, data: new Uint8Array(baseFine.data) } : undefined;
+  // A FILL GROWS AS THE FINGER MOVES, on the same guide its replay will read, and
+  // takes its tolerance now: the number is stored on the stroke when it ends.
+  const guide = skyFixMode === 3 && current ? skyGuideFor(current) : null;
+  fillLive = guide ? startSkyFill(guide, fillToleranceAt(Number(mUI.fillTol.value))) : null;
   moveFix(e);
 }
 /** THE SMALLEST AND LARGEST HAND CORRECTION, as a fraction of the mask
@@ -9979,7 +10005,7 @@ function fixBrushClientRadius(): number | null {
  *  picture, which is the size-slider preview. */
 function showFixBrush(clientX?: number, clientY?: number): void {
   const r = fixBrushClientRadius();
-  if (!r || skyFixMode === 0) { hideFixBrush(); return; }
+  if (!r || skyFixMode === 0 || skyFixMode === 3) { hideFixBrush(); return; }
   let px = clientX, py = clientY;
   if (px === undefined || py === undefined) [px, py] = renderer.imageUvToClient(0.5, 0.5);
   const stage = fixBrushCursor.parentElement!.getBoundingClientRect();
@@ -10001,6 +10027,23 @@ function moveFix(e: PointerEvent) {
   if (!fixing || !m) return;
   const [uu, vv] = renderer.clientToImageUv(e.clientX, e.clientY);
   const u = clamp(uu, 0, 1), v = clamp(vv, 0, 1);
+  if (skyFixMode === 3) {
+    // The fill grows from every guide pixel the finger crosses, and only what it
+    // gained this move is stamped into the live composites. A tap is a stroke of
+    // one point.
+    if (fillLive) {
+      extendSkyFill(fillLive, u, v);
+      const gained = takeFillDirty(fillLive);
+      if (gained) {
+        if (m.eff) stampSkyFill(m.eff, fillLive, gained);
+        if (m.effFine) stampSkyFill(m.effFine, fillLive, gained);
+      }
+    }
+    fixPts.push(u, v);
+    m.rev = (m.rev ?? 0) + 1;
+    draw();
+    return;
+  }
   const r = fixRadius(), add = skyFixMode === 1;
   showFixBrush(e.clientX, e.clientY);
   const n = fixPts.length;
@@ -10024,12 +10067,21 @@ function endFix() {
   clearTimeout(fixBrushHideTimer);
   fixBrushHideTimer = window.setTimeout(() => { if (!fixing) hideFixBrush(); }, 1200);
   const m = currentMask();
-  if (m && fixPts.length >= 2) {
+  // A fill whose guide went away mid-stroke (fillLive null in mode 3) records
+  // nothing: falling through would store it as a Take out.
+  if (m && fixPts.length >= 2 && (skyFixMode !== 3 || fillLive)) {
+    // A fill stores its tolerance and no radius; the finished fill is kept
+    // against the stroke so the replay below does not grow it a second time.
+    const stroke: FixStroke = fillLive
+      ? { pts: Float32Array.from(fixPts), r: 0, add: true, tol: fillLive.tol }
+      : { pts: Float32Array.from(fixPts), r: fixRadius(), add: skyFixMode === 1 };
     // Replacing the array rather than pushing: every undo snapshot shares it.
-    m.fix = [...(m.fix ?? []), { pts: Float32Array.from(fixPts), r: fixRadius(), add: skyFixMode === 1 }];
+    m.fix = [...(m.fix ?? []), stroke];
+    if (fillLive) rememberSkyFill(stroke, fillLive);
     applyMaskFix(m);
     m.rev = (m.rev ?? 0) + 1;
   }
+  fillLive = null;
   fixPts = [];
   updateSkyStatus();
   draw();
@@ -10038,6 +10090,7 @@ function endFix() {
 
 mUI.fixAdd.addEventListener("click", () => setSkyFixMode(skyFixMode === 1 ? 0 : 1));
 mUI.fixCut.addEventListener("click", () => setSkyFixMode(skyFixMode === 2 ? 0 : 2));
+mUI.fixFill.addEventListener("click", () => setSkyFixMode(skyFixMode === 3 ? 0 : 3));
 mUI.fixClear.addEventListener("click", () => {
   const m = currentMask();
   if (!m || !m.fix?.length) return;
@@ -17469,7 +17522,7 @@ function keepEdit(): { json: string; parts: Map<string, Uint8Array> } {
     const sh = shapeOf(m);
     return {
       ...(m.name ? { ...sh, name: m.name } : sh),
-      fix: m.fix ? m.fix.map((f) => ({ pts: Array.from(f.pts), r: f.r, add: f.add })) : undefined,
+      fix: m.fix ? m.fix.map((f) => ({ pts: Array.from(f.pts), r: f.r, add: f.add, ...(f.tol !== undefined ? { tol: f.tol } : {}) })) : undefined,
     };
   });
 
@@ -17651,7 +17704,7 @@ function attachKeepBytes(bytes: KeepBytes): void {
 function reviveFixStrokes(): void {
   for (const m of params.masks) {
     if (!m.fix?.length) continue;
-    m.fix = m.fix.map((f) => (Array.isArray(f.pts) ? { pts: Float32Array.from(f.pts as ArrayLike<number>), r: f.r, add: f.add } : f));
+    m.fix = m.fix.map((f) => (Array.isArray(f.pts) ? { pts: Float32Array.from(f.pts as ArrayLike<number>), r: f.r, add: f.add, ...(f.tol !== undefined ? { tol: f.tol } : {}) } : f));
   }
 }
 
