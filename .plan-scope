@@ -1,10 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=60c8d4c065d5a851
-diffhash=8d584ff9351ff13f
+diffhash=6c2a073098b8cfa5
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 10 builds record 014's chosen options, as far as the code can settle them without the device: a Stop building button that ends the quick look's grid build at the next file and keeps the grid, the cells it never reached saying Not built in words, a count in the report of how many decodes the strip's background pass makes after a keep, and the grid's object URL releases counted so the report can say what it let go of. The Close path now also releases the compare dialog's two images. The record says whether memory returns on the device is the device's measurement, and the patch does not claim it. It touches only the areas the step's Files list names: src/main.ts, src/style.css, ir.html, docs/ARCHITECTURE.md and NOTES.md. The handoff in the record is not rewritten and the strip pictures are not rendered ahead, as the record's Rejected entries require. The stopped tile's accessible name carries its words, which the step's rules require for a control whose visible label is not in its name.
+# IN-SCOPE: Sequence patch 11 extends the control sweep so that it presses its way to the controls that only show after a press, and declares in .control-allow every control it still cannot reach with the state that would show it. It touches only the two files the step's Files list names for this work, .control-allow and tools/control-walk.mjs. Nothing under src/ or in any page is changed, and no look, wording or behaviour of the app moves. The declarations are judged one by one in the file, and the walk's own comments say a declared control that a state now reaches fails until its line is deleted, so the list cannot hide what it excuses.
 # 
-# What was judged: the approved plan's Files and step 193 text, which name these areas and this record, and the whole patch read in full. The status shows the five staged paths and nothing else.
+# What was judged: the approved plan's Files and step 194 text, which name the control walk and its declaration file for this work, and the whole patch read in full. The status shows the two staged files and nothing else.
 # 
-# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new words are in the app's existing voice.
+# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The declarations are written in the file's own form.

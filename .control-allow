@@ -12,6 +12,38 @@ ir.html#askOk — Written at call time. #askDlg is the app's own confirm dialog:
 
 ir.html#askCancel — Written at call time, the other half of #askOk above.
 
+ir.html#sessionPick — The label is the verb itself; the title adds the shortcut letter for a hardware keyboard (P) and a gloss of the verb ("Keep this one"). Nothing a touch reader needs lives only in the title: the button reports its state with aria-pressed, and pressing it a second time takes the verdict off, exactly as in the quick look.
+
+ir.html#sessionReject — The other half of #sessionPick: the title adds the shortcut letter (X) and a gloss of the verb ("Not this one"), and the press is undone by pressing again.
+
+ir.html#sessionDone — The title says that Done ends the session and frees its storage. The press does not do that at once: it asks first, in a confirmation that says the same thing in words on screen (the session's photograph count, and that ending it frees the storage), so the title restates a sentence the reader is shown before anything is thrown away.
+
+# --- labels the sweep reaches by pressing, whose title adds a gloss the label does not carry --
+# Each reason says where the sentence the title adds is also said, in words, on screen or to a
+# screen reader, or why the label cannot be longer. A control is declared here only because it
+# was reached and judged; none is here to make a count come out.
+
+ir.html#Held · Walk balance — A kept balance's row in the Basic tab's Kept balances list. The label is the balance's own name, which the reader typed or which is the date and time it was kept under, so it cannot carry a verb. The title adds that pressing it holds the balance and puts it on the open photograph; the note under the list explains holding and keeping in words, and the row says whether it is the held one in the word Held and in aria-pressed. The walk keeps one balance under a name of its own, so this key does not carry a clock.
+ir.html#cropLevel — Level, in the Straighten row, is the automatic one; its title says it finds the angle that levels the horizon. What carries the difference in words is the next row, Level to a line you draw, which names the manual alternative, and the angle shown in the same row, which moves when Level is pressed. The label stays one word because that row has the width of three 44 px targets (the markup says why).
+ir.html#sectionBack — The label names the place it goes, Sections, with a caret for the way up; the title adds only the direction, back to the list of sections, which the open section's heading beside it shows.
+ir.html#stripHere — The label says where it goes, back to the current photograph; the title says the same at length, scroll the strip back to the photo you are viewing. It shows only while the strip has scrolled away from the photograph being viewed.
+ir.html#1 White balance — A learn-mode chip on a practice photograph. The label is the lesson's number and name; the title adds a short gloss, and pressing the chip opens the lesson card, which carries the lesson in words on screen.
+ir.html#2 Swap & Looks — Learn-mode chip 2; the reason for #1 White balance above.
+ir.html#3 Sky & clouds — Learn-mode chip 3; the reason for #1 White balance above.
+ir.html#4 Color tools — Learn-mode chip 4; the reason for #1 White balance above.
+ir.html#5 Detail & finish — Learn-mode chip 5; the reason for #1 White balance above.
+ir.html#6 Dust & spots — Learn-mode chip 6; the reason for #1 White balance above.
+ir.html#7 Black & white — Learn-mode chip 7; the reason for #1 White balance above.
+ir.html#8 Grade the mood — Learn-mode chip 8; the reason for #1 White balance above.
+ir.html#9 Stickers — Learn-mode chip 9; the reason for #1 White balance above.
+ir.html#10 Warp — Learn-mode chip 10; the reason for #1 White balance above.
+ir.html#11 A whole folder at onc — Learn-mode chip 11; the reason for #1 White balance above. (The key is the label's first 24 characters.)
+ir.html#✕ Exit lessons — The label says it; the title adds the consequence, hide the lessons and edit the photo freely, which the chips going away shows.
+macro.html#resetBtn — The label is the whole verb for this app, whose one job is a focus-shift set, and the button appears only once a set is loaded; the title adds start over and focus-shift, which the page around it already says.
+macro.html#1 — A frame thumbnail in Macro Studio: the label is the frame's number over its picture, named Frame 1 to assistive technology. The title's instruction, tap to view and tap again to turn it off, is said in words in the status line the first tap raises (Frame 1 of 2. Tap it again to turn off), and each thumbnail reports on or off with aria-pressed. The walk loads two frames, so there are two of these lines.
+macro.html#2 — The second frame's thumbnail; the reason for #1 above.
+ir.html#… — A quick look tile whose file the build has not reached yet (the walk catches a folder of twelve while it builds). The label is an ellipsis, the app's mark for something still to come; the title adds that the file is not read yet, which the grid's count line says in words for as long as any tile is in this state (Reading n / m…, written by updateQuickHeader as each file lands), and the file's name is on screen in the line under the tile. Every waiting tile has this label, so this one line covers them all. The stopped tile, which says Not built, carries its sentence in its accessible name and needs no line.
+
 # --- controls that exist only in a state a cold sweep cannot manufacture -----
 # Each reason names WHAT would put the control on screen, so the next session
 # can drive it instead of inheriting the excuse. These are not "not looked at
@@ -21,20 +53,30 @@ index.html#swStripGo — The update strip, which appears only while a second ser
 index.html#swStripLater — The other half of the update strip above; offline-shell-walk presses it on ir.html, not here.
 ir.html#swStripGo — The update strip on the editor page. A cold sweep cannot manufacture a second worker, so it stays declared here; tools/offline-shell-walk.mjs drives it with a real one and presses it (check 11).
 ir.html#swStripLater — The other half of the editor's update strip; tools/offline-shell-walk.mjs presses it during a download and after a failed one (checks 13 and 14).
+macro.html#swStripGo — The update strip on Macro Studio, the same module as the three pages above and the same state: it appears only while a second service worker is downloading or waiting, which a cold sweep cannot manufacture. tools/offline-shell-walk.mjs drives the strip on ir.html with a real second worker; this page's copy of the markup is not driven by it.
+macro.html#swStripLater — The other half of Macro Studio's update strip above.
+debug.html#swStripGo — The update strip on the test page, the same module and the same state as the pages above: a second service worker downloading or waiting, which a cold sweep cannot manufacture and tools/offline-shell-walk.mjs drives on ir.html only.
+debug.html#swStripLater — The other half of the test page's update strip above.
 index.html#shareBtn — Revealed by setupInstalledShare only when the page is running as an INSTALLED standalone app. A browser tab is by definition not that, so a headless sweep can never see it; the walk would have to fake the display-mode media query, which would be measuring the fake.
+ir.html#shareBtn — The editor's copy of the installed-app Share button, revealed by the same setupInstalledShare (src/share.ts) only when the page is running as an INSTALLED standalone app. A browser tab is not that, and faking the display-mode media query would be measuring the fake.
+macro.html#shareBtn — Macro Studio's copy of the installed-app Share button: revealed by setupInstalledShare only when the page is running as an INSTALLED standalone app, which no browser tab is.
+ir.html#a2hsInstall — The Install app button on the start screen's Add to Home Screen strip. It is hidden in the markup and shown only when the browser raises its own offer to install the app, which a headless browser tab is not given; a walk that faked the offer would be measuring the fake. Reachable on a device whose browser offers the install, with the app not yet installed.
+ir.html#lessonShow — The floating "?" that Got it raises when a lesson card was open with learn mode OFF, the classic route for a DNG lesson. Leaving learn mode puts the card away, and every practice tile on the start screen opens in learn mode, where the numbered chips stand in for the "?", so no press this walk can make has the card open outside learn mode. The state would be a lesson card raised outside learn mode, and no route that does that was found in the code read for this list.
+ir.html#stripSkip — The offer to skip a file whose read has gone on longer than it should, once a set has a photograph on screen (decision 075's review). It needs a read that stalls, such as a file in a cloud store that is not on the device yet; a container cannot make one, and holding a request open to fake one would be measuring the fake.
+ir.html#busySkip — The same offer on the busy card, before any photograph is on screen: shown only after a read has taken longer than it should. The stalled read that #stripSkip needs is the one that shows it.
+ir.html#busyReport — The way into the diagnostic report from the busy card, shown only while the app waits on the last session's delete and that wait has run long (decision 075). A sweep cannot make a delete slow without faking the store.
+ir.html#myLensBypass — On the card for the reader's OWN measured lens (#myLensCard), which shows only when the open photograph matches a lens profile the reader measured and kept on this device. A fresh browser holds none, and making one takes a finished lens run on frames whose EXIF carries a lens name and a focal length; the practice raws carry neither.
+ir.html#myLensForget — The other half of #myLensBypass, on the same card.
+ir.html#glBrokenReload — On the card shown when the browser has WebGL2 and preparing the editor on the graphics driver then failed (decision 071). The walk's software graphics build the editor, so the state needs a driver that refuses it; reachable by planting a failure in the graphics build, which is its own piece of work.
+ir.html#glBrokenReport — The other half of #glBrokenReload, on the same card.
+ir.html#lensStop — The lens rig's Stop button, shown only while a measurement run is going over frames. The run starts only for a set whose files carry a lens name and a focal length in their EXIF; the three practice raws tried answered that nothing in the set carries them, and stayed idle for two minutes.
+ir.html#lensUse — Use these on my photos, which the lens rig shows only once a run has finished and produced a profile. Needs a set whose files carry a lens name and a focal length in their EXIF, and sky frames to measure; the practice raws carry neither.
+ir.html#lensBackup2 — Back up every profile on this device, on the lens rig's result after a finished run; the state #lensUse needs.
+ir.html#lensCopy2 — Copy this run, on the lens rig's result after a finished run; the state #lensUse needs.
+ir.html#lensSave2 — Save this run as a file, on the lens rig's result after a finished run; the state #lensUse needs.
 ir.html#locTip — The location tip, shown only when the opened file carries GPS data. Reachable by adding a GPS-bearing fixture to tools/fixtures and opening it.
 ir.html#mAimShadow — The "Shadow colour, here only" switch in the mask place's whole-photo tools group. Since a mask takes its own Shadow colour (record 042, stage 2b) the switch is shown only on a mask whose saved edit already carries that aim, so a saved aim is never hidden and can be switched off; no control a reader can press makes a new one, which is why a sweep that adds masks never sees it. The state that shows it is a mask loaded from an edit saved with that aim on, which needs a saved-edit fixture carrying one.
 ir.html#tatBanner — An armed-tool banner over the photograph; appears only while that tool is armed with a stroke in progress.
-ir.html#healBanner — Shown while Heal spots is armed.
 ir.html#healReviewBanner — Shown only after an automatic spot sweep has found something to review, so it needs a frame with real dust in it.
-ir.html#exportSave — In the export strip, which exists only after an export has finished. Reachable by running one, at the cost of a full-resolution encode per sweep.
-ir.html#exportSaveAll — The other half of the export strip above.
 ir.html#exportRetry — In the export strip, and only after an export has FAILED. Reachable by planting a failure, which is its own piece of work.
 ir.html#exportStop — In the export strip while an export is running.
-ir.html#exportDismiss — In the export strip once there is something to dismiss.
-ir.html#welcomeBack — On the start screen, and only when there is a photograph open BEHIND it to go back to. A cold start has nothing to return to, so the control correctly does not exist.
-ir.html#resumeSession — On the start screen, and only when a previous session is in storage. Reachable by opening a set, reloading, and sweeping the second load.
-ir.html#recoverBatch — On the start screen, and only when an interrupted batch left finished frames behind. It needs a batch killed mid-run to exist at all.
-ir.html#cropLevel — Measured with the crop tool armed: display:none. It is in #cropTools, whose two arms (crop, straighten) do not put the same controls on screen, and this sweep presses the crop one. One more press reaches it once somebody names the control that arms the other.
-ir.html#straightenDown — In #cropTools and laid out 0x0 with the crop arm pressed — an ancestor is display:none. Same cause as #cropLevel above.
-ir.html#straightenUp — The other half of #straightenDown.

@@ -56,6 +56,38 @@
 // It also PRINTS THE INVENTORY, grouped by surface, so reviewing every control
 // in the app is one read of one page rather than a person tapping through it.
 //
+// AND IT PRESSES ITS WAY TO THE CONTROLS THE MARKUP ONLY SHOWS AFTER A PRESS
+// (decision 046). A control that exists in the page and is not on screen until
+// something is done is not looked at by a sweep that only looks, and the coverage
+// section at the bottom is what said so: 60 of them, at the audit commit. Each
+// was judged on its own. Where a plain press, a typed name, a small file or the
+// browser's own window events puts the control on screen, this walk does that and
+// samples what it finds, in the states below; where the state needs something a
+// page cannot make for itself (an installed app, a second service worker, a file
+// that carries a lens, a read that stalls) the control is declared in
+// `.control-allow` with the state that would show it. Nothing is declared to get
+// green: a declared control that a state here now reaches FAILS until its line is
+// deleted, which is how the list only shrinks.
+//
+//   editorStates       one photograph open: the held balance, the straighten arm,
+//                      the finishing panel, the panel scrolled, a sticker placed,
+//                      a lens picked by hand, a healed spot, a LUT, a saved look's
+//                      share dialog and its QR, the start screen with a
+//                      photograph behind it
+//   jpegSetStates      two camera JPEGs open (the one-band notice, a pick, the
+//                      export row), a small export, and the graphics lost
+//   stripStates        six frames at phone width, the strip scrolled away, and the
+//                      start screen after a reload with that set left open
+//   quickLookStates    a folder of two photographs, a pick, a second run
+//   quickLookStopStates  a folder of twelve, caught while it builds and the Stop
+//                      pressed, and the grid it leaves
+//   lessonStates       a practice tile and its lesson card
+//   padStates          the start screen as an iPad shows it
+//   batchStates        a batch of four small frames, stopped after the first, and
+//                      the leftovers it keeps
+//   macroStates        two frames stacked
+//   debugStates        a test run
+//
 // `.control-allow` declares the honest exceptions, one `page#id` per line with
 // a reason after `—`, checked BOTH WAYS and printed on every run: a list that
 // hides what it excuses is a list nobody audits.
@@ -64,7 +96,7 @@ import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: this renders through the build in `dist`, and a stale one
 // renders the PREVIOUS build's pictures. See tools/fresh-dist.mjs.
 requireFreshDist();
-import { readFileSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { PAGES, repo } from "./surfaces.mjs";
 
@@ -118,7 +150,13 @@ async function controlsOn(page, where) {
       // to textContent, which is the label the DOM actually carries. Suspect the
       // instrument first (CLAUDE.md), and this is the third time that sentence
       // has paid for itself in this file's lifetime of one afternoon.
-      const text = (el.innerText || el.textContent || el.value || "").replace(/\s+/g, " ").trim();
+      const own = (el.innerText || el.textContent || el.value || "").replace(/\s+/g, " ").trim();
+      // A BUTTON WHOSE CONTENT IS A PICTURE IS NAMED BY THE PICTURE'S alt, which is
+      // what the browser's own name computation reads and innerText skips: a strip
+      // thumbnail with its picture drawn read here as a control with no name, and
+      // was not one. The alt is added only where the text does not already say it.
+      const alts = [...el.querySelectorAll("img[alt]")].map((i) => (i.getAttribute("alt") || "").trim()).filter((a) => a && !own.includes(a));
+      const text = [own, ...alts].join(" ").trim();
       out.push({
         where: w,
         id: el.id || "",
@@ -230,6 +268,332 @@ function uncovered(row) {
   if (!row.title) return [];
   const have = new Set([...words(row.text), ...words(row.aria)]);
   return words(row.title).filter((w) => !have.has(w));
+}
+
+// ===== THE STATES THE MARKUP ONLY SHOWS AFTER A PRESS (decision 046) ====================
+//
+// Each function below brings a page to a state a reader reaches by pressing, typing a
+// name, choosing a small file or having the browser take something away, and SAMPLES
+// what is on screen there exactly as the sweep above samples a tab: the same two
+// readers, into the same two lists. A state that cannot be reached prints that, once,
+// and the controls it would have shown stay unreached, which the coverage section then
+// refuses by name — a walk that cannot do what it says must not go quiet about it.
+
+/** Everything on screen now, as one more surface. Takes `page` and `where`, a label that
+ *  opens with the page's file name and ` · ` (the dedup and the allow list key on it).
+ *  Returns nothing; pushes into `rows` and `ctlRows`, the two lists every other sample
+ *  fills, so a control seen only here is counted, named and held to the same rules. */
+async function sample(page, where) {
+  rows.push(...(await controlsOn(page, where)));
+  ctlRows.push(...(await explainedOn(page, where)));
+}
+
+/** Press a control by id and give the page a moment. Takes `page`, the id and the wait in
+ *  milliseconds. Returns nothing. A synthetic click, like the tab presses above: what
+ *  matters here is that the state arrives, and each state's own sample says whether it did. */
+async function press(page, id, wait = 250) {
+  await page.evaluate((i) => document.getElementById(i)?.click(), id);
+  await page.waitForTimeout(wait);
+}
+
+/** Run one state, and say so when it cannot be reached. Takes a name and an async function.
+ *  Returns nothing and never throws: a state that fails leaves its controls unreached,
+ *  which the coverage section fails by name, so nothing is lost by carrying on. */
+async function attempt(name, fn) {
+  try { await fn(); } catch (e) {
+    console.log(`  (${name}: could not be reached — ${String((e && e.message) || e).split("\n")[0].slice(0, 160)}; what it shows stays unreached in this run)`);
+  }
+}
+
+const IPAD = "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+const FIXTURES = join(repo, "tools", "fixtures");
+/** A 2-point 3D LUT, the smallest .cube there is: eight lines of red, green and blue. */
+const CUBE = 'TITLE "Walk"\nLUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n';
+/** `n` copies of a camera JPEG under different names, as file objects a picker can take.
+ *  Takes the count. Returns the list `setInputFiles` wants. The names differ so that a
+ *  set of them is a set of photographs and not one photograph asked for `n` times. */
+function frames(n) {
+  const bytes = readFileSync(join(FIXTURES, "camera-ir-a.jpg"));
+  return Array.from({ length: n }, (_, i) => ({ name: `frame-${i + 1}.jpg`, mimeType: "image/jpeg", buffer: bytes }));
+}
+
+/** A context of its own with one page of the app open. Takes the browser, the context
+ *  options, the page file and an async function of the page. Returns when the function
+ *  has finished; the context is closed in a finally whatever happens. Service workers
+ *  are blocked, as in the phone state above: these states are about the page's controls,
+ *  not the offline shell, and a worker installing in the background would only be noise. */
+async function inPage(br, opts, file, fn) {
+  const ctx = await br.newContext({ serviceWorkers: "block", ...opts });
+  try {
+    const page = await ctx.newPage();
+    page.on("dialog", (d) => d.accept());
+    await page.goto(`${BASE}/${file}`, { waitUntil: "load" });
+    await page.waitForTimeout(700);
+    await fn(page);
+  } finally { await ctx.close(); }
+}
+
+/** The editor with a practice raw open and the mask place left as the sweep above left it.
+ *  Takes the page. Returns nothing. Every press here is undone before the next, so the
+ *  states do not lean on each other. */
+async function editorStates(page) {
+  const at = (name) => sample(page, `ir.html · ${name}`);
+  await press(page, "maskPlaceClose", 300);
+  await press(page, "ptab-basic", 150);
+
+  await attempt("ir.html, a balance held", async () => {
+    // A NAME OF OUR OWN: the default is the date and time, which would put a clock
+    // into the key of the list row this state shows. Typed and pressed in one task,
+    // so nothing between the two can put the default back.
+    await page.evaluate(() => {
+      const box = document.getElementById("balName");
+      if (box) { box.value = "Walk balance"; box.dispatchEvent(new Event("input", { bubbles: true })); }
+      document.getElementById("balHoldBtn")?.click();
+    });
+    await page.waitForTimeout(300);
+    const rowsKept = await page.evaluate(() => [...document.querySelectorAll("#balKept button.mask-pick")].map((b) => (b.textContent || "").trim()));
+    // The declared key in .control-allow reads this row's text; say so when it is not the name typed.
+    if (!rowsKept.includes("Held · Walk balance")) console.log(`  (ir.html, a balance held: the kept list reads ${JSON.stringify(rowsKept)}, not the name typed, so its row's key in .control-allow will not match)`);
+    await at("a balance held");
+    await press(page, "balBack", 300);
+  });
+  // THE OTHER ARM of the geometry tools, which the crop sweep above does not press:
+  // #straightenBtn arms the line and the level and the nudges that crop's arm leaves
+  // display:none.
+  await attempt("ir.html, the straighten arm", async () => {
+    await press(page, "ptab-crop", 200);
+    await press(page, "straightenBtn", 400);
+    await at("straighten armed");
+    await press(page, "straightenBtn", 300);
+  });
+  await attempt("ir.html, the finishing panel", async () => {
+    await press(page, "ptab-ir", 200);
+    await press(page, "lookEir", 800);
+    await at("Aerochrome pressed, its finishing panel up");
+    await press(page, "finishClose", 300);
+    await at("the finishing panel put away");
+    await press(page, "lookNone", 600);
+  });
+  await attempt("ir.html, the panel scrolled", async () => {
+    await page.evaluate(() => { const b = document.getElementById("panelBody"); if (b) { b.scrollTop = 400; b.dispatchEvent(new Event("scroll")); } });
+    await page.waitForTimeout(300);
+    await at("the panel scrolled down");
+    await page.evaluate(() => { const b = document.getElementById("panelBody"); if (b) { b.scrollTop = 0; b.dispatchEvent(new Event("scroll")); } });
+  });
+  await attempt("ir.html, a sticker placed", async () => {
+    await press(page, "ptab-stickers", 400);
+    await page.evaluate(() => document.querySelector("#stickerAdd button")?.click());
+    await page.waitForTimeout(800);
+    await at("a sticker placed");
+    await press(page, "stkClear", 400);
+  });
+  // A practice raw carries no lens in its EXIF, so the card asks for one; picking it by
+  // hand is the route a reader takes and it turns the correction on.
+  await attempt("ir.html, a lens picked by hand and a healed spot", async () => {
+    await press(page, "ptab-corrections", 300);
+    await page.evaluate(() => { const s = document.getElementById("hsLens"); if (s && s.options.length > 1) { s.selectedIndex = 1; s.dispatchEvent(new Event("change", { bubbles: true })); } });
+    await page.waitForTimeout(200);
+    await page.evaluate(() => { const s = document.getElementById("hsFL"); if (s && s.options.length > 1) { s.selectedIndex = 1; s.dispatchEvent(new Event("change", { bubbles: true })); } });
+    await press(page, "hsApplyManual", 1200);
+    await at("a lens picked by hand");
+    await press(page, "healBtn", 300);
+    const box = await page.evaluate(() => { const r = (document.getElementById("view") || document.querySelector("canvas")).getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+    await page.mouse.click(box.x + box.w * 0.5, box.y + box.h * 0.5);
+    await page.waitForTimeout(1500);
+    await at("Heal armed, a spot healed");
+    await press(page, "healClear", 300);
+    await press(page, "healBtn", 300);
+  });
+  // A LUT, a saved look that carries it, and that look's share dialog. The QR needs a
+  // name typed first: the first press with none only asks for one.
+  await attempt("ir.html, a LUT and a saved look's share dialog", async () => {
+    await press(page, "ptab-grade", 300);
+    await page.setInputFiles("#lutFile", { name: "walk.cube", mimeType: "text/plain", buffer: Buffer.from(CUBE) });
+    await page.waitForTimeout(1500);
+    await at("a LUT on the photograph");
+    await page.evaluate(() => document.querySelector(".slot-save")?.click());
+    await page.waitForTimeout(600);
+    await page.evaluate(() => document.querySelector(".slot-more")?.click());
+    await page.waitForTimeout(600);
+    await at("a saved look that carries a LUT, its share dialog");
+    await page.fill("#lookName", "Walk look");
+    await press(page, "lookShowQr", 800);
+    await at("the share dialog, the QR shown");
+    await press(page, "lookDlgClose", 300);
+    await press(page, "lutRemoveBtn", 300);
+  });
+  await attempt("ir.html, the start screen with a photograph behind it", async () => {
+    await press(page, "homeBtn", 600);
+    await at("the start screen, a photograph behind it");
+    await press(page, "welcomeBack", 400);
+  });
+}
+
+/** Two camera JPEGs open: the one-band notice under a colour look, a pick, the Export
+ *  tab's row for the picks, two small exports and the line they leave, and the graphics
+ *  taken away last (the page cannot draw after it). Takes the browser. Returns nothing.
+ *  Camera JPEGs of 1400 by 932, so an export is seconds and not a full-resolution encode. */
+async function jpegSetStates(br) {
+  await attempt("ir.html, two camera JPEGs", () => inPage(br, { viewport: { width: 900, height: 900 } }, "ir.html", async (page) => {
+    const at = (name) => sample(page, `ir.html · ${name}`);
+    await page.setInputFiles("#file", [join(FIXTURES, "camera-ir-a.jpg"), join(FIXTURES, "camera-ir-b.jpg")]);
+    await page.waitForFunction(() => document.getElementById("welcome")?.hidden && document.querySelectorAll("#sessionThumbs .session-thumb").length === 2, null, { timeout: 120000 });
+    await page.waitForTimeout(1500);
+    await press(page, "ptab-ir", 300);
+    await press(page, "lookAero", 2000);
+    await at("two camera JPEGs, a colour look on");
+    await press(page, "sessionPick", 400);
+    await press(page, "ptab-export", 400);
+    await at("a pick made, the Export tab");
+    const strip = (re) => page.waitForFunction((s) => new RegExp(s).test(document.getElementById("exportStripText")?.textContent || ""), re, { timeout: 120000 });
+    await press(page, "exBtn", 100);
+    await strip("^Ready —");
+    await at("an export finished");
+    await press(page, "exBtn", 100);
+    await strip("^Ready —[\\s\\S]*exported, not yet saved");
+    await at("two exports waiting");
+    await press(page, "exportDismiss", 400);
+    await at("the export line put away, the panel's row left");
+    await page.evaluate(() => { const c = document.getElementById("view") || document.querySelector("canvas"); const g = c && (c.getContext("webgl2") || c.getContext("webgl")); g?.getExtension("WEBGL_lose_context")?.loseContext(); });
+    await page.waitForTimeout(1500);
+    await at("the graphics lost");
+  }));
+}
+
+/** Six frames at phone width, and the strip scrolled away from the photograph being
+ *  viewed: the way back to it only exists while the strip is overflowing and the photo
+ *  is out of its window; then the page reloaded with the set still open. Takes the
+ *  browser. Returns nothing. */
+async function stripStates(br) {
+  await attempt("ir.html, six frames at phone width", () => inPage(br, { viewport: { width: 302, height: 656 }, hasTouch: true }, "ir.html", async (page) => {
+    await page.setInputFiles("#file", frames(6));
+    await page.waitForFunction(() => document.getElementById("welcome")?.hidden && document.querySelectorAll("#sessionThumbs .session-thumb").length === 6, null, { timeout: 120000 });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => { const s = document.getElementById("sessionThumbs"); s.scrollLeft = s.scrollWidth; });
+    await page.waitForTimeout(800);
+    await sample(page, "ir.html · six frames at phone width, the strip scrolled away from the photograph");
+    // AND THE SAME SET LEFT BEHIND BY A RELOAD: a session in storage is what puts
+    // "Resume session" on the start screen, so the page is reloaded with the set open.
+    await page.reload({ waitUntil: "load" });
+    await page.waitForTimeout(1500);
+    await sample(page, "ir.html · the start screen after a set was left open");
+  }));
+}
+
+/** Quick look on a folder of two practice raws, a pick made with the key every culling
+ *  tool uses, and the same folder again (the second run comes back from the device, which
+ *  is what puts "Build these again" on screen). Takes the browser. Returns nothing. */
+async function quickLookStates(br) {
+  const two = [join(repo, "dist", "examples", OPEN_WITH), join(repo, "dist", "examples", "NIR_0102.dng")];
+  await attempt("ir.html, quick look", () => inPage(br, { viewport: { width: 900, height: 900 } }, "ir.html", async (page) => {
+    const counted = () => page.waitForFunction(() => /^2 photos/.test(document.getElementById("qlCount")?.textContent || ""), null, { timeout: 240000 });
+    const opened = () => page.waitForFunction(() => document.getElementById("quickLook")?.open, null, { timeout: 60000 });
+    await page.setInputFiles("#quickFiles", two);
+    await opened();
+    await counted();
+    await page.waitForTimeout(800);
+    await sample(page, "ir.html · quick look, two photographs");
+    await page.locator("#qlGrid .ql-tile").first().focus();
+    await page.keyboard.press("p");
+    await page.waitForTimeout(400);
+    await sample(page, "ir.html · quick look, a pick made");
+    await press(page, "qlClose", 400);
+    await page.setInputFiles("#quickFiles", two);
+    await opened();
+    await counted();
+    await page.waitForTimeout(800);
+    await sample(page, "ir.html · quick look, the same folder again");
+  }));
+}
+
+/** A quick look caught while its grid builds, "Stop building" pressed, and the grid it leaves.
+ *  Takes the browser. Returns nothing. Twelve practice raws, so the build is still running when
+ *  the walk looks; the button is waited for by itself at animation-frame polling and sampled the
+ *  moment it is on screen, then pressed, and the state after it sampled again. If the build
+ *  finishes before the walk can see the button, the state says so and `#qlStop` stays
+ *  unreached, which the coverage section below then refuses by name. */
+async function quickLookStopStates(br) {
+  const many = readdirSync(join(repo, "dist", "examples")).filter((f) => f.endsWith(".dng")).sort().slice(0, 12).map((f) => join(repo, "dist", "examples", f));
+  await attempt("ir.html, a quick look stopped part-way", () => inPage(br, { viewport: { width: 900, height: 900 } }, "ir.html", async (page) => {
+    await page.setInputFiles("#quickFiles", many);
+    await page.waitForFunction(() => { const b = document.getElementById("qlStop"); return !!b && !b.hidden && b.getBoundingClientRect().width > 0; }, null, { timeout: 60000, polling: "raf" });
+    await sample(page, "ir.html · quick look, still building");
+    await press(page, "qlStop", 100);
+    await page.waitForFunction(() => document.getElementById("qlStop")?.hidden, null, { timeout: 120000 });
+    await page.waitForTimeout(600);
+    await sample(page, "ir.html · quick look, stopped part-way");
+  }));
+}
+
+/** A practice tile on the start screen and the lesson card it opens. Takes the browser.
+ *  Returns nothing. The card's other control, the floating "?", is shown only by "Got it"
+ *  with learn mode off, and no state has the card open with learn mode off. */
+async function lessonStates(br) {
+  await attempt("ir.html, a practice photograph", () => inPage(br, { viewport: { width: 900, height: 900 } }, "ir.html", async (page) => {
+    await page.evaluate(() => document.querySelector("#galleryList button.gal:not(.gal-library)")?.click());
+    await page.waitForFunction(() => document.getElementById("lesson") && !document.getElementById("lesson").hidden, null, { timeout: 120000 });
+    await page.waitForTimeout(800);
+    await sample(page, "ir.html · a practice photograph, its lesson card");
+  }));
+}
+
+/** The start screen as an iPad shows it: the app teaches Add to Home Screen there, since
+ *  iOS has no install prompt. The user agent is what the app reads (src/platform.ts). */
+async function padStates(br) {
+  await attempt("ir.html, an iPad start screen", () => inPage(br, { viewport: { width: 820, height: 1180 }, userAgent: IPAD, hasTouch: true }, "ir.html", async (page) => {
+    await sample(page, "ir.html · the start screen as an iPad shows it");
+  }));
+}
+
+/** A batch of four small frames from the start screen, stopped after the first: the card
+ *  while it runs, the card once it has stopped, and the start screen after a reload, where
+ *  the finished frame it leaves behind is offered back. Takes the browser. Returns nothing.
+ *  The look is the first the chooser lists; the frames are the camera JPEG fixture. */
+async function batchStates(br) {
+  await attempt("ir.html, a batch of four frames", () => inPage(br, { viewport: { width: 900, height: 900 } }, "ir.html", async (page) => {
+    await press(page, "batchBtn", 300);
+    await page.waitForFunction(() => document.getElementById("batchDlg")?.open, null, { timeout: 20000 });
+    const chooser = page.waitForEvent("filechooser", { timeout: 20000 });
+    await page.evaluate(() => document.querySelector("#bcLooks button")?.click());
+    await (await chooser).setFiles(frames(4));
+    const shown = (id) => page.waitForFunction((i) => { const b = document.getElementById(i); return !!b && !b.hidden && b.getBoundingClientRect().width > 0; }, id, { timeout: 180000, polling: "raf" });
+    await shown("busyStop");
+    await sample(page, "ir.html · a batch running");
+    await press(page, "busyStop", 100);
+    await shown("busySave");
+    await sample(page, "ir.html · a batch stopped after its first frame");
+    await press(page, "busyClose", 600);
+    await page.reload({ waitUntil: "load" });
+    await page.waitForTimeout(1500);
+    await sample(page, "ir.html · the start screen after a batch left unfinished");
+  }));
+}
+
+/** Macro Studio with two frames loaded and stacked. Takes the page (macro.html, open).
+ *  Returns nothing. The page takes JPEG and PNG, so the camera JPEG fixture stands in for a
+ *  focus-shift burst; the result's controls exist only once a stack has finished. */
+async function macroStates(page) {
+  await attempt("macro.html, two frames stacked", async () => {
+    await page.setInputFiles("#files", frames(2));
+    await page.waitForFunction(() => !document.getElementById("work")?.hidden, null, { timeout: 60000 });
+    await page.waitForTimeout(1200);
+    await sample(page, "macro.html · two frames loaded");
+    await press(page, "stackBtn", 100);
+    await page.waitForFunction(() => !document.getElementById("compareBtn")?.hidden, null, { timeout: 180000 });
+    await page.waitForTimeout(600);
+    await sample(page, "macro.html · the frames stacked");
+  });
+}
+
+/** The test page after one of its tests has run: "Copy the results" appears only then.
+ *  Takes the page (debug.html, open). Returns nothing. The test chosen is the shortest,
+ *  reading one photograph out of a big stored session. */
+async function debugStates(page) {
+  await attempt("debug.html, a test run", async () => {
+    await press(page, "dBigRead", 100);
+    await page.waitForFunction(() => !document.getElementById("dCopyAll")?.hidden, null, { timeout: 240000 });
+    await sample(page, "debug.html · a test run");
+  });
 }
 
 const served = await fetch(`${BASE}/ir.html`).then((r) => r.ok).catch(() => false);
@@ -354,6 +718,16 @@ try {
         await page.waitForTimeout(150);
         rows.push(...(await controlsOn(page, `${s.file} · a mask picked`)));
         ctlRows.push(...(await explainedOn(page, `${s.file} · a mask picked`)));
+        // AND ITS TONE TAB (042, stage 2b). While a mask is picked the curve on this
+        // tab is THE MASK'S OWN curve, and "Reset this mask's curve" is shown with it
+        // and in no other state, so a sweep that looks at the tab with nothing picked
+        // leaves it declared and never reached.
+        await page.evaluate(() => document.getElementById("ptab-tone")?.click());
+        await page.waitForTimeout(150);
+        rows.push(...(await controlsOn(page, `${s.file} · a mask picked, the Tone tab`)));
+        ctlRows.push(...(await explainedOn(page, `${s.file} · a mask picked, the Tone tab`)));
+        await page.evaluate(() => document.getElementById("ptab-basic")?.click());
+        await page.waitForTimeout(100);
         await page.evaluate(() => document.getElementById("maskPlaceOpen")?.click());
         await page.waitForTimeout(150);
       }
@@ -388,6 +762,10 @@ try {
       ctlRows.push(...(await explainedOn(page, `${s.file} · ${id}`)));
       await page.evaluate(() => document.querySelector("dialog[open]")?.close());
     }
+    // THE STATES THAT NEED A PRESS, last, because they change the edit and put it back.
+    if (s.file === "ir.html") await editorStates(page);
+    if (s.file === "macro.html") await macroStates(page);
+    if (s.file === "debug.html") await debugStates(page);
     await page.close();
   }
   // AND THE WAY BACK TO THE WHOLE PHOTOGRAPH (053), which exists only on a
@@ -412,6 +790,14 @@ try {
     }
     await ctx.close();
   }
+  // AND THE STATES THAT NEED A CONTEXT OF THEIR OWN (decision 046), cheapest first.
+  await padStates(br);
+  await lessonStates(br);
+  await stripStates(br);
+  await jpegSetStates(br);
+  await batchStates(br);
+  await quickLookStates(br);
+  await quickLookStopStates(br);
 } finally { await br.close(); }
 
 // ONE ROW PER CONTROL, and the dedup key is the CONTROL rather than the place
