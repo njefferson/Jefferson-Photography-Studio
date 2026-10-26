@@ -467,6 +467,34 @@ selection; built in stages, each shippable and checkable on its own.** Chosen.
     masks overlap (one weight applied once, against two offsets that add) is
     the one question in 2b the conventions do not answer, so its design is
     written when it is built, before the code.
+    **The design, written 24 October 2026 from the conventions under Looked up
+    and before the code:**
+    - **The value.** A mask's own Shadow colour is an optional `shadow` on the
+      group head, in the field's own sense: how much more colour is taken out
+      of the dark end. At a pixel the stage uses the whole photo's `shadowSat`
+      times the aim's weight where an aim is saved, plus each group's `shadow`
+      times that group's joined weight, then holds the sum to 0..1. The control
+      keeps the whole photo's direction, so right keeps more colour, and a
+      mask's own starts at no change.
+    - **Two masks that overlap add.** Their offsets add and the sum is held to
+      the field's range, the convention Lightroom and Capture One give every
+      local value (Looked up, "How a masked control gets its value").
+    - **A saved aim keeps its own rule and is never turned into an offset.** An
+      aim is one weight applied once to the whole photo's amount, the largest of
+      the aiming weights, so two aimed masks that overlap give that largest
+      weight where two offsets would give their sum. Converting a saved aim
+      would paint a different picture wherever two soft aimed edges overlap,
+      would move the whole photo's amount to nothing and so change what a later
+      look does with it, and would rewrite every saved edit that carries one.
+      So there is **no Convert**: the aim term is read exactly as before, an
+      edit with no offset renders to the bit as it did, and the aim and the
+      offset are two terms of one sum.
+    - **The interface.** The "Shadow colour, here only" toggle shows only on a
+      mask that already carries the aim, so a saved aim is never hidden and can
+      be switched off, and no new one can be made. A colour mask can carry the
+      offset, because the stage runs after the mask stage, where the group's
+      weight, colour key included, exists; the aim could not, being read before
+      it, and still cannot.
   - **Contrast:** already the mask's own since stage 2. The whole-photo
     contrast after the mask stage does not also go per mask: two contrasts on
     one mask would be two sliders for one thing.
@@ -536,6 +564,7 @@ list). Stage 2 builds on these three.
 - **A mode holding only today's five adjustments**: a mode is a claim about capacity, and moving five sliders into a place of their own promises more than it has.
 - **A longer menu in the same tab**: the ruling rules out a submenu, and a longer one in the same place is the same shape.
 - **Copying Lightroom's control list verbatim**: a visible-light inventory with no channel swap, no red-channel flood and no hot-spot; the list is this app's own controls, and it is not cut down to the six the scope gate first flagged.
+- **Converting a saved shadow-colour aim into a per-mask offset** (24 October 2026): the aim is the largest of the aiming weights and offsets add, so a conversion changes the picture where two aimed masks overlap; it moves the whole photo's amount to nothing, which changes what a later look does with it; and it rewrites every saved edit that carries an aim. The aim stays a reader.
 - **Every stage takes a mask, rewritten all at once**: this record's former Rejected 3, reopened 2026-09-24 in the narrow sense above; what stays rejected is doing it in one change rather than in stages.
 
 ## Rank
