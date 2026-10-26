@@ -17,12 +17,19 @@
 // A var() WITH a fallback — var(--x, #fff) — is deliberate and is not checked.
 // The bare form is the one that fails silently.
 //
-//   node tools/token-check.mjs [--repo .]
+//   node tools/token-check.mjs [--repo=DIR]
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
+// `--repo=` names another checkout; with none given, the repository THIS FILE SITS
+// IN, found from the file's own location and never from the directory the process
+// was started in (tools/contract-check.mjs does the same). It used to default to
+// "." and, started anywhere but the repository root, found no stylesheet at all and
+// printed "0 defined, 0 referenced" with exit 0 — a pass that had read nothing.
+// Nothing may `cd` in the sessions that run these tools.
 const arg = process.argv.find((a) => a.startsWith("--repo="));
-const root = arg ? arg.split("=")[1] : ".";
+const root = arg ? arg.split("=")[1] : join(dirname(fileURLToPath(import.meta.url)), "..");
 const ROOTS = ["src", "public"];
 const SKIP = /node_modules|[/\\]dist[/\\]|[/\\]\.git[/\\]/;
 
@@ -38,6 +45,14 @@ const walk = (d) => {
   }
 };
 for (const r of ROOTS) { try { if (statSync(join(root, r)).isDirectory()) walk(join(root, r)); } catch {} }
+
+// A GATE THAT READ NOTHING HAS NOT PASSED. No file under src or public means the
+// root is not this app's repository, and "0 defined, 0 referenced" is the silent
+// zero that said ok over a tree it never opened.
+if (!files.length) {
+  console.log(`FAIL  no stylesheet, script or page found under src or public of ${root} — this is not the repository to check`);
+  process.exit(1);
+}
 
 const defined = new Set();
 const used = new Map();                       // name -> Set of "file:line"

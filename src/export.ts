@@ -1197,9 +1197,12 @@ export function bilinearTap(sample: LinearSampler, fx: number, fy: number, w: nu
  *  neighbourhood taps this far apart, a drawn export scales the shader's taps by
  *  it, and a batch export has to agree with a single one. Kept in sync with
  *  main.ts MAX_PREVIEW (8-bit proxy) and demosaic.ts binning (RAW = half-res).
- *  An 8-bit source is now shown at full size wherever the browser gives the
- *  drawing buffer (main.ts toPreview), with its taps scaled by this same
- *  factor, so the footprint a reader tuned is unchanged by that. */
+ *  An 8-bit source over 2800 px on its long side is shown from a 2800 px proxy
+ *  (main.ts toPreview, because OPEN_8BIT_AT_FULL_SIZE is off), so this returns
+ *  that long side over 2800 and the export's taps are spaced that far apart; a
+ *  smaller one is shown at its own size and gets 1. The full-size path stays in
+ *  main.ts switched off, and if it is turned on the preview's taps scale by this
+ *  same factor, so the footprint a reader tuned is the same either way. */
 export function proxyFactorFor(src: Source, srcW: number, srcH: number): number {
   const PREVIEW_MAX = 2800;
   return "cfa" in src ? 2 : Math.max(1, Math.max(srcW, srcH) / PREVIEW_MAX);

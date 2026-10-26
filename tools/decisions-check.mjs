@@ -463,12 +463,18 @@ function dependsOf(text) {
   return out;
 }
 
+/** The three forms a record cites another in. The bold form refuses a percent
+ *  sign straight after the number: a bold span that opens with a percentage
+ *  ("**100% of the frames**") is a quantity and never a record's key, and read as
+ *  one it made 100 unusable as a key until two older records were reworded. */
+const CITE_FORMS = [/\*\*(\d{3})\b(?!%)/g, /`(\d{3})`/g, /\bdecisions?\s+(\d{3})\b/gi];
+
 /** The decision keys a record CITES in prose, in this repo's own citation
  *  forms only.
  *
  *  Takes the record text and its own key; returns the set of other keys it
  *  names as `**NNN**`, `` `NNN` ``, "decision NNN", or a bold span opening with
- *  the number.
+ *  the number (and not with a percentage of that many digits).
  *
  *  What the result must satisfy, and it is the whole reason the patterns are
  *  narrow: a first pass matched any three-digit run and pulled in IR-SCIENCE
@@ -480,10 +486,20 @@ function citesOf(text, self) {
   const cut = text.replace(/^##\s+Depends\b[\s\S]*?(?=^##\s|$(?![\s\S]))/mi, "");
   const body_ = cut.replace(/^#\s+.*$/m, ""); // the title line names its own key
   const found = new Set();
-  for (const re of [/\*\*(\d{3})\b/g, /`(\d{3})`/g, /\bdecisions?\s+(\d{3})\b/gi]) {
+  for (const re of CITE_FORMS) {
     for (const m of body_.matchAll(re)) if (m[1] !== self) found.add(m[1]);
   }
   return found;
+}
+
+// THE FORMS' OWN CASE, run on every commit. A bold span opening with a three-digit
+// percentage is a quantity, not a record: on the pattern before the percent-sign
+// lookahead this text reads 100 as well as 101, 102 and 103 and the line below
+// fails; with it the four forms read exactly the three records they name.
+{
+  const read = [...citesOf("**100% of the frames** keep it, see **101**, `102` and decision 103.", "000")].sort().join(" ");
+  if (read === "101 102 103") ok("a bold span opening with a percentage is a quantity, not a citation (100%)");
+  else fail(`the citation forms read "${read}" where they should read "101 102 103" — a bold span opening with a percentage is a quantity, not a record's key`);
 }
 
 const rankOf = new Map(open.map((item, i) => [keyOf(item.text), i]));

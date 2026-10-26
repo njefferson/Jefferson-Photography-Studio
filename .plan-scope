@@ -1,10 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=60c8d4c065d5a851
-diffhash=580cffdd57ddc1b1
+diffhash=5cceb58d406c4572
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 12 is the reader-facing fix set from the Found queue and the control walk: the look buttons carry an aria-pressed state from the markup, so a screen reader is told which look is on; Macro Studio's version button takes an accessible name that opens with its visible version text; and the Aerochrome finishing panel's Sky saturation and Restore depth lines are reworded to say what those two stages now do. The Found queue names the two finishing lines as describing what no longer happens, which the step's rules allow to be reworded. No other existing label is reworded, and no look value is changed. It touches only the files the step's Files list names: docs/ARCHITECTURE.md, ir.html, macro.html, src/main.ts, src/verstamp.ts. The architecture line count moves by its own generator.
+# IN-SCOPE: Sequence patch 13 is the last of the thirteen. It moves VERSION from 2.66 to 2.67, as the Versioning section of the app's notes asks for the release commit, and writes the NOTES.md staging entry for this version. It also carries the internal fixes the step's Files list names: the repository-finding defaults of the checks in tools/ (each taking its root from its own file's place, as tools/contract-check.mjs does), the token check's silent zero made a failure, the decisions check's percentage case, the two comments in src/export.ts, src/debug.ts and src/diagnostic.ts made to say what the code does, and the Found queue lines in NOTES.md, each gaining a clause saying what this work did. Nothing under the app's behaviour changes in this patch. All touched paths are in the step's Files list.
 # 
-# What was judged: the approved plan's Files and step 194 text, which name these files and these queue items, and the whole patch read in full. The status shows the five staged paths and nothing else.
+# What was judged: the approved plan's Files and step 194 text, and the whole patch read in full. The status shows the seventeen staged paths and nothing else.
 # 
-# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new words are plain and in the app's existing voice.
+# One note for the owner, recorded here and not changed by this patch: the staging entry's wording says main is moved to the earlier commit before this sequence lands. That promotion was refused by the session's permission check and has not happened, so the entry's sentence about it does not yet hold. The entry is the record of the plan's intention and is left as the sequence has it.
+# 
+# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new prose is written as the record asks.

@@ -21,10 +21,16 @@
 // which re-measures the list and fails on a difference.
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
+// `--repo=` names another checkout; with none given, the repository THIS FILE SITS
+// IN, found from the file's own location and never from the directory the process
+// was started in (tools/contract-check.mjs does the same). It used to default to
+// "." and look for palettes/studio.json in the start directory, and nothing may
+// `cd` in the sessions that run these tools.
 const arg = process.argv.find((a) => a.startsWith("--repo="));
-const root = arg ? arg.split("=")[1] : ".";
+const root = arg ? arg.split("=")[1] : join(dirname(fileURLToPath(import.meta.url)), "..");
 const SPEC = join(root, "palettes/studio.json");
 
 let spec;

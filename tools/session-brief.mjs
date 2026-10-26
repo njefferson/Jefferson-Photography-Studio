@@ -11,10 +11,16 @@
 // of .branch-guard, the walks out of tools/. A brief that can go stale is the
 // document problem again, one level up.
 import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
+// `--repo DIR` names another checkout; with none given, the repository THIS FILE
+// SITS IN, found from the file's own location and never from the directory the
+// process was started in (tools/contract-check.mjs does the same). It used to
+// default to "." and brief the start directory, and nothing may `cd` in the
+// sessions that run these tools.
 const at = process.argv.indexOf("--repo");
-const repo = resolve(at >= 0 ? process.argv[at + 1] : ".");
+const repo = resolve(at >= 0 ? process.argv[at + 1] : join(dirname(fileURLToPath(import.meta.url)), ".."));
 const read = (p) => { try { return readFileSync(join(repo, p), "utf8"); } catch { return ""; } };
 const say = (s = "") => console.log(s);
 

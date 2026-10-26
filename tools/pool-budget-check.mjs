@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // THE POOL IS SIZED FOR WHAT A BAND ACTUALLY WEIGHS.
 //
-//   node tools/pool-budget-check.mjs [--repo .] [--verbose]
+//   node tools/pool-budget-check.mjs [--repo=DIR] [--verbose]
 //
 // WHY IT EXISTS, and why tools/one-pool-check.mjs beside it is not enough.
 // That one refuses a SECOND caller of `workerCount`, which is the shape the
@@ -32,23 +32,32 @@
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repo = process.argv.find((a) => a.startsWith("--repo="))?.split("=")[1] ?? ".";
+// `--repo=` names another checkout; with none given, the repository THIS FILE SITS
+// IN, found from the file's own location and never from the directory the process
+// was started in (tools/contract-check.mjs does the same). It used to default to
+// "." and look for src/export.ts and the bundler in the start directory, and
+// nothing may `cd` in the sessions that run these tools.
+const HERE = join(dirname(fileURLToPath(import.meta.url)), "..");
+const repo = process.argv.find((a) => a.startsWith("--repo="))?.split("=")[1] ?? HERE;
 const VERBOSE = process.argv.includes("--verbose");
 let failed = 0;
 const fail = (m) => { console.error(`  FAIL  ${m}`); failed++; };
 
 /** WHAT ONE PIXEL OF A BAND REALLY COSTS, per format, read from the allocation.
  *
- *  Takes `root`, the repository root. Returns `{ jpeg, tiff }` in bytes per
- *  pixel, parsed from the two typed arrays `src/export.ts` builds a band from.
+ *  Takes `root`, the repository root (default: the repository this file sits
+ *  in, whatever directory the process started in). Returns `{ jpeg, tiff }` in
+ *  bytes per pixel, parsed from the two typed arrays `src/export.ts` builds a
+ *  band from.
  *  Throws when either allocation is not found, because a silent default here
  *  would be this check agreeing with the thing it exists to catch.
  *
  *  What the caller relies on: these are the bytes the export ACTUALLY spends,
  *  independent of anything `exportparallel.ts` believes about them. */
-export function measuredBytesPerPixel(root = ".") {
+export function measuredBytesPerPixel(root = HERE) {
   const src = readFileSync(join(root, "src", "export.ts"), "utf8");
   const grab = (ctor, width) => {
     const m = src.match(new RegExp(`new ${ctor}\\(bandW \\* bandH \\* (\\d+)\\)`));

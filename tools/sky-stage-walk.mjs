@@ -95,7 +95,10 @@ try {
   check("0 both exports are the same size", [on.W, on.H], [off.W, off.H]);
   const s0 = displacement(on, off);
   const { maxMove, p999, p50 } = s0;
-  console.log(`        chroma displacement stage on vs off, sky saturation stage off: max ${s0.maxMove.toFixed(3)} at ${s0.maxAt}, p99.9 ${s0.p999.toFixed(3)}, median ${s0.p50.toFixed(4)}`);
+  // THE WORDS FOLLOW THE REPORT'S LAST SWITCH CLAUSE: a sky stage "ran because Sky
+  // colour smoothing asked for a map" when that slider is above 0, and "none ran,
+  // nothing asked for a map" at 0 (main.ts noteSkyStage). Those are this walk's two arms.
+  console.log(`        chroma displacement, sky stage ran (Sky colour smoothing 1, asked for a map) vs none ran (Sky colour smoothing 0, nothing asked for a map), Sky saturation stage off in both: max ${s0.maxMove.toFixed(3)} at ${s0.maxAt}, p99.9 ${s0.p999.toFixed(3)}, median ${s0.p50.toFixed(4)}`);
   check("1 no pixel is recoloured beyond the gate", maxMove <= MAX_MOVE, true);
   check("2 the tail of the displacement is the mottle's size, not a branch's", p999 <= P999_MOVE, true);
   const view = await exportPair(null);

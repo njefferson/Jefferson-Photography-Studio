@@ -1870,10 +1870,12 @@ function compareOne(label: string, drawn: DrawnFrame, computed: { data?: Uint8Cl
  *
  *  And the canvas one can fail QUIETLY: the WebGL spec answers an
  *  unsatisfiable size with a smaller drawing buffer and reports its true size
- *  in drawingBufferWidth/Height, with no error thrown. The editor now asks for
- *  the whole frame and compares (Renderer.bufferShort), falling back to its
- *  2800 px proxy only on a mismatch — until 2026-10-02 it proxied every 8-bit
- *  source over 2800 px on an assumed 16.7 MP cap. This probe asks for one, reads
+ *  in drawingBufferWidth/Height, with no error thrown. The editor can ask for
+ *  the whole frame and compare (Renderer.bufferShort), falling back to its
+ *  2800 px proxy only on a mismatch, but that full-size path is switched off
+ *  (main.ts OPEN_8BIT_AT_FULL_SIZE), so an 8-bit source over 2800 px is shown
+ *  from a 2800 px proxy whatever the browser would allow; before 2026-10-02 it
+ *  was proxied on an assumed 16.7 MP cap. This probe asks for one, reads
  *  back what was actually allocated, and then DRAWS A KNOWN COLOUR AND READS
  *  IT — because a buffer that reports the size you asked for and paints black
  *  under memory pressure is the failure the size comparison cannot see. */

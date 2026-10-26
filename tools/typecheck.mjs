@@ -20,8 +20,15 @@
 // around; five seconds to know the thing compiles is not that trade.
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repo = process.argv.find((a) => a.startsWith("--repo="))?.slice(7) ?? ".";
+// `--repo=` names another checkout; with none given, the repository THIS FILE SITS
+// IN, found from the file's own location and never from the directory the process
+// was started in (tools/contract-check.mjs does the same). It used to default to
+// "." and look for the compiler in the start directory, and nothing may `cd` in the
+// sessions that run these tools.
+const repo = process.argv.find((a) => a.startsWith("--repo="))?.slice(7) ?? join(dirname(fileURLToPath(import.meta.url)), "..");
 const tsc = `${repo}/node_modules/typescript/bin/tsc`;
 
 console.log("\n=== typecheck · does it compile ===\n");

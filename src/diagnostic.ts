@@ -7,11 +7,14 @@
 // be searched, cannot be diffed against last week's, and leaves out everything
 // that is not currently on screen.
 //
-// NOTHING THE READER WROTE GOES IN IT. No file names, no photo metadata, no
-// location, no edit values — only facts about the device and the build. A
-// session appears as a COUNT and nothing else. That is asserted, not assumed:
-// the session walk opens a named practice file and greps the built report for
-// its name. Anything added here has to survive the same test.
+// NOTHING THE READER WROTE GOES IN IT, WITH ONE DECLARED EXCEPTION. No file
+// names, no photo metadata, no location, no edit values — only facts about the
+// device and the build. The exception is the name of the held white balance,
+// which is the reader's own text and which the editor's report prints on purpose
+// in its "Held balance" row (main.ts heldBalanceLine). A session appears as a
+// COUNT and nothing else. The rest is asserted, not assumed: the session walk
+// opens a named practice file and greps the built report for its name. Anything
+// added here has to survive the same test.
 //
 // IT NAMES WHERE THE APP HELD, FOR THE WHOLE SESSION (decision 071). The
 // "Holds" line carries the three longest times the page could not run a timer,

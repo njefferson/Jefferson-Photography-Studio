@@ -26,10 +26,16 @@
 // rather than dressed up for it. Saying so is the point: the bullet has
 // answered the question.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { internalWords } from "./reader-words.mjs";
 
-const root = process.argv.find((a) => a.startsWith("--repo="))?.slice(7) ?? ".";
+// `--repo=` names another checkout; with none given, the repository THIS FILE SITS
+// IN, found from the file's own location and never from the directory the process
+// was started in (tools/contract-check.mjs does the same). It used to default to
+// "." and read vite.config.ts from the start directory, and nothing may `cd` in
+// the sessions that run these tools.
+const root = process.argv.find((a) => a.startsWith("--repo="))?.slice(7) ?? join(dirname(fileURLToPath(import.meta.url)), "..");
 let bad = 0;
 const fail = (s) => { bad++; console.log(`FAIL  ${s}`); };
 const ok = (s) => console.log(`ok    ${s}`);

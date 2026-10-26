@@ -765,13 +765,13 @@ cannot describe something the code does not say about itself.
 - **`src/color.ts`** (245 lines) — Camera color science.
 - **`src/cubeimport.ts`** (181 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (543 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
-- **`src/debug.ts`** (2395 lines) — The test page behind the version number.
+- **`src/debug.ts`** (2397 lines) — The test page behind the version number.
 - **`src/decode.ts`** (832 lines) — Image decoding. Real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (147 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (426 lines) — Main-thread side of the decode workers.
-- **`src/diagnostic.ts`** (433 lines) — The text report (Doctrine §7f).
+- **`src/diagnostic.ts`** (436 lines) — The text report (Doctrine §7f).
 - **`src/exif.ts`** (339 lines) — Keep the honest EXIF subset in exports: capture date/time, camera and lens, and the exposure triangle — read from the ORIGINAL file and written into exported JPEG/TIFF as a freshly BUILT block.
-- **`src/export.ts`** (1449 lines) — Full-resolution export.
+- **`src/export.ts`** (1452 lines) — Full-resolution export.
 - **`src/export.worker.ts`** (78 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (429 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.

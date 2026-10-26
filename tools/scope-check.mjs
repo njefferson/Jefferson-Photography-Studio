@@ -37,8 +37,15 @@
 //   node tools/scope-check.mjs            check (runs on every commit)
 //   node tools/scope-check.mjs --list     print a seed for .scope-allow
 import { readFileSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repo = process.argv.find((a) => a.startsWith("--repo="))?.slice(7) ?? ".";
+// `--repo=` names another checkout; with none given, the repository THIS FILE SITS
+// IN, found from the file's own location and never from the directory the process
+// was started in (tools/contract-check.mjs does the same). It used to default to
+// "." and read src/pipeline.ts from the start directory, and nothing may `cd` in
+// the sessions that run these tools.
+const repo = process.argv.find((a) => a.startsWith("--repo="))?.slice(7) ?? join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** The field names of one TypeScript interface, read out of a source file.
  *  Takes the file text and the interface name; returns the names declared at

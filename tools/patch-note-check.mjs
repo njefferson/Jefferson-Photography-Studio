@@ -32,23 +32,31 @@
 import { readFileSync, existsSync } from "node:fs";
 import { internalWords } from "./reader-words.mjs";
 import { execSync } from "node:child_process";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repo = process.argv.find((a) => a.startsWith("--repo="))?.split("=")[1] ?? ".";
+// `--repo=` names another checkout; with none given, the repository THIS FILE SITS
+// IN, found from the file's own location and never from the directory the process
+// was started in (tools/contract-check.mjs does the same). It used to default to
+// "." and read vite.config.ts from the start directory, and nothing may `cd` in the
+// sessions that run these tools.
+const HERE = join(dirname(fileURLToPath(import.meta.url)), "..");
+const repo = process.argv.find((a) => a.startsWith("--repo="))?.split("=")[1] ?? HERE;
 const LEAD = /^(Fixed|New|Faster|Changed): \S/;
 let failed = 0;
 const fail = (m) => { console.error(`  FAIL  ${m}`); failed++; };
 
 /** THE TWO FILTERS THE ⓘ DIALOG ACTUALLY USES, read out of vite.config.ts.
  *
- *  Takes `root`, the repository root. Returns `{ path, subject }`, both real
- *  RegExp objects built from the literals declared there as `INTERNAL_PATH` and
- *  `INTERNAL_SUBJECT`. Throws when either is absent.
+ *  Takes `root`, the repository root (default: the repository this file sits
+ *  in, whatever directory the process started in). Returns `{ path, subject }`,
+ *  both real RegExp objects built from the literals declared there as
+ *  `INTERNAL_PATH` and `INTERNAL_SUBJECT`. Throws when either is absent.
  *
  *  What the caller relies on: these are the SAME patterns the build filters the
  *  patch notes with, never a restatement of them. A commit this says is
  *  user-facing is one the reader will see. */
-export function readFilters(root = ".") {
+export function readFilters(root = HERE) {
   const src = readFileSync(join(root, "vite.config.ts"), "utf8");
   const grab = (name) => {
     const m = src.match(new RegExp(`^const ${name} = (/.*/[gimsuy]*);`, "m"));
