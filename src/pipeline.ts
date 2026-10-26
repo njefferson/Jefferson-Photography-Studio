@@ -741,7 +741,8 @@ export function rebuildFix(base: BrushMask, fix: readonly FixStroke[] | undefine
 }
 
 /** A local-adjustment mask. `type` 0 = radial, 1 = linear gradient, 2 = brush,
- *  3 = colour (chroma-key), 4 = sky (classical heuristic). Geometry is in
+ *  3 = colour (chroma-key), 4 = sky (classical heuristic), 5 = rectangle (050;
+ *  a shape of its own, never an oval with corners). Geometry is in
  *  image-uv [0..1] so it anchors to the photo through rotation/zoom; a colour
  *  mask has no geometry — its weight is each pixel's hue/saturation distance to
  *  a tapped colour. A SKY mask also has no live geometry: its weight is a
@@ -816,7 +817,7 @@ export const AIM_NOISE = 16;
 export const AIM_TEXTURE = 32;
 
 export interface MaskLayer {
-  type: 0 | 1 | 2 | 3 | 4;
+  type: 0 | 1 | 2 | 3 | 4 | 5;
   /** Stages this mask gates in addition to its own adjustment — see AIM_*.
    *  Colour masks (type 3) cannot appear here: their key is taken from the
    *  pixel as it DISPLAYS at the mask stage, which does not exist yet at the
@@ -894,10 +895,10 @@ export interface MaskLayer {
    *  a mask (AIM_SHADOW) keeps reading as one weight on the whole photo's amount
    *  (record 042's design). */
   shadow?: number;
-  cx: number; // radial: centre x; linear: start x
-  cy: number; // radial: centre y; linear: start y
-  rx: number; // radial: radius along the oval's FIRST axis, as a fraction of the width
-  ry: number; // radial: radius along its SECOND axis, as a fraction of the height
+  cx: number; // radial and rectangle: centre x; linear: start x
+  cy: number; // radial and rectangle: centre y; linear: start y
+  rx: number; // radial: radius along the oval's FIRST axis, as a fraction of the width; rectangle: half its width, as a fraction of the width
+  ry: number; // radial: radius along its SECOND axis, as a fraction of the height; rectangle: half its height, as a fraction of the height
   /** HOW FAR A RADIAL MASK IS TURNED (027), in radians; absent or 0 is the
    *  axis-aligned oval every edit saved before this field renders as.
    *
@@ -1033,7 +1034,7 @@ export interface MaskLayer {
   warmth: number; // -1..1, + warmer
 }
 
-export function neutralMask(type: 0 | 1 | 2 | 3 | 4): MaskLayer {
+export function neutralMask(type: 0 | 1 | 2 | 3 | 4 | 5): MaskLayer {
   const base = { cx: 0.5, cy: 0.5, rx: 0.35, ry: 0.35, feather: 0.5, lx: 0.5, ly: 0.85, invert: false, op: 0 as const, hueTarget: 0, satTarget: -1, valTarget: 0.75, colorRange: 0.5, reach: 1, skyByColour: true, brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 };
   if (type === 1) return { ...base, type, cx: 0.5, cy: 0.12, lx: 0.5, ly: 0.5 };
   if (type === 2) return { ...base, type, rev: 0 };
@@ -1585,7 +1586,10 @@ export function radialPoint(m: MaskLayer, t: number, aspect: number): [number, n
  *  PERPENDICULAR TO THE LINE DRAWN, in pixels, as darktable's gradient mask
  *  measures them; in uv, on a 3:2 frame a 45-degree drag gave lines at 24
  *  degrees, until 2026-10-02. A radial mask with no angle weighs exactly what
- *  it did before `angle` existed. */
+ *  it did before `angle` existed. A Rectangle (type 5, decision 050) weighs 1
+ *  inside the box its `cx`, `cy`, `rx`, `ry` describe, falls to 0 across the
+ *  outer `feather` of each half-extent, and is 0 past it; a mask of any other
+ *  type weighs what it did before the Rectangle existed. */
 export function maskWeight(m: MaskLayer, u: number, v: number, aspect = 1): number {
   let w: number;
   if (m.type === 0) {
@@ -1594,6 +1598,17 @@ export function maskWeight(m: MaskLayer, u: number, v: number, aspect = 1): numb
     const dy = ly / Math.max(1e-4, m.ry);
     const r = Math.sqrt(dx * dx + dy * dy);
     w = 1 - smooth01(1 - m.feather, 1, r); // 1 in the core, 0 past the edge
+  } else if (m.type === 5) {
+    // A RECTANGLE (050), a shape of its own: the distance from the centre is
+    // measured along each axis in that axis's own half-extent and the LARGER of
+    // the two decides, so the edge is a box with square corners, 1 in the core
+    // and 0 past the edge. `rx` is a fraction of the width and `ry` of the
+    // height, exactly as an unturned oval's are, so neither needs the aspect.
+    // It does not turn: a box is axis-aligned in the file, and Straighten turns
+    // it with the photograph. The same arithmetic as the shader's maskWeight.
+    const dx = Math.abs(u - m.cx) / Math.max(1e-4, m.rx);
+    const dy = Math.abs(v - m.cy) / Math.max(1e-4, m.ry);
+    w = 1 - smooth01(1 - m.feather, 1, Math.max(dx, dy));
   } else if (m.type === 1) {
     // IN PIXELS: x scaled by the aspect so a step across the frame and a step
     // down it are the same distance (both in units of the image HEIGHT, which

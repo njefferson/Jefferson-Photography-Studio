@@ -180,8 +180,8 @@ uniform bool u_toneRgbOn;       // any per-channel curve non-identity
 uniform float u_lum;         // global luminance: v -> pow(v, 1/u_lum) through rgbToneLum (1 = neutral)
 // Local masks (up to MAX_MASKS = 8) — kept identical to pipeline.ts.
 uniform int u_maskCount;
-uniform int u_maskType[8];   // 0 = radial, 1 = linear, 2 = brush, 3 = colour, 4 = sky
-uniform vec4 u_maskGeoA[8];  // radial (cx,cy,rx,ry) | linear (cx,cy,lx,ly)
+uniform int u_maskType[8];   // 0 = radial, 1 = linear, 2 = brush, 3 = colour, 4 = sky, 5 = rectangle
+uniform vec4 u_maskGeoA[8];  // radial and rectangle (cx,cy,rx,ry) | linear (cx,cy,lx,ly)
 uniform vec4 u_maskGeoB[8];  // (feather, invert, cos, sin of a radial mask's turn; 1, 0 unturned)
 uniform vec4 u_maskAdj[8];   // (brightness, contrast, saturation, warmth)
 uniform float u_maskHue[8];  // degrees
@@ -631,6 +631,14 @@ float maskWeight(int i, vec2 uv){
     float dy = (cs * oy - sn * ox * asp) / max(1e-4, gA.w);
     float r = sqrt(dx*dx + dy*dy);
     w = 1.0 - smoothstep(1.0 - u_maskGeoB[i].x, 1.0, r);
+  } else if (u_maskType[i] == 5) {
+    // A RECTANGLE (050): each axis measured in its own half-extent, the larger
+    // of the two deciding, so the edge is a box with square corners. rx is a
+    // fraction of the width and ry of the height, so no aspect is needed, and it
+    // does not turn. Identical arithmetic to maskWeight in pipeline.ts.
+    float rdx = abs(uv.x - gA.x) / max(1e-4, gA.z);
+    float rdy = abs(uv.y - gA.y) / max(1e-4, gA.w);
+    w = 1.0 - smoothstep(1.0 - u_maskGeoB[i].x, 1.0, max(rdx, rdy));
   } else {
     // A GRADIENT MEASURES IN PIXELS (x scaled by the aspect), so its lines of
     // equal weight stand perpendicular to the line drawn on a frame that is
@@ -3225,7 +3233,7 @@ export class Renderer {
         // subtracting from the group above it, which is a different picture.
         op[i] = i === 0 ? 0 : (m.op ?? 0);
         geoA.set(
-          m.type === 0 ? [m.cx, m.cy, m.rx, m.ry]
+          m.type === 0 || m.type === 5 ? [m.cx, m.cy, m.rx, m.ry]
           : m.type === 3 ? [m.hueTarget, m.satTarget, m.colorRange, 0]
           : [m.cx, m.cy, m.lx, m.ly],
           i * 4,

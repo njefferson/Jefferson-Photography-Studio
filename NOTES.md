@@ -3264,6 +3264,12 @@ user-scalable=no.
   a named need each, the smallest surface each. Nothing here becomes one
   "advanced mask" control that does several of them. See
   `docs/decisions/050-the-mask-system-is-short-of-standard-convention.md`.
+  **Row 1, the rectangle, is built on staging (24 October) and waits on the
+  device pass.** A mask type of its own beside the radial and the gradient,
+  with square corners: three round handles on the photograph and four sliders
+  (across, down, width, height, in percent of the picture as shown) for a reader
+  who does not drag. It joins, inverts and feathers as the others do, and an edit
+  saved without one renders as before.
 - [ ] **Show the border and let it be moved** <!-- decision: 049 -->
   **Shown as:** See where the horizon was found, and move it yourself when you know better.
   proposed from the device 2026-09-22, and it reframes 048 below it: the

@@ -1,10 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=60c8d4c065d5a851
-diffhash=0adaed165f3e4878
+diffhash=93016dc1ec2fa0fa
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 07 builds record 028's chosen option, a Reach past branches switch on the Sky mask, off by default and dimmed while Follow the sky's colour is off, which after the grow admits each small connected patch of the sky's colour the flood did not reach. It touches only the areas the step's Files list names for this work: src/main.ts, src/pipeline.ts, src/skyfine.ts, src/style.css, ir.html, docs/ARCHITECTURE.md, NOTES.md and tools/.preview-pipeline. The switch's stored field is optional and read as off when absent, so every saved sky mask renders as it did; the pictures check recorded by the preview tool shows that growSkyByColour is byte-identical with the switch omitted or false. The cap is a named constant with its source in the comment, and the record's own rule that the cap was not tuned on the named frames is kept in that comment. Nothing else in the look is changed.
+# IN-SCOPE: Sequence patch 08 builds record 050's first row, the rectangle: a mask type of its own beside the radial and the gradient, with square corners, three handles on the photograph and four sliders for a reader who does not drag, joining, inverting and feathering as the other types do. It also carries the agreement walk's rectangle arm and the cell-level grid comparison that the arm uses. It touches only the areas the step's Files list names for this work: src/gl.ts, src/main.ts, src/pipeline.ts, src/style.css, ir.html, docs/ARCHITECTURE.md, NOTES.md, tools/.preview-pipeline and tools/agreement-walk.mjs. A saved edit without a rectangle keeps its masks as they were, and the preview tool's record notes the earlier-kind weights were compared and found identical. No look value is chosen; the rectangle's defaults are the box's own starting geometry, not a look.
 # 
-# What was judged: the approved plan's Files and step 192 text, which name these areas and this record, and the whole patch read in full. The status shows the eight staged paths and nothing else.
+# What was judged: the approved plan's Files and step 193 text, which name these areas and this record, and the whole patch read in full. The status shows the nine staged paths and nothing else.
 # 
-# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The two new control sentences are written in the app's existing voice and say in words what the switch does.
+# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new control text is written in the app's existing voice.

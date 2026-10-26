@@ -54,7 +54,7 @@
 // THE RAW ARM IS THE CONTROL. The assemblers differ on FILE KIND, so a walk with
 // only one kind cannot see the disagreement; and an arm that passes in both
 // states is what says the walk is not vacuous.
-import { openMasks, closeMasks, setMaskValue, setValue } from "./walk-input.mjs";
+import { openMasks, closeMasks, setMaskValue, setValue, dragSlider } from "./walk-input.mjs";
 import { chromium } from "playwright-core";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -195,6 +195,34 @@ const dHist = (p, q) => {
 // measure 9.2 honest against a narrowest-swap floor of 19.4, so 15 has room on
 // both sides.
 const HUE_BAR = 15;
+
+// THE RECTANGLE ARM'S CELL BARS, three numbers read off the arm's own first run
+// and stated here so they can be argued with. GEO_CELL is how many levels of red,
+// green and blue a cell may differ by before it counts as differing; GEO_SEE is
+// how many cells a box a column or a row out of place must put over that bar for
+// the comparison to count as able to see it; GEO_AGREE is how many cells the real
+// pair may put over it. Read on the arm's two runs on the same build: the screen
+// against the saved file put 0 of 3456 cells over 20 (largest cell 4.7 levels,
+// median 1.3), and the box's own effect read a column or a row out of place put 73
+// and 57 cells over it on a 48 by 72 grid, the effect itself putting 797 over. So
+// 30 is under the weaker control with room, and 2 is far above the 0 read.
+const GEO_CELL = 20;
+const GEO_SEE = 30;
+const GEO_AGREE = 2;
+// WHAT THE PAGE DOES TO READ THE GRID, as text both page calls share: the canvas the
+// reader sees, averaged to 48 columns by as many rows as its shape gives, in two
+// steps so a large source is not sampled sparsely. Returns RGBA bytes of the cells.
+const GEO_JS = `
+  const view = document.querySelector("#view");
+  const GW = 48, GH = Math.max(1, Math.round(GW * view.height / view.width));
+  const grid = (src, sw, sh) => {
+    const mid = document.createElement("canvas"); mid.width = GW * 4; mid.height = GH * 4;
+    const mx = mid.getContext("2d"); mx.imageSmoothingQuality = "high"; mx.drawImage(src, 0, 0, sw, sh, 0, 0, mid.width, mid.height);
+    const out = document.createElement("canvas"); out.width = GW; out.height = GH;
+    const ox = out.getContext("2d"); ox.imageSmoothingQuality = "high"; ox.drawImage(mid, 0, 0, GW, GH);
+    return ox.getImageData(0, 0, GW, GH).data;
+  };
+`;
 
 // THE TILE ARM NEEDS ITS OWN BAR, AND IT IS NOT A CLEAN ONE — this is the
 // honest version rather than one number stretched to cover everything.
@@ -672,6 +700,42 @@ try {
         await setMaskValue(page, "tone1", "20");
         await setMaskValue(page, "tone2", "25");
       } },
+    // THE RECTANGLE (050, row 1), a mask shape of its own: type 5, centre cx cy and
+    // half-extents rx ry as fractions of the file's width and height, weight 1 in
+    // the core and falling to 0 across the outer feather of each half-extent, the
+    // LARGER axis deciding so the corners are square. The shader holds that in
+    // `maskWeight` and `compileEdit` in `maskWeight` of src/pipeline.ts, and the
+    // whole-frame measures above cannot tell a box in one place from a box a few
+    // percent away (the box covers about a quarter of the frame, and a strip a
+    // few percent wide moves the whole-frame measures by less than their noise),
+    // so this arm also lays the preview and the export over one another on a
+    // 48-column grid and counts the cells that differ by more than a bar. The box
+    // is set the way a reader without a gesture sets it: the four sliders, aiming
+    // at centre 35 across and 40 down, 60 wide and 50 high in percent of the
+    // photograph and a feather of 0.1 (a drag lands within a few steps of that, and
+    // the walk prints where it landed), so all four edges are inside the frame.
+    // The effect inside it is the mask's own Luminance at its top, +1.5, which
+    // moves every cell it reaches by tens of levels, so a box a column out of
+    // place shows as a ring of cells over the bar.
+    { label: "mask rectangle", what: "a Rectangle mask's Luminance, +1.5, in a box set by its four sliders and a feather of about 0.1", check: "lum", want: "1.5",
+      add: "addRect", ready: "mRectRow", geometry: true,
+      place: async (page) => {
+        // A real drag on each, as dragSlider does, but each scrolled into view first:
+        // the panel is taller than the viewport, and a pointer pressed below its edge
+        // lands on nothing, which is how Width, Height and Feather stayed at their
+        // defaults the first time this ran.
+        for (const [id, frac] of [["mRectX", 0.35], ["mRectY", 0.4], ["mRectW", (60 - 4) / 196], ["mRectH", (50 - 4) / 196], ["mFeather", (0.1 - 0.02) / 0.98]]) {
+          await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+          await dragSlider(page, id, frac);
+        }
+        const got = await page.evaluate(() => ["mRectX", "mRectY", "mRectW", "mRectH", "mFeather"].map((i) => Number(document.getElementById(i)?.value)));
+        console.log(`  mask rectangle the box reads across ${got[0]}, down ${got[1]}, wide ${got[2]}, high ${got[3]}, feather ${got[4]}`);
+        // The drag has to have moved all five off their defaults (50, 50, 70, 70, 0.5).
+        if (got[2] === 70 || got[3] === 70 || got[4] === 0.5) { fail(`mask rectangle: a rectangle slider stayed where it began (${got.join(", ")}), so nothing below measures the box the arm describes`); throw new Error("not armed"); }
+      },
+      set: async (page) => {
+        await setMaskValue(page, "lum", "1.5");
+      } },
   ];
   // The photograph as the reader sees it, in the READ measures the bars use.
   const readView = (page) => page.evaluate(`(() => {
@@ -717,12 +781,19 @@ try {
       }
       for (const [id, v] of Object.entries(arm.after ?? {})) await setValue(page, id, v);
       const bare = await settledView(page);
+      // A geometry arm keeps the bare photograph on its grid, so what the box changed can be told from the scene's own edges.
+      const bareCells = arm.geometry ? await page.evaluate(`(() => { ${GEO_JS} return Array.from(grid(view, view.width, view.height)); })()`) : null;
       await openMasks(page);
-      await page.click("#addSky");
-      await page.waitForFunction(() => !document.getElementById("skyControls")?.hidden, null, { timeout: 120000 });
+      // A Sky mask unless the arm names another kind, and the control that appears
+      // once that kind is made (the Sky's, the Rectangle's) is what is waited for.
+      await page.click(`#${arm.add ?? "addSky"}`);
+      await page.waitForFunction((id) => !document.getElementById(id)?.hidden, arm.ready ?? "skyControls", { timeout: 120000 });
       await page.waitForTimeout(1500);
       await page.click("#mOutline");
       await setMaskValue(page, "saturation", "1");
+      // The arm's own placing of the mask, while the place is open (the Rectangle's
+      // four sliders live there).
+      if (arm.place) await arm.place(page);
       // setMaskValue puts the mask place back when it found it open, and the
       // place covers the tabs, so it is closed before the arm's own controls.
       await closeMasks(page);
@@ -749,7 +820,12 @@ try {
       // two arms moved the frame 0.4 points and passed with the export's half
       // thrown away, which is what this refuses.
       const armDh = dHist(pre.p, shown.p), armDl = Math.abs(pre.light - shown.light);
-      if (armDh <= HUE_BAR && armDl <= 8) { fail(`${label}: the arm moves the photograph only ${armDh}deg and ${armDl.toFixed(1)} points on screen, under both bars, so agreement here would prove nothing`); throw new Error("not armed"); }
+      // A GEOMETRY ARM IS EXEMPT FROM THIS ONE, because its effect is only inside a box
+      // that covers a third of the frame and the two whole-frame measures cannot be
+      // expected to clear their bars on that. Its own proof that it is seen is the
+      // cell control below, which has to count cells over a bar for a box a column out.
+      if (armDh <= HUE_BAR && armDl <= 8 && !arm.geometry) { fail(`${label}: the arm moves the photograph only ${armDh}deg and ${armDl.toFixed(1)} points on screen, under both bars, so agreement here would prove nothing`); throw new Error("not armed"); }
+      if (arm.geometry) console.log(`  ${label.padEnd(12)} the arm moves the photograph ${armDh}deg and ${armDl.toFixed(1)} points on screen`);
       await page.click("#ptab-export");
       await page.click("#exBtn");
       await page.waitForFunction(
@@ -782,6 +858,47 @@ try {
       console.log(`  ${"".padEnd(12)} ${dh}deg of hue apart (bar ${HUE_BAR}), ${dl2.toFixed(1)} points of lightness (bar 8)`);
       if (dh > HUE_BAR || dl2 > 8) fail(`${label}: the preview and the export disagree on ${arm.what} — ${dh}deg and ${dl2.toFixed(1)} points. The shader and compileEdit read the mask's values or its weight differently.`);
       else ok(`${label}: preview and export agree on ${arm.what}`);
+      if (arm.geometry) {
+        // WHERE THE EFFECT STOPS, CELL BY CELL. The photograph on screen and the
+        // saved file are each averaged down to 48 columns by as many rows as the
+        // frame's shape gives, and every cell is compared on its mean red, green
+        // and blue: `matched` is the screen against the file. The CONTROLS are the
+        // box's own effect on the screen (each cell less the same cell of the bare
+        // photograph, taken before the mask existed) compared with itself read a
+        // column, or a row, out of place, which is what a box that far off looks
+        // like to this comparison. It has to put cells over the bar for both, or it
+        // cannot be trusted to see the real one; a scene's own edges are subtracted
+        // away by the bare grid, so those cells are the box's edges and nothing else.
+        const geo = await page.evaluate(`(async () => {
+          ${GEO_JS}
+          const bare = ${JSON.stringify(bareCells)};
+          // The canvas is read first and before anything is awaited, as READ does,
+          // because a drawing buffer that was not kept is gone after the next frame.
+          const a = grid(view, view.width, view.height);
+          const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = "data:image/jpeg;base64," + ${JSON.stringify(b64)}; });
+          const b = grid(img, img.naturalWidth, img.naturalHeight);
+          const at = (g, x, y, k) => g[(Math.min(GH - 1, Math.max(0, y)) * GW + Math.min(GW - 1, Math.max(0, x))) * 4 + k];
+          const cells = (f) => { const d = []; for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) d.push((Math.abs(f(x, y, 0)) + Math.abs(f(x, y, 1)) + Math.abs(f(x, y, 2))) / 3); return d; };
+          const eff = (x, y, k) => at(a, x, y, k) - at(bare, x, y, k);
+          const stats = (d) => { const s = [...d].sort((m, n) => m - n); return { median: +s[Math.floor(s.length / 2)].toFixed(1), p99: +s[Math.floor(s.length * 0.99)].toFixed(1), max: +s[s.length - 1].toFixed(1), over: d.filter((v) => v > ${GEO_CELL}).length, cells: d.length }; };
+          return {
+            matched: stats(cells((x, y, k) => at(a, x, y, k) - at(b, x, y, k))),
+            effect: stats(cells(eff)),
+            acrossOne: stats(cells((x, y, k) => eff(x, y, k) - eff(x + 1, y, k))),
+            downOne: stats(cells((x, y, k) => eff(x, y, k) - eff(x, y + 1, k))),
+            cols: GW, rows: GH,
+          };
+        })()`);
+        const line = (n, s) => `${n.padEnd(10)} median ${s.median}, 99th ${s.p99}, largest ${s.max} levels; ${s.over} of ${s.cells} cells over ${GEO_CELL}`;
+        console.log(`  ${"".padEnd(12)} grid ${geo.cols} x ${geo.rows}`);
+        console.log(`  ${"".padEnd(12)} ${line("matched", geo.matched)}   [the screen against the saved file]`);
+        console.log(`  ${"".padEnd(12)} ${line("the box", geo.effect)}   [what the box changed on screen, against the bare photograph]`);
+        console.log(`  ${"".padEnd(12)} ${line("one across", geo.acrossOne)}   [the control: the box's effect read a column out of place]`);
+        console.log(`  ${"".padEnd(12)} ${line("one down", geo.downOne)}   [the control: the box's effect read a row out of place]`);
+        if (geo.acrossOne.over < GEO_SEE || geo.downOne.over < GEO_SEE) fail(`${label}: the grid comparison does not see a box a column or a row out of place (${geo.acrossOne.over} and ${geo.downOne.over} cells over ${GEO_CELL}, it needs ${GEO_SEE}), so agreement here would prove nothing`);
+        else if (geo.matched.over > GEO_AGREE) fail(`${label}: the preview's box and the export's box are not in the same place — ${geo.matched.over} of ${geo.matched.cells} cells differ by more than ${GEO_CELL} levels, where ${GEO_AGREE} are allowed. The shader's maskWeight and compileEdit's have drifted.`);
+        else ok(`${label}: the preview's box and the export's box sit in the same place (${geo.matched.over} cells over ${GEO_CELL}; a box a column out would read ${geo.acrossOne.over})`);
+      }
     } catch (e) {
       if (!/not armed|no preview|no export/.test(String(e && e.message))) fail(`${label}: the arm could not run — ${e}`);
     } finally { await page.close(); }

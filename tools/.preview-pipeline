@@ -1,5 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
 version=101
-hash=dc73f2cb0f1fc992
+hash=a58c34bfbdce9210
 # Recorded WITHOUT a version bump. The evidence the pictures did not change:
-proven=Lane 192 piece 02 (Reach past branches): growSkyByColour of the audit commit against the lane's build, with the switch omitted and with the switch false, compared byte for byte on 12 synthetic frames, 0 differing bytes in all, so a sky mask without the switch renders exactly as before. Recorded on the integrated tree after lane 191's patches and lane 192's piece 01.
+proven=Lane 193 piece 01 (the rectangle): the rectangle is a mask type of its own that only a new mask can carry, previews and strip tiles render with an empty mask list (renderTile in src/tile.ts and tileInputsFor in src/main.ts set masks to none), and the lane's scratch harness compiled the new pipeline against the untouched one over 1800 pixels with masks of the five earlier kinds and every join, identical on all four channels, with maskWeight of the earlier kinds identical over 5760 sites. Recorded on the integrated tree after lane 191's patches and lane 192's two.

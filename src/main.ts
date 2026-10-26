@@ -8286,6 +8286,7 @@ const savedMaskList = $("savedMaskList") as HTMLDivElement;
 const maskCount = $("maskCount") as HTMLParagraphElement;
 const maskEditor = $("maskEditor") as HTMLDivElement;
 const addRadialBtn = $("addRadial") as HTMLButtonElement;
+const addRectBtn = $("addRect") as HTMLButtonElement;
 const addLinearBtn = $("addLinear") as HTMLButtonElement;
 const addBrushBtn = $("addBrush") as HTMLButtonElement;
 const addColorBtn = $("addColor") as HTMLButtonElement;
@@ -8337,6 +8338,13 @@ const mUI = {
   turnVal: $("mTurnVal") as HTMLOutputElement,
   turnDown: $("mTurnDown") as HTMLButtonElement,
   turnUp: $("mTurnUp") as HTMLButtonElement,
+  // A rectangle's place and size without a gesture (050): the same box the
+  // handles on the photograph move, set in percent of the picture as shown.
+  rectRow: $("mRectRow") as HTMLElement,
+  rectX: $("mRectX") as HTMLInputElement,
+  rectY: $("mRectY") as HTMLInputElement,
+  rectW: $("mRectW") as HTMLInputElement,
+  rectH: $("mRectH") as HTMLInputElement,
 };
 let selectedMask = -1;
 let overlayHandles: { el: SVGCircleElement; role: string }[] = [];
@@ -8764,7 +8772,7 @@ function shownToImageUv(du: number, dv: number): [number, number] {
   return [u, v];
 }
 
-function addMask(type: 0 | 1 | 2 | 3 | 4) {
+function addMask(type: 0 | 1 | 2 | 3 | 4 | 5) {
   if (!current || params.masks.length >= MAX_MASKS) return;
   // Brush/sky are limited further by the shared bitmap texture's 4 channels.
   if ((type === 2 || type === 4) && bitmapMaskCount() >= MAX_BITMAP_MASKS) return;
@@ -8796,7 +8804,7 @@ function addMask(type: 0 | 1 | 2 | 3 | 4) {
   if (type === 4) regenerateSkyMask(m); // detect the sky now (fills m.brush)
   params.masks.push(m);
   selectedMask = params.masks.length - 1;
-  if (type === 0 || type === 1) showMaskOutline = true; // a new geometry mask shows its handles
+  if (type === 0 || type === 1 || type === 5) showMaskOutline = true; // a new geometry mask shows its handles
   openMaskPlace(); // reveal the just-created mask's editor in the place it lives
   updateMaskUI();
   renderMaskOverlay();
@@ -9017,7 +9025,7 @@ function updateSkyStatus() {
  *  and the saved list all read it, so a mask cannot be a "Color" in one and a
  *  "Colour" in another. It was written out three times before this. */
 function maskTypeLabel(type: MaskLayer["type"]): string {
-  return type === 0 ? "Radial" : type === 1 ? "Gradient" : type === 2 ? "Brush" : type === 3 ? "Color" : "Sky";
+  return type === 0 ? "Radial" : type === 1 ? "Gradient" : type === 2 ? "Brush" : type === 3 ? "Color" : type === 5 ? "Rectangle" : "Sky";
 }
 
 function deleteMask(i: number) {
@@ -9134,7 +9142,7 @@ async function applySavedMask(id: string): Promise<void> {
   }
   params.masks.push(m);
   selectedMask = params.masks.length - 1;
-  if (m.type === 0 || m.type === 1) showMaskOutline = true;
+  if (m.type === 0 || m.type === 1 || m.type === 5) showMaskOutline = true;
   updateMaskUI();
   renderMaskOverlay();
   draw();
@@ -9312,6 +9320,7 @@ function updateMaskUI() {
   const full = !current || total >= MAX_MASKS;
   const bitmapFull = bitmapMaskCount() >= MAX_BITMAP_MASKS;
   addRadialBtn.disabled = full;
+  addRectBtn.disabled = full;
   addLinearBtn.disabled = full;
   addColorBtn.disabled = full;
   // Brush + Sky hit the bitmap cap first; a tooltip explains why when it does.
@@ -9330,11 +9339,12 @@ function updateMaskUI() {
     : "";
   if (m) {
     mUI.feather.value = String(m.feather);
-    // Feather is the soft edge for radial, colour AND sky masks (transition width).
-    mUI.featherRow.hidden = m.type !== 0 && m.type !== 3 && m.type !== 4;
+    // Feather is the soft edge for radial, rectangle, colour AND sky masks (transition width).
+    mUI.featherRow.hidden = m.type !== 0 && m.type !== 3 && m.type !== 4 && m.type !== 5;
     syncTurnUI(m); // a radial mask's turn (027); hidden for every other kind
+    syncRectUI(m); // a rectangle's place and size without a gesture (050); hidden for every other kind
     // The overlay toggle governs the coverage tint (all types) + the handle
-    // outline (radial/linear), so it's available for every mask.
+    // outline (radial/rectangle/linear), so it's available for every mask.
     mUI.outline.setAttribute("aria-pressed", String(showMaskOutline));
     mUI.brushControls.hidden = m.type !== 2;
     mUI.colorControls.hidden = m.type !== 3;
@@ -9495,6 +9505,7 @@ for (const [el, v] of [[mUI.joinAdd, 0], [mUI.joinUni, 3], [mUI.joinSub, 1], [mU
 }
 $("mDelete").addEventListener("click", () => { if (selectedMask >= 0) deleteMask(selectedMask); });
 addRadialBtn.addEventListener("click", () => addMask(0));
+addRectBtn.addEventListener("click", () => addMask(5));
 addLinearBtn.addEventListener("click", () => addMask(1));
 addColorBtn.addEventListener("click", () => addMask(3));
 addSkyBtn.addEventListener("click", () => addMask(4));
@@ -9593,8 +9604,8 @@ function renderMaskOverlay() {
   const m = currentMask();
   // The mask overlay is live only while the Masks tab is open and the user
   // hasn't hidden it. The COVERAGE tint (drawn in the shader) works for every
-  // mask type; the handle OUTLINE only exists for radial (0) / linear (1) —
-  // brush/colour/sky have no geometry to grab.
+  // mask type; the handle OUTLINE only exists for radial (0) / linear (1) /
+  // rectangle (5) — brush/colour/sky have no geometry to grab.
   //
   // AND NEVER IN FULL VIEW, which is the one thing that list did not say.
   // Entering full view sets `app.dataset.full` and redraws, but nothing here
@@ -9619,7 +9630,7 @@ function renderMaskOverlay() {
     renderer.maskMatte = matteOn;
     draw();
   }
-  const showable = overlayOn && !!m && (m.type === 0 || m.type === 1);
+  const showable = overlayOn && !!m && (m.type === 0 || m.type === 1 || m.type === 5);
   maskOverlay.toggleAttribute("hidden", !showable);
   overlayHandles = [];
   overlayShape = null;
@@ -9635,6 +9646,13 @@ function renderMaskOverlay() {
     kids.push(overlayShape, mkHandle("center"), mkHandle("rx"), mkHandle("ry"));
     overlayTurn = mkTurnGrip();
     kids.push(overlayTurn.stem, overlayTurn.grip);
+  } else if (m.type === 5) {
+    // A RECTANGLE (050): its outline is the box, and its handles are the middle
+    // and the middles of the right and bottom edges, which the same drag
+    // handler that sizes an oval sizes it with. No turn grip: a box does not turn.
+    overlayShape = document.createElementNS(SVGNS, "polygon");
+    overlayShape.setAttribute("class", "mask-shape");
+    kids.push(overlayShape, mkHandle("center"), mkHandle("rx"), mkHandle("ry"));
   } else {
     overlayShape = document.createElementNS(SVGNS, "line");
     overlayShape.setAttribute("class", "mask-line");
@@ -9682,6 +9700,18 @@ function positionMaskOverlay() {
       overlayTurn.grip.setAttribute("transform", `translate(${kx.toFixed(1)} ${ky.toFixed(1)})`);
     }
     syncTurnUI(m); // the readout is an angle AS SHOWN, so it moves with the view
+  } else if (m.type === 5 && overlayShape) {
+    // The box's four corners, each through the renderer's own mapping, so the
+    // outline is where the selection ends under a Straighten, a turn and a flip.
+    const corners: [number, number][] = [
+      [m.cx - m.rx, m.cy - m.ry], [m.cx + m.rx, m.cy - m.ry],
+      [m.cx + m.rx, m.cy + m.ry], [m.cx - m.rx, m.cy + m.ry],
+    ];
+    (overlayShape as SVGPolygonElement).setAttribute("points", corners.map(([cu, cv]) => {
+      const [x, y] = loc(cu, cv);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" "));
+    syncRectUI(m); // the sliders read as the picture is shown, so they move with the view
   } else if (overlayShape) {
     const [x0, y0] = loc(m.cx, m.cy);
     const [x1, y1] = loc(m.lx, m.ly);
@@ -9692,7 +9722,12 @@ function positionMaskOverlay() {
   }
   for (const h of overlayHandles) {
     let u = m.cx, v = m.cy;
-    if (h.role === "rx") [u, v] = radialPoint(m, 0, asp);
+    if (m.type === 5) {
+      // A box's size handles sit on the middles of its right and bottom edges.
+      if (h.role === "rx") u = m.cx + m.rx;
+      else if (h.role === "ry") v = m.cy + m.ry;
+    }
+    else if (h.role === "rx") [u, v] = radialPoint(m, 0, asp);
     else if (h.role === "ry") [u, v] = radialPoint(m, Math.PI / 2, asp);
     else if (h.role === "end") { u = m.lx; v = m.ly; }
     const [x, y] = loc(u, v);
@@ -9920,6 +9955,89 @@ mUI.turn.addEventListener("change", flushRecord); // one drag of the slider = on
 const turnArmed = () => currentMask()?.type === 0;
 wireRepeat(mUI.turnDown, () => { const m = currentMask(); if (m) turnPickedMask(foldTurn(maskScreenTurnRaw(m)) - 0.1); }, turnArmed);
 wireRepeat(mUI.turnUp, () => { const m = currentMask(); if (m) turnPickedMask(foldTurn(maskScreenTurnRaw(m)) + 0.1); }, turnArmed);
+
+// --- A RECTANGLE WITHOUT A GESTURE (050). The three handles on the photograph
+// are a drag; these four sliders set the same box another way, in percent of the
+// picture AS SHOWN, so a reader who cannot drag can still place and size it, and
+// "across" means across on a photograph that is on its side. The mask itself
+// stays in image-uv like every other: only these controls speak in screen terms,
+// through shownToImageUv and its inverse below. ---
+
+/** WHERE A POINT OF THE FILE LIES IN THE PICTURE AS SHOWN.
+ *  Takes `u`, `v`: a point in image-uv. Returns the same point in the uncropped
+ *  picture as displayed, 0..1 from its top-left, through the renderer's mirror
+ *  and then its turn. What it must satisfy: it is the exact inverse of
+ *  `shownToImageUv`, so `shownToImageUv(...imageUvToShown(u, v))` returns the
+ *  point it was given; the rectangle's sliders rely on that to move one
+ *  coordinate without disturbing the other. */
+function imageUvToShown(u: number, v: number): [number, number] {
+  let a = u, b = v;
+  if (renderer.flip & 1) a = 1 - a;
+  if (renderer.flip & 2) b = 1 - b;
+  const r = ((renderer.rotation % 4) + 4) % 4;
+  if (r === 1) return [1 - b, a];
+  if (r === 2) return [1 - a, 1 - b];
+  if (r === 3) return [b, 1 - a];
+  return [a, b];
+}
+
+/** Whether the picture is shown on its side, so that the file's width runs up
+ *  and down the screen. Takes nothing; reads the renderer's quarter turn. */
+function shownOnItsSide(): boolean {
+  return ((renderer.rotation % 2) + 2) % 2 === 1;
+}
+
+/** Put a rectangle's place and size on the panel: four sliders in percent of
+ *  the picture as shown, each with its spoken value. Takes the picked mask or
+ *  null; returns nothing. Hides the row for any other kind of mask, whose shape
+ *  has no box to set. What it relies on: a slider under the finger or a key is
+ *  left alone, because a value written back mid-drag would fight the thumb. */
+function syncRectUI(m: MaskLayer | null): void {
+  const box = !!m && m.type === 5;
+  mUI.rectRow.hidden = !box;
+  if (!box || !m) return;
+  const [sx, sy] = imageUvToShown(m.cx, m.cy);
+  const side = shownOnItsSide();
+  const put = (el: HTMLInputElement, frac: number, words: string) => {
+    const pct = Math.round(frac * 100);
+    if (document.activeElement !== el) el.value = String(pct);
+    el.setAttribute("aria-valuetext", `${pct} percent ${words}`);
+  };
+  put(mUI.rectX, sx, "of the way across");
+  put(mUI.rectY, sy, "of the way down");
+  put(mUI.rectW, 2 * (side ? m.ry : m.rx), "of the picture's width");
+  put(mUI.rectH, 2 * (side ? m.rx : m.ry), "of the picture's height");
+}
+
+/** Move or size the picked rectangle from one of its sliders. Takes which of
+ *  the four moved: `x` across, `y` down, `w` width, `h` height. Writes the mask
+ *  and redraws; returns nothing. Only the coordinate that moved is written, so
+ *  the other three keep the exact numbers a drag gave them rather than their
+ *  rounded readouts. A centre stays on the picture and a half-extent stays in
+ *  the range the handles allow (0.02 to 1.5 of the file's own width or height). */
+function setRectFromSlider(part: "x" | "y" | "w" | "h"): void {
+  const m = currentMask();
+  if (!m || m.type !== 5) return;
+  const el = part === "x" ? mUI.rectX : part === "y" ? mUI.rectY : part === "w" ? mUI.rectW : mUI.rectH;
+  const frac = Number(el.value) / 100;
+  if (part === "x" || part === "y") {
+    const [sx, sy] = imageUvToShown(m.cx, m.cy);
+    const [u, v] = shownToImageUv(part === "x" ? frac : sx, part === "y" ? frac : sy);
+    m.cx = clamp(u, 0, 1);
+    m.cy = clamp(v, 0, 1);
+  } else {
+    // The width as shown is the file's width unless the picture is on its side.
+    const half = clamp(frac / 2, 0.02, 1.5);
+    if ((part === "w") !== shownOnItsSide()) m.rx = half;
+    else m.ry = half;
+  }
+  positionMaskOverlay();
+  draw();
+}
+for (const [el, part] of [[mUI.rectX, "x"], [mUI.rectY, "y"], [mUI.rectW, "w"], [mUI.rectH, "h"]] as const) {
+  el.addEventListener("input", () => setRectFromSlider(part));
+  el.addEventListener("change", flushRecord); // one drag of a slider = one undo step
+}
 
 // --- CORRECTING A GENERATED SELECTION BY HAND (031). Add by hand / Take out
 // by hand arm the canvas the way Paint does, and a drag records a STROKE on

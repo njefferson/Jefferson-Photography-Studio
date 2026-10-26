@@ -554,7 +554,7 @@
           <div class="mask-place-head">
             <button id="maskPlaceClose" type="button" class="mask-place-close">Done with masks</button>
           </div>
-          <p class="note">Add a radial, gradient, brush, color or sky mask, target it on the photo, then adjust only that area. Tap a mask to select it, and tap it again when you are finished with it.</p>
+          <p class="note">Add a radial, rectangle, gradient, brush, color or sky mask, target it on the photo, then adjust only that area. Tap a mask to select it, and tap it again when you are finished with it.</p>
           <!-- WHAT THIS PANEL CAN DO, SAID ONCE (040). Subtract and
                intersect shipped in 2.53 and were asked for again from the
                device, because the control that offers them is on the SECOND
@@ -567,6 +567,7 @@
           <p id="maskCombineNote" class="note">Masks combine. Add a second one and it can add to the first, subtract from it, or keep only where the two overlap &mdash; so you can finish a sky the automatic selection missed with a colour, take a colour back out of it, or grade just the place where two selections meet.</p>
           <div class="mask-add">
             <button id="addRadial" type="button">+ Radial</button>
+            <button id="addRect" type="button">+ Rectangle</button>
             <button id="addLinear" type="button">+ Gradient</button>
             <button id="addBrush" type="button">+ Brush</button>
             <button id="addColor" type="button">+ Color</button>
@@ -661,6 +662,18 @@
                 <button id="mTurnUp" type="button" aria-label="Turn the oval a tenth of a degree clockwise" aria-describedby="mTurnNote">+0.1&deg;</button>
               </div>
               <small id="mTurnNote" class="note">Drag the round knob on the stem past the oval&rsquo;s edge to turn it on the photo; it settles on every 15&deg; as you pass, so level is easy to find. The slider and the tenth-degree buttons turn it without a drag. 0&deg; is level as the photo is shown.</small>
+            </div>
+            <!-- A RECTANGLE WITHOUT A GESTURE (050). The three round handles
+                 on the photograph are a drag; these are the same box set
+                 another way, because a gesture with no alternative is
+                 unreachable for anyone who cannot make it. Percent of the
+                 picture AS SHOWN, so Across is across on a photo on its side. -->
+            <div id="mRectRow" class="mask-rect-row" hidden>
+              <label>Across <input id="mRectX" type="range" min="0" max="100" step="1" value="50" aria-describedby="mRectNote" /></label>
+              <label>Down <input id="mRectY" type="range" min="0" max="100" step="1" value="50" aria-describedby="mRectNote" /></label>
+              <label>Width <input id="mRectW" type="range" min="4" max="200" step="1" value="70" aria-describedby="mRectNote" /></label>
+              <label>Height <input id="mRectH" type="range" min="4" max="200" step="1" value="70" aria-describedby="mRectNote" /></label>
+              <small id="mRectNote" class="note">Drag the round handles on the photo to place the box and size it, or set it here. Across and Down are where its middle sits, and Width and Height how large it is, all in percent of the photo as shown. The corners are square; Feather softens the edge.</small>
             </div>
             <label id="mFeatherRow">Feather <input id="mFeather" type="range" min="0.02" max="1" step="0.01" value="0.5" /></label>
             <fieldset id="mJoinRow" class="mask-join">
