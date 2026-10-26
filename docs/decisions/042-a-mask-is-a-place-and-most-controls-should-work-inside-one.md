@@ -423,11 +423,13 @@ selection; built in stages, each shippable and checkable on its own.** Chosen.
   - **HSL:** the mask's own offsets per band on hue, saturation and luminance,
     added to the whole photo's where the group reaches, summed where masks
     overlap and held to the sliders' range, as Foliage combines (Capture One's
-    Colour Editor on a layer). 8 uniform rows a mask.
+    Colour Editor on a layer). 8 uniform rows a mask. Built on staging, 25
+    September 2026 (6b67ebb).
   - **Grade:** the mask's own wheels, whose tints add to the whole photo's
     where the group reaches (Capture One's Colour Balance on a layer). The
     tints are chroma vectors that already add, so an offset and a value of its
-    own are the same thing here. 4 rows a mask.
+    own are the same thing here. 4 rows a mask. Built on staging, 25 September
+    2026 (3fd058f).
   - **Luminance and LUT strength:** the mask's own offsets, sharing one row a
     mask. The LUT file stays whole-photo; its strength per mask follows
     darktable, since Capture One cannot put a LUT on a layer at all. **Built on
@@ -495,6 +497,13 @@ selection; built in stages, each shippable and checkable on its own.** Chosen.
       offset, because the stage runs after the mask stage, where the group's
       weight, colour key included, exists; the aim could not, being read before
       it, and still cannot.
+    - **Built on staging, 24 October 2026**, and waits on the device pass, as
+      designed above: `MaskLayer.shadow`, one `float` a mask in the shader (8
+      uniform rows and 1 boolean), summed inside the loop that folds the group
+      weights and added to the term the whole photo's amount and a saved aim
+      leave. The control on the Grade tab acts on the picked mask, shown as
+      colour kept like the whole photo's, and its "here only" toggle shows only
+      on a mask that carries the aim.
   - **Contrast:** already the mask's own since stage 2. The whole-photo
     contrast after the mask stage does not also go per mask: two contrasts on
     one mask would be two sliders for one thing.

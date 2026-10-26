@@ -34,7 +34,8 @@
 // strength, the last two stages: the same offsets-added rule, held to the
 // slider's range, with the LUT file itself staying whole-photo. And a mask's
 // own curves, which do not add: they work on what the whole photo's curves
-// left, blended in by the group's weight.
+// left, blended in by the group's weight. And a mask's own Shadow colour, an
+// offset on the amount taken out, added to the term a saved aim leaves.
 //
 // Runs on every commit and needs no browser. Bundled with esbuild so it checks
 // the functions the app ships rather than a copy of them.
@@ -183,5 +184,25 @@ check("a head whose group reaches nowhere here changes nothing with curves", dif
 check("a colour mask can carry curves", diff(pxl([{ ...neutralMask(3), hueTarget: 20, satTarget: 0.3, colorRange: 0.9, curves: cv(CM, CR, CG, CB) }]), bareL) > 0.02 ? 1 : 0, 1);
 check("curves of the wrong length are ignored", diff(pxl([{ ...neutralMask(0), curves: [...CM], brightness: 1.0001 }]), pxl([{ ...neutralMask(0), brightness: 1.0001 }])), 0);
 
-console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer, grade, Sky band, Luminance, LUT strength and curves hold");
+// 042 stage 2b: the mask's own Shadow colour, on a dark coloured pixel where the
+// stage works. The offset is on the amount taken out and adds to it; a saved aim
+// keeps its own rule, one weight on the whole photo's amount, and the offset is
+// a second term added to what the aim leaves, so an edit with no offset renders
+// as it did.
+const pxh = (masks, edit) => { const p = plain(); p.masks = masks; Object.assign(p, edit ?? {}); const o = new Float32Array(4); compileEdit(p, undefined, 1.5)(0.1, 0.03, 0.015, o, 0, 0.5, 0.5); return o; };
+const bareH = pxh([]);
+const AIM_SHADOW_BIT = 4;
+check("Shadow colour taken out on the whole photo changes a dark pixel (so the case is live)", diff(pxh([], { shadowSat: 0.8 }), bareH) > 0.02 ? 1 : 0, 1);
+check("a full head's Shadow colour offset renders as the same amount on the whole photo", diff(pxh([{ ...neutralMask(0), shadow: 0.5 }]), pxh([], { shadowSat: 0.5 })), 0);
+check("an offset is added to the whole photo's amount, not put in its place", diff(pxh([{ ...neutralMask(0), shadow: 0.25 }], { shadowSat: 0.25 }), pxh([], { shadowSat: 0.5 })), 0);
+check("a negative offset gives colour back", diff(pxh([{ ...neutralMask(0), shadow: -0.25 }], { shadowSat: 0.5 }), pxh([], { shadowSat: 0.25 })), 0);
+check("an offset past the end is held to all the colour out", diff(pxh([{ ...neutralMask(0), shadow: 3 }]), pxh([], { shadowSat: 1 })), 0);
+check("an offset of zero changes nothing", diff(pxh([{ ...neutralMask(0), shadow: 0, brightness: 1.0001 }]), pxh([{ ...neutralMask(0), brightness: 1.0001 }])), 0);
+check("a head whose group reaches nowhere here changes nothing with a Shadow colour offset", diff(pxh([{ ...neutralMask(0), shadow: 0.8 }, { ...neutralMask(0), op: 1 }]), bareH), 0);
+check("a colour mask can carry a Shadow colour offset", diff(pxh([{ ...neutralMask(3), hueTarget: 14, satTarget: 0.7, colorRange: 0.9, shadow: 0.8 }]), bareH) > 0.02 ? 1 : 0, 1);
+check("a saved aim still scales the whole photo's amount, here full", diff(pxh([{ ...neutralMask(0), aims: AIM_SHADOW_BIT }], { shadowSat: 0.5 }), pxh([], { shadowSat: 0.5 })), 0);
+check("a saved aim on a mask that reaches nowhere here still takes the whole photo's amount away", diff(pxh([{ ...neutralMask(0), aims: AIM_SHADOW_BIT, cx: 0.0, cy: 0.0, rx: 0.05, ry: 0.05 }], { shadowSat: 0.5 }), bareH), 0);
+check("an offset is added to the term a saved aim leaves", diff(pxh([{ ...neutralMask(0), aims: AIM_SHADOW_BIT, shadow: 0.25 }], { shadowSat: 0.5 }), pxh([], { shadowSat: 0.75 })), 0);
+
+console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer, grade, Sky band, Luminance, LUT strength, curves and Shadow colour hold");
 process.exit(bad ? 1 : 0);

@@ -600,7 +600,7 @@ function fixMaskLoops(src: string, k: number): { src: string; loops: number; cle
   return { src: s, loops, clean: (s.match(/\bu_maskCount\b/g) ?? []).length === 1 };
 }
 
-/** THE FOURTEEN PER-MASK UNIFORM ARRAYS the mask loops index (decision 071,
+/** THE FIFTEEN PER-MASK UNIFORM ARRAYS the mask loops index (decision 071,
  *  option 8), and where each lands in the two rewrites below: `field` is the
  *  vec4 slot per mask, `sw` the components read, `int` whether the value is an
  *  int. `u_maskHsl` (8 per mask) and `u_maskGrade` (3 per mask) are indexed by
@@ -609,7 +609,7 @@ const MASK_FIELDS: [string, number, string, boolean][] = [
   ["u_maskType", 0, "x", true], ["u_maskSlot", 0, "y", true], ["u_maskOp", 0, "z", true], ["u_maskAims", 0, "w", true],
   ["u_maskGeoA", 1, "", false], ["u_maskGeoB", 2, "", false], ["u_maskAdj", 3, "", false],
   ["u_maskFol", 4, "xyz", false], ["u_maskSkyBand", 5, "xyz", false], ["u_maskHue", 6, "x", false], ["u_maskGradeBal", 6, "y", false],
-  ["u_maskLumLut", 6, "zw", false],
+  ["u_maskLumLut", 6, "zw", false], ["u_maskShadow", 4, "w", false],
 ];
 const MASK_ARRAY_NAMES = [...MASK_FIELDS.map((f) => f[0]), "u_maskHsl", "u_maskGrade"];
 /** How many entries each of those arrays declares in `src/gl.ts`: 8 per mask,
@@ -622,7 +622,7 @@ const MASK_ARRAY_SIZE: Record<string, number> = { ...Object.fromEntries(MASK_FIE
  *  `uniform int u_maskCount;`), and `to(name, index)` giving the new read for
  *  one index site. Gives back the source, with its comments removed, and
  *  whether the rewrite is whole: the per-mask arrays declared are exactly the
- *  fourteen at the sizes in `MASK_ARRAY_SIZE`, all fourteen declarations are
+ *  fifteen at the sizes in `MASK_ARRAY_SIZE`, all fifteen declarations are
  *  removed, every array is read at least once, and no read or declaration of a
  *  per-mask array is left. What the caller relies on: `ok` false means the
  *  program has changed shape and the variant must print "not run", never a
@@ -687,7 +687,7 @@ function masksToBlocks(src: string): { src: string; ok: boolean; sites: number }
  *  any device at that minimum, and the row read as the device failing. The
  *  reads go through `MASK_TEX_SAMPLER` instead, whose own reads are by integer
  *  address too, and `bindZeroMaskTexture` puts the zero mask texture on its
- *  unit for the one draw. What the compiler sees is the same: fourteen arrays
+ *  unit for the one draw. What the compiler sees is the same: fifteen arrays
  *  of reads turned into texelFetch on a 2D float texture. */
 const MASK_TEX_SAMPLER = "u_flatTex";
 function masksToTexture(src: string): { src: string; ok: boolean; sites: number } {
@@ -910,7 +910,7 @@ async function whatMakesTheBuildSlow(): Promise<void> {
       // of the indexed uniform arrays FXC is slow on. Measured here before the
       // editor's own program changes.
       { name: "…with the mask settings in a texture", src: texed.src,
-        changed: `${texed.sites} reads of the fourteen mask arrays moved into one texture, read through ${MASK_TEX_SAMPLER}`, ok: texed.ok, prep: bindZeroMaskTexture },
+        changed: `${texed.sites} reads of the fifteen mask arrays moved into one texture, read through ${MASK_TEX_SAMPLER}`, ok: texed.ok, prep: bindZeroMaskTexture },
       // THE PER-MASK-COUNT BUILD (decision 071): the mask loops kept, run to a
       // count the compiler can see. A count of 8 may unroll into a long build.
       // Each row has a context of its own, given back after it, so a loss here
@@ -930,7 +930,7 @@ async function whatMakesTheBuildSlow(): Promise<void> {
       { name: "…with both", src: both.src,
         changed: `${hidden.loops} counts hidden and ${both.loops} mask loops taken out`, ok: hidden.loops > 0 && both.loops > 0 },
       { name: "…with the mask settings in uniform blocks", src: blocks.src,
-        changed: `${blocks.sites} reads of the fourteen mask arrays moved into three blocks`, ok: blocks.ok, prep: bindZeroBlocks },
+        changed: `${blocks.sites} reads of the fifteen mask arrays moved into three blocks`, ok: blocks.ok, prep: bindZeroBlocks },
     ];
     const stamp = 1000 + Math.floor(Math.random() * 8e8);
     const timed: { name: string; t: number }[] = [];

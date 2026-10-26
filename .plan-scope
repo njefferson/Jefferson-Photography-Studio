@@ -1,10 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=60c8d4c065d5a851
-diffhash=658f1e49c8b80cda
+diffhash=9192a5ae8e7bcd46
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 04 is documentation only, one decision record, 042, and the step's Files list names it. It writes the design for stage 2b's Shadow colour into the record before its code, as step 191 required: the offset rule where two masks overlap, the decision that a saved aim keeps its own rule and is not converted, the interface limit to masks that already carry the aim, and a new Rejected line for converting an aim. No code, no look value and no file outside the record is changed. The status shows only the one record staged.
+# IN-SCOPE: Sequence patch 05 builds record 042's stage 2b part for Shadow colour per mask: an optional offset on the group head, added to the whole photo's amount and to the term a saved aim leaves, held to 0..1, with the shader and compileEdit holding the same rule. It also keeps a saved aim on its own rule, shows the "here only" aim switch only on a mask that already carries the aim, and declares that switch in .control-allow with the state that reveals it. The files touched are the ones the step's Files list names for this work: .control-allow, src/gl.ts, src/pipeline.ts, src/main.ts, src/debug.ts, src/previewcache.ts, ir.html, docs/ARCHITECTURE.md, docs/decisions/042, NOTES.md, tools/.preview-pipeline, tools/join-fold-check.mjs and tools/walk-input.mjs. The preview pipeline version moves by its own record. The record gained a built line for this part and the two earlier parts' built lines, which the record's own list asks for. No whole-photo look value was chosen.
 # 
-# What was judged: the approved plan's step 191 text, which requires this design in record 042 before the code, and the whole patch read. The patch adds design prose and a Rejected entry, and the Rejected entry is a live boundary the code must keep clear of.
+# What was judged: the approved plan's Files and step 191 text, and the whole patch read in full. The status shows the fourteen staged files named above and nothing else.
 # 
-# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer.
+# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new control text is written in the app's existing voice.

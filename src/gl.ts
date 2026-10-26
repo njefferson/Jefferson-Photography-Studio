@@ -15,7 +15,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, groupLumLutOf, maskCurvesStraight, LUM_MIN, LUM_MAX, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, groupLumLutOf, groupShadowOf, maskCurvesStraight, LUM_MIN, LUM_MAX, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer, toHalf } from "./half";
 import { sharpenSigmaTexels } from "./raw/detail";
 export type { EditParams };
@@ -203,6 +203,8 @@ uniform bool u_maskGradeOn;  // false when no head carries a grade, so the grade
 uniform vec2 u_maskLumLut[8]; // a HEAD's own offsets on the overall Luminance (x) and on the LUT's strength (y), 042 stage 2b; zero on components
 uniform bool u_maskLumLutOn; // false when no head carries either, so lum and the LUT read the whole photo's alone
 uniform bool u_maskCurveOn;  // false when no head carries curves of its own (042 stage 2b), so no row beyond the whole photo's is read
+uniform float u_maskShadow[8]; // a HEAD's own offset on the shadow colour taken out (042 stage 2b), in the field's own sense; zero on components
+uniform bool u_maskShadowOn; // false when no head carries one, so the stage reads the whole photo's amount and the aims alone
                              // LITERAL 8, like every array above it: MAX_MASKS is a
                              // TypeScript constant and means nothing inside GLSL —
                              // written as MAX_MASKS first, and the shader silently
@@ -1268,8 +1270,8 @@ void main() {
   // The sums of the heads' own Luminance and LUT-strength offsets, each times
   // that head's weight, summed in the same loop that folds the weights (042,
   // stage 2b); the flags say whether any head reached, as compileEdit's do.
-  float lumD = 0.0, lutD = 0.0;
-  bool lumAny = false, lutAny = false;
+  float lumD = 0.0, lutD = 0.0, shadD = 0.0;
+  bool lumAny = false, lutAny = false, shadAny = false;
   for (int i = 0; i < u_maskCount; i++) {
     // A COMPONENT WAS ALREADY FOLDED INTO ITS HEAD (026) — skip it here, or its
     // adjustment would be applied a second time on its own.
@@ -1312,6 +1314,10 @@ void main() {
       vec2 ll = u_maskLumLut[i];
       if (ll.x != 0.0) { lumD += ll.x * w; lumAny = true; }
       if (ll.y != 0.0) { lutD += ll.y * w; lutAny = true; }
+    }
+    if (u_maskShadowOn && w > 0.0) {
+      float sd = u_maskShadow[i];
+      if (sd != 0.0) { shadD += sd * w; shadAny = true; }
     }
     if (w <= 0.0) continue;
     vec4 adj = u_maskAdj[i]; // brightness, contrast, saturation, warmth
@@ -1392,6 +1398,9 @@ void main() {
   // smoothstep reach as that grade's shadow band, at a fixed balance.
   // Matches compileEdit; EditParams.shadowSat says why it is here.
   float shA = u_shadowSat * aimWeightOf(4);
+  // A mask's own offset (042, stage 2b) is added to what the whole photo's amount
+  // and a saved aim leave, held to 0..1, as compileEdit adds it.
+  if (shadAny) shA = clamp(shA + shadD, 0.0, 1.0);
   if (shA > 0.0) {
     float Ls = dot(g, LUMA_W);
     float ks = 1.0 - shA * (1.0 - smoothstep(0.05, 0.6, Ls));
@@ -1652,7 +1661,7 @@ export type MaskState = "in" | "idle" | "building" | "failed";
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskLumLut", "u_maskLumLutOn", "u_maskCurveOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_skyRef", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskLumLut", "u_maskLumLutOn", "u_maskCurveOn", "u_maskShadow", "u_maskShadowOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_skyRef", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -3069,6 +3078,10 @@ export class Renderer {
     const maskLumLutOn = maskGroupsForRender(p.masks).some((g) => !!groupLumLutOf(g));
     const maskLutOn = !!p.lut && maskGroupsForRender(p.masks).some((g) => (groupLumLutOf(g)?.[1] ?? 0) !== 0);
     gl.uniform1i(this.loc.u_maskLumLutOn, maskLumLutOn ? 1 : 0);
+    // A head's own shadow colour (042, stage 2b), on top of the whole photo's
+    // amount and any saved aim.
+    const maskShadowOn = maskGroupsForRender(p.masks).some((g) => groupShadowOf(g) !== null);
+    gl.uniform1i(this.loc.u_maskShadowOn, maskShadowOn ? 1 : 0);
     gl.uniform1i(this.loc.u_bwOn, p.bwOn ? 1 : 0);
     const bwMix = p.bwMix ?? [1, 1, 1];
     gl.uniform3f(this.loc.u_bwMix, bwMix[0], bwMix[1], bwMix[2]);
@@ -3263,6 +3276,11 @@ export class Renderer {
           ll[i * 2 + 1] = p.lut ? m.lumLut[1] : 0;
         });
         gl.uniform2fv(this.loc.u_maskLumLut, ll);
+      }
+      if (maskShadowOn) {
+        const sh = new Float32Array(MAX_MASKS);
+        masks.forEach((m, i) => { if ((i === 0 || (m.op ?? 0) === 0) && typeof m.shadow === "number" && Number.isFinite(m.shadow)) sh[i] = m.shadow; });
+        gl.uniform1fv(this.loc.u_maskShadow, sh);
       }
       if (maskHslOn) {
         const hsl = new Float32Array(MAX_MASKS * 24);

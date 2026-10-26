@@ -862,6 +862,17 @@ export interface MaskLayer {
    *  as a new array, never written in place, because an undo snapshot copies a
    *  mask shallowly. */
   curves?: number[];
+  /** THE MASK'S OWN SHADOW COLOUR (042, stage 2b): an offset on the whole
+   *  photo's `shadowSat`, in the field's own sense (how much MORE colour is taken
+   *  out of the dark end; the control shows the opposite, colour kept), added
+   *  where this mask's group reaches, summed where masks overlap, and held to
+   *  0..1 with the whole photo's amount. Absent or 0 means no change, so every
+   *  edit saved before it renders as it did. Read on a group's HEAD only; a
+   *  colour mask can carry it, the stage running after the mask stage. It is
+   *  added to the term the aims leave, and never replaces it: an aim saved on
+   *  a mask (AIM_SHADOW) keeps reading as one weight on the whole photo's amount
+   *  (record 042's design). */
+  shadow?: number;
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: radius along the oval's FIRST axis, as a fraction of the width
@@ -1098,6 +1109,7 @@ export function maskIsActive(m: MaskLayer): boolean {
   if (m.grade && !gradeIsNeutral(m.grade)) return true;
   if (m.lumLut && (m.lumLut[0] !== 0 || m.lumLut[1] !== 0)) return true;
   if (m.curves && !maskCurvesStraight(m.curves)) return true;
+  if (m.shadow) return true;
   return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
 }
 
@@ -1322,6 +1334,19 @@ export function groupCurvesOf(group: readonly MaskLayer[]): readonly number[] | 
   const h = group[0];
   if (!h || !h.curves || maskCurvesStraight(h.curves)) return null;
   return h.curves;
+}
+
+/** The shadow-colour offset a GROUP adds (042, stage 2b), or null when it adds
+ *  none. Takes one group (head first); returns the head's `shadow` when it is a
+ *  non-zero number. A colour mask can carry it, because the stage runs after the
+ *  mask stage, where the group's weight, colour key included, exists. What the
+ *  caller relies on: null means the group can be skipped at the stage, and the
+ *  renderer uploads a head's offset for exactly the groups this returns non-null
+ *  for. */
+export function groupShadowOf(group: readonly MaskLayer[]): number | null {
+  const h = group[0];
+  if (!h || typeof h.shadow !== "number" || !Number.isFinite(h.shadow) || h.shadow === 0) return null;
+  return h.shadow;
 }
 
 /** THE FOLIAGE BAND'S VALUE AT ONE PIXEL (042, stage 2): the whole-photo value
@@ -2755,7 +2780,10 @@ export function compileEdit(
     curveGroups.push({ gi, master: fn(0), r: fn(1), g: fn(2), b: fn(3) });
   });
   const curveTmp = new Float32Array(3);
-  const keepW = hslGroups.length > 0 || gradeGroups.length > 0 || lumLutGroups.length > 0 || curveGroups.length > 0;
+  // A mask's own shadow colour (042, stage 2b): each group that carries one.
+  const shadowGroups: { gi: number; d: number }[] = [];
+  maskGroupsActive.forEach((g, gi) => { const d = groupShadowOf(g); if (d !== null) shadowGroups.push({ gi, d }); });
+  const keepW = hslGroups.length > 0 || gradeGroups.length > 0 || lumLutGroups.length > 0 || curveGroups.length > 0 || shadowGroups.length > 0;
   const groupW = new Float64Array(maskGroupsActive.length);
   if (folGroups.length) bandsActive = true;
   const folPx: [number, number, number] = [0, 0, 0];
@@ -3173,7 +3201,22 @@ export function compileEdit(
     // EditParams.shadowSat for why the balance is not shared and what this is
     // for. Before the grade on purpose: any tint the reader adds then lands on
     // a neutral shadow. Same in the shader.
-    const shA = u !== undefined && v !== undefined ? shSat * aimWeight(aimGroups, AIM_SHADOW, u, v, aspect) : shSat;
+    let shA = u !== undefined && v !== undefined ? shSat * aimWeight(aimGroups, AIM_SHADOW, u, v, aspect) : shSat;
+    // A MASK'S OWN SHADOW COLOUR (042, stage 2b): each group's offset times that
+    // group's weight as the mask stage folded it, summed where masks overlap,
+    // added to what the whole photo's amount and a saved aim leave, and held to
+    // 0..1. Nothing is added where no group reaches, so an edit with no offset
+    // renders as it did.
+    if (shadowGroups.length && u !== undefined && v !== undefined) {
+      let dShadow = 0, anyShadow = false;
+      for (const q of shadowGroups) {
+        const gw = groupW[q.gi];
+        if (gw <= 0) continue;
+        dShadow += q.d * gw;
+        anyShadow = true;
+      }
+      if (anyShadow) shA = Math.min(1, Math.max(0, shA + dShadow));
+    }
     if (shA > 0) {
       const L = out[0] * 0.2126 + out[1] * 0.7152 + out[2] * 0.0722;
       const k = 1 - shA * (1 - smooth01(0.05, 0.6, L));

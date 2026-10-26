@@ -23,6 +23,7 @@ ir.html#swStripGo — The update strip on the editor page. A cold sweep cannot m
 ir.html#swStripLater — The other half of the editor's update strip; tools/offline-shell-walk.mjs presses it during a download and after a failed one (checks 13 and 14).
 index.html#shareBtn — Revealed by setupInstalledShare only when the page is running as an INSTALLED standalone app. A browser tab is by definition not that, so a headless sweep can never see it; the walk would have to fake the display-mode media query, which would be measuring the fake.
 ir.html#locTip — The location tip, shown only when the opened file carries GPS data. Reachable by adding a GPS-bearing fixture to tools/fixtures and opening it.
+ir.html#mAimShadow — The "Shadow colour, here only" switch in the mask place's whole-photo tools group. Since a mask takes its own Shadow colour (record 042, stage 2b) the switch is shown only on a mask whose saved edit already carries that aim, so a saved aim is never hidden and can be switched off; no control a reader can press makes a new one, which is why a sweep that adds masks never sees it. The state that shows it is a mask loaded from an edit saved with that aim on, which needs a saved-edit fixture carrying one.
 ir.html#tatBanner — An armed-tool banner over the photograph; appears only while that tool is armed with a stroke in progress.
 ir.html#healBanner — Shown while Heal spots is armed.
 ir.html#healReviewBanner — Shown only after an automatic spot sweep has found something to review, so it needs a frame with real dust in it.

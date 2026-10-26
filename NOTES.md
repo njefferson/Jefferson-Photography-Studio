@@ -3116,6 +3116,9 @@ user-scalable=no.
     24 October 2026, and waits on the device pass.
   - Stage 2b, the curves per mask: built on staging on 24 October 2026, and
     waits on the device pass.
+  - Stage 2b, Shadow colour per mask: built on staging on 24 October 2026, and
+    waits on the device pass. A saved "here only" aim is left as it is and keeps
+    rendering as before; the offset is added to what it leaves.
   - Stage 3 covers exposure, white balance and the foliage band. That band
     limited to a place is the standard fix for cladding reddening with the
     grass.

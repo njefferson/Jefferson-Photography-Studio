@@ -1742,7 +1742,9 @@ function syncFromUI() {
   // Right is more colour, which is the app's convention for every slider, and
   // the stored number keeps the meaning every saved look already relies on —
   // so the inversion lives here and in syncToUI, and nowhere else.
-  params.shadowSat = 1 - Number(ui.shadowSat.value);
+  // With a mask picked the control shows THE MASK'S offset (042, stage 2b);
+  // writeMaskControls takes it, and the whole photo's own amount stays.
+  if (!tm) params.shadowSat = 1 - Number(ui.shadowSat.value);
   params.skySmooth = Number(ui.skySmooth.value);
   params.skyDepth = Number(ui.skyDepth.value);
   params.skySat = Number(ui.skySatSel.value);
@@ -8493,6 +8495,12 @@ function maskCtls(): MaskCtl[] {
     // the channel the chips show, on the whole photo's ranges, and not an offset,
     // because a curve does not add. It starts straight and is applied after the
     // whole photo's, mixed in by the mask's weight.
+    // Shadow colour (042, stage 2b): an offset on the whole photo's, shown the way
+    // the control shows it, as colour KEPT, so right is more colour and the stored
+    // number (how much was taken out) is the opposite of what the slider shows.
+    // It is added to the whole photo's amount, and to a saved aim's term if the
+    // mask carries one; the range is as wide as the whole photo's.
+    { el: ui.shadowSat, min: -1, max: 1, step: 0.01, get: (m) => (m.shadow ? -m.shadow : 0), set: (m, v) => { m.shadow = v === 0 ? 0 : -v; }, whole: () => 1 - (params.shadowSat ?? 0) },
     ...ui.tones.map((el, i) => ({
       el, min: -25, max: 25, step: 0.5,
       get: (m: MaskLayer) => ((m.curves && m.curves.length === MASK_CURVE_LEN ? m.curves[toneChannel * 5 + i] : TONE_DEFAULT[i]) - TONE_DEFAULT[i]) * 100,
@@ -9192,6 +9200,11 @@ function updateMaskUI() {
       btn.setAttribute("aria-pressed", String(!!(am?.aims && (am.aims & bit))));
       btn.disabled = blocked;
     }
+    // SHADOW COLOUR IS A PER-MASK VALUE NOW (042, stage 2b): the ordinary control
+    // acts on the picked mask, so this second route to it is shown only on a mask
+    // that already carries the aim. A saved aim is never hidden and can still be
+    // switched off; no new one can be made here.
+    mUI.aimShadow.hidden = !(am?.aims && (am.aims & AIM_SHADOW));
   }
   maskList.replaceChildren(
     ...params.masks.map((m, i) => {
