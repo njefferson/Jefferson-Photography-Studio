@@ -1,10 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=60c8d4c065d5a851
-diffhash=259a994bed7e7f8c
+diffhash=8d584ff9351ff13f
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 09 builds record 050's second row, the colour-proximity limit on the Colour mask: one slider, off by default, that keeps a colour selection to where it was picked, softening over the mask's own Feather. It touches only the areas the step's Files list names for this work: src/gl.ts, src/main.ts, src/pipeline.ts, src/style.css, ir.html, docs/ARCHITECTURE.md, NOTES.md and tools/.preview-pipeline. The new mask fields are optional and absent on every colour mask saved before, and colorReach returns 0 for them, so a saved colour mask weighs what it did. The preview tool's record states that the colour weight with no limit was compared between the copy and the new build and found identical. No look value is chosen; the slider's default is off, which is the record's own choice.
+# IN-SCOPE: Sequence patch 10 builds record 014's chosen options, as far as the code can settle them without the device: a Stop building button that ends the quick look's grid build at the next file and keeps the grid, the cells it never reached saying Not built in words, a count in the report of how many decodes the strip's background pass makes after a keep, and the grid's object URL releases counted so the report can say what it let go of. The Close path now also releases the compare dialog's two images. The record says whether memory returns on the device is the device's measurement, and the patch does not claim it. It touches only the areas the step's Files list names: src/main.ts, src/style.css, ir.html, docs/ARCHITECTURE.md and NOTES.md. The handoff in the record is not rewritten and the strip pictures are not rendered ahead, as the record's Rejected entries require. The stopped tile's accessible name carries its words, which the step's rules require for a control whose visible label is not in its name.
 # 
-# What was judged: the approved plan's Files and step 193 text, which name these areas and this record, and the whole patch read in full. The status shows the eight staged paths and nothing else.
+# What was judged: the approved plan's Files and step 193 text, which name these areas and this record, and the whole patch read in full. The status shows the five staged paths and nothing else.
 # 
-# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new control's words are written in the app's existing voice.
+# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new words are in the app's existing voice.

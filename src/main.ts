@@ -14160,6 +14160,13 @@ interface SessionPhoto {
    *  rendered a colour cast of 1.18/0.90/0.92 and every tile 1.02/0.98/0.99 —
    *  near-neutral, the look nowhere on them. */
   thumbGrade?: string;
+  /** FROM A KEEP (record 014): the keep that brought this photograph in, and
+   *  whether it arrived with its strip picture already rendered by the grid.
+   *  Both absent for a photograph opened any other way. Read only by the count
+   *  in the report (`keepSplit`) and written only by `addToSession`; neither is
+   *  an edit, neither is stored, and neither changes what is drawn. */
+  keptBy?: KeepProfile;
+  arrived?: boolean;
 }
 
 /** The live, in-memory edit for one photo — kept so switching back within a
@@ -16062,6 +16069,8 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
     thumbState: "waiting" as SessionPhoto["thumbState"],
     thumbGrade: undefined as string | undefined,
     mark: undefined as SessionPhoto["mark"],
+    keptBy: undefined as KeepProfile | undefined,
+    arrived: undefined as boolean | undefined,
   }));
   for (const p of planned) { sessionPhotos.push(p); pendingStore.add(p.id); }
   adding = { done: 0, total: files.length, index: 1, name: files[0]?.name ?? "" , since: performance.now() };
@@ -16264,6 +16273,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
         if (slot.thumbUrl) URL.revokeObjectURL(slot.thumbUrl);
         slot.thumbUrl = URL.createObjectURL(new Blob([done.thumb], { type: "image/jpeg" }));
         slot.thumbState = "real";
+        slot.arrived = true; // the count in the report reads this (record 014)
         // The grid rendered this one under the live grade, which for a photo
         // arriving in the session is also what opening it will apply. That
         // sentence was only true of a FRESH render until the quick look's
@@ -16335,7 +16345,12 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
             carried: ready ? [...ready.values()].filter((r) => r.thumb && r.thumb.byteLength).length : 0,
             editor: msEditor, reset: msReset, room: msRoom, roomSaid: room, sweep: msSweep, read: msRead, decode: msDecode, show: msShow,
             total: performance.now() - pressedAt, storedAgain: 0,
+            passWithPicture: 0, passWithout: 0,
           };
+          // EVERY PHOTOGRAPH OF THIS KEEP POINTS BACK AT ITS RECORD, so the
+          // strip's background pass can add to the right keep's count even when
+          // a second keep has replaced `lastKeepProfile` by the time it runs.
+          for (const p of planned) p.keptBy = keepProfile;
         }
         ownsBusy = false;
         skipInStrip = true; // a slow read from here on is offered beside Done, not over the editor
@@ -16451,6 +16466,15 @@ async function oneThumbnail(view: SessionPhoto, gen: number): Promise<void> {
   // A TILE IS A STAGE THE HOLD WATCH NAMES, "the strip's tiles": several run side
   // by side and the watch counts the time any of them was in force once.
   const endStage = busyWith("the strip's tiles");
+  // RECORD 014'S SECOND NUMBER, counted at the claim so a decode that fails
+  // counts too: a decode this pass starts for a photograph that came in with a
+  // keep, split by whether the grid had already handed it a picture. Every
+  // decode of the pass since the keep is in it, a redraw after a look change
+  // included, and the line in the report says "since".
+  if (view.keptBy) {
+    if (view.arrived) view.keptBy.passWithPicture++;
+    else view.keptBy.passWithout++;
+  }
   try {
     const bytes = await Session.getBytes(view.id);
     const imported: ImportedFile = { name: view.name, kind: view.kind, bytes, looksTranscoded: false };
@@ -17477,8 +17501,13 @@ function switchSplit(): string {
  *  being told a total. Returns "none this session" where nothing has run — the
  *  honest answer on a freshly opened page, and never a zero. */
 function quickLookSplit(): string {
+  // THE GRID'S PICTURES, FROM FIRST TO LAST (record 014): object URLs made for
+  // tiles and let go of, over the whole session. After a Close the third figure
+  // is 0 when the app has let go of everything it made; whether the browser then
+  // returns the memory is for the device to measure, and this does not claim it.
+  const held = `; the grid's pictures: ${quickUrls.made} made, ${quickUrls.revoked} let go of, ${quickUrls.made - quickUrls.revoked} held now`;
   const p = lastQuickProfile;
-  if (!p) return "none this session";
+  if (!p) return quickUrls.made ? `no run has finished this session${held}` : "none this session";
   const t = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)}s`);
   const pic = p.firstPicture ? t(p.firstPicture) : "never — no file gave a picture";
   return (
@@ -17486,7 +17515,9 @@ function quickLookSplit(): string {
     `; store lookup ${t(p.lookup)}, reading ${t(p.read)}, decode ${t(p.decode)}, rendering ${t(p.render)}, keeping ${t(p.store)}` +
     `; ${p.reused} of ${p.files} came back already rendered` +
     `, ${p.previewed} showed the camera's own picture first` +
-    `, ${p.lanes || "no"} decoder${p.lanes === 1 ? "" : "s"} running`
+    `, ${p.lanes || "no"} decoder${p.lanes === 1 ? "" : "s"} running` +
+    (p.stopped ? `; stopped by the reader with ${p.stopped} not built` : "") +
+    held
   );
 }
 
@@ -17532,6 +17563,13 @@ function keepSplit(): string {
     `, asking the browser for room ${t(p.room)} (${p.roomSaid}), waiting on its delete ${t(p.sweep)}` +
     `, reading the first file ${t(p.read)}, decoding it ${t(p.decode)}, first paint ${t(p.show)}` +
     `; ${p.carried} of ${p.kept} arrived with a picture already rendered` +
+    // THE OTHER SIDE OF THE HANDOFF (record 014), read live: what the strip's
+    // background pass has decoded since, split by whether the photograph came
+    // with its picture. A non-zero first figure means a photograph that arrived
+    // with one was decoded anyway; a first figure of 0 with the second equal to
+    // the number that arrived without means the handoff is honoured.
+    `; since the keep the strip's background pass has decoded ${p.passWithPicture + p.passWithout} time${p.passWithPicture + p.passWithout === 1 ? "" : "s"}` +
+    ` (${p.passWithPicture} for photographs that arrived with a picture, ${p.passWithout} for ones that arrived without)` +
     (p.storedAgain ? `; ${p.storedAgain} stored again after the last session's space was freed` : "")
   );
 }
@@ -18166,12 +18204,16 @@ interface QuickItem {
    *  - `real` — this app's own rendering, through the same pipeline as opening
    *    the photograph.
    *  - `bad` — the file could not be opened at all.
+   *  - `stopped` — the reader stopped the build (014) before this file was
+   *    reached. It is a `waiting` cell that will never be filled, said in words
+   *    rather than left as an ellipsis that promises a picture; it is still a
+   *    real file, so `willKeep` takes it and the session decodes it later.
    *
    *  `ok` is the keepable half and does NOT track this: a `preview` tile is a
    *  real photograph and `willKeep` takes it, a `waiting` one is not yet known
    *  to be anything. Changing this field means repainting through
    *  `paintQuickTile`, which is what keeps the cell and its listeners intact. */
-  state: "waiting" | "preview" | "real" | "bad";
+  state: "waiting" | "preview" | "real" | "bad" | "stopped";
   thumbUrl: string; // object URL for the grid tile ("" if it couldn't decode)
   /** The SAME picture at strip size, rendered from the same decode. Quick look
    *  decodes every file to build the grid; keeping a set afterwards used to
@@ -18245,6 +18287,23 @@ setUpdateCost(() => {
     (picked && picked !== n ? `, and the ${picked} you have kept selected would be forgotten.` : ".");
 });
 let quickGen = 0; // bumped on open/close to abort an in-flight decode loop
+/** THE RUN THE READER STOPPED (014): the `quickGen` of the build that Stop was
+ *  pressed on, -1 when none was. A stop ends THAT run's lanes at their next
+ *  file and keeps the grid; a later run has a later generation, so a stop cannot
+ *  reach it. */
+let quickStopAt = -1;
+/** THE LIFE OF THE GRID'S PICTURES, FOR THE REPORT (014): object URLs made for
+ *  tiles and let go of, so the report can say whether the app released what it
+ *  made. This counts the app's own hold on them; whether the browser then gives
+ *  the memory back is the device's measurement. */
+const quickUrls = { made: 0, revoked: 0 };
+/** Let go of one grid picture's object URL and count it. Takes the URL; returns
+ *  nothing. Every revoke of a grid picture goes through here, so `made` minus
+ *  `revoked` is exactly the number still held. */
+function dropQuickUrl(url: string): void {
+  URL.revokeObjectURL(url);
+  quickUrls.revoked++;
+}
 
 const quickLook = $("quickLook") as HTMLDialogElement;
 // Escape (native dialog cancel -> close) must free previews exactly like the
@@ -18263,6 +18322,18 @@ const qlCount = $("qlCount") as HTMLSpanElement;
 const qlKeep = $("qlKeep") as HTMLButtonElement;
 const qlSelectToggle = $("qlSelectToggle") as HTMLButtonElement;
 const qlPos = $("qlPos") as HTMLDivElement;
+const qlStop = $("qlStop") as HTMLButtonElement;
+
+/** The grid's one machine-readable "still going", and the Stop that goes with
+ *  it. Takes whether a build is running; returns nothing. The flag is the same
+ *  `data-busy` the walks poll, and Stop is on view exactly while it is set, so
+ *  there is no moment where the build runs with no way to end it or the way to
+ *  end it outlives the build. */
+function setQuickBusy(on: boolean): void {
+  if (on) qlGrid.dataset.busy = "1";
+  else delete qlGrid.dataset.busy;
+  qlStop.hidden = !on;
+}
 
 const QUICK_EDGE = 512; // grid-tile preview edge (bigger than the strip's 260)
 
@@ -18342,17 +18413,29 @@ function paintQuickTile(cell: HTMLElement, it: QuickItem): void {
   const x = cell.querySelector(".ql-x") as HTMLButtonElement | null;
   if (!tile) return;
   cell.classList.toggle("provisional", it.state === "preview");
-  cell.classList.toggle("waiting", it.state === "waiting");
+  cell.classList.toggle("waiting", it.state === "waiting" || it.state === "stopped");
   const prov = cell.querySelector(".ql-prov") as HTMLElement | null;
   if (prov) prov.hidden = it.state !== "preview";
   if (x) x.hidden = it.state === "bad";
   tile.disabled = it.state === "bad";
+  // A STOPPED TILE'S NAME CARRIES ITS WORDS. The tile shows "Not built", and a
+  // button's accessible name replaces what is inside it, so a name that stopped at
+  // the file's name left a reader who hears the tile without the words a reader who
+  // sees it has (WCAG 2.5.3, label in name). The sentence is the title's as well, so
+  // it is written once, and touch and assistive technology get it without a hover.
+  const stoppedSaid = "not built, because the build was stopped; it can still be picked and kept";
   tile.title = it.state === "preview"
     ? `${it.name} — the camera's own picture, until this app has rendered its own`
     : it.state === "waiting"
       ? `${it.name} — not read yet`
-      : it.name;
-  tile.setAttribute("aria-label", it.state === "bad" ? `${it.name} — could not be opened` : `Pick ${it.name}`);
+      : it.state === "stopped"
+        ? `${it.name} — ${stoppedSaid}`
+        : it.name;
+  tile.setAttribute("aria-label", it.state === "bad"
+    ? `${it.name} — could not be opened`
+    : it.state === "stopped"
+      ? `Pick ${it.name} — ${stoppedSaid}`
+      : `Pick ${it.name}`);
   const img = tile.querySelector("img");
   if (it.thumbUrl) {
     if (img) { if (img.getAttribute("src") !== it.thumbUrl) img.src = it.thumbUrl; img.alt = it.name; return; }
@@ -18362,9 +18445,10 @@ function paintQuickTile(cell: HTMLElement, it: QuickItem): void {
   // No picture yet, or never. A waiting cell is deliberately NOT disabled: it
   // is a real file with a real name and a reader who recognises the number can
   // reject it before its bytes have been read.
+  // A STOPPED CELL SAYS SO IN WORDS: an ellipsis promises a picture is coming.
   tile.replaceChildren(Object.assign(document.createElement("span"), {
-    className: it.state === "bad" ? "ql-bad-mark" : "ql-wait-mark",
-    textContent: it.state === "bad" ? "\u26A0\uFE0E" : "\u2026",
+    className: it.state === "bad" ? "ql-bad-mark" : it.state === "stopped" ? "ql-wait-mark ql-stopped-mark" : "ql-wait-mark",
+    textContent: it.state === "bad" ? "\u26A0\uFE0E" : it.state === "stopped" ? "Not built" : "\u2026",
   }));
   tile.classList.toggle("ql-bad", it.state === "bad");
 }
@@ -18526,6 +18610,9 @@ interface QuickProfile {
   decode: number;
   render: number;
   store: number;
+  /** HOW MANY CELLS THE READER'S STOP LEFT UNBUILT (014); 0 for a run that went
+   *  to its end. */
+  stopped: number;
 }
 let lastQuickProfile: QuickProfile | null = null;
 
@@ -18543,6 +18630,12 @@ let lastQuickProfile: QuickProfile | null = null;
  *  `carried` is how many of the kept photographs arrived with a picture from
  *  the grid, against `kept`. Record 014 turns on that pair.
  *
+ *  `passWithPicture` and `passWithout` are the pair's other half: how many
+ *  decodes the strip's background pass has started since the keep, for
+ *  photographs that arrived with a picture and for ones that did not. They
+ *  start at 0 and GROW after this record is written, which is why the report
+ *  reads them live. Counts only, never a name.
+ *
  *  `roomSaid` is why the sweep was or was not waited for (decision 075): the
  *  browser's ALLOWANCE against the set — never free disk space, which no
  *  browser reports — or why there was none; `room` is how long the browser
@@ -18553,6 +18646,8 @@ let lastQuickProfile: QuickProfile | null = null;
 interface KeepProfile {
   kept: number;
   carried: number;
+  passWithPicture: number;
+  passWithout: number;
   editor: number;
   reset: number;
   sweep: number;
@@ -18578,7 +18673,7 @@ async function openQuickLook(files: File[]) {
   let msLookup = 0, msRead = 0, msDecode = 0, msRender = 0, msStore = 0;
   files = inShutterOrder(files); // see inShutterOrder — the picker's order is arbitrary
   const gen = ++quickGen;
-  for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+  for (const it of quickItems) if (it.thumbUrl) dropQuickUrl(it.thumbUrl);
   quickItems = [];
   // BACK TO THE START OF THIS FOLDER. The cursor is module state and survived
   // the last one, so a second folder opened in the same sitting began with the
@@ -18600,7 +18695,7 @@ async function openQuickLook(files: File[]) {
   // A MACHINE-READABLE "STILL GOING", because three walks polled the header's
   // PROSE for it and all three broke the day that sentence changed a word.
   // Copy is the product's and must stay free to change; a harness needs state.
-  qlGrid.dataset.busy = "1";
+  setQuickBusy(true);
   quickItems = files.map((f) => ({ file: f, name: f.name, state: "waiting" as const, thumbUrl: "", stripThumb: null, ok: false, mark: null }));
   quickItems.forEach((it, i) => addQuickTile(it, i + 1));
   firstTile = performance.now() - t0;
@@ -18649,9 +18744,10 @@ async function openQuickLook(files: File[]) {
     if (gen !== quickGen) return;
     const old = it.thumbUrl;
     it.thumbUrl = URL.createObjectURL(new Blob([bytes instanceof Uint8Array ? bytes.slice() : bytes], { type: "image/jpeg" }));
+    quickUrls.made++;
     it.state = state;
     it.ok = true;
-    if (old) URL.revokeObjectURL(old);
+    if (old) dropQuickUrl(old);
   };
 
   /** ONE FILE, ALL THE WAY THROUGH — and the order inside it is the point.
@@ -18765,7 +18861,9 @@ async function openQuickLook(files: File[]) {
   let next = 0;
   const lane = async (once = false): Promise<void> => {
     for (;;) {
-      if (gen !== quickGen) return;
+      // STOP (014) ends this lane at its next file; the file in hand finishes,
+      // because a decode cannot be taken back, and nothing after it is started.
+      if (gen !== quickGen || quickStopAt === gen) return;
       const i = next++;
       if (i >= files.length) return;
       await one(i);
@@ -18791,15 +18889,43 @@ async function openQuickLook(files: File[]) {
   await Promise.all(Array.from({ length: Math.max(1, decodeLaneTarget()) }, () => lane()));
   if (gen !== quickGen) return;
 
-  delete qlGrid.dataset.busy;
+  // A STOPPED RUN (014): every cell the lanes never reached becomes `stopped`,
+  // said in words on the tile, and the run is otherwise finished like any other.
+  // The cells that were built keep their pictures and the whole grid stays
+  // pickable, so the reader can cull what is there and keep, or close and let
+  // go of all of it. Counted, because a stop with nothing left to stop is not
+  // one the report should claim.
+  let unreached = 0;
+  if (quickStopAt === gen) {
+    quickItems.forEach((it, i) => {
+      if (it.state !== "waiting") return;
+      it.state = "stopped";
+      unreached++;
+      repaint(i);
+    });
+  }
+  // Read BEFORE the button is hidden: hiding the element that holds the focus
+  // moves it to the page in some browsers and leaves it in others.
+  const stopHadFocus = document.activeElement === qlStop;
+  setQuickBusy(false);
   lastRun = { files, reused };
   lastQuickProfile = {
     files: files.length, reused, previewed, lanes: decodeLanes(),
     firstTile, firstPicture, total: performance.now() - t0,
     lookup: msLookup, read: msRead, decode: msDecode, render: msRender, store: msStore,
+    stopped: unreached,
   };
   updateQuickHeader();
   updateRebuildNote();
+  if (unreached) {
+    // IN THE STATUS REGION the reuse note already owns, so it is announced, and
+    // after `updateRebuildNote`, which would otherwise write over it.
+    const note = document.getElementById("qlReuseNote");
+    if (note) note.textContent = `Stopped: ${files.length - unreached} of ${files.length} built. The rest are named but not built; they can still be picked and kept.`;
+  }
+  // The button the reader pressed has just been hidden, which would leave the
+  // focus nowhere; the grid is where the keys live.
+  if (stopHadFocus) focusQuickCursor(false);
   void prunePreviews(); // one pass per run, never per file
 }
 
@@ -18936,11 +19062,16 @@ let closingQuickLook = false;
 function closeQuickLook() {
   quickLookSetAside = false;
   quickGen++;
-  delete qlGrid.dataset.busy; // a run abandoned mid-way is not still going
+  setQuickBusy(false); // a run abandoned mid-way is not still going
   closingQuickLook = true;
   // Its pictures are the grid's object URLs, revoked two lines below.
   if (cmpDlg?.open) cmpDlg.close();
-  for (const it of quickItems) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+  // THE COMPARE DIALOG'S TWO IMAGES STILL HOLD THE LAST PICTURES THEY SHOWED.
+  // Revoking an object URL does not release a picture an <img> has already
+  // loaded from it, so the two decoded pictures would outlive the Close until
+  // the next compare replaced them. Taking the source away is what lets them go.
+  for (const id of ["cmpLeftImg", "cmpRightImg"]) document.getElementById(id)?.removeAttribute("src");
+  for (const it of quickItems) if (it.thumbUrl) dropQuickUrl(it.thumbUrl);
   quickItems = [];
   qlGrid.replaceChildren();
   clearTimeout(qlPosHide);
@@ -19004,6 +19135,18 @@ async function keepQuickLook() {
 for (const id of ["quickFiles", "welcomeQuickFiles"]) registerPicker(id, (files) => void openQuickLook(files));
 qlKeep.addEventListener("click", keepQuickLook);
 $("qlClose").addEventListener("click", closeQuickLook);
+// STOP THE BUILD, KEEP THE GRID (record 014). Close ends everything and lets go
+// of every picture; this is the step before it, for the reader who has seen
+// enough of a large folder to cull from what is built. The photos being read
+// finish, nothing new starts, and the cells never reached say so in words.
+// Shown only while a build runs (`setQuickBusy`), so it is never a button that
+// does nothing.
+qlStop.addEventListener("click", () => {
+  if (!qlGrid.dataset.busy || quickStopAt === quickGen) return;
+  quickStopAt = quickGen;
+  const note = document.getElementById("qlReuseNote");
+  if (note) note.textContent = "Stopping once the photos being read are done.";
+});
 // One button, and what it clears depends on what there is to clear: picks
 // first, because a folder with picks in it is one the reader has been choosing
 // from and the rejects are still information.

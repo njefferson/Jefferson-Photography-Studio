@@ -2264,6 +2264,9 @@ body.dropping::after {
   border: 2px dashed var(--line-2);
   border-radius: 10px;
 }
+/* A cell the reader's Stop left unbuilt (014): the same empty frame, with words
+   where the ellipsis was, because an ellipsis promises a picture is coming. */
+.ql-wait-mark.ql-stopped-mark { font: 500 0.75rem/1.3 var(--ui); text-align: center; padding: 4px; }
 /* THE CAMERA'S PICTURE, SAID IN WORDS. It sits under the verdict badge rather
    than replacing it: a tile can be a pick AND still be showing the camera's
    rendering, and both facts are the reader's to see. Never colour alone — the

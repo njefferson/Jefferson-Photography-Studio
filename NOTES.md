@@ -3342,6 +3342,15 @@ user-scalable=no.
   which is the argument for counting the decodes on both sides of the keep before
   changing anything rather than rewriting the handoff a second time. See
   `docs/decisions/014-quick-look-stop-and-release.md`.
+  **The count and the stop are built on staging (24 October) and wait on the
+  device pass.** The report's Last keep row now says how many decodes the
+  strip's background pass has made since the keep, split by whether the
+  photograph arrived with a picture, and its Last quick look row says how many
+  grid pictures were made, let go of and are still held. A Stop building button
+  ends the grid's build and keeps the grid; the cells it never reached say Not
+  built and can still be picked and kept. Close still lets go of every picture,
+  and now the compare dialog's two as well. Whether that returns memory under
+  iPad Safari is the device's measurement, and the handoff is untouched.
 
 - [ ] **The control sweep reaches two thirds of the controls** <!-- decision: 046 -->
   **Shown as:** internal

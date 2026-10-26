@@ -1474,6 +1474,11 @@
           <button id="qlCompare" type="button" class="ql-btn" hidden>Compare two</button>
           <button id="qlRebuild" type="button" class="ql-btn" hidden>Build these again</button>
           <button id="qlSelectToggle" type="button" class="ql-btn" hidden>Select none</button>
+          <!-- STOP THE BUILD (014). On view only while the grid is still being
+               built; the photos being read finish, the rest say they were not
+               built, and the grid stays pickable. Close, beside Keep, still ends
+               it all and lets go of every picture. -->
+          <button id="qlStop" type="button" class="ql-btn" hidden>Stop building</button>
           <button id="qlKeep" type="button" class="ql-btn ql-keep" disabled>Keep in a session &rarr;</button>
           <button id="qlClose" type="button" class="ql-btn">Close</button>
         </div>
