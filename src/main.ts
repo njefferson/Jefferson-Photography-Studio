@@ -1725,7 +1725,9 @@ function syncFromUI() {
     params.contrast = Number(ui.con.value);
   }
   params.glow = Number(ui.glow.value);
-  params.lum = fromPos(Number(ui.lum.value), LUM_LO, LUM_HI);
+  // With a mask picked the Luminance slider shows THE MASK'S offset (042, stage
+  // 2b); writeMaskControls takes it, and the whole photo's own value stays.
+  if (!tm) params.lum = fromPos(Number(ui.lum.value), LUM_LO, LUM_HI);
   params.hotspot = Number(ui.hotspot.value);
   params.hotspotSize = Number(ui.hotspotSize.value);
   params.hotspotColor = Number(ui.hotspotColor.value);
@@ -8295,6 +8297,7 @@ const maskWarmthRow = $("maskWarmthRow") as HTMLElement;
 const maskWarmthEl = $("maskWarmth") as HTMLInputElement;
 const folMaskNote = $("folMaskNote") as HTMLElement;
 const skyMaskNote = $("skyMaskNote") as HTMLElement;
+const lutMaskNote = $("lutMaskNote") as HTMLElement;
 const wbGainRows = [ui.wbR, ui.wbG, ui.wbB].map((el) => el.closest("label") as HTMLElement);
 
 /** The index in `params.masks` of the picked mask's group HEAD, or -1 when
@@ -8357,6 +8360,16 @@ function hslMaskSet(k: 0 | 1 | 2): (m: MaskLayer, v: number) => void {
     m.hsl = a;
   };
 }
+/** Write one of a mask's two tone-stage offsets (042, stage 2b): 0 is the
+ *  overall Luminance, 1 the LUT's strength. Takes which; returns the setter.
+ *  A NEW ARRAY, never written in place, for the same reason as folSetter. */
+function lumLutSet(k: 0 | 1): (m: MaskLayer, v: number) => void {
+  return (m, v) => {
+    const a: [number, number] = m.lumLut ? [m.lumLut[0], m.lumLut[1]] : [0, 0];
+    a[k] = v;
+    m.lumLut = a;
+  };
+}
 let maskCtlList: MaskCtl[] | null = null;
 /** The controls that follow a picked mask (042, stage 2), built once. Takes
  *  nothing; returns the list the switch, `syncFromUI` and `syncToUI` read, so
@@ -8395,6 +8408,13 @@ function maskCtls(): MaskCtl[] {
         set: (_m: MaskLayer, v: number) => writeGrade(band * 2 + 1, v / 100), whole: () => Math.round((params.grade?.[band * 2 + 1] ?? 0) * 100) },
     ]),
     { el: gradeBalEl, min: -1, max: 1, step: 0.01, get: (m) => m.grade?.[6] ?? 0, set: (_m, v) => writeGrade(6, v), whole: () => params.grade?.[6] ?? 0 },
+    // The overall Luminance and the LUT's strength (042, stage 2b): offsets on
+    // the whole photo's, each range as wide as the whole photo's own so an
+    // offset can reach either end from any value; the sum is held to the
+    // slider's range. The LUT FILE stays whole-photo: its strength row is read
+    // through $() because the row's own constants are declared far below.
+    { el: ui.lum, min: -(LUM_HI - LUM_LO), max: LUM_HI - LUM_LO, step: 0.01, get: (m) => m.lumLut?.[0] ?? 0, set: lumLutSet(0), whole: () => toPos(params.lum, LUM_LO, LUM_HI) },
+    { el: $("lutStrength") as HTMLInputElement, min: -1, max: 1, step: 0.01, get: (m) => m.lumLut?.[1] ?? 0, set: lumLutSet(1), whole: () => params.lut?.strength ?? 1 },
   ];
   return maskCtlList;
 }
@@ -8433,7 +8453,7 @@ function inertOthers(root: Element, ids: Set<string>): void {
   for (const child of Array.from(root.children)) {
     // The mixer's band chips and its pick only choose WHICH band the sliders
     // show, so they stay live with a mask picked (042, stage 2b).
-    if (child === maskTargetNote || child === folMaskNote || child === skyMaskNote || child === hslChipsEl || child === hslPickBtn) continue;
+    if (child === maskTargetNote || child === folMaskNote || child === skyMaskNote || child === lutMaskNote || child === hslChipsEl || child === hslPickBtn) continue;
     // A grade wheel is the pointer route to the same values as the sliders
     // beside it (042, stage 2b), so it stays live with them.
     if ((child as HTMLElement).classList?.contains("grade-wheel-box")) continue;
@@ -8446,6 +8466,29 @@ function inertOthers(root: Element, ids: Set<string>): void {
       child.setAttribute("data-mask-inert", "");
     }
   }
+}
+
+/** THE LUT ROW WITH A MASK PICKED (042, stage 2b). Takes nothing; returns
+ *  nothing. With no mask picked it hides the note and leaves the row to
+ *  `syncLutUI`. With one picked it says, in the note, what the strength below
+ *  is: the mask's own offset on the whole photo's, shown signed; or, when no LUT
+ *  is applied, why there is no strength to move (the LUT FILE stays
+ *  whole-photo). What the caller relies on: the strength text and slider value
+ *  are the mask's while it is picked, and the whole photo's again the moment it
+ *  is not (`syncLutUI` writes them then). */
+function updateLutMaskUI(): void {
+  const note = $("lutMaskNote");
+  const t = overlayReady ? targetMask() : null;
+  if (!t) { note.hidden = true; note.textContent = ""; return; }
+  note.hidden = false;
+  if (!params.lut) {
+    note.textContent = "No LUT is applied to the whole photo, and a LUT is chosen for the whole photo, so this mask has no strength to move. Go back to the whole photo, apply a LUT, then pick this mask again.";
+    return;
+  }
+  note.textContent = "The strength below is this mask's own: it is added to the whole photo's strength where the mask reaches, and the LUT itself is the whole photo's.";
+  const v = t.lumLut?.[1] ?? 0;
+  ($("lutStrength") as HTMLInputElement).value = String(v);
+  $("lutStrengthVal").textContent = `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.round(Math.abs(v) * 100)}%`;
 }
 
 let maskTargetShown = "";
@@ -8496,6 +8539,7 @@ function applyMaskTargetUI(): void {
   if (m && tatArmed) setTat(false);
   updateHslUI();
   updateGradeUI();
+  updateLutMaskUI();
   maskWarmthRow.hidden = !m;
   for (const r of wbGainRows) r.hidden = !!m;
   // Temperature and Tint are the same three gains read two other ways, so they stand down on the same condition (decision 101).
@@ -20813,6 +20857,7 @@ function syncLutUI() {
     lutStrength.value = String(lut.strength);
     lutStrengthVal.textContent = `${Math.round(lut.strength * 100)}%`;
   }
+  if (overlayReady) updateLutMaskUI(); // a picked mask's own strength over the whole photo's (042, stage 2b)
 }
 
 /** Apply a stored/parsed LUT to the edit as one atomic undo step. */
@@ -20977,6 +21022,10 @@ registerPicker("lutFile", (files) => { void (async () => {
 })(); });
 
 lutStrength.addEventListener("input", () => {
+  // With a mask picked the slider holds THE MASK'S offset (042, stage 2b), so
+  // it goes to the mask through the same path as every control that follows
+  // one, and the whole photo's strength stays as it is.
+  if (overlayReady && targetMask()) { syncFromUI(); updateLutMaskUI(); return; }
   if (!params.lut) return;
   params.lut.strength = Number(lutStrength.value);
   lutStrengthVal.textContent = `${Math.round(params.lut.strength * 100)}%`;

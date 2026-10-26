@@ -168,8 +168,8 @@ export async function closeMasks(page) {
 /** A PICKED MASK'S OWN VALUE, set the way a reader sets it now (042, stage 2).
  *
  *  Takes `page`, `field` and `value`. `field` is one of brightness, contrast,
- *  saturation, hue, warmth, folHue, folSat, folLum, skyHue, skySat, skyLum, or
- *  a colour-mixer or grade control; `value` is in the mask's
+ *  saturation, hue, warmth, folHue, folSat, folLum, skyHue, skySat, skyLum,
+ *  lum, lutStrength, or a colour-mixer or grade control; `value` is in the mask's
  *  own units (brightness as a multiplier, 0.3 to 2; Foliage as an offset, 0 for
  *  no change). Returns the value the control carries afterwards, as a string.
  *
@@ -191,7 +191,11 @@ export async function setMaskValue(page, field, value) {
     gradeHue0: ["grade", "gradeHue0"], gradeAmount0: ["grade", "gradeAmount0"],
     gradeHue1: ["grade", "gradeHue1"], gradeAmount1: ["grade", "gradeAmount1"],
     gradeHue2: ["grade", "gradeHue2"], gradeAmount2: ["grade", "gradeAmount2"],
-    gradeBal: ["grade", "gradeBal"] }[field];
+    gradeBal: ["grade", "gradeBal"],
+    // The overall Luminance on the Tone tab, an offset from -1.5 to 1.5 while a
+    // mask is picked, and the LUT's strength on the Grade tab, an offset from -1
+    // to 1 (042, stage 2b; the strength row shows only while a LUT is applied).
+    lum: ["tone", "lum"], lutStrength: ["grade", "lutStrength"] }[field];
   assert.ok(where, `setMaskValue: no mask control is called ${field}`);
   const [tab, id] = where;
   const wasOpen = await page.evaluate(() => !document.getElementById("maskPlace")?.hidden);

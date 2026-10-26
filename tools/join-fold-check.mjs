@@ -30,7 +30,9 @@
 // hold a mask's own grade, whose wheels add to the whole photo's. And a mask's
 // own Sky band, which runs BEFORE the mask stage like Foliage: its offsets add
 // the same way, and a group with a colour mask in it adds nothing, because the
-// colour key does not exist that early.
+// colour key does not exist that early. And a mask's own Luminance and LUT
+// strength, the last two stages: the same offsets-added rule, held to the
+// slider's range, with the LUT file itself staying whole-photo.
 //
 // Runs on every commit and needs no browser. Bundled with esbuild so it checks
 // the functions the app ships rather than a copy of them.
@@ -134,5 +136,31 @@ check("a Sky band of zero changes nothing", diff(pxs([{ ...neutralMask(0), skyBa
 check("a head whose group reaches nowhere here changes nothing with a Sky band", diff(pxs([{ ...neutralMask(0), skyBand: SB }, { ...neutralMask(0), op: 1 }]), bareS), 0);
 check("a colour mask cannot carry a Sky band (the band runs before its key exists)", diff(pxs([{ ...neutralMask(3), hueTarget: 220, satTarget: 0.7, colorRange: 0.9, skyBand: SB }]), bareS), 0);
 
-console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer, grade and Sky band hold");
+// 042 stage 2b: the mask's own Luminance and LUT strength, the last two stages,
+// both after the mask stage. A full head's offset renders as the same value on
+// the whole photo; zero, or a group that reaches nowhere, changes nothing; a
+// colour mask can carry them; the sum is held to the slider's range; and the
+// LUT FILE stays whole-photo, so with none applied the strength offset is inert.
+const pxl = (masks, edit) => { const p = plain(); p.masks = masks; Object.assign(p, edit ?? {}); const o = new Float32Array(4); compileEdit(p, undefined, 1.5)(0.55, 0.45, 0.4, o, 0, 0.5, 0.5); return o; };
+const bareL = pxl([]);
+check("a Luminance on the whole photo changes the pixel (so the case is live)", diff(pxl([], { lum: 1.5 }), bareL) > 0.02 ? 1 : 0, 1);
+check("a full head's Luminance offset renders as the same Luminance on the whole photo", diff(pxl([{ ...neutralMask(0), lumLut: [0.5, 0] }]), pxl([], { lum: 1.5 })), 0);
+check("an offset is added to the whole photo's Luminance, not put in its place", diff(pxl([{ ...neutralMask(0), lumLut: [0.25, 0] }], { lum: 1.25 }), pxl([], { lum: 1.5 })), 0);
+check("a Luminance offset past the slider's end is held to the end", diff(pxl([{ ...neutralMask(0), lumLut: [5, 0] }]), pxl([], { lum: 2 })), 0);
+check("Luminance and LUT-strength offsets of zero change nothing", diff(pxl([{ ...neutralMask(0), lumLut: [0, 0], brightness: 1.0001 }]), pxl([{ ...neutralMask(0), brightness: 1.0001 }])), 0);
+check("a head whose group reaches nowhere here changes nothing with a Luminance", diff(pxl([{ ...neutralMask(0), lumLut: [0.5, 0] }, { ...neutralMask(0), op: 1 }]), bareL), 0);
+check("a colour mask can carry a Luminance offset", diff(pxl([{ ...neutralMask(3), hueTarget: 20, satTarget: 0.3, colorRange: 0.9, lumLut: [0.5, 0] }]), bareL) > 0.02 ? 1 : 0, 1);
+// A two-by-two-by-two lattice that inverts every channel, red fastest, so a LUT
+// at any strength moves the pixel a long way and the strength is easy to read.
+const lutData = new Float32Array(24);
+for (let b = 0, k = 0; b < 2; b++) for (let g = 0; g < 2; g++) for (let r = 0; r < 2; r++, k += 3) { lutData[k] = 1 - r; lutData[k + 1] = 1 - g; lutData[k + 2] = 1 - b; }
+const lutAt = (strength) => ({ lut: { id: "plant", name: "plant", size: 2, data: lutData, strength } });
+check("a LUT on the whole photo changes the pixel (so the case is live)", diff(pxl([], lutAt(0.75)), bareL) > 0.02 ? 1 : 0, 1);
+check("a full head's LUT-strength offset renders as the same strength on the whole photo", diff(pxl([{ ...neutralMask(0), lumLut: [0, 0.5] }], lutAt(0.25)), pxl([], lutAt(0.75))), 0);
+check("a mask can turn a LUT up from a strength of zero", diff(pxl([{ ...neutralMask(0), lumLut: [0, 0.75] }], lutAt(0)), pxl([], lutAt(0.75))), 0);
+check("a LUT-strength offset past 1 is held to 1", diff(pxl([{ ...neutralMask(0), lumLut: [0, 3] }], lutAt(0.25)), pxl([], lutAt(1))), 0);
+check("with no LUT applied the strength offset moves nothing (the file is whole-photo)", diff(pxl([{ ...neutralMask(0), lumLut: [0, 0.5] }]), bareL), 0);
+check("a colour mask can carry a LUT-strength offset", diff(pxl([{ ...neutralMask(3), hueTarget: 20, satTarget: 0.3, colorRange: 0.9, lumLut: [0, 0.5] }], lutAt(0)), pxl([], lutAt(0))) > 0.02 ? 1 : 0, 1);
+
+console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer, grade, Sky band, Luminance and LUT strength hold");
 process.exit(bad ? 1 : 0);

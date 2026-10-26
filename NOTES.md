@@ -3112,6 +3112,8 @@ user-scalable=no.
   - Stage 2 is the switch, with every stage after the mask stage per mask.
     The five mask sliders and the six "here only" toggles go at the same
     time.
+  - Stage 2b, Luminance and LUT strength per mask: built on staging on
+    24 October 2026, and waits on the device pass.
   - Stage 3 covers exposure, white balance and the foliage band. That band
     limited to a place is the standard fix for cladding reddening with the
     grass.

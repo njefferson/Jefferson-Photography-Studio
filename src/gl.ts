@@ -15,7 +15,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, groupLumLutOf, LUM_MIN, LUM_MAX, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer, toHalf } from "./half";
 import { sharpenSigmaTexels } from "./raw/detail";
 export type { EditParams };
@@ -116,6 +116,8 @@ const float SAT_GUARD_LO = ${SAT_GUARD_LO.toFixed(6)};
 const float SAT_GUARD_HI = ${SAT_GUARD_HI.toFixed(6)};
 const float SKY_SAT_GATE_LO = ${SKY_SAT_GATE_LO.toFixed(6)};
 const float SKY_SAT_GATE_HI = ${SKY_SAT_GATE_HI.toFixed(6)};
+const float LUM_MIN = ${LUM_MIN.toFixed(6)};
+const float LUM_MAX = ${LUM_MAX.toFixed(6)};
 in vec2 v_uv;
 in vec2 v_cropUv;
 out vec4 frag;
@@ -163,6 +165,8 @@ uniform bool u_maskHslOn;    // false when no head carries any, so the mixer rea
 uniform vec3 u_maskGrade[24]; // a HEAD's own grade (042 stage 2b): amount x tint for shadows, midtones, highlights, head i at i*3
 uniform float u_maskGradeBal[8]; // that head's own balance
 uniform bool u_maskGradeOn;  // false when no head carries a grade, so the grade reads the whole photo's alone
+uniform vec2 u_maskLumLut[8]; // a HEAD's own offsets on the overall Luminance (x) and on the LUT's strength (y), 042 stage 2b; zero on components
+uniform bool u_maskLumLutOn; // false when no head carries either, so lum and the LUT read the whole photo's alone
                              // LITERAL 8, like every array above it: MAX_MASKS is a
                              // TypeScript constant and means nothing inside GLSL —
                              // written as MAX_MASKS first, and the shader silently
@@ -1207,6 +1211,11 @@ void main() {
   // take a mask's own values (042, stage 2b), so they read the weight this loop
   // folded rather than folding a second one.
   float gW[8] = float[8](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+  // The sums of the heads' own Luminance and LUT-strength offsets, each times
+  // that head's weight, summed in the same loop that folds the weights (042,
+  // stage 2b); the flags say whether any head reached, as compileEdit's do.
+  float lumD = 0.0, lutD = 0.0;
+  bool lumAny = false, lutAny = false;
   for (int i = 0; i < u_maskCount; i++) {
     // A COMPONENT WAS ALREADY FOLDED INTO ITS HEAD (026) — skip it here, or its
     // adjustment would be applied a second time on its own.
@@ -1245,6 +1254,11 @@ void main() {
     }
     if (i == u_maskViz) vizW = w; // the true post-invert coverage of the shown mask
     gW[i] = max(w, 0.0);
+    if (u_maskLumLutOn && w > 0.0) {
+      vec2 ll = u_maskLumLut[i];
+      if (ll.x != 0.0) { lumD += ll.x * w; lumAny = true; }
+      if (ll.y != 0.0) { lutD += ll.y * w; lutAny = true; }
+    }
     if (w <= 0.0) continue;
     vec4 adj = u_maskAdj[i]; // brightness, contrast, saturation, warmth
     c.r *= 1.0 + 0.5 * adj.w * w;
@@ -1411,12 +1425,19 @@ void main() {
   }
   // Global luminance rides on top of the tone curve (endpoints pinned),
   // hue-keeping like the master curve.
-  if (u_lum != 1.0) g = rgbToneLum(g, 1.0 / u_lum);
+  // A mask's own offset (042, stage 2b) is added to the whole photo's value and
+  // held to the slider's range, as compileEdit does; none reached, no change.
+  float lumV = u_lum;
+  if (lumAny) lumV = clamp(u_lum + lumD, LUM_MIN, LUM_MAX);
+  if (lumV != 1.0) g = rgbToneLum(g, 1.0 / lumV);
 
   // Imported .cube LUT — the LAST colour stage, on the final display colour,
   // so third-party LUTs stack on top of the whole IR grade. Identical math to
-  // pipeline.ts's compileEdit tail (via lut3d.ts).
-  if (u_lutStrength > 0.0) g = mix(g, sampleLut3d(clamp(g, 0.0, 1.0)), u_lutStrength);
+  // pipeline.ts's compileEdit tail (via lut3d.ts). A mask's own strength offset
+  // is added to the LUT's, held to 0..1, the way compileEdit adds it.
+  float lutS = u_lutStrength;
+  if (lutAny) lutS = clamp(u_lutStrength + lutD, 0.0, 1.0);
+  if (lutS > 0.0) g = mix(g, sampleLut3d(clamp(g, 0.0, 1.0)), lutS);
 
   // ON-TOP stickers — laid over the FINISHED look (after every colour stage,
   // before grain), so they keep their OWN colours instead of being cooked by the
@@ -1568,7 +1589,7 @@ export type MaskState = "in" | "idle" | "building" | "failed";
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_skyRef", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskLumLut", "u_maskLumLutOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_skyRef", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -2940,6 +2961,11 @@ export class Renderer {
     gl.uniform1i(this.loc.u_maskHslOn, maskHslOn ? 1 : 0);
     const maskGradeOn = maskGroupsForRender(p.masks).some((g) => !!groupGradeOf(g));
     gl.uniform1i(this.loc.u_maskGradeOn, maskGradeOn ? 1 : 0);
+    // A head's own luminance and LUT-strength offsets (042, stage 2b). The LUT
+    // half counts only while a LUT is applied: the file stays whole-photo.
+    const maskLumLutOn = maskGroupsForRender(p.masks).some((g) => !!groupLumLutOf(g));
+    const maskLutOn = !!p.lut && maskGroupsForRender(p.masks).some((g) => (groupLumLutOf(g)?.[1] ?? 0) !== 0);
+    gl.uniform1i(this.loc.u_maskLumLutOn, maskLumLutOn ? 1 : 0);
     gl.uniform1i(this.loc.u_bwOn, p.bwOn ? 1 : 0);
     const bwMix = p.bwMix ?? [1, 1, 1];
     gl.uniform3f(this.loc.u_bwMix, bwMix[0], bwMix[1], bwMix[2]);
@@ -3126,6 +3152,15 @@ export class Renderer {
         gl.uniform3fv(this.loc.u_maskGrade, gt);
         gl.uniform1fv(this.loc.u_maskGradeBal, gb);
       }
+      if (maskLumLutOn) {
+        const ll = new Float32Array(MAX_MASKS * 2);
+        masks.forEach((m, i) => {
+          if (!((i === 0 || (m.op ?? 0) === 0) && m.lumLut && m.lumLut.length === 2)) return;
+          ll[i * 2] = m.lumLut[0];
+          ll[i * 2 + 1] = p.lut ? m.lumLut[1] : 0;
+        });
+        gl.uniform2fv(this.loc.u_maskLumLut, ll);
+      }
       if (maskHslOn) {
         const hsl = new Float32Array(MAX_MASKS * 24);
         masks.forEach((m, i) => { if ((i === 0 || (m.op ?? 0) === 0) && m.hsl && m.hsl.length === 24) hsl.set(m.hsl, i * 24); });
@@ -3167,7 +3202,9 @@ export class Renderer {
     // re-uploads only when the LUT identity changes; strength-only changes are
     // just a uniform. Data is padded RGB -> RGBA32F (RGB32F is driver-fragile).
     {
-      const lut = p.lut && p.lut.strength > 0 ? p.lut : null;
+      // A mask can turn a LUT up from nothing (042, stage 2b), so the lattice is
+      // there for a strength of 0 too while one does; the shader adds the offset.
+      const lut = p.lut && (p.lut.strength > 0 || maskLutOn) ? p.lut : null;
       gl.uniform1f(this.loc.u_lutStrength, lut ? lut.strength : 0);
       gl.uniform1i(this.loc.u_lutSize, lut ? lut.size : 2);
       gl.uniform1i(this.loc.u_lutTex, 5);

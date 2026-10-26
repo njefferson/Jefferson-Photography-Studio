@@ -655,6 +655,15 @@ try {
         await setMaskValue(page, "gradeHue2", "30");
         await setMaskValue(page, "gradeAmount2", "100");
       } },
+    // The overall Luminance, the last stage but the LUT (042, stage 2b): the
+    // shader sums the heads' offsets inside the loop that folds their weights,
+    // compileEdit sums them from the weights it kept. Its LUT-strength twin has
+    // no arm here: it needs a LUT applied, and join-fold-check holds that sum on
+    // the export's path alone.
+    { label: "mask luminance", what: "a Sky mask's Luminance, +0.75", check: "lum", want: "0.75",
+      set: async (page) => {
+        await setMaskValue(page, "lum", "0.75");
+      } },
   ];
   // The photograph as the reader sees it, in the READ measures the bars use.
   const readView = (page) => page.evaluate(`(() => {

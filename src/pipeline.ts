@@ -837,6 +837,18 @@ export interface MaskLayer {
    *  array, never written in place, because an undo snapshot copies a mask
    *  shallowly. */
   grade?: number[];
+  /** THE MASK'S OWN LUMINANCE AND LUT STRENGTH (042, stage 2b), sharing one
+   *  row a mask: [offset on the whole photo's `lum`, offset on its LUT's
+   *  `strength`], each starting at 0 for no change and added where this mask's
+   *  group reaches, summed where masks overlap, then held to the sliders' own
+   *  range (LUM_MIN..LUM_MAX, 0..1). Absent means no change, so every edit
+   *  saved before it renders as it did. Read on a group's HEAD only; a colour
+   *  mask can carry it, both stages running after the mask stage. The LUT FILE
+   *  stays whole-photo (darktable masks a LUT's strength, Capture One cannot
+   *  put a LUT on a layer at all): with no LUT applied the second number moves
+   *  nothing. Always replaced as a new array, never written in place, because
+   *  an undo snapshot copies a mask shallowly. */
+  lumLut?: [number, number];
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: radius along the oval's FIRST axis, as a fraction of the width
@@ -1071,6 +1083,7 @@ export function maskIsActive(m: MaskLayer): boolean {
   if (m.skyBand && (m.skyBand[0] !== 0 || m.skyBand[1] !== 0 || m.skyBand[2] !== 0)) return true;
   if (m.hsl && m.hsl.some((x) => x !== 0)) return true;
   if (m.grade && !gradeIsNeutral(m.grade)) return true;
+  if (m.lumLut && (m.lumLut[0] !== 0 || m.lumLut[1] !== 0)) return true;
   return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
 }
 
@@ -1249,6 +1262,24 @@ export function groupHslOffset(group: readonly MaskLayer[]): readonly number[] |
   const h = group[0];
   if (!h || !h.hsl || h.hsl.length !== 24 || !h.hsl.some((x) => x !== 0)) return null;
   return h.hsl;
+}
+
+/** The overall Luminance slider's own range (src/main.ts LUM_LO and LUM_HI,
+ *  half to double): the whole photo's `lum` with masks' offsets added is held to
+ *  it. The shader's LUM_MIN and LUM_MAX are these two numbers. */
+export const LUM_MIN = 0.5;
+export const LUM_MAX = 2;
+
+/** The luminance and LUT-strength offsets a GROUP adds (042, stage 2b), or null
+ *  when it adds none. Takes one group (head first); returns the head's `lumLut`
+ *  when it has two numbers and either is non-zero. A colour mask can carry it,
+ *  because both stages run after the mask stage. What the caller relies on: null
+ *  means the group can be skipped at those two stages, and the renderer uploads
+ *  a head's pair for exactly the groups this returns non-null for. */
+export function groupLumLutOf(group: readonly MaskLayer[]): readonly [number, number] | null {
+  const h = group[0];
+  if (!h || !h.lumLut || h.lumLut.length !== 2 || (h.lumLut[0] === 0 && h.lumLut[1] === 0)) return null;
+  return h.lumLut;
 }
 
 /** THE FOLIAGE BAND'S VALUE AT ONE PIXEL (042, stage 2): the whole-photo value
@@ -2663,7 +2694,15 @@ export function compileEdit(
     const gr = groupGradeOf(g);
     if (gr) gradeGroups.push({ gi, aS: gr[1] ?? 0, aM: gr[3] ?? 0, aH: gr[5] ?? 0, bal: gr[6] ?? 0, tS: gradeTintVec(gr[0] ?? 0), tM: gradeTintVec(gr[2] ?? 0), tH: gradeTintVec(gr[4] ?? 0) });
   });
-  const keepW = hslGroups.length > 0 || gradeGroups.length > 0;
+  // A mask's own luminance and LUT strength (042, stage 2b). The LUT half is
+  // read only while a LUT is applied: the file stays whole-photo, so with none
+  // there is nothing for a mask to turn up.
+  const lumLutGroups: { gi: number; dLum: number; dLut: number }[] = [];
+  maskGroupsActive.forEach((g, gi) => {
+    const o = groupLumLutOf(g);
+    if (o) lumLutGroups.push({ gi, dLum: o[0], dLut: p.lut ? o[1] : 0 });
+  });
+  const keepW = hslGroups.length > 0 || gradeGroups.length > 0 || lumLutGroups.length > 0;
   const groupW = new Float64Array(maskGroupsActive.length);
   if (folGroups.length) bandsActive = true;
   const folPx: [number, number, number] = [0, 0, 0];
@@ -2729,8 +2768,14 @@ export function compileEdit(
   const gTintS = gradeTintVec(grade[0] ?? 0);
   const gTintM = gradeTintVec(grade[2] ?? 0);
   const gTintH = gradeTintVec(grade[4] ?? 0);
-  const lut = p.lut && p.lut.strength > 0 ? p.lut : null;
+  // The LUT stage runs when the LUT has a strength of its own OR a mask can
+  // turn it up (042, stage 2b); the strength is read per pixel below.
+  const lut = p.lut && (p.lut.strength > 0 || lumLutGroups.some((q) => q.dLut !== 0)) ? p.lut : null;
   const lutTmp = lut ? new Float32Array(3) : null;
+  // The exponent a mask's luminance offset works out to at the pixel in hand,
+  // read by `lumPow` below: one function made once, not one per pixel.
+  let lumE = 0;
+  const lumPow = (v: number) => Math.pow(v, lumE);
 
   const recPx = new Float64Array(3);
   // `mu`, `mv`: where the pixel CAME FROM in the source — under a warp, the
@@ -3173,14 +3218,36 @@ export function compileEdit(
         out[0] *= f; out[1] *= f; out[2] *= f;
       }
     }
+    // A MASK'S OWN LUMINANCE AND LUT STRENGTH (042, stage 2b): each group's
+    // offsets times that group's weight as the mask stage folded it, summed
+    // where masks overlap, added to the whole photo's value and held to the
+    // slider's range. Nothing is touched where no offset reaches, so the whole
+    // photo's own value is used exactly as it always was.
+    let lumF = lumFn;
+    let lutS = lut ? lut.strength : 0;
+    if (lumLutGroups.length && u !== undefined && v !== undefined) {
+      let dLum = 0, dLut = 0, anyLum = false, anyLut = false;
+      for (const q of lumLutGroups) {
+        const gw = groupW[q.gi];
+        if (gw <= 0) continue;
+        if (q.dLum !== 0) { dLum += q.dLum * gw; anyLum = true; }
+        if (q.dLut !== 0) { dLut += q.dLut * gw; anyLut = true; }
+      }
+      if (anyLum) {
+        const lv = Math.min(LUM_MAX, Math.max(LUM_MIN, (p.lum || 1) + dLum));
+        lumE = lv !== 1 ? 1 / lv : 0;
+        lumF = lumE ? lumPow : null;
+      }
+      if (anyLut) lutS = Math.min(1, Math.max(0, lutS + dLut));
+    }
     // Global luminance — the very last step of the app's own grade, matching
     // the shader's u_lum. Hue-keeping like the master curve (rgbTone).
-    if (lumFn) rgbTone(out, lumFn);
+    if (lumF) rgbTone(out, lumF);
     // Imported .cube LUT — the LAST colour stage, on the final display
     // colour (mirrors the shader's u_lutTex block; math in lut3d.ts).
-    if (lut && lutTmp) {
+    if (lut && lutTmp && lutS > 0) {
       sampleLut3d(lut.data, lut.size, out[0], out[1], out[2], lutTmp);
-      const s = lut.strength;
+      const s = lutS;
       out[0] += (lutTmp[0] - out[0]) * s;
       out[1] += (lutTmp[1] - out[1]) * s;
       out[2] += (lutTmp[2] - out[2]) * s;

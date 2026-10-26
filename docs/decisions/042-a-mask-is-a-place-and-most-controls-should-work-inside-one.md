@@ -430,7 +430,15 @@ selection; built in stages, each shippable and checkable on its own.** Chosen.
     own are the same thing here. 4 rows a mask.
   - **Luminance and LUT strength:** the mask's own offsets, sharing one row a
     mask. The LUT file stays whole-photo; its strength per mask follows
-    darktable, since Capture One cannot put a LUT on a layer at all.
+    darktable, since Capture One cannot put a LUT on a layer at all. **Built on
+    staging, 24 October 2026**, and waits on the device pass: `MaskLayer.lumLut`
+    `[luminance offset, LUT strength offset]`, one `vec2` a mask in the shader
+    (8 uniform rows, and no texture), summed inside the loop that folds the
+    group weights; the offsets add to the whole photo's value and are held to the
+    slider's range, so the sum is the whole photo's own value exactly wherever no
+    group reaches. A colour mask can carry both, since both stages run after the
+    mask stage. With no LUT applied the strength offset moves nothing, and its
+    control says so in words.
   - **Curves:** the mask's own curve, master and red, green and blue, starting
     straight, applied after the whole photo's curve and blended by the group's
     weight. Not an offset: a curve does not add (Lightroom's mask curve is
