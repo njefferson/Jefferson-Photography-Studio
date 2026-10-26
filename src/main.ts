@@ -2379,10 +2379,10 @@ interface Look {
  *  the research's, not a slogan. */
 const EIR_FINISH: FinishStep[] = [
   { id: "hsStrength", name: "Lens colour correction", why: "First, before anything is judged: a hot spot is a white-balance shift of about a thousand kelvin between the centre and the edge, and this look magnifies it. Set it looking at the sky's corners." },
-  { id: "skySatSel", name: "Sky saturation", why: "The sky's own colour, where the sky is; a cloud, a haze and an overcast sky keep their grey. The film's sky reads 0.66 to 0.92." },
+  { id: "skySatSel", name: "Sky saturation", why: "Ships at 0: the sky takes its colour from this look's own mapping, and Restore depth no longer adds to it. Raise it by hand for more colour where the sky is. The film's sky reads 0.66 to 0.92." },
   { id: "skyDepth", name: "Sky depth", why: "Darker where the sky is a blue sky — the film's is dark as well as blue. Ships at 0: a daylight sky at the film's value reads as night on a screen." },
   { id: "folSat", name: "Foliage amount", why: "The infrared-bright foliage's own colour and nothing else's. The film's foliage is scarlet at 0.60 to 0.78." },
-  { id: "irLift", name: "Restore depth", why: "The per-photograph top-up toward the film's references; off shows the look's own numbers." },
+  { id: "irLift", name: "Restore depth", why: "The per-photograph top-up toward the film's references, for the tone and the foliage; under this look it no longer adds to the sky's saturation. Off shows the look's own numbers." },
   { id: "addSky", name: "Add a Sky mask", why: "For anything beyond: warmth, brightness and contrast on the sky alone, on the Masks tab." },
 ];
 

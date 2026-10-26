@@ -21,8 +21,20 @@ declare const __APP_VERSION__: string;
  *  One function rather than two copies: the editor had this inline and Macro
  *  Studio had nothing, which is how Macro Studio shipped without a stamp for
  *  its whole life. Importing this is now the whole of the job, and the look
- *  comes with it. */
+ *  comes with it.
+ *
+ *  Takes nothing and returns nothing. The tag's visible text becomes
+ *  `v<version>`. A tag that carries `data-ver-about` (Macro Studio's) is also
+ *  given an accessible name that OPENS WITH that visible text and then says what
+ *  the button does, `v<version> — <about>`: a fixed name written in the markup
+ *  cannot hold a version the build stamps in, and a name that leaves the visible
+ *  text out is a label a voice-control reader cannot say. What it must satisfy:
+ *  the accessible name contains the visible text. */
 export function writeVersionStamp(): void {
   const el = document.getElementById("verTag");
-  if (el) el.textContent = `v${__APP_VERSION__}`;
+  if (!el) return;
+  const text = `v${__APP_VERSION__}`;
+  el.textContent = text;
+  const about = el.getAttribute("data-ver-about");
+  if (about) el.setAttribute("aria-label", `${text} — ${about}`);
 }

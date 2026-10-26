@@ -840,7 +840,7 @@ cannot describe something the code does not say about itself.
 - **`src/tile.ts`** (883 lines) — A strip tile drawn from plain inputs, so the page and the decode worker draw the same picture.
 - **`src/toggletip.ts`** (134 lines) — A CONTROL'S OWN SENTENCE, REACHED BY A FINGER — the toggletip of decision 024.
 - **`src/verdlg.ts`** (135 lines) — THE "THIS BUILD" PANEL — what changed, and the report to send (Doctrine §7d, §7f).
-- **`src/verstamp.ts`** (29 lines) — THE BUILD STAMP, WRITTEN AT BOOT (Doctrine §7b) — the version visible on every page, so a reader reporting a problem can say which build they are on without being asked to go looking for it.
+- **`src/verstamp.ts`** (41 lines) — THE BUILD STAMP, WRITTEN AT BOOT (Doctrine §7b) — the version visible on every page, so a reader reporting a problem can say which build they are on without being asked to go looking for it.
 - **`src/wakelock.ts`** (77 lines) — Keeping the screen awake while a long job runs.
 - **`src/warp.ts`** (197 lines) — Playful warp tools — Swirl / Push (liquefy) / Pinch & Bloat.
 - **`src/zip.ts`** (308 lines) — Minimal ZIP reader — no dependencies.

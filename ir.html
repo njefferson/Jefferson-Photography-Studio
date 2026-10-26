@@ -837,19 +837,23 @@
               <!-- NONE COMES FIRST (064). A look could not be pressed off: no
                    look button removed one, and Reset brings back a look the
                    photograph opened wearing. -->
-              <button id="lookNone" type="button">None<small class="look-sub"></small></button>
+              <!-- EVERY LOOK BUTTON CARRIES ITS PRESSED STATE FROM PARSE: None is
+                   pressed and the nine others are not, which is how a
+                   photograph opens; the editor then keeps them in step with
+                   the look that is on. -->
+              <button id="lookNone" type="button" aria-pressed="true">None<small class="look-sub"></small></button>
               <!-- THE ID STAYS `lookAero`. Only the printed name moved: this
                    look is the R&#8646;B swap with saturation, which is not what
                    the film did, and the walks press this button by id. -->
-              <button id="lookAero" type="button">Pink IR<small class="look-sub"></small></button>
-              <button id="lookEir" type="button">Aerochrome<small class="look-sub"></small></button>
-              <button id="lookBoldPink" type="button">Bold Pink<small class="look-sub"></small></button>
-              <button id="lookRed" type="button">Red<small class="look-sub"></small></button>
-              <button id="lookGoldie" type="button">Goldie<small class="look-sub"></small></button>
-              <button id="lookNatural" type="button">Natural IR<small class="look-sub"></small></button>
-              <button id="lookMono" type="button">B&amp;W IR<small class="look-sub"></small></button>
-              <button id="lookSepia" type="button">Sepia IR<small class="look-sub"></small></button>
-              <button id="lookHie" type="button">HIE B&amp;W<small class="look-sub"></small></button>
+              <button id="lookAero" type="button" aria-pressed="false">Pink IR<small class="look-sub"></small></button>
+              <button id="lookEir" type="button" aria-pressed="false">Aerochrome<small class="look-sub"></small></button>
+              <button id="lookBoldPink" type="button" aria-pressed="false">Bold Pink<small class="look-sub"></small></button>
+              <button id="lookRed" type="button" aria-pressed="false">Red<small class="look-sub"></small></button>
+              <button id="lookGoldie" type="button" aria-pressed="false">Goldie<small class="look-sub"></small></button>
+              <button id="lookNatural" type="button" aria-pressed="false">Natural IR<small class="look-sub"></small></button>
+              <button id="lookMono" type="button" aria-pressed="false">B&amp;W IR<small class="look-sub"></small></button>
+              <button id="lookSepia" type="button" aria-pressed="false">Sepia IR<small class="look-sub"></small></button>
+              <button id="lookHie" type="button" aria-pressed="false">HIE B&amp;W<small class="look-sub"></small></button>
             </div>
             <p class="note">Looks showing <strong>norm / R&#8646;B</strong> under the name flip that swap when you press them again. <strong>Aerochrome</strong> shows <strong>film</strong> instead: the swap is part of its recipe rather than an option on top of it, so there is nothing to flip &mdash; the swap button above and the Grade tab's channel mixer are there if you want to take it apart yourself. <strong>Bold Pink</strong> is Aerochrome left pink, before it turns the foliage red and the sky blue; it has no swap to flip either. <strong>None</strong> takes the look off this photograph, back to its own balance, and the photographs you open next start without one; an imported LUT stays.</p>
             <button id="finishOpen" type="button" class="accent-outline full-btn" hidden>Finish this look</button>
