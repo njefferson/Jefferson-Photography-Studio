@@ -15,7 +15,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, groupLumLutOf, groupShadowOf, maskCurvesStraight, LUM_MIN, LUM_MAX, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, colorReach, groupHslOffset, groupGradeOf, groupLumLutOf, groupShadowOf, maskCurvesStraight, LUM_MIN, LUM_MAX, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer, toHalf } from "./half";
 import { sharpenSigmaTexels } from "./raw/detail";
 export type { EditParams };
@@ -181,8 +181,8 @@ uniform float u_lum;         // global luminance: v -> pow(v, 1/u_lum) through r
 // Local masks (up to MAX_MASKS = 8) — kept identical to pipeline.ts.
 uniform int u_maskCount;
 uniform int u_maskType[8];   // 0 = radial, 1 = linear, 2 = brush, 3 = colour, 4 = sky, 5 = rectangle
-uniform vec4 u_maskGeoA[8];  // radial and rectangle (cx,cy,rx,ry) | linear (cx,cy,lx,ly)
-uniform vec4 u_maskGeoB[8];  // (feather, invert, cos, sin of a radial mask's turn; 1, 0 unturned)
+uniform vec4 u_maskGeoA[8];  // radial and rectangle (cx,cy,rx,ry) | linear (cx,cy,lx,ly) | colour (hue,sat,range,reach)
+uniform vec4 u_maskGeoB[8];  // (feather, invert, cos, sin of a radial mask's turn; 1, 0 unturned) | colour (feather, invert, pickU, pickV)
 uniform vec4 u_maskAdj[8];   // (brightness, contrast, saturation, warmth)
 uniform float u_maskHue[8];  // degrees
 uniform int u_maskSlot[8];   // brush/sky: which packed channel (0..3); -1 otherwise
@@ -667,9 +667,15 @@ vec3 keyDisplay(vec3 c){
 // colourful it is" — hue discrimination stays constant whether the image's
 // chroma is vivid or IR-flat (absolute distance could not discriminate on
 // low-sat IR frames; field bug 2026-07-05). satTarget < 0 = unpicked -> inert.
-// u_maskGeoA[i] = (hueTargetDeg, satTarget, colorRange, -). Matches pipeline.ts.
+// u_maskGeoA[i] = (hueTargetDeg, satTarget, colorRange, reach). Matches pipeline.ts.
+// COLOUR PROXIMITY (050): reach is how far from the pick the selection extends,
+// as a fraction of the picture's height, 0 for no limit; the pick travels in
+// u_maskGeoB[i].zw. Where it is above 0 the colour match is multiplied by a
+// factor that is 1 within reach, falls to 0 over the mask's Feather, and is 0
+// beyond, measured in pixels (the horizontal offset scaled by the aspect).
+// colorReach() in pipeline.ts decides whether a limit applies, for both sides.
 float colorMaskWeight(int i, vec3 c){
-  vec4 gA = u_maskGeoA[i]; // (hueTargetDeg, satTarget, colorRange, -)
+  vec4 gA = u_maskGeoA[i]; // (hueTargetDeg, satTarget, colorRange, reach)
   if (gA.y < 0.0) return 0.0; // unpicked mask is inert (invert included)
   vec3 d = keyDisplay(c);
   // HSV chroma-plane vector s*(cosH,sinH) straight from RGB (opponent
@@ -682,6 +688,11 @@ float colorMaskWeight(int i, vec3 c){
   float edge = max(1e-4, gA.z);
   float plateau = edge * (1.0 - u_maskGeoB[i].x);
   float w = 1.0 - smoothstep(plateau, edge, nd);
+  if (gA.w > 0.0) {
+    vec2 pk = u_maskGeoB[i].zw;
+    float dd = length(vec2((v_uv.x - pk.x) * u_aspect, v_uv.y - pk.y));
+    w *= 1.0 - smoothstep(gA.w * (1.0 - u_maskGeoB[i].x), gA.w, dd);
+  }
   if (u_maskGeoB[i].y > 0.5) w = 1.0 - w;
   return w;
 }
@@ -3234,14 +3245,21 @@ export class Renderer {
         op[i] = i === 0 ? 0 : (m.op ?? 0);
         geoA.set(
           m.type === 0 || m.type === 5 ? [m.cx, m.cy, m.rx, m.ry]
-          : m.type === 3 ? [m.hueTarget, m.satTarget, m.colorRange, 0]
+          : m.type === 3 ? [m.hueTarget, m.satTarget, m.colorRange, colorReach(m)]
           : [m.cx, m.cy, m.lx, m.ly],
           i * 4,
         );
         // A radial mask's turn travels as its cosine and sine (027), worked out
         // here once rather than per pixel, and 1, 0 for every other mask.
         const turn = m.type === 0 ? (m.angle ?? 0) : 0;
-        geoB.set([m.feather, m.invert ? 1 : 0, turn ? Math.cos(turn) : 1, turn ? Math.sin(turn) : 0], i * 4);
+        // A colour mask has no turn, so the same two slots carry where it was
+        // picked (050); the shader reads them only when its reach is above 0.
+        geoB.set(
+          m.type === 3
+            ? [m.feather, m.invert ? 1 : 0, m.pickU ?? 0, m.pickV ?? 0]
+            : [m.feather, m.invert ? 1 : 0, turn ? Math.cos(turn) : 1, turn ? Math.sin(turn) : 0],
+          i * 4,
+        );
         adj.set([m.brightness, m.contrast, m.saturation, m.warmth], i * 4);
         hue[i] = m.hue;
         slot[i] = slotOf[i];

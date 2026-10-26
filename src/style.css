@@ -2960,6 +2960,11 @@ button.toggletip {
 /* A rectangle's four sliders (050), spaced as the Turn row is; they are plain
    labelled ranges, so the panel's own label and slider rules carry the rest. */
 .mask-rect-row { margin: 6px 0; }
+/* A colour mask's reach from its pick (050), spaced as the Turn row is, its
+   readout in the Turn readout's own face; it holds words rather than an angle,
+   so it is wider and wraps rather than clipping on a narrow panel. */
+.mask-near-row { margin: 6px 0; }
+#mColorNearVal { margin-left: auto; font-size: 0.75rem; font-variant-numeric: tabular-nums; text-align: right; }
 .mask-turn-head { display: flex; align-items: center; gap: 8px; }
 #panel .mask-turn-head label { flex: 1; min-height: 0; padding-bottom: 2px; }
 #mTurnVal { margin-left: auto; font-size: 0.75rem; font-variant-numeric: tabular-nums; min-width: 5ch; text-align: right; }

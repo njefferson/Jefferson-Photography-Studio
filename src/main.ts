@@ -8345,6 +8345,11 @@ const mUI = {
   rectY: $("mRectY") as HTMLInputElement,
   rectW: $("mRectW") as HTMLInputElement,
   rectH: $("mRectH") as HTMLInputElement,
+  // A colour mask's reach from the place it was picked (050, row 3): one slider,
+  // its words, and a note that says what it does in the state it is in.
+  colorNear: $("mColorNear") as HTMLInputElement,
+  colorNearVal: $("mColorNearVal") as HTMLOutputElement,
+  colorNearNote: $("mColorNearNote") as HTMLElement,
 };
 let selectedMask = -1;
 let overlayHandles: { el: SVGCircleElement; role: string }[] = [];
@@ -9352,6 +9357,7 @@ function updateMaskUI() {
     if (m.type === 3) {
       mUI.colorRange.value = String(m.colorRange);
       updateColorSwatch(m);
+      syncNearUI(m); // the reach from the pick (050); hidden with the rest of the colour controls
     }
     if (m.type === 4) {
       mUI.skyReach.value = String(m.reach);
@@ -9394,6 +9400,43 @@ function updateColorSwatch(m: MaskLayer) {
     ? `Hue ${Math.round(m.hueTarget)}° · Sat ${m.satTarget.toFixed(2)}`
     : "Tap the photo to pick a color";
 }
+
+/** Put a colour mask's reach from its pick on the panel (050, row 3): the
+ *  slider, its readout in words, and the note beneath it.
+ *  Takes the picked colour mask `m`; returns nothing. What it relies on: the
+ *  slider is open to the reader only once the mask has a recorded place to
+ *  measure from, because `colorReach` ignores a limit without one, and a mask
+ *  from before the place was recorded says in words to pick again rather than
+ *  offering a control that does nothing. A slider under the finger is left alone,
+ *  so a value written back mid-drag cannot fight the thumb. */
+function syncNearUI(m: MaskLayer): void {
+  const hasPick = m.pickU !== undefined && m.pickV !== undefined;
+  const near = hasPick ? (m.near ?? 0) : 0;
+  const pct = Math.round(near * 100);
+  if (document.activeElement !== mUI.colorNear) mUI.colorNear.value = String(near);
+  mUI.colorNear.disabled = !hasPick;
+  mUI.colorNearVal.textContent = near > 0 ? `${pct}% of the photo's height` : "Off";
+  mUI.colorNear.setAttribute("aria-valuetext", near > 0 ? `within ${pct} percent of the photo's height from the pick` : "off, anywhere in the photo");
+  mUI.colorNearNote.textContent = !hasPick
+    ? (m.satTarget < 0
+      ? "Pick a color first; this then keeps it to where you picked."
+      : "Pick the color again to use this: it was picked before the place was recorded.")
+    : near > 0
+      ? "The color is matched only within this reach of the spot you picked, and Feather softens the edge. Pick again to move the spot."
+      : "Off, the color is matched anywhere in the photo. Raise this to match it only near the spot you picked.";
+}
+
+mUI.colorNear.addEventListener("input", () => {
+  const m = currentMask();
+  if (!m || m.type !== 3) return;
+  beginMaskAdjust();
+  const v = Number(mUI.colorNear.value);
+  if (v > 0) m.near = v;
+  else delete m.near; // off is no field at all, so a mask that never used it stays as it was
+  syncNearUI(m);
+  draw();
+});
+mUI.colorNear.addEventListener("change", flushRecord); // one drag of the slider = one undo step
 
 function syncMaskFromUI() {
   const m = currentMask();
@@ -9553,7 +9596,12 @@ function handleColorMaskPick(clientX: number, clientY: number): boolean {
     m.hueTarget = h;
     m.satTarget = Math.hypot(cx, cy);
     m.valTarget = Math.max(px[0], px[1], px[2]) / 255; // swatch cosmetics only
+    // WHERE IT WAS TAPPED (050, row 3), written at every pick so the reach from
+    // the pick follows the latest one; image uv, the space a mask's geometry is in.
+    m.pickU = clamp(uu, 0, 1);
+    m.pickV = clamp(vv, 0, 1);
     updateColorSwatch(m);
+    syncNearUI(m);
     draw();
     flushRecord(); // each re-pick is one undo step (deduped when unchanged)
   }

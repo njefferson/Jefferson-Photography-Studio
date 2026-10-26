@@ -1,5 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
 version=101
-hash=a58c34bfbdce9210
+hash=36785fcc5bbaa619
 # Recorded WITHOUT a version bump. The evidence the pictures did not change:
-proven=Lane 193 piece 01 (the rectangle): the rectangle is a mask type of its own that only a new mask can carry, previews and strip tiles render with an empty mask list (renderTile in src/tile.ts and tileInputsFor in src/main.ts set masks to none), and the lane's scratch harness compiled the new pipeline against the untouched one over 1800 pixels with masks of the five earlier kinds and every join, identical on all four channels, with maskWeight of the earlier kinds identical over 5760 sites. Recorded on the integrated tree after lane 191's patches and lane 192's two.
+proven=Lane 193 piece 02 (the colour proximity limit): it adds a colour-proximity factor to colorMaskWeight and a colorReach helper, both inert without a limit, quick-look previews and strip tiles render with an empty mask list (renderTile in src/tile.ts and tileInputsFor in src/main.ts set masks to none), and the lane's scratch harness compiled the new pipeline against the copy taken after its first piece over 2400 pixels of random edits holding masks of all six kinds, colour masks with no limit among them, and every channel was identical. Recorded on the integrated tree after lane 191's patches, lane 192's two and the rectangle.

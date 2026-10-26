@@ -3270,6 +3270,12 @@ user-scalable=no.
   (across, down, width, height, in percent of the picture as shown) for a reader
   who does not drag. It joins, inverts and feathers as the others do, and an edit
   saved without one renders as before.
+  **Row 3, the colour-proximity limit, is built on staging (24 October) and
+  waits on the device pass.** One slider on the Color mask, Stay near the pick,
+  off by default: the colour is matched only within that reach of the spot that
+  was tapped, in percent of the photo's height, softening over the mask's own
+  Feather. A mask picked before the place was recorded says to pick again. A
+  colour mask saved without it renders as before.
 - [ ] **Show the border and let it be moved** <!-- decision: 049 -->
   **Shown as:** See where the horizon was found, and move it yourself when you know better.
   proposed from the device 2026-09-22, and it reframes 048 below it: the

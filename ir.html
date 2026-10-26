@@ -598,6 +598,21 @@
                 <span id="mColorSwatchText" class="note-inline"></span>
               </div>
               <label>Range <input id="mColorRange" type="range" min="0.05" max="1.5" step="0.01" value="0.5" /></label>
+              <!-- A COLOUR KEPT TO WHERE IT WAS PICKED (050, row 3). One
+                   parameter on the colour mask and nothing else: how far from
+                   the tapped spot the match reaches, in percent of the photo's
+                   height. 0 is off, written as no field at all, so a mask from
+                   before it renders as it did. The readout sits OUTSIDE the
+                   label, as the Turn row's does, so the slider's name stays put
+                   and its value is spoken through aria-valuetext. -->
+              <div id="mColorNearRow" class="mask-near-row">
+                <div class="mask-turn-head">
+                  <label for="mColorNear">Stay near the pick</label>
+                  <output id="mColorNearVal" for="mColorNear" aria-hidden="true">Off</output>
+                </div>
+                <input id="mColorNear" type="range" min="0" max="1" step="0.01" value="0" aria-describedby="mColorNearNote" />
+                <small id="mColorNearNote" class="note">Off, the color is matched anywhere in the photo.</small>
+              </div>
             </div>
             <div id="brushControls" hidden>
               <small class="note">Paint on the photo to build the mask. Turn Paint off to pan/zoom.</small>

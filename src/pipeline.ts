@@ -1026,6 +1026,20 @@ export interface MaskLayer {
   satTarget: number; // 0..1 (HSV); -1 = unpicked (mask inert)
   valTarget: number; // HSV value of the tapped colour — swatch cosmetics ONLY
   colorRange: number; // normalised chroma distance at which selection reaches 0
+  /** COLOUR PROXIMITY (050, row 3): keep a colour selection to where it was
+   *  picked, for the frame where one colour appears twice and only one is wanted.
+   *  `pickU` and `pickV` are the place the colour was tapped, in image uv,
+   *  written at every pick. `near` is how far from that place the selection
+   *  reaches, as a fraction of the picture's HEIGHT, measured in pixels (the
+   *  horizontal offset is scaled by the aspect, so the reach is a circle), and
+   *  it falls away over the mask's own Feather, so no second softness control
+   *  exists. All three are absent on a mask made before this field, and `near`
+   *  absent or 0 means no limit, so every colour mask saved earlier weighs what it
+   *  did. A `near` with no recorded pick is ignored (`colorReach`), on the CPU and
+   *  in the shader alike. Colour masks (type 3) only. */
+  pickU?: number;
+  pickV?: number;
+  near?: number;
   // Local adjustments — neutral = brightness/contrast/saturation 1, hue/warmth 0.
   brightness: number;
   contrast: number;
@@ -1669,8 +1683,18 @@ export function chromaVec(r: number, g: number, b: number): [number, number] {
  *  hue). Weight is 1 at the target, smoothstep-falling to 0 past `colorRange`;
  *  `feather` widens the soft transition. An unpicked mask (satTarget < 0) is
  *  inert — 0 everywhere, invert included. Kept numerically identical to the
- *  shader's colorMaskWeight. */
-export function colorMaskWeight(m: MaskLayer, r: number, g: number, b: number): number {
+ *  shader's colorMaskWeight.
+ *
+ *  COLOUR PROXIMITY (050, row 3). Takes the pixel's key colour `r`, `g`, `b`
+ *  and, for the limit, the pixel's place `u`, `v` in image uv and the photograph's
+ *  `aspect`. Returns the weight, 0..1. When the mask has a limit (`colorReach`
+ *  above 0) and the place is given, the colour match is multiplied by a factor
+ *  that is 1 within `near` of the pick, falls to 0 over the Feather, and is 0
+ *  beyond; invert applies after the product. What the result has to satisfy: with
+ *  no limit, or no place given (the LUT bake has none), it is EXACTLY the colour
+ *  match alone, which is what keeps every mask saved before the limit rendering
+ *  as it did; and the shader's copy is the same arithmetic. */
+export function colorMaskWeight(m: MaskLayer, r: number, g: number, b: number, u?: number, v?: number, aspect = 1): number {
   if (m.satTarget < 0) return 0; // no colour picked yet
   const [px, py] = chromaVec(r, g, b);
   const tRad = (m.hueTarget * Math.PI) / 180;
@@ -1678,8 +1702,29 @@ export function colorMaskWeight(m: MaskLayer, r: number, g: number, b: number): 
   const nd = Math.hypot(px - tx, py - ty) / Math.max(0.08, m.satTarget);
   const edge = Math.max(1e-4, m.colorRange);
   const plateau = edge * (1 - m.feather);
-  const w = 1 - smooth01(plateau, edge, nd);
+  let w = 1 - smooth01(plateau, edge, nd);
+  const reach = colorReach(m);
+  if (reach > 0 && u !== undefined && v !== undefined) {
+    const d = Math.hypot((u - (m.pickU as number)) * aspect, v - (m.pickV as number));
+    w *= 1 - smooth01(reach * (1 - m.feather), reach, d);
+  }
   return m.invert ? 1 - w : w;
+}
+
+/** HOW FAR FROM ITS PICK A COLOUR MASK REACHES (050, row 3).
+ *  Takes `m`, a mask. Returns the limit as a fraction of the picture's height, or
+ *  0 when there is none: the mask is not a colour mask, has no `near` above 0, or
+ *  has no recorded pick to measure from.
+ *
+ *  What the result has to satisfy: it is the one decision about whether the limit
+ *  applies, read by `colorMaskWeight` and by the GL uploader that sends the
+ *  shader its limit, so the export and the screen cannot disagree about a mask
+ *  whose limit has no pick; and a mask without `near` gives 0, which is what
+ *  makes every colour mask saved before the limit weigh what it did. */
+export function colorReach(m: MaskLayer): number {
+  if (m.type !== 3) return 0;
+  const n = m.near ?? 0;
+  return n > 0 && m.pickU !== undefined && m.pickV !== undefined ? n : 0;
 }
 
 export const TONE_X = [0, 0.25, 0.5, 0.75, 1] as const;
@@ -3135,8 +3180,8 @@ export function compileEdit(
         // operator. A one-component group is the head's own weight, so every
         // edit made before 026 renders exactly as it did.
         let w = group.length === 1
-          ? (m.type === 3 ? colorMaskWeight(m, kr, kg, kb) : maskWeight(m, u, v, aspect))
-          : groupWeight(group, (c) => (c.type === 3 ? colorMaskWeight(c, kr, kg, kb) : maskWeight(c, u, v, aspect)));
+          ? (m.type === 3 ? colorMaskWeight(m, kr, kg, kb, u, v, aspect) : maskWeight(m, u, v, aspect))
+          : groupWeight(group, (c) => (c.type === 3 ? colorMaskWeight(c, kr, kg, kb, u, v, aspect) : maskWeight(c, u, v, aspect)));
         if (keepW) groupW[gi] = w > 0 ? w : 0;
         if (w <= 0) continue;
         // warmth (linear temp shift)
