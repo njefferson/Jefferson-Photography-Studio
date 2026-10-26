@@ -15,7 +15,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, groupLumLutOf, LUM_MIN, LUM_MAX, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, groupHslOffset, groupGradeOf, groupLumLutOf, maskCurvesStraight, LUM_MIN, LUM_MAX, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer, toHalf } from "./half";
 import { sharpenSigmaTexels } from "./raw/detail";
 export type { EditParams };
@@ -33,16 +33,50 @@ const IDENTITY_LUT = (() => {
   return a;
 })();
 
-/** Fresh RGBA identity ramps (r=g=b=i/255) for the per-channel curve texture. */
-function identityRgbaRamp(): Float32Array {
-  const a = new Float32Array(256 * 4);
-  for (let i = 0; i < 256; i++) {
-    a[i * 4] = i / 255;
-    a[i * 4 + 1] = i / 255;
-    a[i * 4 + 2] = i / 255;
-    a[i * 4 + 3] = 1;
+/** HOW MANY ROWS THE CURVE TEXTURE HOLDS (042, stage 2b). Row 0 is the whole
+ *  photo's red, green and blue curves, as it always was; rows 1 to MAX_MASKS
+ *  are the masks' own, row 1 + i for the mask uploaded at index i, each holding
+ *  that mask's red, green and blue curves in the same three channels and its
+ *  master curve in the fourth. ONE TEXTURE, AND NO NEW UNIT: the edit shader
+ *  declares sixteen samplers, which is every texture unit WebGL 2 guarantees a
+ *  fragment shader, so the masks' curves ride the texture unit 6 already
+ *  carries rather than taking a seventeenth. */
+const TONE_ROWS = 1 + MAX_MASKS;
+
+/** Fresh RGBA identity ramps (r=g=b=a=i/255) for the per-channel curve
+ *  texture, `rows` of them one after another. Takes the number of rows, one by
+ *  default; returns the pixels, 256 RGBA texels a row. */
+function identityRgbaRamp(rows = 1): Float32Array {
+  const a = new Float32Array(256 * 4 * rows);
+  for (let r = 0; r < rows; r++) {
+    for (let i = 0; i < 256; i++) {
+      const o = (r * 256 + i) * 4;
+      a[o] = i / 255;
+      a[o + 1] = i / 255;
+      a[o + 2] = i / 255;
+      a[o + 3] = i / 255;
+    }
   }
   return a;
+}
+
+/** Write one row of the curve texture: the red, green and blue curves into the
+ *  first three channels and the master into the fourth. Takes the pixels from
+ *  `identityRgbaRamp`, the row, and each curve as its five points (absent or
+ *  straight leaves that channel's ramp); returns nothing. What it must
+ *  satisfy: texel i holds the curve at i/255 unrounded, which is what the
+ *  whole photo's row has always held, so the shader's `toneCoord` reads a mask's
+ *  curve and the whole photo's the same way, and `toneEvaluator`'s curve is the
+ *  one the CPU export evaluates. */
+function fillToneRow(buf: Float32Array, row: number, red?: readonly number[], green?: readonly number[], blue?: readonly number[], master?: readonly number[]): void {
+  const fns = [red, green, blue, master].map((c) => (c && !toneIsIdentity(c) ? toneEvaluator(c) : null));
+  for (let i = 0; i < 256; i++) {
+    const x = i / 255, o = (row * 256 + i) * 4;
+    for (let ch = 0; ch < 4; ch++) {
+      const fn = fns[ch];
+      buf[o + ch] = fn ? fn(x) : x;
+    }
+  }
 }
 
 export const VERT = `#version 300 es
@@ -118,6 +152,7 @@ const float SKY_SAT_GATE_LO = ${SKY_SAT_GATE_LO.toFixed(6)};
 const float SKY_SAT_GATE_HI = ${SKY_SAT_GATE_HI.toFixed(6)};
 const float LUM_MIN = ${LUM_MIN.toFixed(6)};
 const float LUM_MAX = ${LUM_MAX.toFixed(6)};
+const float TONE_ROWS = ${TONE_ROWS.toFixed(1)};
 in vec2 v_uv;
 in vec2 v_cropUv;
 out vec4 frag;
@@ -140,7 +175,7 @@ uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
 uniform float u_glow;        // 0..1 HIE halation strength
 uniform sampler2D u_toneTex; // 256x1 R16F master tone-curve LUT, texel i = f(i/255)
 uniform bool u_toneOn;          // master curve non-identity (skipped otherwise, as on the CPU)
-uniform sampler2D u_toneRgbTex; // 256x1 RGBA16F: per-channel R/G/B curve LUTs
+uniform sampler2D u_toneRgbTex; // 256 x TONE_ROWS RGBA16F: row 0 the whole photo's R/G/B curve LUTs, row 1 + i mask i's R/G/B (and its master in alpha)
 uniform bool u_toneRgbOn;       // any per-channel curve non-identity
 uniform float u_lum;         // global luminance: v -> pow(v, 1/u_lum) through rgbToneLum (1 = neutral)
 // Local masks (up to MAX_MASKS = 8) — kept identical to pipeline.ts.
@@ -167,6 +202,7 @@ uniform float u_maskGradeBal[8]; // that head's own balance
 uniform bool u_maskGradeOn;  // false when no head carries a grade, so the grade reads the whole photo's alone
 uniform vec2 u_maskLumLut[8]; // a HEAD's own offsets on the overall Luminance (x) and on the LUT's strength (y), 042 stage 2b; zero on components
 uniform bool u_maskLumLutOn; // false when no head carries either, so lum and the LUT read the whole photo's alone
+uniform bool u_maskCurveOn;  // false when no head carries curves of its own (042 stage 2b), so no row beyond the whole photo's is read
                              // LITERAL 8, like every array above it: MAX_MASKS is a
                              // TypeScript constant and means nothing inside GLSL —
                              // written as MAX_MASKS first, and the shader silently
@@ -357,6 +393,24 @@ vec3 rgbToneLum(vec3 c, float e) {
   c = clamp(c, 0.0, 1.0);
   float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b);
   return rgbToneSpread(c, mx, mn, pow(mx, e), pow(mn, e));
+}
+// MASK I'S OWN CURVES (042, stage 2b), the twin of the curves block in
+// compileEdit: its master through the hue-keeping spread, then its red, green and
+// blue. Row 1 + i of the curve texture, read at the row's centre so the linear
+// filter takes nothing from a neighbouring row; textureLod because it is called
+// from a loop that steps over masks by a value that varies per pixel.
+vec3 maskCurve(vec3 c, int i) {
+  float rv = (float(i) + 1.5) / TONE_ROWS;
+  c = clamp(c, 0.0, 1.0);
+  float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b);
+  float fmx = textureLod(u_toneRgbTex, vec2(toneCoord(mx), rv), 0.0).a;
+  float fmn = textureLod(u_toneRgbTex, vec2(toneCoord(mn), rv), 0.0).a;
+  c = rgbToneSpread(c, mx, mn, fmx, fmn);
+  return vec3(
+    textureLod(u_toneRgbTex, vec2(toneCoord(c.r), rv), 0.0).r,
+    textureLod(u_toneRgbTex, vec2(toneCoord(c.g), rv), 0.0).g,
+    textureLod(u_toneRgbTex, vec2(toneCoord(c.b), rv), 0.0).b
+  );
 }
 
 // The sRGB transfer curve, piecewise, both ways: the drawing buffer and every
@@ -1282,10 +1336,19 @@ void main() {
   // its own channel (display space, before the mixer). Matches pipeline.ts.
   if (u_toneRgbOn) {
     g = vec3(
-      texture(u_toneRgbTex, vec2(toneCoord(g.r), 0.5)).r,
-      texture(u_toneRgbTex, vec2(toneCoord(g.g), 0.5)).g,
-      texture(u_toneRgbTex, vec2(toneCoord(g.b), 0.5)).b
+      texture(u_toneRgbTex, vec2(toneCoord(g.r), 0.5 / TONE_ROWS)).r,
+      texture(u_toneRgbTex, vec2(toneCoord(g.g), 0.5 / TONE_ROWS)).g,
+      texture(u_toneRgbTex, vec2(toneCoord(g.b), 0.5 / TONE_ROWS)).b
     );
+  }
+  // A mask's own curves (042, stage 2b) work on what the whole photo's left, one
+  // mask after another, each mixed in by that mask's group weight as the mask
+  // loop kept it. The twin of the curves block in compileEdit.
+  if (u_maskCurveOn) {
+    for (int i = 0; i < u_maskCount; i++) {
+      if (u_maskOp[i] != 0 || gW[i] <= 0.0) continue;
+      g = mix(g, maskCurve(g, i), gW[i]);
+    }
   }
   // 8-channel HSL mixer in DISPLAY space (after gamma + tone curve) so the
   // hue it classifies is exactly the hue on screen. Matches pipeline.ts.
@@ -1589,7 +1652,7 @@ export type MaskState = "in" | "idle" | "building" | "failed";
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskLumLut", "u_maskLumLutOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_skyRef", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskLumLut", "u_maskLumLutOn", "u_maskCurveOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_skyRef", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -1802,6 +1865,14 @@ export class Renderer {
   private lensSig = "";
   private lensC: [number, number] = [0, 0];
   private toneRgbTex: WebGLTexture;
+  /** The pixels of the whole curve texture, TONE_ROWS rows, kept here so a
+   *  change to the whole photo's row (`setToneCurve`) and a change to the masks'
+   *  rows (`setMaskCurves`) each rewrite their own and upload the other's as it
+   *  stood. */
+  private toneRgbRows: Float32Array = identityRgbaRamp(TONE_ROWS);
+  /** What the masks' rows were last built from, so a draw that changed none of
+   *  the masks' curves uploads nothing. */
+  private maskCurveKey = "";
   private brushTex: WebGLTexture;
   private brushFineTex: WebGLTexture;
   /** The refined atlas's upload signature and whether it holds anything — the
@@ -2007,7 +2078,7 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 256, 1, 0, gl.RGBA, gl.FLOAT, identityRgbaRamp());
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 256, TONE_ROWS, 0, gl.RGBA, gl.FLOAT, this.toneRgbRows);
 
     // Brush-mask atlas (unit 3): MAX_BITMAP_MASKS painted/sky masks packed four
     // per RGBA layer of a 2D ARRAY.
@@ -2561,13 +2632,45 @@ export class Renderer {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, 256, 1, 0, gl.RED, gl.FLOAT, lut);
     }
     gl.bindTexture(gl.TEXTURE_2D, this.toneRgbTex);
-    const rgba = identityRgbaRamp();
-    for (const [ch, curve] of [[0, toneR], [1, toneG], [2, toneB]] as const) {
-      if (!curve || toneIsIdentity(curve)) continue;
-      const fn = toneEvaluator(curve);
-      for (let i = 0; i < 256; i++) rgba[i * 4 + ch] = fn(i / 255);
+    // Row 0 only; the masks' rows stay as `setMaskCurves` last built them.
+    fillToneRow(this.toneRgbRows, 0, toneR, toneG, toneB);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 256, TONE_ROWS, 0, gl.RGBA, gl.FLOAT, this.toneRgbRows);
+  }
+
+  /**
+   * Rebuild the masks' rows of the curve texture (042, stage 2b) when any mask's
+   * curves changed since the last draw.
+   * @param masks  the masks as they are uploaded this draw, heads and components
+   *   in the shader's order; a head at index i has its row at 1 + i.
+   * @returns whether any head carries a curve that is not straight, which is
+   *   what the shader's u_maskCurveOn says. What it must satisfy: a row of a
+   *   mask with no curves, a component, or an index past the last mask is the
+   *   identity ramp, so the shader can read any row it likes; and the whole
+   *   photo's row 0 is untouched, because `setToneCurve` owns it.
+   */
+  private setMaskCurves(masks: EditParams["masks"]): boolean {
+    const gl = this.gl;
+    const curvesOf = (m: EditParams["masks"][number] | undefined, i: number): readonly number[] | null =>
+      m && (i === 0 || (m.op ?? 0) === 0) && m.curves && !maskCurvesStraight(m.curves) ? m.curves : null;
+    let key = "";
+    for (let i = 0; i < masks.length; i++) {
+      const c = curvesOf(masks[i], i);
+      if (c) key += `${i}:${c.join(",")};`;
     }
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 256, 1, 0, gl.RGBA, gl.FLOAT, rgba);
+    if (key !== this.maskCurveKey) {
+      this.maskCurveKey = key;
+      for (let r = 0; r < MAX_MASKS; r++) {
+        const c = curvesOf(masks[r], r);
+        fillToneRow(this.toneRgbRows, 1 + r, c?.slice(5, 10), c?.slice(10, 15), c?.slice(15, 20), c?.slice(0, 5));
+      }
+      // Its own unit, named: this runs inside bindPipeline, which leaves the
+      // active unit wherever its last texture went.
+      gl.activeTexture(gl.TEXTURE6);
+      gl.bindTexture(gl.TEXTURE_2D, this.toneRgbTex);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 256, TONE_ROWS, 0, gl.RGBA, gl.FLOAT, this.toneRgbRows);
+    }
+    return key !== "";
   }
 
   /** Display rotation in 90-degree CW steps; swaps the canvas aspect. */
@@ -3176,6 +3279,9 @@ export class Renderer {
     const toneRgbOn =
       (p.toneR && !toneIsIdentity(p.toneR)) || (p.toneG && !toneIsIdentity(p.toneG)) || (p.toneB && !toneIsIdentity(p.toneB));
     gl.uniform1i(this.loc.u_toneRgbOn, toneRgbOn ? 1 : 0);
+    // The masks' own curves (042, stage 2b) ride rows of the same texture; the
+    // rows are rebuilt only when a mask's curves changed.
+    gl.uniform1i(this.loc.u_maskCurveOn, this.setMaskCurves(masks) ? 1 : 0);
     gl.uniform1i(this.loc.u_toneRgbTex, 6);
     gl.activeTexture(gl.TEXTURE6);
     gl.bindTexture(gl.TEXTURE_2D, this.toneRgbTex);

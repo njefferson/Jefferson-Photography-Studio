@@ -3114,6 +3114,8 @@ user-scalable=no.
     time.
   - Stage 2b, Luminance and LUT strength per mask: built on staging on
     24 October 2026, and waits on the device pass.
+  - Stage 2b, the curves per mask: built on staging on 24 October 2026, and
+    waits on the device pass.
   - Stage 3 covers exposure, white balance and the foliage band. That band
     limited to a place is the standard fix for cladding reddening with the
     grass.

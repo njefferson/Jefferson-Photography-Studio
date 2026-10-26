@@ -169,7 +169,7 @@ export async function closeMasks(page) {
  *
  *  Takes `page`, `field` and `value`. `field` is one of brightness, contrast,
  *  saturation, hue, warmth, folHue, folSat, folLum, skyHue, skySat, skyLum,
- *  lum, lutStrength, or a colour-mixer or grade control; `value` is in the mask's
+ *  lum, lutStrength, tone0 to tone4, or a colour-mixer or grade control; `value` is in the mask's
  *  own units (brightness as a multiplier, 0.3 to 2; Foliage as an offset, 0 for
  *  no change). Returns the value the control carries afterwards, as a string.
  *
@@ -195,7 +195,11 @@ export async function setMaskValue(page, field, value) {
     // The overall Luminance on the Tone tab, an offset from -1.5 to 1.5 while a
     // mask is picked, and the LUT's strength on the Grade tab, an offset from -1
     // to 1 (042, stage 2b; the strength row shows only while a LUT is applied).
-    lum: ["tone", "lum"], lutStrength: ["grade", "lutStrength"] }[field];
+    lum: ["tone", "lum"], lutStrength: ["grade", "lutStrength"],
+    // The curve's five points on the Tone tab (042, stage 2b): while a mask is
+    // picked they are THE MASK'S OWN curve for the channel the chips show (All
+    // until a chip is pressed), as a distance from the straight line, -25 to 25.
+    tone0: ["tone", "tone0"], tone1: ["tone", "tone1"], tone2: ["tone", "tone2"], tone3: ["tone", "tone3"], tone4: ["tone", "tone4"] }[field];
   assert.ok(where, `setMaskValue: no mask control is called ${field}`);
   const [tab, id] = where;
   const wasOpen = await page.evaluate(() => !document.getElementById("maskPlace")?.hidden);

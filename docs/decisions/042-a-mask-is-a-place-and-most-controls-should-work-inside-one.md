@@ -446,7 +446,21 @@ selection; built in stages, each shippable and checkable on its own.** Chosen.
     All eight masks' curves share one texture of eight rows, built by the
     function that builds the whole photo's, so they take one of the two free
     texture units rather than eight: 15 of 16 in use afterwards, which the test
-    page's shader-room row reads on the device.
+    page's shader-room row reads on the device. **Built on staging, 24 October
+    2026**, and waits on the device pass, with one correction to the unit
+    count: the edit shader declares sixteen samplers, which is every unit WebGL 2
+    guarantees a fragment shader (`src/debug.ts` says so beside its texture
+    variant), so there was no free unit. The eight rows are rows 1 to 8 of the
+    texture the whole photo's red, green and blue curves already use, which
+    becomes nine rows tall, its row 0 the whole photo's as before: each mask row
+    holds that mask's red, green and blue curves in the first three channels and
+    its master curve in the fourth, written by the same `toneEvaluator` through
+    the same row writer. No unit is added and no uniform array: one boolean says
+    whether any head carries a curve. The shader walks the heads after the whole
+    photo's curves, one after another, each mixed in by the weight its mask loop
+    kept, so a second mask works on the first's result, and `compileEdit` does
+    the same in the same order. `MaskLayer.curves` is 20 numbers, master, red,
+    green, blue, each the five points; a colour mask can carry it.
   - **Shadow colour last, with the Convert this record owes.** It is the one
     tool here with an aim today, so its per-mask value replaces the aim, and a
     saved aim has to become something. What an aim becomes where two aimed

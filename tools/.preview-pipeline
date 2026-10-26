@@ -1,3 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
-version=99
-hash=1fcadab5706dfbe0
+version=100
+hash=2beca290cbf51421
+# Recorded WITHOUT a version bump. The evidence the pictures did not change:
+proven=the only change since version 100 was recorded is the contract comment of maskCurvesStraight naming its parameter; no code line changed

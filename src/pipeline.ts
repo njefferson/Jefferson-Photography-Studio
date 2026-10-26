@@ -849,6 +849,19 @@ export interface MaskLayer {
    *  nothing. Always replaced as a new array, never written in place, because
    *  an undo snapshot copies a mask shallowly. */
   lumLut?: [number, number];
+  /** THE MASK'S OWN CURVES (042, stage 2b): the master curve and the red, green
+   *  and blue curves, 20 numbers laid out as four of the whole photo's five-point
+   *  curves one after another, [master x5, red x5, green x5, blue x5], each
+   *  point the output at TONE_X (TONE_DEFAULT is straight). Not an offset: a
+   *  curve does not add, so these are applied AFTER the whole photo's curves, to
+   *  what they left, and blended in by the group's weight (Lightroom's mask
+   *  curve is separate from the whole-photo one; Capture One's works on a
+   *  layer). Absent, or straight in all four, means no change, so every edit
+   *  saved before it renders as it did. Read on a group's HEAD only; a colour
+   *  mask can carry it, the curves running after the mask stage. Always replaced
+   *  as a new array, never written in place, because an undo snapshot copies a
+   *  mask shallowly. */
+  curves?: number[];
   cx: number; // radial: centre x; linear: start x
   cy: number; // radial: centre y; linear: start y
   rx: number; // radial: radius along the oval's FIRST axis, as a fraction of the width
@@ -1084,6 +1097,7 @@ export function maskIsActive(m: MaskLayer): boolean {
   if (m.hsl && m.hsl.some((x) => x !== 0)) return true;
   if (m.grade && !gradeIsNeutral(m.grade)) return true;
   if (m.lumLut && (m.lumLut[0] !== 0 || m.lumLut[1] !== 0)) return true;
+  if (m.curves && !maskCurvesStraight(m.curves)) return true;
   return m.brightness !== 1 || m.contrast !== 1 || m.saturation !== 1 || m.hue !== 0 || m.warmth !== 0;
 }
 
@@ -1280,6 +1294,34 @@ export function groupLumLutOf(group: readonly MaskLayer[]): readonly [number, nu
   const h = group[0];
   if (!h || !h.lumLut || h.lumLut.length !== 2 || (h.lumLut[0] === 0 && h.lumLut[1] === 0)) return null;
   return h.lumLut;
+}
+
+/** How many numbers a mask's `curves` holds: four five-point curves, master,
+ *  red, green, blue, one after another. */
+export const MASK_CURVE_LEN = 20;
+
+/** Whether a mask's curves change nothing. Takes `c`, the 20 numbers of a
+ *  `MaskLayer.curves`; returns true when `c` is not 20 long or when all four of
+ *  its curves are straight, by the same test the whole photo's curves use
+ *  (`toneIsIdentity`). What the callers rely on: true means the curves can be
+ *  skipped everywhere, and a mask that is otherwise neutral can be dropped. */
+export function maskCurvesStraight(c: readonly number[]): boolean {
+  if (c.length !== MASK_CURVE_LEN) return true;
+  for (let k = 0; k < 4; k++) if (!toneIsIdentity(c.slice(k * 5, k * 5 + 5))) return false;
+  return true;
+}
+
+/** The curves a GROUP applies (042, stage 2b), or null when it applies none.
+ *  Takes one group (head first); returns the head's `curves` when it has 20
+ *  numbers and any of the four is off the straight line. A colour mask can
+ *  carry them, because the curves run after the mask stage. What the caller
+ *  relies on: null means the group can be skipped at the curves, and the
+ *  renderer builds a head's row of the curve texture for exactly the groups
+ *  this returns non-null for. */
+export function groupCurvesOf(group: readonly MaskLayer[]): readonly number[] | null {
+  const h = group[0];
+  if (!h || !h.curves || maskCurvesStraight(h.curves)) return null;
+  return h.curves;
 }
 
 /** THE FOLIAGE BAND'S VALUE AT ONE PIXEL (042, stage 2): the whole-photo value
@@ -2702,7 +2744,18 @@ export function compileEdit(
     const o = groupLumLutOf(g);
     if (o) lumLutGroups.push({ gi, dLum: o[0], dLut: p.lut ? o[1] : 0 });
   });
-  const keepW = hslGroups.length > 0 || gradeGroups.length > 0 || lumLutGroups.length > 0;
+  // A mask's own curves (042, stage 2b), each evaluator made once. A straight
+  // curve is left out, as the whole photo's are, so a mask with only a master
+  // curve pays for one function per pixel and not four.
+  const curveGroups: { gi: number; master: ((v: number) => number) | null; r: ((v: number) => number) | null; g: ((v: number) => number) | null; b: ((v: number) => number) | null }[] = [];
+  maskGroupsActive.forEach((gr, gi) => {
+    const c = groupCurvesOf(gr);
+    if (!c) return;
+    const fn = (k: number) => { const pts = c.slice(k * 5, k * 5 + 5); return toneIsIdentity(pts) ? null : toneEvaluator(pts); };
+    curveGroups.push({ gi, master: fn(0), r: fn(1), g: fn(2), b: fn(3) });
+  });
+  const curveTmp = new Float32Array(3);
+  const keepW = hslGroups.length > 0 || gradeGroups.length > 0 || lumLutGroups.length > 0 || curveGroups.length > 0;
   const groupW = new Float64Array(maskGroupsActive.length);
   if (folGroups.length) bandsActive = true;
   const folPx: [number, number, number] = [0, 0, 0];
@@ -3047,6 +3100,26 @@ export function compileEdit(
     if (toneRFn) out[0] = toneRFn(out[0]);
     if (toneGFn) out[1] = toneGFn(out[1]);
     if (toneBFn) out[2] = toneBFn(out[2]);
+    // A MASK'S OWN CURVES (042, stage 2b): after the whole photo's, to what they
+    // left, one group after another, each blended in by that group's weight as
+    // the mask stage folded it. A curve does not add, so a second group works on
+    // the first's result and not on the whole photo's. The same master through
+    // rgbTone and then the three channels, in the same order as above. Nothing
+    // runs where no group reaches.
+    if (curveGroups.length && u !== undefined && v !== undefined) {
+      for (const q of curveGroups) {
+        const gw = groupW[q.gi];
+        if (gw <= 0) continue;
+        curveTmp[0] = out[0]; curveTmp[1] = out[1]; curveTmp[2] = out[2];
+        if (q.master) rgbTone(curveTmp, q.master);
+        if (q.r) curveTmp[0] = q.r(curveTmp[0]);
+        if (q.g) curveTmp[1] = q.g(curveTmp[1]);
+        if (q.b) curveTmp[2] = q.b(curveTmp[2]);
+        out[0] += (curveTmp[0] - out[0]) * gw;
+        out[1] += (curveTmp[1] - out[1]) * gw;
+        out[2] += (curveTmp[2] - out[2]) * gw;
+      }
+    }
     // 8-channel HSL mixer in DISPLAY space, on the near-final colour (after
     // gamma + tone curve) — so the hue it classifies is EXACTLY the hue on
     // screen, and the chip you pick owns the colour you see. (It originally

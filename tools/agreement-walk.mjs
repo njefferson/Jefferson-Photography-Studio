@@ -664,6 +664,14 @@ try {
       set: async (page) => {
         await setMaskValue(page, "lum", "0.75");
       } },
+    // The mask's own master curve (042, stage 2b), lifting the shadows and the
+    // midtones: the shader reads a row of the curve texture that compileEdit
+    // evaluates exactly, and mixes it in by the weight its loop kept.
+    { label: "mask curve", what: "a Sky mask's master curve, shadows +20, midtones +25", check: "tone2", want: "25",
+      set: async (page) => {
+        await setMaskValue(page, "tone1", "20");
+        await setMaskValue(page, "tone2", "25");
+      } },
   ];
   // The photograph as the reader sees it, in the READ measures the bars use.
   const readView = (page) => page.evaluate(`(() => {

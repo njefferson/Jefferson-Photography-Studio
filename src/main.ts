@@ -51,7 +51,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP, keepSkyMap, getKeptSkyMap, keptSkyMapHint, photographStamp, digestBytes } from "./maskstore";
-import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, skyReference, SKY_SAT_SECOND_GATE, type SkyMap } from "./pipeline";
+import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, MASK_CURVE_LEN, maskCurvesStraight, radialLocal, radialPoint, type MaskLayer, type CropRect, BRUSH_MAX_EDGE, skyReference, SKY_SAT_SECOND_GATE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache, type HealSolves } from "./heal";
@@ -1756,7 +1756,9 @@ function syncFromUI() {
     params.sky = [Number(ui.skyHue.value), Number(ui.skySat.value), Number(ui.skyLum.value)];
     params.foliage = [Number(ui.folHue.value), Number(ui.folSat.value), Number(ui.folLum.value)];
   } else writeMaskControls(tm);
-  {
+  // With a mask picked the five sliders show THE MASK'S curve (042, stage 2b);
+  // writeMaskControls took them above, so they are not read into the whole photo's.
+  if (!tm) {
     const t = activeTone();
     for (let i = 0; i < 5; i++) {
       t[i] = TONE_DEFAULT[i] + Number(ui.tones[i].value) / 100;
@@ -1773,12 +1775,7 @@ function syncFromUI() {
 /** Keep the five tone points in ascending order with a small gap — on the
  *  master curve AND each per-channel curve (loads may arrive unordered). */
 function clampToneOrder() {
-  for (const t of [params.tone, params.toneR, params.toneG, params.toneB]) {
-    for (let i = 0; i < 5; i++) {
-      const lo = i === 0 ? 0 : t[i - 1] + 0.01;
-      t[i] = clamp(t[i], Math.max(lo, TONE_DEFAULT[i] - 0.25), Math.min(1, TONE_DEFAULT[i] + 0.25));
-    }
-  }
+  for (const t of [params.tone, params.toneR, params.toneG, params.toneB]) clampTonePoints(t);
 }
 
 function syncToUI() {
@@ -4829,8 +4826,65 @@ const TONE_CHANNELS = [
   { label: "Blue", cls: "tone-b" },
 ] as const;
 let toneChannel: 0 | 1 | 2 | 3 = 0;
+
+/** The mask the curve controls act on, or null for the whole photograph
+ *  (042, stage 2b). Takes nothing. The same pick every control that follows a
+ *  mask goes by (`targetMask`), asked only once the switch exists. */
+function toneMask(): MaskLayer | null {
+  return overlayReady ? targetMask() : null;
+}
+
+/** The five points of one of a mask's curves (042, stage 2b). Takes the mask
+ *  and a channel, 0 All, 1 Red, 2 Green, 3 Blue; returns a FRESH tuple, the
+ *  straight line when the mask has no curves. What the caller relies on: it is a
+ *  copy, so writing into it changes nothing; a mask's curves are only ever
+ *  replaced (`writeMaskTone`), because an undo snapshot copies a mask shallowly. */
+function maskToneOf(m: MaskLayer, ch: number): [number, number, number, number, number] {
+  const c = m.curves;
+  return (c && c.length === MASK_CURVE_LEN ? c.slice(ch * 5, ch * 5 + 5) : [...TONE_DEFAULT]) as [number, number, number, number, number];
+}
+
+/** Hold five points in ascending order with a small gap, inside the band each
+ *  may move in, starting `off` places into `t`. Takes the array and the offset;
+ *  returns nothing. This is `clampToneOrder`'s rule for one curve, and the
+ *  mask's curves obey the same one. */
+function clampTonePoints(t: number[], off = 0): void {
+  for (let i = 0; i < 5; i++) {
+    const lo = i === 0 ? 0 : t[off + i - 1] + 0.01;
+    t[off + i] = clamp(t[off + i], Math.max(lo, TONE_DEFAULT[i] - 0.25), Math.min(1, TONE_DEFAULT[i] + 0.25));
+  }
+}
+
+/** Write one point of one of a mask's curves (042, stage 2b). Takes the mask,
+ *  the channel, the point 0 to 4 and its new output; returns nothing. A NEW
+ *  ARRAY, never written in place, for the same reason as folSetter, and held in
+ *  order afterwards like the whole photo's. The mask's four curves start
+ *  straight, which is what absent means. */
+function writeMaskTone(m: MaskLayer, ch: number, i: number, v: number): void {
+  const a = m.curves && m.curves.length === MASK_CURVE_LEN ? m.curves.slice() : [...TONE_DEFAULT, ...TONE_DEFAULT, ...TONE_DEFAULT, ...TONE_DEFAULT];
+  a[ch * 5 + i] = v;
+  clampTonePoints(a, ch * 5);
+  m.curves = maskCurvesStraight(a) ? undefined : a;
+}
+
+/** The curve the widget and the five sliders show: the picked mask's own for
+ *  the channel chosen, a copy, or the whole photo's (the array itself, which the
+ *  whole photo's writers change in place). */
 function activeTone(): [number, number, number, number, number] {
+  const tm = toneMask();
+  if (tm) return maskToneOf(tm, toneChannel);
   return toneChannel === 1 ? params.toneR : toneChannel === 2 ? params.toneG : toneChannel === 3 ? params.toneB : params.tone;
+}
+
+/** Write one point of the curve the widget shows, to the picked mask's or to the
+ *  whole photo's. Takes the point 0 to 4 and its output; returns nothing. Every
+ *  write to the widget's curve goes through this, so none reaches the wrong
+ *  target. */
+function writeActiveTone(i: number, v: number): void {
+  const tm = toneMask();
+  if (tm) { writeMaskTone(tm, toneChannel, i, v); return; }
+  activeTone()[i] = v;
+  clampToneOrder();
 }
 const toneChanBtns: HTMLButtonElement[] = [];
 {
@@ -4849,7 +4903,10 @@ const toneChanBtns: HTMLButtonElement[] = [];
 }
 
 function updateToneChanUI() {
-  const curves = [params.tone, params.toneR, params.toneG, params.toneB];
+  // The badges say which of the four curves is off the straight line: the picked
+  // mask's own when one is picked (042, stage 2b), else the whole photo's.
+  const tm = toneMask();
+  const curves = tm ? [0, 1, 2, 3].map((ch) => maskToneOf(tm, ch)) : [params.tone, params.toneR, params.toneG, params.toneB];
   toneChanBtns.forEach((b, i) => {
     const on = i === toneChannel;
     const tweaked = !toneIsIdentity(curves[i]);
@@ -4858,6 +4915,12 @@ function updateToneChanUI() {
     b.setAttribute("aria-label", `${TONE_CHANNELS[i].label} curve${tweaked ? " — adjusted" : ""}`);
   });
   $("toneReset").textContent = toneChannel === 0 ? "Reset tone" : `Reset ${TONE_CHANNELS[toneChannel].label.toLowerCase()} curve`;
+  // With a mask picked the whole photo's reset stands down with the rest of the
+  // tab and this mask's own takes its place, saying whose curve it puts back.
+  const maskReset = $("maskToneReset") as HTMLButtonElement;
+  maskReset.hidden = !tm;
+  maskReset.textContent = toneChannel === 0 ? "Reset this mask's curve" : `Reset this mask's ${TONE_CHANNELS[toneChannel].label.toLowerCase()} curve`;
+  $("toneMaskNote").hidden = !tm;
 }
 
 // --- Tone-curve widget: five draggable dots (blacks/shadows/mids/whites/
@@ -4907,8 +4970,7 @@ let tonePath: SVGPathElement;
         const r = toneSvg.getBoundingClientRect();
         // Pointer -> padded viewBox units -> 0..100 plot -> 0..1 value.
         const vb = TONE_VB_MIN + TONE_VB_SPAN * ((ev.clientY - r.top) / Math.max(1, r.height));
-        activeTone()[i] = 1 - vb / 100;
-        clampToneOrder();
+        writeActiveTone(i, 1 - vb / 100); // the picked mask's curve when one is picked (042, stage 2b)
         syncToUI();
         draw();
       };
@@ -4938,8 +5000,20 @@ function updateToneWidget() {
 }
 
 $("toneReset").addEventListener("click", () => {
+  if (toneMask()) return; // stands down with a mask picked: the mask has its own button
   const t = activeTone();
   for (let i = 0; i < 5; i++) t[i] = TONE_DEFAULT[i];
+  syncToUI();
+  draw();
+  flushRecord();
+});
+
+// The picked mask's curve for the channel shown, put back to the straight line
+// (042, stage 2b). One press, one undo step.
+$("maskToneReset").addEventListener("click", () => {
+  const tm = toneMask();
+  if (!tm) return;
+  for (let i = 0; i < 5; i++) writeMaskTone(tm, toneChannel, i, TONE_DEFAULT[i]);
   syncToUI();
   draw();
   flushRecord();
@@ -8415,6 +8489,16 @@ function maskCtls(): MaskCtl[] {
     // through $() because the row's own constants are declared far below.
     { el: ui.lum, min: -(LUM_HI - LUM_LO), max: LUM_HI - LUM_LO, step: 0.01, get: (m) => m.lumLut?.[0] ?? 0, set: lumLutSet(0), whole: () => toPos(params.lum, LUM_LO, LUM_HI) },
     { el: $("lutStrength") as HTMLInputElement, min: -1, max: 1, step: 0.01, get: (m) => m.lumLut?.[1] ?? 0, set: lumLutSet(1), whole: () => params.lut?.strength ?? 1 },
+    // The curve's five points (042, stage 2b): the picked mask's OWN curve for
+    // the channel the chips show, on the whole photo's ranges, and not an offset,
+    // because a curve does not add. It starts straight and is applied after the
+    // whole photo's, mixed in by the mask's weight.
+    ...ui.tones.map((el, i) => ({
+      el, min: -25, max: 25, step: 0.5,
+      get: (m: MaskLayer) => ((m.curves && m.curves.length === MASK_CURVE_LEN ? m.curves[toneChannel * 5 + i] : TONE_DEFAULT[i]) - TONE_DEFAULT[i]) * 100,
+      set: (m: MaskLayer, v: number) => writeMaskTone(m, toneChannel, i, TONE_DEFAULT[i] + v / 100),
+      whole: () => ([params.tone, params.toneR, params.toneG, params.toneB][toneChannel][i] - TONE_DEFAULT[i]) * 100,
+    })),
   ];
   return maskCtlList;
 }
@@ -8457,6 +8541,11 @@ function inertOthers(root: Element, ids: Set<string>): void {
     // A grade wheel is the pointer route to the same values as the sliders
     // beside it (042, stage 2b), so it stays live with them.
     if ((child as HTMLElement).classList?.contains("grade-wheel-box")) continue;
+    // The curve's channel chips and the widget are the pointer route to the same
+    // five values as the sliders, and choose WHICH curve they show; the mask's
+    // own reset and the sentence that says whose curve it is stay with them (042,
+    // stage 2b).
+    if (["toneChans", "toneSvg", "maskToneReset", "toneMaskNote"].includes((child as HTMLElement).id)) continue;
     if (holdsPerMask(child, ids)) {
       if (child.tagName !== "LABEL" && !ids.has((child as HTMLElement).id)) inertOthers(child, ids);
       continue;
@@ -8540,6 +8629,14 @@ function applyMaskTargetUI(): void {
   updateHslUI();
   updateGradeUI();
   updateLutMaskUI();
+  // THE TONE TAB FOLLOWS THE PICK TOO (042, stage 2b). Its curve, the chips' badges,
+  // the reset's label and the mask's own reset button are all read from the picked
+  // mask, and picking one reaches this function through selectMask and updateMaskUI
+  // without going through syncToUI, so without these two the tab showed the last
+  // sync: the mask's reset hidden under a mask and shown again after Back to whole
+  // photo.
+  updateToneChanUI();
+  updateToneWidget();
   maskWarmthRow.hidden = !m;
   for (const r of wbGainRows) r.hidden = !!m;
   // Temperature and Tint are the same three gains read two other ways, so they stand down on the same condition (decision 101).
@@ -16517,12 +16614,14 @@ function wireSliderReset(): void {
   };
   const backTone = (i: number) => {
     const t = activeTone();
-    const to = toneDefaults[toneChannel]?.[i];
+    // WITH A MASK PICKED the point goes back to the mask's own straight line,
+    // not to where the photo opened: that is a whole-photo number (042, stage 2b),
+    // the same rule the sliders follow above.
+    const to = toneMask() ? TONE_DEFAULT[i] : toneDefaults[toneChannel]?.[i];
     if (to === undefined || t[i] === to) return;
-    t[i] = to;
     // The curve has to stay ordered, so a neighbour may hold this point short of
     // the baseline. That is the same answer Reset would give from here.
-    clampToneOrder();
+    writeActiveTone(i, to);
     syncToUI();
     draw();
     flushRecord(); // one gesture, one undo step

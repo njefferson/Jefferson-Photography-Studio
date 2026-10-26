@@ -32,7 +32,9 @@
 // the same way, and a group with a colour mask in it adds nothing, because the
 // colour key does not exist that early. And a mask's own Luminance and LUT
 // strength, the last two stages: the same offsets-added rule, held to the
-// slider's range, with the LUT file itself staying whole-photo.
+// slider's range, with the LUT file itself staying whole-photo. And a mask's
+// own curves, which do not add: they work on what the whole photo's curves
+// left, blended in by the group's weight.
 //
 // Runs on every commit and needs no browser. Bundled with esbuild so it checks
 // the functions the app ships rather than a copy of them.
@@ -162,5 +164,24 @@ check("a LUT-strength offset past 1 is held to 1", diff(pxl([{ ...neutralMask(0)
 check("with no LUT applied the strength offset moves nothing (the file is whole-photo)", diff(pxl([{ ...neutralMask(0), lumLut: [0, 0.5] }]), bareL), 0);
 check("a colour mask can carry a LUT-strength offset", diff(pxl([{ ...neutralMask(3), hueTarget: 20, satTarget: 0.3, colorRange: 0.9, lumLut: [0, 0.5] }], lutAt(0)), pxl([], lutAt(0))) > 0.02 ? 1 : 0, 1);
 
-console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer, grade, Sky band, Luminance and LUT strength hold");
+// 042 stage 2b: the mask's own curves, applied after the whole photo's and
+// blended in by the group's weight. A full head's master or colour-channel curve
+// renders as the same curve on the whole photo; straight curves, or a group that
+// reaches nowhere, change nothing; a colour mask can carry them; and a curve is
+// not an offset, so it works on what the whole photo's curve left.
+const S5 = [...TONE_DEFAULT];
+const CM = [0.05, 0.4, 0.6, 0.8, 0.95], CR = [0, 0.15, 0.4, 0.7, 1], CG = [0.1, 0.3, 0.55, 0.7, 0.9], CB = [0, 0.35, 0.45, 0.85, 1];
+const cv = (m, r, g, b) => [...m, ...r, ...g, ...b];
+check("a master curve on the whole photo changes the pixel (so the case is live)", diff(pxl([], { tone: CM }), bareL) > 0.02 ? 1 : 0, 1);
+check("a full head's master curve renders as the same curve on the whole photo", diff(pxl([{ ...neutralMask(0), curves: cv(CM, S5, S5, S5) }]), pxl([], { tone: CM })), 0);
+check("a full head's red, green and blue curves render as the same curves on the whole photo", diff(pxl([{ ...neutralMask(0), curves: cv(S5, CR, CG, CB) }]), pxl([], { toneR: CR, toneG: CG, toneB: CB })), 0);
+check("all four of a full head's curves render as the same four on the whole photo", diff(pxl([{ ...neutralMask(0), curves: cv(CM, CR, CG, CB) }]), pxl([], { tone: CM, toneR: CR, toneG: CG, toneB: CB })), 0);
+check("a mask's curve works on what the whole photo's curve left", diff(pxl([{ ...neutralMask(0), curves: cv(CM, S5, S5, S5) }], { tone: CR }), pxl([], { tone: CR })) > 0.01 ? 1 : 0, 1);
+check("and it is not the whole photo's curve put in its place", diff(pxl([{ ...neutralMask(0), curves: cv(CM, S5, S5, S5) }], { tone: CR }), pxl([], { tone: CM })) > 0.005 ? 1 : 0, 1);
+check("straight curves change nothing", diff(pxl([{ ...neutralMask(0), curves: cv(S5, S5, S5, S5), brightness: 1.0001 }]), pxl([{ ...neutralMask(0), brightness: 1.0001 }])), 0);
+check("a head whose group reaches nowhere here changes nothing with curves", diff(pxl([{ ...neutralMask(0), curves: cv(CM, CR, CG, CB) }, { ...neutralMask(0), op: 1 }]), bareL), 0);
+check("a colour mask can carry curves", diff(pxl([{ ...neutralMask(3), hueTarget: 20, satTarget: 0.3, colorRange: 0.9, curves: cv(CM, CR, CG, CB) }]), bareL) > 0.02 ? 1 : 0, 1);
+check("curves of the wrong length are ignored", diff(pxl([{ ...neutralMask(0), curves: [...CM], brightness: 1.0001 }]), pxl([{ ...neutralMask(0), brightness: 1.0001 }])), 0);
+
+console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer, grade, Sky band, Luminance, LUT strength and curves hold");
 process.exit(bad ? 1 : 0);
