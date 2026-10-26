@@ -3310,6 +3310,15 @@ user-scalable=no.
   and the app already has the narrow case of it, the pinhole fill, which
   declines these only because they are larger than its cap. See
   `docs/decisions/028-sky-seen-through-a-canopy-takes-no-sky-adjustment.md`.
+  **Built on staging, 2026-10-24: Reach past branches, and it waits on the device pass.**
+  A switch on the Sky mask, off by default, dimmed while Follow the sky's colour
+  is off. After the grow settles it admits each connected patch of the sky's
+  colour the flood did not reach when the patch is small, by size alone, in
+  `admitSkyPastBranches`; Feather softens what it adds and a mask without the
+  switch renders as before. The cap is set from the largest unreached block
+  record 023 measured over an estimated canvas, and was not tuned on any frame
+  the record names. Not yet seen: what it takes on the oak frame, and whether the
+  cap lets a small object of the sky's colour in.
 - [ ] **A quick look you cannot stop, and a session that renders it all again** <!-- decision: 014 --> — reported Reported a second time 2026-09-18 from a PC on staging 2.51.2; the record carries a candidate mechanism to count against.
   **Shown as:** Stop a quick look part-way through, and get the memory back.
   from the iPad 2026-09-17. There is no way to stop a quick look building its

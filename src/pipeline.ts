@@ -981,6 +981,17 @@ export interface MaskLayer {
    *  Optional and read as ON when absent, so saved edits and undo snapshots
    *  from before it migrate by doing nothing — the same shape `op` took. */
   skyByColour?: boolean;
+  /** Sky mask (type 4) "Reach past branches" (decision 028): when on, the colour
+   *  grow also admits every small disconnected patch of the sky's colour it did
+   *  not reach, which is how sky seen between leaves is taken. It acts only
+   *  while `skyByColour` is on, because it is a step of that grow.
+   *
+   *  Optional and read as OFF when absent, so saved edits and undo snapshots
+   *  from before it migrate by doing nothing — they render exactly as before,
+   *  the opposite default from `skyByColour` on purpose (028, Rejected 2). It
+   *  rides `shapeOf` and the keep file by the spread, and a Reach or Feather
+   *  drag regenerates the mask with it still set. */
+  skyPastBranches?: boolean;
   /** CORRECTIONS TO A GENERATED SELECTION (031), in the order they were made.
    *  Sky masks (type 4) only; absent on every other type and on every mask
    *  nobody has corrected, so saved edits and undo snapshots from before this

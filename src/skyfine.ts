@@ -798,6 +798,22 @@ const FEATHER_MAX_PX = 3;
  *  a bird against the sky is orders of magnitude bigger, and filling it would
  *  be selecting an object as sky. */
 const PINHOLE_MAX_PX = 24;
+/** REACH PAST BRANCHES (decision 028): the largest disconnected patch of the
+ *  sky's colour that switch admits, as a share of the guide's pixels, so the cap
+ *  scales with the guide and is not one resolution's pixel count.
+ *
+ *  WHERE THE NUMBER COMES FROM. The only sizes of sky-coloured gaps in a crown
+ *  that the records measure are the largest blocks decision 023 found the grow
+ *  missing, 292, 406 and 430 pixels, about seventeen to twenty pixels across, on
+ *  the acceptance walk's canvas. This takes the largest of them, 430, over that
+ *  canvas's size, about 1300 thousand pixels (read off 023's own figures for
+ *  NIR_1651, where 174,292 pixels were about 13% of the frame). It was NOT tried
+ *  against a render and NOT tuned on any frame record 028 names; the canvas size
+ *  is an estimate, and the size the walk prints beside its lines replaces it if
+ *  the two differ. A cap generous enough to take every speck on an oak frame is
+ *  generous enough to take a car roof (028, Rejected 2), which is why the switch
+ *  is off by default and the cap stays small. */
+export const REACH_PAST_MAX_FRAC = 430 / (1300 * 1000);
 
 /** What the grow decides with: which pixels seeded it, where the sky's colour
  *  sits, how far from there still counts, and the test itself.
@@ -886,6 +902,59 @@ export function skyGrowGradient(guide: SkyGuide): Float32Array {
 }
 
 /**
+ * Admit the small disconnected patches of the sky's colour the flood did not
+ * reach — "Reach past branches" (decision 028), the pinhole fill generalised.
+ *
+ * @param out  the selection so far, one byte per guide pixel with 255 selected
+ *   and 0 not; changed in place.
+ * @param matches  the grow's own colour test from `skyGrowKey`, true where a
+ *   pixel is the sky's colour, so the switch asks the same question the flood did.
+ * @param w  the guide's width in pixels.
+ * @param h  the guide's height in pixels.
+ * @returns how many pixels it admitted, 0 when none qualified.
+ *
+ * What the result must satisfy: it only ever raises a byte from below 128 to
+ * 255 and never lowers one, so the contour the flood drew is untouched and only
+ * unselected pixels change. A patch is a 4-connected set of unselected pixels
+ * that each match the sky's colour, and it is admitted whole or not at all: whole
+ * when it holds no more than `max(PINHOLE_MAX_PX, REACH_PAST_MAX_FRAC * w * h)`
+ * pixels, so a hillside or a wall of the same colour, which is far larger, stays
+ * out, and a patch the pinhole fill already declined at 24 pixels or fewer can
+ * never be refused here. SIZE ALONE decides, never distance to the selection
+ * (028, Rejected 3). `growSkyByColour` is its only caller and calls it only when
+ * the reader has turned the switch on, after the pinhole fill and before the
+ * feather, so Feather softens what this admits like everything else.
+ */
+export function admitSkyPastBranches(out: Uint8Array, matches: (p: number) => boolean, w: number, h: number): number {
+  const N = w * h;
+  const cap = Math.max(PINHOLE_MAX_PX, Math.round(N * REACH_PAST_MAX_FRAC));
+  // 1 where a pixel is unselected, matches the sky's colour and has not been
+  // looked at yet; a patch is walked once and its pixels cleared as they are met.
+  const open = new Uint8Array(N);
+  for (let p = 0; p < N; p++) if (out[p] < 128 && matches(p)) open[p] = 1;
+  const queue = new Int32Array(N);
+  let admitted = 0;
+  for (let p0 = 0; p0 < N; p0++) {
+    if (!open[p0]) continue;
+    let head = 0, tail = 0;
+    open[p0] = 0;
+    queue[tail++] = p0;
+    while (head < tail) {
+      const p = queue[head++], x = p % w, y = (p / w) | 0;
+      if (x > 0 && open[p - 1]) { open[p - 1] = 0; queue[tail++] = p - 1; }
+      if (x < w - 1 && open[p + 1]) { open[p + 1] = 0; queue[tail++] = p + 1; }
+      if (y > 0 && open[p - w]) { open[p - w] = 0; queue[tail++] = p - w; }
+      if (y < h - 1 && open[p + w]) { open[p + w] = 0; queue[tail++] = p + w; }
+    }
+    if (tail <= cap) {
+      for (let i = 0; i < tail; i++) out[queue[i]] = 255;
+      admitted += tail;
+    }
+  }
+  return admitted;
+}
+
+/**
  * Grow the sky selection outward from the coarse seed, through the guide, by
  * colour AND connectivity — the reader's Sky mask reading which pixels ARE the
  * sky and not only where it is (decision 023).
@@ -898,6 +967,11 @@ export function skyGrowGradient(guide: SkyGuide): Float32Array {
  *   to FEATHER_MAX_PX. It does NOT move the colour tolerance and has not since
  *   membership became binary — the ramp it used to set was computed and never
  *   read. Selection is all-or-nothing and the softness is on the boundary.
+ * @param pastBranches  the mask's "Reach past branches" switch (028), off when
+ *   omitted: when on, after the flood and the pinhole fill have settled, every
+ *   small disconnected patch of the sky's colour is admitted as well
+ *   (`admitSkyPastBranches`), which is how sky seen between leaves is taken. Off,
+ *   the result is exactly what it was before the switch existed.
  * @returns a BrushMask at the GUIDE's size, 0..255, image-uv like the input —
  *   the same shape refineSkyMask returns, so it drops into `MaskLayer.fine`
  *   and is read by compileEdit's brush sampler and the shader's mask atlas
@@ -948,7 +1022,7 @@ export function skyGrowGradient(guide: SkyGuide): Float32Array {
  * coverage per pixel from two overlay reads, which is a real piece of work and
  * buys nothing the signature above already guarantees.
  */
-export function growSkyByColour(mask: BrushMask, guide: SkyGuide, reach = 1, feather = 0.5): BrushMask {
+export function growSkyByColour(mask: BrushMask, guide: SkyGuide, reach = 1, feather = 0.5, pastBranches = false): BrushMask {
   const W = guide.w, H = guide.h, N = W * H;
   const out = new Uint8Array(N);
   const key = skyGrowKey(mask, guide, reach);
@@ -1035,6 +1109,16 @@ export function growSkyByColour(mask: BrushMask, guide: SkyGuide, reach = 1, fea
       if (comp.length <= PINHOLE_MAX_PX) for (const p of comp) out[p] = 255;
     }
   }
+
+  // REACH PAST BRANCHES (028), when the reader has turned it on. The flood only
+  // walks through pixels JOINED to the sky, so sky seen between leaves, joined to
+  // the open sky by no sky-coloured path, is never entered at any tolerance. This
+  // is the pinhole fill at a size that fill refuses: each connected patch of the
+  // sky's colour left unselected is admitted when it is small, and left out when
+  // it is large, which is what keeps a hillside of the same colour out. Off by
+  // default and absent from every older mask, because the cap cannot tell a gap
+  // in a canopy from a small thing of the same colour (028, Rejected 2).
+  if (pastBranches) admitSkyPastBranches(out, matchesSky, W, H);
 
   // The soft edge, from the BOUNDARY rather than from colour: a separable box
   // blur whose radius comes from Feather, which is how a region mask has

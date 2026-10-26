@@ -1,5 +1,5 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
 version=101
-hash=a411f261e16d4d87
+hash=dc73f2cb0f1fc992
 # Recorded WITHOUT a version bump. The evidence the pictures did not change:
-proven=Lane 192 piece 01 (Fill by hand): rebuildFix old and new compared byte for byte on 40 random stroke lists with no tolerance, 0 differing bytes, and growSkyByColour is not touched by this patch. Recorded on the integrated tree after the three curve, luminance and shadow patches of lane 191, which moved the version.
+proven=Lane 192 piece 02 (Reach past branches): growSkyByColour of the audit commit against the lane's build, with the switch omitted and with the switch false, compared byte for byte on 12 synthetic frames, 0 differing bytes in all, so a sky mask without the switch renders exactly as before. Recorded on the integrated tree after lane 191's patches and lane 192's piece 01.

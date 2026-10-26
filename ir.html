@@ -613,6 +613,11 @@
               <label>Reach <input id="mSkyReach" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
               <button id="mSkyByColour" type="button" class="toggle" aria-pressed="true">Follow the sky&rsquo;s colour</button>
               <small id="mSkyByColourNote" class="note">On, the selection grows out of what was found into every pixel that matches the sky&rsquo;s own colour and joins it &mdash; between branches, up to each crown, and into a cloud. Turn it off for a sky whose colour you have already changed past recognising.</small>
+              <!-- REACH PAST BRANCHES (028). Off by default. It is a step of the
+                   grow above, so it is disabled while Follow is off, and the note
+                   under it says so in words as well as in the dimmed look. -->
+              <button id="mSkyPastBranches" type="button" class="toggle" aria-pressed="false" aria-describedby="mSkyPastBranchesNote">Reach past branches</button>
+              <small id="mSkyPastBranchesNote" class="note">Off, the selection stops where the sky stops joining. On, it also takes the small patches of the sky&rsquo;s colour that nothing of that colour joins to the sky &mdash; sky seen between leaves &mdash; when each is small. It works only while Follow the sky&rsquo;s colour is on, and it can take a small thing of the same colour that is not sky. Press it again to take the patches back.</small>
               <div class="mask-editor-actions">
                 <button id="mSkyFixAdd" type="button" class="toggle" aria-pressed="false">Add by hand</button>
                 <button id="mSkyFixCut" type="button" class="toggle" aria-pressed="false">Take out by hand</button>

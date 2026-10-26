@@ -1,10 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=60c8d4c065d5a851
-diffhash=128074a290d1214a
+diffhash=0adaed165f3e4878
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 06 builds record 065's chosen option, Fill by hand on the Sky mask: a stroke grows from every point it crosses into the connected pixels of similar colour and brightness, with a Tolerance control beside it, stored among the mask's hand corrections and replayed like the other two. It touches only the areas the step's Files list names: a new module under src/ (skyfill.ts), src/main.ts, src/maskstore.ts, src/pipeline.ts, ir.html, docs/ARCHITECTURE.md, NOTES.md and tools/.preview-pipeline. The stored tolerance is optional on the stroke and absent on every earlier stroke, so saved edits are unchanged. Nothing outside the Sky mask's own hand corrections is altered, and the whole-photo look values are untouched. The preview pipeline version is recorded by its own tool with its evidence line.
+# IN-SCOPE: Sequence patch 07 builds record 028's chosen option, a Reach past branches switch on the Sky mask, off by default and dimmed while Follow the sky's colour is off, which after the grow admits each small connected patch of the sky's colour the flood did not reach. It touches only the areas the step's Files list names for this work: src/main.ts, src/pipeline.ts, src/skyfine.ts, src/style.css, ir.html, docs/ARCHITECTURE.md, NOTES.md and tools/.preview-pipeline. The switch's stored field is optional and read as off when absent, so every saved sky mask renders as it did; the pictures check recorded by the preview tool shows that growSkyByColour is byte-identical with the switch omitted or false. The cap is a named constant with its source in the comment, and the record's own rule that the cap was not tuned on the named frames is kept in that comment. Nothing else in the look is changed.
 # 
 # What was judged: the approved plan's Files and step 192 text, which name these areas and this record, and the whole patch read in full. The status shows the eight staged paths and nothing else.
 # 
-# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new control's note is written in the app's existing voice and says what the control does.
+# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The two new control sentences are written in the app's existing voice and say in words what the switch does.

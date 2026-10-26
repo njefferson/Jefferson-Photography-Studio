@@ -3021,6 +3021,10 @@ button.toggletip {
 .mask-join label { display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; }
 .mask-join input { min-width: 20px; min-height: 20px; }
 .mask-editor-actions button { width: auto; padding: 6px 12px; font-size: 0.8125rem; }
+/* REACH PAST BRANCHES (028) waits on Follow the sky's colour. Dimmed AND said in
+   words (the note under it), so the state does not ride on the dimming alone, and
+   it keeps its pressed colours rather than going flat so a stored "on" still reads. */
+#mSkyPastBranches:disabled { opacity: 0.55; cursor: default; }
 
 /* Keeping sits above Format in the Export panel, separated by a rule so it
    reads as the other way of finishing rather than as an export setting. */

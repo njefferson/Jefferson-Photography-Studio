@@ -8322,6 +8322,7 @@ const mUI = {
   skyControls: $("skyControls") as HTMLElement,
   skyReach: $("mSkyReach") as HTMLInputElement,
   skyByColour: $("mSkyByColour") as HTMLButtonElement,
+  skyPastBranches: $("mSkyPastBranches") as HTMLButtonElement,
   skyStatus: $("mSkyStatus") as HTMLElement,
   fixAdd: $("mSkyFixAdd") as HTMLButtonElement,
   fixCut: $("mSkyFixCut") as HTMLButtonElement,
@@ -8908,9 +8909,13 @@ function regenerateSkyMask(m: MaskLayer) {
   // crowns are the reported defect — a rim round every object and sky missed
   // between branches — so the fine boundary is the one that has to win. The
   // composed arm's numbers are in NOTES.md for whoever revisits this.
+  //
+  // REACH PAST BRANCHES (028) is the grow's fifth argument, read only on this
+  // path and only when the reader has switched it on: the guided filter has no
+  // flood to reach past, so the switch waits (disabled) while the grow is off.
   const guide = res.found ? skyGuideFor(current) : null;
   m.fine = guide && res.mask
-    ? ((m.skyByColour ?? true) ? growSkyByColour(res.mask, guide, m.reach ?? 1, m.feather) : refineSkyMask(res.mask, guide))
+    ? ((m.skyByColour ?? true) ? growSkyByColour(res.mask, guide, m.reach ?? 1, m.feather, m.skyPastBranches === true) : refineSkyMask(res.mask, guide))
     : undefined;
   // AND THE READER'S OWN CORRECTIONS GO BACK ON TOP (031). This is the whole
   // reason they are a stroke list rather than paint: everything above just
@@ -8945,6 +8950,23 @@ function applyMaskFix(m: MaskLayer) {
   m.effFine = m.fine ? rebuildFix(m.fine, m.fix, fill) : undefined;
 }
 
+/** THE SHARE OF ITS BITMAP A SKY MASK SELECTS, from the bitmap the render reads.
+ *
+ *  Takes `m`, a mask. Returns a number from 0 to 1: the fraction of texels above
+ *  127 in the first of `effFine`, `fine`, `eff`, `brush` that exists, the same
+ *  ordering `maskWeight` uses; 0 when the mask holds no bitmap at all.
+ *
+ *  What the callers rely on: the status line and the Reach past branches toast
+ *  both describe THE SELECTION THE READER HAS, so they read it through this one
+ *  function and cannot come to disagree about which bitmap that is. */
+function skyCoverage(m: MaskLayer): number {
+  const d = (m.effFine ?? m.fine ?? m.eff ?? m.brush)?.data;
+  if (!d || !d.length) return 0;
+  let on = 0;
+  for (let i = 0; i < d.length; i++) if (d[i] > 127) on++;
+  return on / d.length;
+}
+
 /** Sky-mask status line, read straight from the generated bitmap so it is
  *  accurate per mask: coverage of texels the mask actually selects. Near-zero
  *  coverage means the heuristic found no sky — keep the label honest and point
@@ -8962,10 +8984,7 @@ function updateSkyStatus() {
   // rendered: the reader's corrections on top of the refinement on top of the
   // seed. Reading the automatic bitmap here would report a percentage that
   // does not move when a hand correction changes what is selected.
-  const d = (m.effFine ?? m.fine ?? m.eff ?? m.brush).data;
-  let on = 0;
-  for (let i = 0; i < d.length; i++) if (d[i] > 127) on++;
-  const frac = d.length ? on / d.length : 0;
+  const frac = skyCoverage(m);
   // AND HOW IT WAS FOUND, not only how much. A percentage is equally true of a
   // sky and of a playhouse — decision 029's defect was found with a harness
   // rather than by looking, because nothing in the app said anything a reader
@@ -9327,6 +9346,7 @@ function updateMaskUI() {
     if (m.type === 4) {
       mUI.skyReach.value = String(m.reach);
       mUI.skyByColour.setAttribute("aria-pressed", String(m.skyByColour ?? true));
+      syncPastBranchesUI(m);
       updateSkyStatus();
     }
     mUI.invert.setAttribute("aria-pressed", String(m.invert));
@@ -9405,10 +9425,51 @@ mUI.skyByColour.addEventListener("click", () => {
   beginMaskAdjust();
   m.skyByColour = !(m.skyByColour ?? true);
   mUI.skyByColour.setAttribute("aria-pressed", String(m.skyByColour));
+  syncPastBranchesUI(m); // Reach past branches waits on this one
   regenerateSkyMask(m);
   updateSkyStatus();
   draw();
   flushRecord(); // one press is one undo step
+});
+
+/** The Reach past branches button's state from the mask it acts on (028).
+ *
+ *  Takes `m`, the selected Sky mask. Returns nothing. It sets `aria-pressed` to
+ *  the stored switch, ON only when the field is true, and disables the button
+ *  while Follow the sky's colour is off, because the switch is a step of that
+ *  grow and does nothing without it.
+ *
+ *  What it must satisfy: the stored field is NOT cleared when the button is
+ *  disabled, so turning Follow back on restores the switch as the reader left
+ *  it, and the pressed state keeps telling the truth about what is stored. The
+ *  reason for a disabled button is in the words under it, not only in its look. */
+function syncPastBranchesUI(m: MaskLayer): void {
+  mUI.skyPastBranches.setAttribute("aria-pressed", String(m.skyPastBranches === true));
+  mUI.skyPastBranches.disabled = !(m.skyByColour ?? true);
+}
+// "Reach past branches" — the grow's flood only walks through sky-coloured pixels
+// JOINED to the sky, so sky seen between leaves is never entered. This switch
+// also admits each small disconnected patch of the sky's colour, by size alone
+// (028). Off by default and off for every older edit. It changes the SELECTION,
+// so the bitmap is rebuilt; Reach and Feather keep working over it. The toast
+// says what the press did in words, because the selection can change by less
+// than a screen shows and a press that visibly did nothing looks like a broken
+// button.
+mUI.skyPastBranches.addEventListener("click", () => {
+  const m = currentMask();
+  if (!m || m.type !== 4 || !(m.skyByColour ?? true)) return;
+  const before = skyCoverage(m);
+  beginMaskAdjust();
+  m.skyPastBranches = !(m.skyPastBranches === true);
+  syncPastBranchesUI(m);
+  regenerateSkyMask(m);
+  updateSkyStatus();
+  draw();
+  flushRecord(); // one press is one undo step
+  const after = skyCoverage(m);
+  toast(m.skyPastBranches
+    ? (after > before ? "Reach past branches is on: the small patches of sky between the leaves are added." : "Reach past branches is on: it added nothing to the selection here.")
+    : (after < before ? "Reach past branches is off: those patches are taken back." : "Reach past branches is off."), 2600);
 });
 mUI.invert.addEventListener("click", () => {
   const m = currentMask();
