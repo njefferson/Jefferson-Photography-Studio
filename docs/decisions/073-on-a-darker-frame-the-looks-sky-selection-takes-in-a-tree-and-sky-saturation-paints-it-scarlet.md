@@ -38,8 +38,14 @@ tinting lives.
 - The border method is Shen and Wang (IJARS 10(10), 2013), recorded with its
   sources in IR-SCIENCE 9o; its thresholds are a sweep over 120 values, taken here
   as quantiles of the photograph's gradient rather than the paper's fixed range.
-- Nothing yet on how the method behaves as noise rises; that is the research this
-  record needs before an option is chosen.
+- **Researched 24 October 2026 (IR-SCIENCE 9x-i): how the method behaves as noise
+  rises.** No published measurement of it was found. Shen and Wang's abstract names no
+  test under noise, and their full text answered 403. What the formulas give: for noise
+  alone, the threshold at a stated false-alarm rate is a fixed multiple of its scale
+  (the Rayleigh quantile), which is how a constant false alarm rate and LSD's a
+  contrario test set one; noise depends on brightness and on frequency (Liu and
+  co-authors, the Noise Clinic); and a gradient taken after an edge-preserving denoise
+  can carry false edges. Option 1 is written from that, and it is left open.
 
 ## Built already
 
@@ -137,10 +143,61 @@ hold is dark red now where it was scarlet.
 
 ## Options
 
-1. **Research first, then choose**: how the border method behaves as a frame's
-   noise rises, and whether measuring the gradient after the denoise, or scaling
-   the thresholds by the frame's own measured noise, keeps the border in the sky.
-   Proposed.
+1. **Researched 24 October 2026 (IR-SCIENCE 9x-i), written, and left open: let the
+   border search allow for the frame's noise.** The question was how the border
+   method behaves as a frame's noise rises, and whether measuring the gradient after
+   the denoise, or scaling the thresholds by the frame's own measured noise, keeps the
+   border in the sky. No published measurement of the method under noise was found, so
+   what follows is what the formulas and the code imply, and a measurement chooses.
+   - **What is known.** The search reads no noise estimate: its thresholds are
+     quantiles of the frame's own gradient (the 0.5 to 0.999 quantiles, 120 steps), and
+     the gradient is divided by the frame's own 95th percentile. For noise alone a
+     threshold at a stated false-alarm rate is a fixed multiple of its scale (the
+     Rayleigh quantile: 2.45 at 5 percent, 3.03 at 1, 3.72 at 0.1), which is how a
+     constant false alarm rate and LSD's a contrario test set one. The app already
+     measures a robust sigma, for the denoise, on a variance-stabilised guide where one
+     number holds at every brightness (`measuredStrength` in `src/raw/denoise.ts`).
+   - **Route A, scale the thresholds by the frame's noise.** The sweep keeps only the
+     thresholds the sky's own noise explains at a stated false-alarm rate: a multiple
+     of the sigma of the gradient as the search forms it, the multiple being the
+     Rayleigh quantile of a rate fixed before any frame is looked at, so not a number
+     fitted to frames. Costs: the gradient is of luma and not of the stabilised guide,
+     so its sigma varies with brightness unless the gradient is taken of the guide; the
+     darkest 40 percent the measurement reads is not known to be the sky on every
+     frame; and a ceiling near the sky's own scale lies far below the two thresholds the
+     record measured (0.187 and 0.334), so it would move the good frame's as well.
+   - **Route B, measure the gradient after the denoise.** The search reads the copy the
+     denoise has cleaned, at the strength the app measured. Costs: the statistics after
+     a blur are not known (LSD), an edge-preserving denoise can make false edges
+     (gradient reversal, staircasing), and the search reads the undenoised copy now, so
+     this changes what it reads and not only a threshold.
+   - **Route C, which the wording did not name: search on a copy made by a smoothing
+     and a sub-sample whose effect on white noise is known** (LSD's scale step, the
+     Noise Clinic's 2 by 2 average). The noise is smaller and its statistics are
+     known. Costs: demosaiced noise is not white, and the border is found at a coarser
+     scale; the resolution the search runs at now is to be read first.
+   - **The sources lean to A and do not choose it.** A keeps the statistics known,
+     where B and C buy a smaller noise with them.
+   - **What settles it, next, in node and with no render** (nothing was run in this
+     step). Bars are written in words before the run. First the instrument reproduces
+     the record's own figures from the app's own search module and not a rewrite of
+     it: the selection at 20.5 percent of the frame on NIR_3472 and 45.7 percent on
+     NIR_3471, and a run that cannot is measuring something else. Then, on the pair:
+     the sky's gradient noise scale by route A's method on each frame; the threshold
+     the search lands on divided by that scale; and the control that separates noise
+     from exposure, noise added in node to NIR_3472 at the scale measured on
+     NIR_3471, the search run again and the selected fraction counted. If noise is the
+     cause, the ratio is lower and the border deeper on the darker frame, and the added
+     noise gives NIR_3472 a border like NIR_3471's; if it leaves NIR_3472's border where
+     it was, noise is not the cause and the record goes back to its options. Then each
+     route in the same harness on every frame with a sky. A route that moves a frame
+     whose border is right today fails as written and is not retuned. Only a render
+     says whether a moved border still looks right, and that is the next move after
+     this one, not part of it.
+   - **Clear of** Rejected 4 (leave it) and of option 2 with the depth key's fixed
+     band. Option 2's gate stays as built and this does not touch it. It changes what
+     the selection holds on every frame, so 069's and 052's acceptance renders are
+     repeated once it moves (Rank).
 2. **Gate Sky saturation on the sky's hue as well as on saturation**, reusing the
    hue band the depth key already carries, so a tree inside the selection is not
    boosted whatever the selection does. **Chosen, and built 2026-10-13 against the

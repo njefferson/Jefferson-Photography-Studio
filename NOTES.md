@@ -2840,6 +2840,13 @@ user-scalable=no.
   unchanged, and the cloud checks on the turned frames (070) are still owed for them.
   Aerochrome's own pale blue cloud, which came back with the global saturation of 2.4, is a
   different cause and is named in the staging entry of 2026-10-17.
+  **Option 13, 24 October 2026: the white guard under the three sliders, researched and
+  written, open, not built (IR-SCIENCE 9x-ii).** The field's automatic guard is a constant
+  floor on arriving chroma, which is option 1 again; where a constant will not do, its tools
+  hand the range to the person at the picture, with a transition and the mask shown. The
+  option is that: a range the reader taps on the photograph, or, once 052's option 1 lands, a
+  Colour mask subtracted from the Sky mask. Nothing was measured. The notes under Sky depth
+  and Sky saturation still say a cloud is left as it is, which no guard makes true.
 - [ ] **The first launch after an update froze with nothing said, and every update fetches the whole app again** <!-- decision: 071 -->
   **Shown as:** After an update the start screen answers and says it is preparing the editor, and an update downloads only what changed. On some Windows PCs the editor still takes about 45 seconds to prepare after an update; the part of it that takes the time is found, and is changed next.
   Reported from the PC after v2.63.7: the start screen showed and nothing
@@ -2994,6 +3001,13 @@ user-scalable=no.
   the gate. The gate and the border search question stay for a reader who raises Sky
   saturation by hand: with the gate off the stage is again the one of the build before
   2026-10-14, and a tree the selection holds can be tripled by it.
+  **Option 1, 24 October 2026: the border search under noise, researched and written, open,
+  not built (IR-SCIENCE 9x-i).** No published measurement of the method under noise was
+  found. The formulas say a threshold for a stated false-alarm rate is a fixed multiple of the
+  noise's scale, and the app already measures a robust noise sigma for the denoise; scaling the
+  border search's thresholds by it is the route the sources lean to. A node measurement on
+  NIR_3471 and NIR_3472 with no render, bars written first, decides it, and a noise ceiling
+  may cut the good frame's threshold as well.
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
   **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
   from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
@@ -3140,6 +3154,11 @@ user-scalable=no.
   corrected: the app REPORTS the measurement in the ⓘ diagnostic as "Shadow
   light" and suggests no amount. IR-SCIENCE 9j-ii has the run and names the two
   candidates that are not more tuning — read it before touching this again.
+  **The two candidates of 9j-ii, looked up 24 October 2026 (IR-SCIENCE 9x-iii), both open
+  and neither built.** Shade with foliage in view is expected to carry a real cast, so the
+  carport may be right to read one; and the field's shadow work pairs a lit and a shaded
+  region of one material and does not take a dark band. The carport and the two camera JPEGs
+  are not in the shared set, so the first candidate's test cannot be run on its named frame.
 - [ ] **A mask keys the photograph, not the grade** <!-- decision: 032 -->
   **Shown as:** A colour selection stays on the same pixels when you change the look.
   the Colour mask keys on the colour the pixel DISPLAYS — the decode through

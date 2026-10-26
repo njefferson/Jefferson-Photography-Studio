@@ -36,6 +36,21 @@ channel swap that bounce is the red the reader is taking out by hand.
 for one illuminant. The sunlit face and the shaded face are lit by two, and
 they are further apart in the infrared than they ever are in visible light.
 
+**Researched 24 October 2026 (IR-SCIENCE 9x-iii), for the two candidates that
+9j-ii names as not more tuning.** For the first, whether a shade with foliage in
+view carries a real cast whatever is overhead: leaf reflectance rises from about 5
+percent to about 50 percent between 680 and 730 nm (Wikipedia, Red edge), and the
+light under and through leaves is far-red enriched (Wikipedia, Shade avoidance,
+which gives no numbers), so a shaded surface that sees sunlit foliage is lit by
+near-infrared-rich bounce from the side as well as from above. For the second,
+whether the population should be a pair and not a band: shadow detection and
+removal by paired regions of one material, one lit and one in shadow (Guo, Dai and
+Hoiem, CVPR 2011 and TPAMI 2012, abstract only), and colour constancy under
+several light sources by local illuminant estimates (Gijsenij, Lu and Gevers, IEEE
+TIP 2012, abstract only). Entropy-minimisation shadow removal (Finlayson and
+co-authors) was a search summary only and is not weighed. The Options below are
+written from this.
+
 ## Weighed against
 
 **IR-SCIENCE.md section 9j is this exact idea, already tried and already
@@ -111,6 +126,60 @@ numbered: an additive complement on a near-black neutral pixel clamps one
 channel to zero and leaves the others positive, which is saturation 1 by
 definition. `shadowSat` already demonstrates the asymmetry that makes grey
 shade safe by construction rather than by calibration.
+
+**Two candidates for what the measurement is taken over, looked up 24 October 2026
+(IR-SCIENCE 9x-iii), and left open.** They are the two that 9j-ii names as not more
+tuning. Neither is built and nothing was measured, and neither replaces the chosen
+option above: both answer its first half, which population is "this photograph's
+shadows". Before either, the figures that make the carport look wrong need
+measuring again, because they were taken in the space 9s corrected and the three
+frames measured again since all rose, by 1.6 to 1.7 times. The carport and the two
+camera JPEGs cannot be measured again, for the reason under the first candidate.
+
+1. **Candidate 1, the cast is real: the carport's shade is lit by the trees along
+   its apron, and "reads nothing" was the wrong test.**
+   - What the research gives: leaf reflectance rises from about 5 to about 50
+     percent between 680 and 730 nm, and the light under and through leaves is
+     far-red enriched, so a shaded surface that sees sunlit foliage is lit from the
+     side by near-infrared-rich bounce whatever roof is above it. That supports a
+     real cast in any shade with foliage in view. It gives no size, and it does not
+     say that 17.6 percent is right.
+   - What it changes: the design's acceptance, and not its arithmetic. The
+     invariants stay (chromaticity and not colour, unit luma, exact unity where it
+     cannot measure). The carport must read a cast that points at the foliage facing
+     it, and must read nothing where no foliage faces the shade.
+   - What settles it: the shade's chromaticity direction against the mean
+     chromaticity of the foliage in view of it, on a frame with roofed or walled shade
+     and foliage beside it. The frame this was named for, NIR_3406, is not in the
+     shared set (`tools/owner-images.json`), and neither are NIR_3394 and NIR_3429, so
+     it cannot be measured or rendered under the rule that only the shared photographs
+     are. A stand-in has to come from that set, and none was searched for.
+   - Clear of: the additive complement, a look constant, widening `shadowSat`, a
+     luminance-only key, taking one frame at one angle as the answer, and a third
+     round of percentile tuning. It adds no tuned number: it changes what the
+     existing reading is judged against.
+2. **Candidate 2, a pair and not a band: measure the cast between a material's lit
+   and shaded instances.**
+   - What the research gives: shadow detection by pairs of regions of one material,
+     one lit and one in shadow, where the relation inside the pair says shadow (Guo,
+     Dai and Hoiem), so a dark roof with no lit twin is not a shadow; and colour
+     constancy for several lights by local illuminant estimates and not one number
+     for the frame (Gijsenij, Lu and Gevers). The percentile band asks whether a
+     pixel is dark; a pair asks whether it has a lit twin.
+   - What it changes: the population. The unit becomes a pair, the roof stays at
+     unity because it has no twin, and the tree's shade is measured against the same
+     tree's sunlit leaves.
+   - What is not known: how the paper pairs regions was not read, and whether that
+     similarity survives a cast that moves chromaticity, the quantity being measured,
+     is open. The pairing must also be a place and not a hue band (019, in the
+     Depends above), and nothing in the app selects vegetation or a material today;
+     only the sky selection and the Colour mask exist.
+   - What settles it: reading the paper's pairing (the author's host did not resolve,
+     so it is a host to ask for), then a measurement in node on frames from the shared
+     set, with bars written in words before the run. Not before.
+   - Clear of: keying on luminance alone, a hue band as the place, and the additive
+     complement. It is a different piece of work from candidate 1, as 9j-ii says, and
+     the larger.
 
 ## Built already
 

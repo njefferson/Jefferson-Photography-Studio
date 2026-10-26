@@ -6063,3 +6063,273 @@ depth-map and enhanced-image chapters. Hosts that failed on a lookup error and w
 tried for the same documents: codesearch.debian.net, fossies.org, sources.debian.org and
 rawpedia.pixls.us. web.archive.org was refused by the fetch tool and api.github.com
 answered HTTP 403.
+
+### 9x. THREE QUESTIONS PUT TO THE LITERATURE BEFORE ANYTHING IS BUILT — THE BORDER SEARCH UNDER NOISE, A WHITE GUARD FOR SLIDERS MOVED BY HAND, AND WHAT THE SHADOW CAST IS MEASURED OVER (decisions 073, 069 and 034, 24 October 2026)
+
+**The questions.** Three decision records each name research as the next move, and
+none held it. Record 073 found the sky-border search of 9o running down into a willow
+on a frame shot 2.4 stops under, and left a pointer and not a measurement: its
+thresholds are quantiles of the frame's own gradient, so a noisier frame raises them.
+It asked how the method behaves as noise rises. Record 069 holds no standing option for
+a guard that keeps white and grey out of the three sky stages. Since 17 October the
+look no longer carries those stages, so what the record still answers for is the three
+sliders a reader moves by hand: Sky colour smoothing, Sky depth and Sky saturation,
+each at 0 on opening. Record 034's measurement of the shadow cast (9j-ii) names two
+candidates that are not more tuning, and asks that each be looked up before either is
+built.
+
+**How the sources were read, and what this section is not.** Pages and papers were
+fetched and read. "PDF pages" gives the pages read of a PDF. "Abstract only" is the
+abstract and nothing else, as Crossref or OpenAlex carries it. "Summary only" is the
+text of a web search result and nothing more, and no claim below rests on one. A host
+that did not resolve is listed under Not read. No photograph was opened, no frame was
+rendered and nothing in the app was run: each figure below is a source's, or
+arithmetic on a source's formula, or read from the app's code, and it says which. None
+is a measurement of this app on a photograph. A measurement is made only where a record
+names one, and none of the three asks for one before its research is done.
+
+#### 9x-i. The border search as noise rises (decision 073)
+
+**What the app does, read from its code.**
+
+- The search (`src/skyhorizon.ts`) sweeps 120 thresholds, the 0.5 to 0.999 quantiles of
+  the frame's own gradient, and keeps the one whose energy Jn is best (9o).
+- The gradient (`skyFields` in `src/sky.ts`) is a central difference of luma divided by
+  the frame's own 95th percentile, taken from a 3 by 3 box of taps on the undenoised
+  decode copy. No estimate of noise enters it or the sweep.
+- The app does measure noise per photograph, for the denoise alone. `measuredStrength`
+  in `src/raw/denoise.ts` takes the median absolute difference of horizontal neighbours
+  in a variance-stabilised guide over the darkest 40 percent of a sampled grid, and
+  divides by 0.954, which its comment gives as 0.6745 times the square root of 2: the
+  median size of the difference of two independent samples, in units of their sigma.
+  So the number is a robust sigma, and because the guide is stabilised the comment
+  says the same sigma holds at every brightness.
+- 9o records, from a comment in `src/sky.ts` dated 2026-07-06, that the sky's luma
+  gradient is 0.004 to 0.03 against 0.1 to 0.4 for foliage. The units the comment used
+  were not checked against the normalised gradient the search reads now.
+
+**What the literature gives.**
+
+- **The Rayleigh distribution** (Wikipedia, read). The length of a 2-D zero-mean
+  Gaussian vector with equal, independent components is Rayleigh with scale sigma:
+  survival exp(-x squared over 2 sigma squared), quantile sigma times the square root
+  of -2 ln(1 - F). So on a gradient made of noise alone, the threshold for a stated
+  false-alarm rate is a fixed multiple of sigma: 1.18 at the median, 2.45 at the 95th
+  percentile, 3.03 at the 99th, 3.72 at the 99.9th (arithmetic on that quantile).
+- **A contrario detection, LSD** (Grompone von Gioi and co-authors, Image Processing On
+  Line 2012; PDF pages 37 to 42). A detection is kept when its number of false alarms,
+  the number of tests times the tail probability under a noise-only model, is below
+  epsilon, set to 1; the detection limit then varies as the square root of minus the
+  log of epsilon. The threshold follows the noise model and no constant is fitted to
+  images. The paper's scale step is a Gaussian filter followed by a sub-sample, and it
+  records that this keeps white-noise statistics where blurring alone does not.
+- **Constant false alarm rate** (Wikipedia, read): the threshold is set from a local
+  noise estimate at a chosen false-alarm rate. **Canny edge detector** (Wikipedia,
+  read): its two thresholds are set by hand, and a wider Gaussian lowers its noise
+  sensitivity at a cost in where the edge lies.
+- **Image noise** (Wikipedia, read): photon shot noise grows as the square root of the
+  signal and read noise is a fixed floor, so signal to noise falls with exposure. By
+  arithmetic on that law, a frame 2.4 stops darker carries noise larger relative to its
+  signal by a factor of 2.3 if shot noise alone sets it (the square root of 2 to the
+  power 2.4), and by up to 5.3 if the read floor does. Record 073's two thresholds,
+  0.334 on the dark frame and 0.187 on the properly exposed one, differ by 1.8. The
+  direction agrees. The size cannot be compared, because the gradient is divided by its
+  own 95th percentile and noise moves that too.
+- **Liu, Szeliski, Kang, Zitnick and Freeman, automatic estimation and removal of noise
+  from a single image** (TPAMI 2008; PDF pages 1 to 3). The noise level depends on image
+  brightness (the noise level function); the variances of smooth segments bound the
+  noise from above; and the paper says edge-detection parameters can be set as a
+  function of the noise level.
+- **The Noise Clinic** (Lebrun, Colom and Morel, Image Processing On Line 2015; PDF
+  pages 1 to 4, 13 to 16 and 19 to 20). Noise in real images depends on the signal and
+  on the frequency. Its multiscale scheme halves the sigma of white noise at each 2 by 2
+  average and sub-sample, and it says low-frequency noise turns into high-frequency,
+  uncorrelated noise after three sub-samplings. So the Rayleigh multiple holds for the
+  gradient of white noise only. Demosaiced noise is not white, and the scale has to be
+  measured on the quantity the search uses.
+- **Bilateral filter** (Wikipedia, read): it can introduce false edges (gradient
+  reversal) and plateaus (staircasing). A gradient taken after an edge-preserving
+  denoise carries what the denoise makes of it.
+- **Foi and co-authors, Poissonian-Gaussian noise modelling and fitting for single-image
+  raw data** (IEEE TIP 2008): title, authors and venue only, Crossref carrying no
+  abstract. Nothing of its content is used.
+- **Shen and Wang 2013, the border method itself** (International Journal of Advanced
+  Robotic Systems 10(10)): abstract only, through Crossref and a search summary. More
+  than 95 percent accuracy on 1000 images, and no test under noise named. The full text
+  at journals.sagepub.com answered 403.
+- **No source found measures the Shen and Wang method, or the Ettinger method it
+  descends from (9o), as noise rises.** The question has no published answer that was
+  found. What follows is what the formulas and the code imply.
+
+**What follows, derived and not measured.**
+
+- **The pointer has a formula behind it, and not yet a mechanism.** The same scene shot
+  2.4 stops under differs in noise relative to signal, and the threshold went from 0.187
+  to 0.334. The thresholds are quantiles of a histogram that mixes the sky's noise with
+  the foliage's texture. As the signal falls the two come together, and a quantile range
+  set from the whole histogram cannot know that the gap it searches has narrowed. The
+  division by the frame's 95th percentile makes the gradient relative to a number that
+  noise also moves. And nothing in the sweep asks whether a threshold is one the sky's
+  own noise explains, which for noise alone is a fixed multiple of its scale.
+- **Where a noise ceiling would sit.** If the sky's gradient is 0.004 to 0.03 on a good
+  frame, a threshold at 2.45 to 3.72 times that scale lies near 0.01 to 0.1, below both
+  the record's thresholds, 0.187 and 0.334, which sit inside the foliage's range. A
+  ceiling at a Rayleigh quantile would therefore cut the good frame's threshold as well
+  as the dark one's. Whether the search still finds the border at the lower threshold is
+  what a measurement has to show, and if it does not, a noise ceiling fails as written
+  and is not retuned.
+- **Two routes, as the record words them, and what each costs.** Scaling the thresholds
+  by a measured noise keeps the statistics known, which a constant false alarm rate and
+  LSD both rest on. It needs a sigma for the gradient as the search forms it. The app
+  measures one on a variance-stabilised guide, where one number holds at every
+  brightness; the quantity 4c-xiv found a single per-frame number could not express was
+  a different one, a regional colour residual. Whether the darkest 40 percent the
+  measurement reads is the sky on every frame is not known: the code's comment names
+  flat sky and shadow as what it holds, and 9o records that brightness is not a usable
+  prior for where the sky is. Measuring the gradient after a denoise removes
+  the noise at the price of the statistics (blurring does not keep white-noise
+  statistics, LSD) and of false edges (the bilateral), and it changes what the search
+  reads, since it takes the undenoised decode copy now.
+- **A third route the wording does not name.** Search on a copy made by a smoothing and
+  a sub-sample whose effect on white noise is known: LSD's scale step, or the Noise
+  Clinic's 2 by 2 average, which halves the sigma of white noise. The noise is smaller
+  and its statistics are still known, at the cost that demosaiced noise is not white
+  and the border is found at a coarser scale. The resolution the search runs at was not
+  read for this section.
+- **The sources lean to the first route and do not choose it.** The lean is from the
+  sources, and no frame was measured.
+
+**What would measure it.** A node run with no render, on the shared pair of the 2.4-stop
+scene, with its bars written in words before the run. It is set out in record 073's
+option 1.
+
+#### 9x-ii. A white guard for sliders moved by hand (decision 069)
+
+**The question.** What does the field do to keep white and grey out of a colour
+adjustment, and which of it is not already one of record 069's rejected options?
+
+**What the field does.**
+
+- **RawTherapee, vibrance** (`rtengine/ipvibrance.cc`, the repository's source on
+  raw.githubusercontent.com, read). Only pixels whose Lab chroma is above 6 are
+  adjusted: a hard floor on the chroma a pixel arrives with, so grey and white are never
+  touched. Pastel and saturated tones are told apart at a threshold the user sets, with
+  a transition, and a skin-tone weight is applied. No comment in the file explains the
+  6. That is the shape of 019's gate on Sky saturation, a ramp on the pixel's own
+  saturation, and of 069's option 1 extended to three stages: both are a constant.
+- **darktable, parametric masks** (the user manual, read). Each channel carries a range
+  with a trapezoidal opacity, full between the inner markers and falling in proportion
+  across the transition to nothing at the outer ones. A picker sets a channel's range from a point or a
+  dragged rectangle on the picture itself, and a toggle shows the mask over the picture.
+  The guard is the person's, set on the photograph with its effect in view.
+- **The Noise Clinic** (above). Chroma noise, like luma noise, depends on brightness and
+  frequency, so "arrives without colour" has a noise-sized chroma that differs across a
+  frame. That agrees with 4c-xiii and 4c-xiv, where a fixed floor and a per-frame
+  number both failed here.
+- **Lightroom and Photoshop vibrance, and Lightroom's range masks**: summaries only.
+  **Kodak's sky-detection patent** (US 6,504,951): summary only, and the patent hosts
+  did not resolve. Nothing below rests on either.
+
+**What that says for record 069.**
+
+- The field's automatic white guard is a constant floor on arriving chroma, which is
+  what 069 built and rejected as its option 1 and what 019 ships for one stage. Where a
+  constant will not do, the field hands the range to the person at the picture, with a
+  transition and the selection shown.
+- Every option 069 rejected is an automatic rule. The three sliders open at 0 and are
+  reached by hand with the photograph in view, and a person looking at the frame can
+  tell a speckle from a cloud, which the record found no rule on a pixel can.
+- A range is a colour and not a place. Thin cloud arrives as saturated as the pale clear
+  sky beside it (0.269 against 0.268 on NIR_1661, the record's trace on the shared
+  raws), so a range picked on thin cloud also takes the clear sky of that colour. Only
+  a place separates the two, which is what the mask system supplies, and 019 settled
+  that a hue band is not one.
+- The notes under Sky depth and Sky saturation in `ir.html` say a cloud is left exactly
+  as it was and stays as grey as it is. Record 069 records that Sky depth can darken a
+  cloud inside a blue texel and that the stages tinted cloud when they were built under
+  the look. Until a guard stands, those two notes describe a guard that does not exist.
+
+#### 9x-iii. What the shadow cast is measured over (decision 034)
+
+**The two candidates of 9j-ii, each looked up.**
+
+**First: the carport's shade may carry a real cast, so "this frame must read nothing"
+is the wrong test.**
+
+- **Red edge** (Wikipedia, read): leaf reflectance rises from about 5 percent to about
+  50 percent between 680 and 730 nm. **Shade avoidance** (Wikipedia, read): the light
+  under and through leaves is far-red enriched; the page gives no numbers. Together they
+  say that light reaching a shaded surface from sunlit foliage beside it is rich in the
+  near infrared, by the same physics that makes foliage the brightest thing in an
+  infrared frame, and a roof overhead does not stop light arriving from the side. The
+  physics supports a real cast in any shade with foliage in view. It gives no size, and
+  it does not say that the 17.6 percent is the right one.
+- **What the 17.6 percent rests on.** It was measured in the space 9s corrected, and the
+  carport and the two camera JPEGs were not measured again afterwards. The three frames
+  that were measured again all rose, by factors of 1.6 to 1.7 (the oak from 7.7 to 12.4
+  percent, and two others from 2.6 to 4.4 and from 8.9 to 14.6). Nothing says the carport
+  falls.
+- **The test it needs** is not "reads nothing" but "points at the foliage that faces it,
+  and reads nothing where no foliage does": the shade's chromaticity direction against
+  the mean chromaticity of the foliage in view of it. The frames 9j-ii names for it,
+  NIR_3406, NIR_3394 and NIR_3429, are not in the shared set (`tools/owner-images.json`),
+  so under the rule that only the shared photographs are measured or rendered, the test
+  cannot be run on its own frames.
+
+**Second: the populations are wrong, and a selection rather than a percentile would
+answer.**
+
+- **Guo, Dai and Hoiem, shadow detection and removal with paired regions** (CVPR 2011
+  and TPAMI 2012; abstract paraphrase through OpenAlex, read). The unit is a pair of
+  regions of one material, one lit and one in shadow, and the relation inside the pair
+  is what says shadow. A dark region with no lit twin is not a shadow, which is the
+  question a percentile band cannot ask and the one the roof and the tree turn on. How
+  the paper pairs regions was not read, because the author's host did not resolve, and
+  whether that similarity survives a cast that moves chromaticity, the very quantity
+  being measured, is open. That circularity is this section's remark and not the
+  paper's.
+- **Gijsenij, Lu and Gevers, colour constancy for multiple light sources** (IEEE TIP
+  2012; abstract through OpenAlex, read). The illuminant is estimated on local patches
+  and the patch estimates are combined, so the correction can differ between regions lit
+  differently. That is the shape for two lights, the sun and the foliage bounce: a local
+  estimate and not one number for the frame, which is what `grayWorldWB` is.
+- **Finlayson and co-authors, entropy minimisation for shadow removal**: summary only.
+  Not weighed.
+- **What the app has to select with.** The sky selection (`skyMaskFor`) and the Colour
+  mask exist, and nothing selects vegetation or a material. 019 settled that a hue band
+  is not a place, and 9j-ii that the darkest band that is not sky takes in a branch and
+  the inside of a treeline.
+
+**Sources.** Addresses are the hosts that served the page, (read) meaning the page as
+fetched. Wikipedia, en.wikipedia.org: Rayleigh_distribution, Image_noise,
+Constant_false_alarm_rate, Canny_edge_detector, Bilateral_filter, Red_edge and
+Shade_avoidance. Image Processing On Line, www.ipol.im: the LSD article and the Noise
+Clinic article, as PDFs. Liu and co-authors, TPAMI 2008, as a PDF (the host it was read
+from is not recorded in the note this section was written from). Crossref,
+api.crossref.org: the abstract records of Shen and Wang and of Foi and co-authors.
+OpenAlex, api.openalex.org: the abstract records of Guo, Dai and Hoiem and of Gijsenij,
+Lu and Gevers. RawTherapee's source, raw.githubusercontent.com, `rtengine/ipvibrance.cc`.
+darktable's user manual, docs.darktable.org, the parametric masks page. The app's own
+`src/skyhorizon.ts`, `src/sky.ts`, `src/raw/denoise.ts` and `docs/ARCHITECTURE.md`.
+
+**Not read.**
+
+- **Hosts that did not resolve** (a lookup error, not a refusal): goobi.tib.eu,
+  www.eecis.udel.edu, ntrs.nasa.gov, ipol.im (the bare host; www.ipol.im resolves and
+  served the two papers above), mcolom.perso.math.cnrs.fr, patents.justia.com,
+  image-ppubs.uspto.gov, dhoiem.cs.illinois.edu, staff.fnwi.uva.nl, mlanthology.org and
+  www.dare.uva.nl. Each was tried for a paper or page named above or an author's copy of
+  it; the note this section was written from records the failure and not the document
+  sought for each, so what each would have held is given by what the host is: the Noise
+  Clinic author's page (a full text and code), the paired-regions author's page (the
+  paper's method for pairing regions), the Amsterdam group's two hosts (the
+  multiple-light-sources paper in full), the two patent hosts (US 6,504,951 in full), and
+  a conference-paper index. Three hosts, goobi.tib.eu, www.eecis.udel.edu and
+  ntrs.nasa.gov, are not tied to a document by that note.
+- **Refused:** journals.sagepub.com answered 403, so Shen and Wang stays read by its
+  abstract.
+- **Not fetched on purpose**, because the reply guard refuses them until they are named:
+  dechifro.org, web.archive.org, rawpedia.rawtherapee.com, and rawpedia.pixls.us, which a
+  search listed as a mirror of the refused one. A source found only there is a host to
+  ask for. The one that would add here is RawPedia's documentation of the vibrance tool,
+  which could say what the chroma floor of 6 in the code is for; the code does not.

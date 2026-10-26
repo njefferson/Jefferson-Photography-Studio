@@ -324,6 +324,15 @@ film decides what the guard keeps: a cloud comes out white.
     service.
   - **Never left:** www.aidanguerraastrophotography.com did not resolve.
   - What those hosts hold is not in this record.
+- **Researched 24 October 2026 (IR-SCIENCE 9x-ii): a white guard for the sliders a
+  reader moves by hand.** RawTherapee's vibrance adjusts only pixels whose Lab chroma is
+  above a constant, 6 (the source file read; no comment in it explains the value), which
+  is the shape of 019's gate and of option 1. darktable's parametric masks hand the
+  range to the person: a picker sets a channel's range from a point or a dragged
+  rectangle on the picture, the opacity is a trapezoid with a transition, and the mask
+  can be shown over the picture (the manual read). Lightroom and Photoshop vibrance,
+  Lightroom's range masks and Kodak's sky-detection patent were search summaries only,
+  and nothing here rests on them. Option 13 is written from this, and it is left open.
 
 ## Built already
 
@@ -393,6 +402,8 @@ What exists that this item will use, so a second one does not get written
 - distinct-from 061 — both are about NIR_3461's steel under the look, and they are different pixels: 061's steel arrives red from the foliage band and its discs are sky moved toward red wire, neither of which this guard reaches; this record's are the steel and cloud that arrive without colour.
 - touches 087 — option 12's discs and dots are measured with 087's route under them, and the map's taps are weighted by the selection 087 changes.
 - touches 088 — option 12 is the estimator the coarse map and the full map are both built with.
+- touches 050 — option 13's second form keeps a colour pick to where it was made with 050's proximity limit on the Colour mask, which is the place a colour range lacks; a change to that limit changes what the guard can do.
+- touches 048 — option 13's second form subtracts a Colour mask from the Sky mask with the joins 048 added.
 
 ## Found on the device, 2026-09-26
 
@@ -731,6 +742,68 @@ What exists that this item will use, so a second one does not get written
       patches on NIR_3460's left pylon, where it was one blue (087's margin, and the
       map's estimate over a lattice, which the render does not separate). The coarse
       map's halo at NIR_1651's crown is what 088 measures.
+
+13. **RESEARCHED 24 October 2026 (IR-SCIENCE 9x-ii), written, open and not built: the
+    white guard under the three sliders is a range the reader fixes on the picture,
+    with a transition and the selection shown.** Since 2026-10-17 the look carries none
+    of the three stages, so the record answers now for the reader who raises Sky colour
+    smoothing, Sky depth or Sky saturation by hand, and it held no standing option for
+    that reader. Every option above is an automatic rule, and each failed or was
+    rejected.
+    - **What the field does.** The automatic white guard in the field is a constant floor
+      on the chroma a pixel arrives with: RawTherapee's vibrance adjusts only pixels
+      above Lab chroma 6, with a threshold the user sets and a transition for the rest.
+      That is 019's gate and this record's option 1 again. Where a constant will not do,
+      darktable hands the range to the person at the picture: a picker sets a channel's
+      range from a point or a dragged rectangle on the photograph, the opacity is a
+      trapezoid with a transition, and the mask can be shown over the picture.
+    - **What it is here.** One guard weight, 1 minus a trapezoid on the pixel's colour as
+      the stages receive it, multiplies all three stages, so nothing the reader picked is
+      smoothed, darkened or boosted. The reader taps the cloud, wall or steel to keep.
+      The guard's range is the robust spread (the median and the median absolute
+      deviation) of the arriving values in a small patch round the tap, a feather slider
+      sets the transition, and an overlay shows what the guard holds. Nothing is fixed in
+      advance but the structure; every width is the reader's, set on this photograph. The
+      tap is a tap and the feather a slider, so nothing needs a drag. It is per-shot and
+      corrective, like white balance, and does not ride a saved look.
+    - **A second form that needs no new control, once 052's option 1 is built.** The
+      stages then read the reader's Sky mask, and a Colour mask picked on the cloud and
+      subtracted from it, with the joins 048 added, would be the guard; 050's proximity
+      limit on the Colour mask would keep the pick to where it was made, which is the
+      place a colour range lacks. Whether the stages would read the joined matte or the
+      Sky mask's own is not settled by 052's record, and that is the question this form
+      raises. Nothing is built for it, and it waits on both of those.
+    - **Why it is not a rejected option again.** Not 1: it does compare each pixel with a
+      range, as 1 did with a gate, and the difference is who set the range. 1 was a rule
+      fixed in advance for every photograph and its failure was silent; this is a range the
+      reader fixed on this one, with the result shown. Not 2: no constant is set by looking
+      at these frames. Not 3: the selection keeps the cloud. Not 4: no infrared axis.
+      Not 5: all three stages are guarded. Not 6: the notes under the sliders say what is
+      not true (below). Not 7, 8 or 12: the map is not touched. Not 9 or 11: no gate on
+      arriving saturation fixed in advance and no model of the clear sky. Not 10: the
+      white point is not touched.
+    - **What it does not settle.** A range is a colour and not a place. Thin cloud
+      arrives as saturated as the pale clear sky beside it (0.269 against 0.268 on
+      NIR_1661), so a range picked on thin cloud takes the clear sky of that colour too;
+      only a place separates them, which is the second form's job. 013's speckle: a pale
+      dot inside the picked range is spared, and the overlay is what shows it. A reader
+      who never taps gets no guard, which is how it is today.
+    - **What it costs.** A control under three sliders, an overlay, and a field on the
+      photograph's edits: the five places a field goes (`cloneParams`, `applySnapshot`,
+      `syncFromUI`, `syncToUI` and the input-listener array in `src/main.ts`), the
+      shader and `compileEdit` computing the same weight (`tools/agreement-walk.mjs`
+      holds them), and a saved edit without it rendering as before. A new control owes
+      the accessibility standing rule: a real button, a label, a 44 px target, a state
+      change announced, text and rails at contrast in both themes.
+    - **Until a guard stands**, the notes under Sky depth and Sky saturation in `ir.html`
+      say a cloud is left exactly as it was and stays as grey as it is, while this record
+      says the stages can tint and darken a cloud. That is a found defect with a known
+      fix, not an option: the two notes are to say what the stages do. It is reported as
+      found in the 24 October research, for the plan that next builds in this area, and
+      no wording is chosen here.
+    - **What would decide it, when it is built:** the cloud checks this record still owes
+      on the turned frames, NIR_1651 and NIR_1644, rendered with the guard on and off
+      while the sliders are moved, whole frame and at 1:1, and opened.
 
 ## Rejected
 
