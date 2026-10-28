@@ -178,8 +178,9 @@ hold is dark red now where it was scarlet.
      scale; the resolution the search runs at now is to be read first.
    - **The sources lean to A and do not choose it.** A keeps the statistics known,
      where B and C buy a smaller noise with them.
-   - **What settles it, next, in node and with no render** (nothing was run in this
-     step). Bars are written in words before the run. First the instrument reproduces
+   - **What settles it, next, in node and with no render** (nothing was run in the
+     step that wrote this; the run of 26 October 2026 is below the bars). Bars are
+     written in words before the run. First the instrument reproduces
      the record's own figures from the app's own search module and not a rewrite of
      it: the selection at 20.5 percent of the frame on NIR_3472 and 45.7 percent on
      NIR_3471, and a run that cannot is measuring something else. Then, on the pair:
@@ -194,6 +195,101 @@ hold is dark red now where it was scarlet.
      whose border is right today fails as written and is not retuned. Only a render
      says whether a moved border still looks right, and that is the next move after
      this one, not part of it.
+   - **The bars, written in words on 26 October 2026, before the run.** The run
+     takes the pair (NIR_3471 and NIR_3472) from the owner's shared raws, decoded by
+     the app's own decoder and read as the look reads them: the app's own small copy
+     of the photograph (`prepareSkySource`), the gray-world balance taken from that
+     copy the way `buildSkySelectionFrom` takes it, and the app's own `skyPrepare`
+     and `buildSkyMask` on it. The frame's noise is read two ways. One is the app's
+     own `measuredStrength` on the full frame, turned back into the noise it aimed at
+     (the strength squared times the range scale, over the at-open ratio). The other
+     is the search's own gradient floor: the grid cut into blocks 8 cells square, the
+     blocks ranked by their median gradient, the flattest quarter pooled, and the
+     median of that pool. The floor is this reading's stand-in for route A's sigma
+     and is not a published estimator. Only the gradient the search forms is
+     compared with a threshold, so the floor carries the bars; the app's figure is
+     printed beside it.
+     1. **The instrument is trusted only if all three hold on both frames.** The
+        coarse bitmap rebuilt from the pieces above equals, byte for byte, the one
+        `buildSkySelectionFrom` returns. The refined selection's share of the frame,
+        counted as the cells at or above half weight or as the mean weight (the same
+        count on both frames), is within 2 points of this record's 45.7 percent on
+        NIR_3471 and 20.5 percent on NIR_3472. And the threshold the search chose is
+        within 0.01 of this record's 0.334 on NIR_3471 and 0.187 on NIR_3472. If any
+        fails, no reading about noise is drawn, option 1 stays open, and the record
+        says what the instrument read instead.
+     2. **The pair differs in noise:** the floor of NIR_3471 is at least 1.5 times
+        NIR_3472's. If it is not, noise is not what the pair differs by in the
+        search's gradient, and option 1's premise is unsupported on this pair.
+     3. **The record's own prediction:** the chosen threshold divided by the floor is
+        lower on NIR_3471 than on NIR_3472.
+     4. **The control.** Noise is added to NIR_3472's small copy, Gaussian,
+        independent for each cell and each channel, the same absolute size in all
+        three camera channels, sized by bisection until the floor is within 3 percent
+        of NIR_3471's, with three seeds. Two things are read from each run: the share
+        of the refined selection (cells at or above half weight) and the mean border
+        depth as a fraction of the frame's depth, each as the median of the three
+        seeds. The gap is NIR_3471's value less NIR_3472's untouched value. Noise IS
+        the cause if both medians have moved at least half the gap. Noise is NOT the
+        cause if both have moved less than a quarter of it. Anything else is partly,
+        and option 1 stays open.
+     5. **Route A's ceiling, arithmetic only.** The false-alarm rate is fixed here, at
+        1 percent, before any reading and never tuned: the ceiling is the Rayleigh
+        quantile, 3.035 times the Rayleigh scale, and the scale is the floor over
+        1.1774 (the Rayleigh median over its scale). Each frame's ceiling and its
+        chosen threshold over that ceiling are printed. A ceiling below NIR_3472's
+        chosen threshold means route A as written moves the frame whose border is
+        right today, so it fails as written and is not retuned.
+     **What each reading decides.** Bar 1 failing leaves everything open and unread.
+     Bar 2 failing leaves it open. With bars 1 and 2 holding, "not the cause" moves
+     option 1 to Rejected for this pair and the record goes back to its options;
+     "the cause", with bar 3 holding, chooses the direction and leaves the route to
+     the next move, which runs each route on every frame with a sky and then renders.
+     The run draws numbers about where the border lands and nothing about how a
+     photograph looks; whether a moved border still looks right is for a render.
+   - **The run, 26 October 2026, in node with no render: its instrument did not
+     reproduce this record's figures, so it decided nothing.** The pair was read as
+     the bars said, through the app's own decoder, the lens flat the app lays on a
+     raw before anything is measured (both frames are the 50-250 at 50 mm and f/5,
+     whose shipped profile brings colour and no brightness curve), the app's small
+     copy, its border search and its selection. The coarse bitmap rebuilt from those
+     pieces equalled the app's own, byte for byte, on both frames. A first run laid
+     no lens flat and read the same to within 1.2 points of share and 0.006 of
+     threshold; it was repeated with the flat because the app lays it first, and the
+     bars were not touched. What the head reads:
+     - **NIR_3471:** threshold 0.342 (this record: 0.334); refined selection 49.4
+       percent of the frame at or above half weight and 48.7 as mean weight (this
+       record: 45.7).
+     - **NIR_3472:** threshold 0.234 (this record: 0.187); refined selection 36.0
+       percent at or above half weight and 35.6 as mean weight (this record: 20.5).
+     **Bar 1 failed.** NIR_3471 sits 0.008 and 3.7 points from the record, inside
+     the threshold bar and outside the share bar; NIR_3472 sits 0.047 and 15.5
+     points away, outside both. The written bars say what follows and it is done: no
+     reading about noise is drawn, the control (bar 4) was not run, and option 1
+     stays open and unread. **Printed and not read, because the instrument failed:**
+     the gradient floor is 0.0141 on NIR_3471 and 0.0152 on NIR_3472 (bar 2's ratio,
+     0.92 against 1.5), the app's own measured noise 0.0037 and 0.0060 (a ratio of
+     0.61), the chosen threshold over the floor 24.3 and 15.4, and route A's 1
+     percent ceiling 0.036 and 0.039, which the chosen thresholds exceed by 9.4 and
+     6.0 times.
+     **Why the instrument and this record differ, as a candidate and not a
+     finding.** This record's figures are of 26 September. The commit log between
+     then and the head holds five changes to the decode of a Nikon raw that could
+     reach these two files: the lens correction at full strength on every photo (30
+     September), 12-bit shadows kept (1 October), the brightest highlights kept with
+     highlight recovery starting where the sensor really clips (1 October), the
+     autofocus-pixel stripe every 12 rows removed (2 October) and noise reduction
+     measured the way the sensor makes grain (2 October). Which of them reaches
+     these files, if any does, was not tried one at a time, which would need the 26
+     September source decoded beside the head's, and that was not done. What is
+     measured is the gap: at the head the two selections are 13.4 points apart where
+     this record has them 25.2 apart.
+     **What is next, and it is not part of this run.** This record's figures are
+     dated, so the next run takes the pair's figures at the head as the ones to
+     reproduce, writes new bars for them before it runs, and decides first whether
+     the darker frame still takes in the willow at the head, which only a render
+     says. The script that made this run lived in a session's scratch folder and goes
+     with it; `tools/sky-probe.mjs` is the place a script like it belongs.
    - **Clear of** Rejected 4 (leave it) and of option 2 with the depth key's fixed
      band. Option 2's gate stays as built and this does not touch it. It changes what
      the selection holds on every frame, so 069's and 052's acceptance renders are

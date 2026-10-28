@@ -3017,8 +3017,11 @@ user-scalable=no.
   found. The formulas say a threshold for a stated false-alarm rate is a fixed multiple of the
   noise's scale, and the app already measures a robust noise sigma for the denoise; scaling the
   border search's thresholds by it is the route the sources lean to. A node measurement on
-  NIR_3471 and NIR_3472 with no render, bars written first, decides it, and a noise ceiling
-  may cut the good frame's threshold as well.
+  NIR_3471 and NIR_3472 with no render, bars written first, was run on 26 October 2026 and
+  decided nothing: its instrument did not reproduce the record's figures at the head (the
+  refined selection reads 49.4 and 36.0 percent where the record has 45.7 and 20.5), so no
+  reading about noise was drawn and option 1 stays open. The next run starts from the head's
+  own figures, with new bars written first.
 - [ ] **Aerochrome is the right colour and comes out splotchy** <!-- decision: 013 --> — reported
   **Shown as:** Aerochrome comes out smooth instead of breaking into hard-edged patches.
   from the iPad 2026-09-17 with two frames, on the look that shipped the same day:
