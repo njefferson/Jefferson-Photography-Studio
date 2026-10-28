@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=496304b0da9fe762
-diffhash=83b815decc430209
+diffhash=45ed3db2e8140788
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 05 of step 208 changes two files: NOTES.md, a line of the border-search entry saying the node run of 26 October was made and decided nothing because its instrument did not reproduce the record's figures, and record 073, where the bars written before that run, its readings and its open next step are written down. It is documentation of a measurement already taken on the approved plan's step 201 to 208 path, and it changes no code and no reader-facing behaviour. The patch was read whole, and it touches no file outside the plan's Files list.
+# IN-SCOPE: Sequence patch 06 of step 208 changes three files: src/main.ts (the oval's and the box's handles get an invisible 44 px disc that takes the press, cut back where neighbours or the turn knob crowd it), src/style.css (the rules that let the disc take the press while the drawn handle stays as it was) and docs/ARCHITECTURE.md (one line count). It is the finger-target work on the Masks tab that the approved sequence carries, with the drawn handles unchanged in look. The patch was read whole, and it touches no file outside the plan's Files list.

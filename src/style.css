@@ -2946,6 +2946,14 @@ button.toggletip {
 #maskOverlay .mask-shape { fill: rgba(120, 200, 255, 0.06); stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-line { stroke: rgba(130, 205, 255, 0.9); stroke-width: 1.5; stroke-dasharray: 6 4; }
 #maskOverlay .mask-handle { fill: rgba(12, 12, 16, 0.72); stroke: #82cdff; stroke-width: 2; pointer-events: auto; cursor: grab; touch-action: none; }
+/* THE OVAL'S AND THE BOX'S HANDLES TAKE A 44 PX TARGET (050). The drawn handle stays
+   the 18 px circle it was, with the same dark fill and light ring, so what it says in
+   grayscale and in both themes is unchanged; an invisible disc over it, 44 px across
+   when its neighbours leave the room, takes the finger, as the turn grip's disc and the
+   crop corners' do. The drawn circle then lets the press through to the disc. The
+   gradient's two ends keep the drawn circle as their target. */
+#maskOverlay .mask-handle-touch .mask-handle { pointer-events: none; }
+#maskOverlay .mask-handle-hit { fill: transparent; pointer-events: auto; cursor: grab; touch-action: none; }
 /* A radial mask's turn grip (027): a filled knob carrying a turning arrow, on a
    dashed stem past the first axis's handle — the sticker's rotate knob in
    shape, so SHAPE and POSITION say which control turns, not colour (the knob is

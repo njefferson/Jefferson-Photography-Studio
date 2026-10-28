@@ -8352,7 +8352,10 @@ const mUI = {
   colorNearNote: $("mColorNearNote") as HTMLElement,
 };
 let selectedMask = -1;
-let overlayHandles: { el: SVGCircleElement; role: string }[] = [];
+// `el` is the drawn circle; `hit` is the invisible disc over it that takes the finger
+// (the oval's and the box's handles) or null (the gradient's ends, whose drawn circle
+// is their target).
+let overlayHandles: { el: SVGCircleElement; hit: SVGCircleElement | null; role: string }[] = [];
 let overlayShape: SVGPolygonElement | SVGLineElement | null = null;
 // A radial mask's turn grip (027): the dashed stem from the first axis's handle
 // and the knob at its end. Rebuilt with the rest of the overlay, never mid-drag.
@@ -9608,13 +9611,71 @@ function handleColorMaskPick(clientX: number, clientY: number): boolean {
   return true; // stays armed — tap again to re-pick, banner/button to exit
 }
 
-function mkHandle(role: string): SVGCircleElement {
+/** The radius of the invisible disc over a handle of the oval or the box: 44 px
+ *  across, the target this app is held to, and the same disc the turn grip carries. */
+const HANDLE_HIT_R = 22;
+/** The radius of the drawn handle, and the least a disc is cut to when its
+ *  neighbours crowd it, so a handle is never harder to hit than it was. */
+const HANDLE_DRAWN_R = 9;
+
+/**
+ * Build one handle of the mask overlay.
+ * @param role  what dragging it does ("center", "rx", "ry", "start", "end"), the
+ *   name `attachHandleDrag` moves the mask's geometry by.
+ * @param touch  true for the oval's and the box's handles, which get a 44 px
+ *   target; false for the gradient's two ends, whose drawn circle is the target.
+ * @returns a group holding the drawn circle (18 px across, as it has always been)
+ *   and, when `touch`, the invisible disc over it; the pair is entered in
+ *   `overlayHandles` for `positionMaskOverlay` to place.
+ * What the result must satisfy: the press, the drag and the release are taken by
+ *   the disc when there is one and by the drawn circle when there is not, through
+ *   one `attachHandleDrag`, so one drag is one undo step on either.
+ */
+function mkHandle(role: string, touch = false): SVGGElement {
+  const g = document.createElementNS(SVGNS, "g");
   const c = document.createElementNS(SVGNS, "circle");
-  c.setAttribute("r", "9");
+  c.setAttribute("r", String(HANDLE_DRAWN_R));
   c.setAttribute("class", "mask-handle");
-  attachHandleDrag(c, role);
-  overlayHandles.push({ el: c, role });
-  return c;
+  let hit: SVGCircleElement | null = null;
+  if (touch) {
+    hit = document.createElementNS(SVGNS, "circle");
+    hit.setAttribute("r", String(HANDLE_HIT_R));
+    hit.setAttribute("class", "mask-handle-hit");
+    g.setAttribute("class", "mask-handle-touch");
+    g.append(c, hit);
+  } else {
+    g.append(c);
+  }
+  attachHandleDrag(hit ?? c, role);
+  overlayHandles.push({ el: c, hit, role });
+  return g;
+}
+
+/**
+ * Cut the discs over the handles so they stay apart.
+ * @param pts  the screen position of each handle that has a disc, in pixels.
+ * @param knob  the screen position of the turn knob, whose own disc is
+ *   HANDLE_HIT_R across, or null when the mask has none.
+ * @returns each disc's radius: HANDLE_HIT_R, cut so that it reaches no further
+ *   than half the way to the nearest other handle and no nearer than the knob's
+ *   disc, and never below HANDLE_DRAWN_R.
+ * What the result must satisfy: for any two handles the two radii sum to at most
+ *   the distance between them, and each handle's radius plus the knob's is at most
+ *   its distance from the knob, except where that would take a radius under
+ *   HANDLE_DRAWN_R, which is where the drawn circles themselves overlap. That is
+ *   what keeps all three handles of a small oval or box separately grabbable
+ *   once each is 44 px wide where there is room. Pure; `positionMaskOverlay` is
+ *   its only caller.
+ */
+function handleDiscRadii(pts: [number, number][], knob: [number, number] | null): number[] {
+  return pts.map(([x, y], i) => {
+    let r = HANDLE_HIT_R;
+    for (let j = 0; j < pts.length; j++) {
+      if (j !== i) r = Math.min(r, Math.hypot(pts[j][0] - x, pts[j][1] - y) / 2);
+    }
+    if (knob) r = Math.min(r, Math.hypot(knob[0] - x, knob[1] - y) - HANDLE_HIT_R);
+    return Math.max(HANDLE_DRAWN_R, r);
+  });
 }
 
 /** IS THE MASKS TAB ACTUALLY IN FRONT OF THE READER — asked once, answered in
@@ -9691,7 +9752,7 @@ function renderMaskOverlay() {
   if (m.type === 0) {
     overlayShape = document.createElementNS(SVGNS, "polygon");
     overlayShape.setAttribute("class", "mask-shape");
-    kids.push(overlayShape, mkHandle("center"), mkHandle("rx"), mkHandle("ry"));
+    kids.push(overlayShape, mkHandle("center", true), mkHandle("rx", true), mkHandle("ry", true));
     overlayTurn = mkTurnGrip();
     kids.push(overlayTurn.stem, overlayTurn.grip);
   } else if (m.type === 5) {
@@ -9700,7 +9761,7 @@ function renderMaskOverlay() {
     // handler that sizes an oval sizes it with. No turn grip: a box does not turn.
     overlayShape = document.createElementNS(SVGNS, "polygon");
     overlayShape.setAttribute("class", "mask-shape");
-    kids.push(overlayShape, mkHandle("center"), mkHandle("rx"), mkHandle("ry"));
+    kids.push(overlayShape, mkHandle("center", true), mkHandle("rx", true), mkHandle("ry", true));
   } else {
     overlayShape = document.createElementNS(SVGNS, "line");
     overlayShape.setAttribute("class", "mask-line");
@@ -9723,6 +9784,7 @@ function positionMaskOverlay() {
   // A turned oval's edge and handles come from the same function its weight
   // does (027), so the outline is where the selection ends at every angle.
   const asp = maskAspect();
+  let turnKnobAt: [number, number] | null = null; // where the turn knob sits, for the discs over the handles to keep clear of
   if (m.type === 0 && overlayShape) {
     const pts: string[] = [];
     for (let a = 0; a <= 48; a++) {
@@ -9741,6 +9803,7 @@ function positionMaskOverlay() {
       const ul = Math.hypot(ux, uy);
       if (ul > 1e-6) { ux /= ul; uy /= ul; } else { ux = 1; uy = 0; }
       const kx = hx + ux * TURN_STEM_PX, ky = hy + uy * TURN_STEM_PX;
+      turnKnobAt = [kx, ky];
       overlayTurn.stem.setAttribute("x1", hx.toFixed(1));
       overlayTurn.stem.setAttribute("y1", hy.toFixed(1));
       overlayTurn.stem.setAttribute("x2", kx.toFixed(1));
@@ -9768,6 +9831,7 @@ function positionMaskOverlay() {
     overlayShape.setAttribute("x2", String(x1));
     overlayShape.setAttribute("y2", String(y1));
   }
+  const discs: { hit: SVGCircleElement; x: number; y: number }[] = [];
   for (const h of overlayHandles) {
     let u = m.cx, v = m.cy;
     if (m.type === 5) {
@@ -9781,7 +9845,17 @@ function positionMaskOverlay() {
     const [x, y] = loc(u, v);
     h.el.setAttribute("cx", String(x));
     h.el.setAttribute("cy", String(y));
+    if (h.hit) {
+      h.hit.setAttribute("cx", String(x));
+      h.hit.setAttribute("cy", String(y));
+      discs.push({ hit: h.hit, x, y });
+    }
   }
+  // THE DISCS STAY APART (050): each is 44 px across where its neighbours and the
+  // turn knob leave the room, and is cut back where they do not, so a small oval or
+  // box keeps its three handles separately grabbable.
+  const radii = handleDiscRadii(discs.map((d): [number, number] => [d.x, d.y]), turnKnobAt);
+  discs.forEach((d, i) => d.hit.setAttribute("r", radii[i].toFixed(1)));
 }
 
 function attachHandleDrag(el: SVGCircleElement, role: string) {
@@ -9831,8 +9905,10 @@ function attachHandleDrag(el: SVGCircleElement, role: string) {
 // make it. Decision 027 rejects the outline-drag and the panel-only routes. ---
 
 /** How far past the first axis's handle the turn knob sits, in screen pixels:
- *  far enough that the knob's 44 px target clears that handle's own. */
-const TURN_STEM_PX = 40;
+ *  far enough that the knob's 44 px target clears that handle's own. Both are
+ *  44 px across now (HANDLE_HIT_R each side), which is why this is 44 and was 40
+ *  when the handle's target was its drawn 18. */
+const TURN_STEM_PX = 44;
 /** The coarse step the grip settles on, in degrees as shown, and how close the
  *  finger has to come to one for it to settle: 15 is Lightroom's snap, and 3
  *  either side is wide enough to land on without precision and narrow enough
