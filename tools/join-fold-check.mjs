@@ -37,10 +37,16 @@
 // left, blended in by the group's weight. And a mask's own Shadow colour, an
 // offset on the amount taken out, added to the term a saved aim leaves.
 //
+// And decision 102's white balance (the last section): the Temperature and Tint sliders read the
+// three gains on Adobe's scale through a camera profile, so the SDK's arithmetic, the profiles and
+// the rule that picks one are held BOTH WAYS here — a white through gains and back, gains through
+// a white and back, the grid move — with no ground-truth pair (there is no Lightroom DNG among the
+// shared photographs) and with stand-in matrices already in src/color.ts in place of any profile.
+//
 // Runs on every commit and needs no browser. Bundled with esbuild so it checks
 // the functions the app ships rather than a copy of them.
 import { build } from "esbuild";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -51,10 +57,19 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = mkdtempSync(join(tmpdir(), "joinfold-"));
 const entry = join(dir, "entry.ts");
-writeFileSync(entry, `export { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT } from ${JSON.stringify(join(repo, "src/pipeline.ts"))};`);
+writeFileSync(entry, [
+  `export { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT, cloneParams } from ${JSON.stringify(join(repo, "src/pipeline.ts"))};`,
+  // 102: the white balance on Adobe's scale through a camera profile: the SDK's arithmetic, the profiles, and the store that reads and moves it on the gain track.
+  `export { SDK_TABLE, KELVIN_MIN, KELVIN_MAX, TINT_MIN, TINT_MAX, xyToTempTint, tempTintToXy, illuminantToTemperature, normalizeColorMatrix, makeColourSpec, gainsToWhite, whiteToGains } from ${JSON.stringify(join(repo, "src/kelvin.ts"))};`,
+  `export { cameraKey, profileProblem, readProfileFile, photoCamera, choicesFor, chooseProfile, renderedChoice, keepProfiles, loadedFor, forgetProfile, lastChoice, rememberChoice } from ${JSON.stringify(join(repo, "src/camprofile.ts"))};`,
+  `export { readBalance, moveBalance, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR } from ${JSON.stringify(join(repo, "src/balancestore.ts"))};`,
+  `export { WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS } from ${JSON.stringify(join(repo, "src/decode.ts"))};`,
+  `export { trackPos, trackVal } from ${JSON.stringify(join(repo, "src/tile.ts"))};`,
+  `export { NIKON_Z50_COLOR_MATRIX, NIKON_D5300_COLOR_MATRIX } from ${JSON.stringify(join(repo, "src/color.ts"))};`,
+].join("\n"));
 const out = join(dir, "bundle.mjs");
 await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
-const { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT } = await import(pathToFileURL(out).href);
+const { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT, cloneParams, SDK_TABLE, KELVIN_MIN, KELVIN_MAX, TINT_MIN, TINT_MAX, xyToTempTint, tempTintToXy, illuminantToTemperature, normalizeColorMatrix, makeColourSpec, gainsToWhite, whiteToGains, cameraKey, profileProblem, readProfileFile, photoCamera, choicesFor, chooseProfile, renderedChoice, keepProfiles, loadedFor, forgetProfile, lastChoice, rememberChoice, readBalance, moveBalance, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS, trackPos, trackVal, NIKON_Z50_COLOR_MATRIX, NIKON_D5300_COLOR_MATRIX } = await import(pathToFileURL(out).href);
 
 let bad = 0;
 const near = (a, b) => Math.abs(a - b) < 1e-9;
@@ -204,5 +219,236 @@ check("a saved aim still scales the whole photo's amount, here full", diff(pxh([
 check("a saved aim on a mask that reaches nowhere here still takes the whole photo's amount away", diff(pxh([{ ...neutralMask(0), aims: AIM_SHADOW_BIT, cx: 0.0, cy: 0.0, rx: 0.05, ry: 0.05 }], { shadowSat: 0.5 }), bareH), 0);
 check("an offset is added to the term a saved aim leaves", diff(pxh([{ ...neutralMask(0), aims: AIM_SHADOW_BIT, shadow: 0.25 }], { shadowSat: 0.5 }), pxh([], { shadowSat: 0.75 })), 0);
 
-console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, and a mask's own mixer, grade, Sky band, Luminance, LUT strength, curves and Shadow colour hold");
+// ═══ 102 · THE WHITE BALANCE ON ADOBE'S SCALE, THROUGH A CAMERA PROFILE (record 102) ═══════════════════════════════════════════════════
+// The Temperature and Tint sliders read the three gains as a temperature in kelvin and a tint through a camera profile's colour matrices
+// (src/kelvin.ts, which is Adobe's DNG SDK), pick the profile a photograph is read through (src/camprofile.ts), and move the gains on the
+// gain track (src/balancestore.ts). Nothing else asserts any of it on every commit, so this section holds the mapping BOTH WAYS, with a
+// bar for each reading, and holds the rules that choose the profile. Pure functions, no browser.
+//
+// WHAT IT CANNOT HOLD, said plainly. There are NO GROUND-TRUTH PAIRS: step 206 found no DNG among the shared test photographs, so no
+// file here has a Lightroom Temperature and Tint beside an embedded profile, and the section is held to the SDK's own points instead
+// (the table's row, the standard whites as the SDK reads them, a round trip). The two Nikon Z 50 profile files this was built against are
+// NOT in the repository (their terms are not settled), so the dual-calibration cases use two matrices that src/color.ts already holds, as a
+// STAND-IN pair; the real profiles were checked by a scratch proof against an independent port of the same functions, and that reading is in
+// the step's report and in IR-SCIENCE.md section 3. Run with a planted wrong table row, which the known-point reading refused before it was
+// trusted.
+{
+  const within = (name, got, bar) => {
+    const ok = Number.isFinite(got) && got <= bar;
+    if (!ok) bad++;
+    console.log(`${ok ? "ok  " : "FAIL"}  ${name}: ${Number.isFinite(got) ? got.toFixed(4) : got} (bar ${bar})`);
+  };
+  const isTrue = (name, cond) => { if (!cond) bad++; console.log(`${cond ? "ok  " : "FAIL"}  ${name}`); };
+
+  // THE SCALE IS ADOBE'S: the schema's four numbers, and the table exactly as the SDK prints it (a "correction" of one row is the thing to refuse).
+  isTrue("Adobe's scale: 2000 to 50000 kelvin and minus 150 to 150 tint", KELVIN_MIN === 2000 && KELVIN_MAX === 50000 && TINT_MIN === -150 && TINT_MAX === 150);
+  isTrue("the SDK's table has 31 rows and its 325 mired row carries u of 0.24702 as printed", SDK_TABLE.length === 31 && SDK_TABLE[19][0] === 325 && SDK_TABLE[19][1] === 0.24702);
+  // THE SDK'S KNOWN POINTS. The 200 mired row's own point is 5000 K on the locus; the standard whites read as the SDK's own functions read them (the values step 206's independent port printed).
+  {
+    const row = SDK_TABLE[14], den = row[1] - 4 * row[2] + 2;
+    const a = xyToTempTint((1.5 * row[1]) / den, row[2] / den);
+    within("the table's own 200 mired row reads 5000 K: miss in kelvin", Math.abs(a.kelvin - 5000), 1);
+    within("the table's own 200 mired row sits on the locus: tint", Math.abs(a.tint), 0.05);
+    const xy = tempTintToXy(5000, 50), back = xyToTempTint(xy.x, xy.y);
+    within("a tint of 50 at 5000 K turned into an xy reads back: miss in tint", Math.abs(back.tint - 50), 0.05);
+    within("a tint of 50 at 5000 K turned into an xy reads back: miss in kelvin", Math.abs(back.kelvin - 5000), 1);
+    const STD = { "Standard light A": [0.4476, 0.4074, 2854.9, -0.06], D50: [0.3457, 0.3585, 5000.7, 9.56], D55: [0.3324, 0.3474, 5502.3, 9.99], D65: [0.3127, 0.329, 6503.7, 9.77], D75: [0.299, 0.3149, 7506.4, 9.75] };
+    for (const [nm, [x, y, k, t]] of Object.entries(STD)) {
+      const r = xyToTempTint(x, y);
+      within(`${nm} reads ${k} K as the SDK reads it: miss in kelvin`, Math.abs(r.kelvin - k), 1);
+      within(`${nm} reads a tint of ${t} as the SDK reads it: miss`, Math.abs(r.tint - t), 0.1);
+    }
+    within("D65 reads a daylight white, 6504 K: miss in kelvin", Math.abs(xyToTempTint(0.3127, 0.329).kelvin - 6504), 1);
+    const cool = tempTintToXy(1500, 0), coolBack = xyToTempTint(cool.x, cool.y);
+    isTrue("a white cooler than the table's last row reads at 1667 K, as the SDK does (no locus is computed below the table)", Math.abs(coolBack.kelvin - 1666.7) < 1);
+  }
+  // THE COLOUR SPEC follows the SDK's constructor: one matrix at 5000 K when there is no second, an illuminant the SDK does not list, or two equal temperatures; otherwise the cooler calibration first.
+  {
+    isTrue("the SDK's temperatures for the illuminant codes: A 2850, D50 5000, D65 6500, an unlisted code 0", illuminantToTemperature(17) === 2850 && illuminantToTemperature(23) === 5000 && illuminantToTemperature(21) === 6500 && illuminantToTemperature(99) === 0 && illuminantToTemperature(undefined) === 0);
+    const one = makeColourSpec(NIKON_Z50_COLOR_MATRIX, undefined, null, undefined);
+    isTrue("a profile with one matrix is one matrix at 5000 K", !!one && one.t1 === 5000 && one.t2 === 5000 && one.cm1.every((v, i) => v === one.cm2[i]));
+    const dual = makeColourSpec(NIKON_Z50_COLOR_MATRIX, 17, NIKON_D5300_COLOR_MATRIX, 21);
+    const flip = makeColourSpec(NIKON_D5300_COLOR_MATRIX, 21, NIKON_Z50_COLOR_MATRIX, 17);
+    isTrue("two calibrations are read cooler first, whichever way round the file lists them", !!dual && !!flip && dual.t1 === 2850 && dual.t2 === 6500 && flip.t1 === 2850 && flip.t2 === 6500 && dual.cm1.every((v, i) => v === flip.cm1[i]) && dual.cm2.every((v, i) => v === flip.cm2[i]));
+    const odd = makeColourSpec(NIKON_Z50_COLOR_MATRIX, 99, NIKON_D5300_COLOR_MATRIX, 21);
+    isTrue("an illuminant the SDK does not list makes the profile one matrix at 5000 K", !!odd && odd.t1 === 5000 && odd.t2 === 5000);
+    isTrue("a matrix of eight numbers, and one of zeros, make no spec", makeColourSpec(NIKON_Z50_COLOR_MATRIX.slice(0, 8), 17, null, undefined) === null && makeColourSpec([0, 0, 0, 0, 0, 0, 0, 0, 0], 17, null, undefined) === null);
+    const big = NIKON_Z50_COLOR_MATRIX.map((v) => v * 2);
+    isTrue("a colour matrix whose D50 coordinate is far from 1 is scaled back before it is blended, and rounded to four places", normalizeColorMatrix(big).every((v, i) => Math.abs(v - normalizeColorMatrix(NIKON_Z50_COLOR_MATRIX)[i]) < 2e-4) && normalizeColorMatrix(big).every((v) => Math.abs(v * 10000 - Math.round(v * 10000)) < 1e-6));
+  }
+  // THE MAPPING BOTH WAYS, on three stand-in specs: a white through gains and back, and gains through a white and back. The pair of
+  // calibrations is the stock Z 50 matrix and the same matrix with its columns scaled 0.9, 1 and 1.1, an ordinary size of difference between
+  // a tungsten and a daylight calibration of one camera (the two Z 50 profiles read for record 102 differ by tens of percent); a pair of
+  // two different cameras' matrices is not a profile, and the blend between them has more than one self-consistent white.
+  {
+    const warmCal = NIKON_Z50_COLOR_MATRIX.map((v, i) => v * [0.9, 1, 1.1][i % 3]);
+    const SPECS = [
+      ["one matrix (the Z 50's stock)", makeColourSpec(NIKON_Z50_COLOR_MATRIX, undefined, null, undefined)],
+      ["two calibrations, cooler first (stand-in pair)", makeColourSpec(NIKON_Z50_COLOR_MATRIX, 17, warmCal, 21)],
+      ["two calibrations, listed the other way round", makeColourSpec(warmCal, 21, NIKON_Z50_COLOR_MATRIX, 17)],
+    ];
+    for (const [name, spec] of SPECS) {
+      let dm = 0, dt = 0, n = 0, ratio = 0;
+      for (let k = KELVIN_MIN; k <= KELVIN_MAX; k *= 1.1) for (const tint of [-60, -30, 0, 30, 60]) {
+        const g = whiteToGains(spec, k, tint);
+        // The SDK pins a chromaticity inside the real ones (x plus y under 1) and a camera channel at a thousandth, so a white outside them is
+        // not reproduced; the tint range is where the SDK's isotherms are one-to-one with the plane near the locus.
+        const xy = tempTintToXy(k, tint);
+        if (!g || xy.x + xy.y > 0.99 || Math.min(...g) / Math.max(...g) < 0.002) continue;
+        const w = gainsToWhite(spec, g);
+        if (!w) continue;
+        n++; dm = Math.max(dm, Math.abs(w.mired - 1e6 / k)); dt = Math.max(dt, Math.abs(w.tint - tint));
+        const u = Math.min(...g), g0 = g.map((x) => x / u);
+        const g2 = whiteToGains(spec, w.kelvin, w.tint), u2 = Math.min(...g2), gb = g2.map((x) => x / u2);
+        ratio = Math.max(ratio, ...gb.map((x, i) => Math.abs(x - g0[i]) / g0[i]));
+      }
+      isTrue(`${name}: ${n} whites across 2000 K to 50000 K had gains`, n >= 40);
+      within(`${name}: a white through gains and back, miss in mired`, dm, 0.1);
+      within(`${name}: a white through gains and back, miss in tint`, dt, 0.1);
+      // Record 102 measured 0.008 percent at worst on 32 raws through the two real profiles; this reads the whole of Adobe's scale, edges
+      // included, and measures 0.011 percent there (the edge whites are the ones the SDK's pins reach), so the bar is 0.02 percent.
+      within(`${name}: gains through a white and back, miss as a fraction of a gain`, ratio, 2e-4);
+    }
+    // The blend between the two calibrations is the white's own temperature, linear in mired: the first matrix alone at the cool end, the second alone at the warm end, a share between.
+    const [, dualSpec] = SPECS[1];
+    const wt = (k) => gainsToWhite(dualSpec, whiteToGains(dualSpec, k, 0)).weight;
+    isTrue("the first calibration's share is 1 at 2000 K, between 0 and 1 at 4000 K, and 0 at 9000 K", wt(2000) === 1 && wt(4000) > 0 && wt(4000) < 1 && wt(9000) === 0);
+    // WHICH WAY IS WHICH, the claim the sliders' captions make: right is warmer (red up against blue), and right is more magenta (green down).
+    const [, z50] = SPECS[0];
+    const cool = whiteToGains(z50, 3000, 0), warm = whiteToGains(z50, 8000, 0);
+    isTrue("a warmer temperature gives more red against blue", warm[0] / warm[2] > cool[0] / cool[2]);
+    const green = whiteToGains(z50, 5000, -40), magenta = whiteToGains(z50, 5000, 40);
+    isTrue("a more positive tint gives a smaller green gain against red and blue", magenta[1] / Math.sqrt(magenta[0] * magenta[2]) < green[1] / Math.sqrt(green[0] * green[2]));
+    const sr = renderedChoice();
+    within("gains of 1, 1 and 1 on a photograph the camera developed read as its own white, 6504 K: miss in kelvin", Math.abs(gainsToWhite(sr.spec, [1, 1, 1]).kelvin - 6504), 5);
+    // THE GRID. A move lands on whole track positions with the start's sum, and reads back within the grid's own resolution.
+    const posOf = (g) => Math.round(trackPos(g, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS));
+    const snap = (g) => trackVal(posOf(g), WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS);
+    const from = [1, 1.884, 3.033].map(snap), sum0 = from.reduce((s, g) => s + posOf(g), 0);
+    for (const [name, spec] of SPECS) {
+      let dm = 0, dt = 0, drift = 0, none = 0, n = 0;
+      for (let k = 3000; k <= 12000; k += 1000) for (let tint = -60; tint <= 60; tint += 20) {
+        const want = { mired: 1e6 / k, tint };
+        const to = moveBalance(want, from, spec);
+        n++;
+        if (!to) { none++; continue; }
+        const r = readBalance(to, spec);
+        dm = Math.max(dm, Math.abs(r.mired - want.mired)); dt = Math.max(dt, Math.abs(r.tint - want.tint));
+        drift = Math.max(drift, Math.abs(to.reduce((s, g) => s + posOf(g), 0) - sum0));
+      }
+      isTrue(`${name}: the grid move found gains for every one of ${n} whites from 3000 K to 12000 K (${none} had none)`, none === 0);
+      within(`${name}: a move then a read, miss in mired`, dm, 3);
+      within(`${name}: a move then a read, miss in tint`, dt, 3);
+      within(`${name}: a move leaves the sum of the three track positions where it was: largest drift`, drift, 0);
+    }
+  }
+  // THE PAGE AS SERVED CARRIES THE SLIDERS' ENDS the store holds: four numbers in two places, held to each other here.
+  {
+    const html = readFileSync(join(repo, "ir.html"), "utf8");
+    const range = (id) => { const m = new RegExp(`<input id="${id}" type="range" min="(-?\\d+)" max="(-?\\d+)"`).exec(html); return m ? [Number(m[1]), Number(m[2])] : null; };
+    const t = range("balT"), ti = range("balTi");
+    isTrue(`ir.html's Temperature slider runs ${t ? t.join(" to ") : "nowhere"}, the store's ${-TEMPERATURE_MIRED_FAR} to ${-TEMPERATURE_MIRED_NEAR}`, !!t && t[0] === -TEMPERATURE_MIRED_FAR && t[1] === -TEMPERATURE_MIRED_NEAR);
+    isTrue(`ir.html's Tint slider runs ${ti ? ti.join(" to ") : "nowhere"}, Adobe's ${TINT_MIN} to ${TINT_MAX}`, !!ti && ti[0] === TINT_MIN && ti[1] === TINT_MAX);
+    isTrue("the thumb's ends are Adobe's: 500 mired is 2000 K and 20 mired is 50000 K", TEMPERATURE_MIRED_FAR === 1e6 / KELVIN_MIN && TEMPERATURE_MIRED_NEAR === 1e6 / KELVIN_MAX);
+  }
+  // THE PROFILES: reading one from a file's tags, the store, the list a photograph offers and the rule that picks one. The files are built here
+  // from the stand-in matrices; no real profile is held.
+  {
+    const mem = new Map();
+    globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); }, removeItem: (k) => { mem.delete(k); } };
+    /** A small TIFF-shaped file of the listed tags, in the byte order a profile uses. Each tag is [number, "ascii" | "short" | "srational", value or values]. */
+    const tiffBytes = (tags) => {
+      const sorted = tags.slice().sort((a, b) => a[0] - b[0]);
+      const ifdSize = 2 + sorted.length * 12 + 4;
+      const body = Buffer.alloc(ifdSize);
+      body.writeUInt16LE(sorted.length, 0);
+      const extra = [];
+      let at = 8 + ifdSize;
+      sorted.forEach(([tag, type, values], i) => {
+        let data, t;
+        if (type === "ascii") { data = Buffer.from(values + "\0", "latin1"); t = 2; }
+        else if (type === "short") { data = Buffer.alloc(values.length * 2); values.forEach((v, k) => data.writeUInt16LE(v, k * 2)); t = 3; }
+        else { data = Buffer.alloc(values.length * 8); values.forEach((v, k) => { data.writeInt32LE(Math.round(v * 10000), k * 8); data.writeInt32LE(10000, k * 8 + 4); }); t = 10; }
+        const e = 2 + i * 12;
+        body.writeUInt16LE(tag, e); body.writeUInt16LE(t, e + 2); body.writeUInt32LE(type === "ascii" ? data.length : values.length, e + 4);
+        if (data.length <= 4) data.copy(body, e + 8); else { body.writeUInt32LE(at, e + 8); extra.push(data); at += data.length; }
+      });
+      const head = Buffer.alloc(8);
+      head.write("II", 0, "latin1"); head.writeUInt16LE(17234, 2); head.writeUInt32LE(8, 4);
+      return new Uint8Array(Buffer.concat([head, body, ...extra]));
+    };
+    const profileFile = (o = {}) => tiffBytes([
+      ...(o.camera === null ? [] : [[50708, "ascii", o.camera ?? "Test Camera One"]]),
+      ...(o.noMatrix ? [] : [[50721, "srational", o.cm1 ?? NIKON_Z50_COLOR_MATRIX]]),
+      [50722, "srational", o.cm2 ?? NIKON_D5300_COLOR_MATRIX], [50778, "short", [17]], [50779, "short", [21]],
+      ...(o.name === null ? [] : [[50936, "ascii", o.name ?? "Test profile"]]),
+    ]);
+    const got = readProfileFile(profileFile(), "fallback");
+    isTrue("a profile file reads as the camera it names, its own name, and both matrices and illuminants", "profile" in got && got.profile.camera === "Test Camera One" && got.profile.name === "Test profile" && got.profile.cm1.every((v, i) => Math.abs(v - NIKON_Z50_COLOR_MATRIX[i]) < 1e-4) && got.profile.cm2.every((v, i) => Math.abs(v - NIKON_D5300_COLOR_MATRIX[i]) < 1e-4) && got.profile.ill1 === 17 && got.profile.ill2 === 21 && profileProblem(got.profile) === null);
+    const unnamed = readProfileFile(profileFile({ name: null }), "the file's name");
+    isTrue("a profile that names itself nothing takes the file's name", "profile" in unnamed && unnamed.profile.name === "the file's name");
+    isTrue("a file that names no camera, one with no colour matrix, a cut-short one, plain text and an oversized one are each refused in words", [readProfileFile(profileFile({ camera: null }), "x"), readProfileFile(profileFile({ noMatrix: true }), "x"), readProfileFile(profileFile().slice(0, 60), "x"), readProfileFile(new Uint8Array(Buffer.from("this is not a camera profile, just some plain text")), "x"), readProfileFile(new Uint8Array(2 * 1024 * 1024 + 1), "x")].every((r) => "problem" in r && r.problem.length > 20));
+    isTrue("a stored profile that fails the check is refused: no name, a short matrix, a code out of range", [{ name: "", camera: "A", cm1: NIKON_Z50_COLOR_MATRIX }, { name: "N", camera: "A", cm1: [1, 2, 3] }, { name: "N", camera: "A", cm1: NIKON_Z50_COLOR_MATRIX, ill1: 999 }].every((p) => profileProblem(p) !== null) && profileProblem({ name: "N", camera: "A", cm1: NIKON_Z50_COLOR_MATRIX, cm2: null, ill1: null, ill2: null }) === null);
+    isTrue("a camera's two spellings meet and two bodies do not: NIKON Z 50 and Nikon Z 50, but not a Z 50_2", cameraKey("NIKON Z 50") === "nikonz50" && cameraKey("NIKON Z 50") === cameraKey("Nikon Z 50") && cameraKey("NIKON Z 50_2") !== cameraKey("NIKON Z 50") && cameraKey(undefined) === "");
+    // What a file says about its camera.
+    const nef = photoCamera(true, tiffBytes([[272, "ascii", "NIKON Z 50"]]));
+    isTrue("a NEF names no profile: its stock matrix is the model's, and its key is the model's", nef.embedded === null && !!nef.stock && /Nikon Z 50/.test(nef.stock.name) && nef.keys.length === 1 && nef.keys[0] === "nikonz50");
+    const d5300 = photoCamera(true, tiffBytes([[272, "ascii", "NIKON D5300"]]));
+    isTrue("a D5300 NEF takes the D5300's own matrix, not the Z 50's", !!d5300.stock && /D5300/.test(d5300.stock.name) && Math.abs(d5300.stock.spec.cm1[0] - normalizeColorMatrix(NIKON_D5300_COLOR_MATRIX)[0]) < 1e-9);
+    const z6 = photoCamera(true, tiffBytes([[272, "ascii", "NIKON Z 6"]]));
+    isTrue("a body the app holds no matrix for is said to be read through the Z 50's, in the name", !!z6.stock && /Z 50/.test(z6.stock.name) && /holds no matrix for NIKON Z 6/.test(z6.stock.words));
+    const dngBytes = (model, unique, name) => tiffBytes([[272, "ascii", model], [50708, "ascii", unique], [50721, "srational", NIKON_Z50_COLOR_MATRIX], [50722, "srational", NIKON_D5300_COLOR_MATRIX], [50778, "short", [17]], [50779, "short", [21]], ...(name ? [[50936, "ascii", name]] : [])]);
+    const dng = photoCamera(true, dngBytes("NIKON Z 50", "Nikon Z 50", "Infrared Temp -100"));
+    isTrue("a DNG embeds its own profile, by the name it carries, and also offers the stock matrix for a body the app knows", !!dng.embedded && dng.embedded.name === "Infrared Temp -100" && !!dng.stock && dng.keys.length === 1);
+    const other = photoCamera(true, dngBytes("Canon EOS R6", "Canon EOS R6", null));
+    isTrue("a DNG from another body embeds its matrices (named as the file's own) and offers no stock matrix", !!other.embedded && other.embedded.name === "This file's own colour matrix" && other.stock === null && other.keys.length === 1 && other.keys[0] === "canoneosr6");
+    const developed = photoCamera(false, dngBytes("NIKON Z 50", "Nikon Z 50", null));
+    isTrue("a photograph the camera developed has no embedded profile and no stock matrix", developed.embedded === null && developed.stock === null && developed.isRaw === false);
+    isTrue("garbage bytes and no bytes never throw, and still name a stock matrix", !!photoCamera(true, new Uint8Array(40)).stock && !!photoCamera(true, undefined).stock);
+    // The list a photograph offers, and the rule that picks one.
+    const loaded = (name, key = "nikonz50", cam = "Nikon Z 50") => ({ name, camera: cam, cm1: NIKON_Z50_COLOR_MATRIX.slice(), ill1: 17, cm2: NIKON_D5300_COLOR_MATRIX.slice(), ill2: 21, key, made: "" });
+    const L100 = loaded("Infrared Temp -100"), L50 = loaded("Infrared Temp -50");
+    const tokens = (cs) => cs.map((c) => c.token).join("|");
+    isTrue("a DNG offers its own profile, then each loaded one, then the stock matrix", tokens(choicesFor(dng, [L50, L100])) === "embedded|loaded:Infrared Temp -50|loaded:Infrared Temp -100|stock");
+    isTrue("a NEF offers each loaded profile and the stock matrix; a developed file offers the one rendered reading", tokens(choicesFor(nef, [L100])) === "loaded:Infrared Temp -100|stock" && tokens(choicesFor(developed, [L100])) === "rendered");
+    const pick = (cam, ls, saved, held, last) => chooseProfile(choicesFor(cam, ls), saved, held, last)?.token;
+    isTrue("with both of the pack's profiles loaded and nothing else deciding, the -100 is chosen", pick(nef, [L50, L100], undefined, null, null) === "loaded:Infrared Temp -100");
+    isTrue("with only the -50 loaded it is chosen; with none loaded the stock matrix is", pick(nef, [L50], undefined, null, null) === "loaded:Infrared Temp -50" && pick(nef, [], undefined, null, null) === "stock");
+    isTrue("the profile a file embeds is chosen before a loaded one", pick(dng, [L100], undefined, null, null) === "embedded");
+    isTrue("the reader's last switch for the camera beats the file's own profile, and a held balance's choice beats the last switch", pick(dng, [L100], undefined, null, "loaded:Infrared Temp -100") === "loaded:Infrared Temp -100" && pick(dng, [L100, L50], undefined, "loaded:Infrared Temp -50", "loaded:Infrared Temp -100") === "loaded:Infrared Temp -50");
+    isTrue("the choice saved with the photograph beats every other rule", pick(dng, [L100, L50], "stock", "loaded:Infrared Temp -50", "loaded:Infrared Temp -100") === "stock");
+    isTrue("a choice that names nothing available now is passed over to the next rule, never an error", pick(nef, [L100], "loaded:Gone", "loaded:Also gone", "embedded") === "loaded:Infrared Temp -100");
+    isTrue("nothing to choose from gives null", chooseProfile([], undefined, null, null) === null);
+    // The store: kept under the camera it names, offered only for that camera, replaced by name, forgotten, and honest when the device refuses.
+    const mk = (camera, name, cm1) => ({ camera, name, cm1: cm1 ?? NIKON_Z50_COLOR_MATRIX.slice(), ill1: 17, cm2: NIKON_D5300_COLOR_MATRIX.slice(), ill2: 21 });
+    const kept = keepProfiles([mk("Camera One", "P1"), mk("Camera One", "P2"), mk("Camera Two", "P1")]);
+    isTrue("three profiles are kept, two for one camera and one for another", kept.stored === 3 && !kept.refused && loadedFor(["cameraone"]).map((p) => p.name).join("|") === "P1|P2" && loadedFor(["cameratwo"]).length === 1 && loadedFor(["nobody"]).length === 0 && loadedFor([]).length === 0);
+    keepProfiles([mk("Camera One", "P1", NIKON_D5300_COLOR_MATRIX.slice())]);
+    isTrue("a profile of the same camera and name is replaced, and comes first", loadedFor(["cameraone"]).length === 2 && loadedFor(["cameraone"])[0].name === "P1" && Math.abs(loadedFor(["cameraone"])[0].cm1[0] - NIKON_D5300_COLOR_MATRIX[0]) < 1e-9);
+    isTrue("a loaded profile is forgotten once, and not twice", forgetProfile("cameraone", "P2") && !forgetProfile("cameraone", "P2") && loadedFor(["cameraone"]).length === 1);
+    rememberChoice(["cameraone", "alias"], "loaded:P1");
+    isTrue("the last switch is remembered for the camera under each of its keys, and not for another camera", lastChoice(["alias"]) === "loaded:P1" && lastChoice(["cameratwo"]) === null && lastChoice([]) === null);
+    const was = globalThis.localStorage.setItem;
+    globalThis.localStorage.setItem = () => { throw new Error("quota"); };
+    const refused = keepProfiles([mk("Camera One", "P9")]);
+    globalThis.localStorage.setItem = was;
+    isTrue("a device that refuses to keep a profile is told so, and the list is as it was", refused.refused === true && refused.stored === 0 && loadedFor(["cameraone"]).every((p) => p.name !== "P9"));
+  }
+  // THE FIELD, in the five places an EditParams field goes. cloneParams keeps it and lets absent stay absent; applySnapshot reads it from the snapshot directly (a merge with the live params
+  // would hand a photograph that was never switched the last photograph's switch); a fresh open clears it; the input handler is the switch's own; and no look or stamp carries it.
+  {
+    const withP = cloneParams({ ...plain(), profile: "embedded" }), without = cloneParams(plain());
+    isTrue("cloneParams keeps the profile switch and lets an unswitched edit stay without the key", withP.profile === "embedded" && !("profile" in without));
+    const main = readFileSync(join(repo, "src/main.ts"), "utf8");
+    const pipe = readFileSync(join(repo, "src/pipeline.ts"), "utf8");
+    isTrue("EditParams declares the field as optional text, so an edit stored before it existed has none", /\n  profile\?: string;/.test(pipe));
+    isTrue("applySnapshot reads the switch from the snapshot itself and clears it when the snapshot has none", /if \(s\.params\.profile\) params\.profile = s\.params\.profile; else delete params\.profile;/.test(main));
+    isTrue("a fresh open clears the switch, and syncFromUI says why it does not read it back", (main.match(/delete params\.profile;/g) || []).length >= 2 && /`params\.profile` is NOT read back here/.test(main));
+    isTrue("the switch has its own change handler", /balUi\.profile\.addEventListener\("change", balanceProfileInput\);/.test(main));
+    const stamp = /function stampOf\([^]*?\n}/.exec(main);
+    isTrue("the tile stamp does not carry the switch (it moves no pixel)", !!stamp && !/\.profile\b/.test(stamp[0]));
+  }
+}
+
+console.log(bad ? `\n${bad} check(s) failed` : "\nthe three joins, an aim through them, a mask's own mixer, grade, Sky band, Luminance, LUT strength, curves and Shadow colour, and the white balance on Adobe's scale through a camera profile hold");
 process.exit(bad ? 1 : 0);

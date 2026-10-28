@@ -161,6 +161,16 @@ export interface EditParams {
    *  corrective, so it does not ride a SavedLook, for the same reason white
    *  balance does not. Optional: an edit stored before it existed has no pick. */
   lensPick?: { short: string; fl: number } | null;
+  /** WHICH CAMERA PROFILE THE TEMPERATURE AND TINT ARE READ THROUGH, the reader's
+   *  switch on the Basic tab (record 102): "embedded" (the profile the file
+   *  carries), "stock" (the camera's own matrix), or "loaded:" and the name of a
+   *  profile the reader loaded for the camera (src/camprofile.ts). Absent means
+   *  the reader has not chosen, and the photograph reads under the profile the
+   *  rules in that file pick. NOTHING IN THE RENDER READS IT: it names the scale
+   *  the two numbers are shown on, not a colour route, so it moves no pixel, it
+   *  is not in the tile stamp, and it is per-shot like white balance, so it does
+   *  not ride a SavedLook. Optional: an edit stored before it existed has none. */
+  profile?: string;
   /** 8-channel HSL colour mixer: flat [hueShiftDeg, satScale, lumScale] × 8
    *  bands at HSL_CENTERS (red, orange, yellow, green, aqua, blue, purple,
    *  magenta). Weights interpolate smoothly between ADJACENT band centres, so
@@ -1954,6 +1964,8 @@ export function cloneParams(p: EditParams): EditParams {
     hsFix: p.hsFix ?? 0,
     hsBypass: p.hsBypass ?? false,
     lensPick: p.lensPick ? { ...p.lensPick } : null,
+    // Absent stays absent: `profile: undefined` would serialise to nothing in a stored edit, but a key that is there and undefined is a second spelling of "not chosen" for every comparison of two edits.
+    ...(p.profile ? { profile: p.profile } : {}),
     vignette: p.vignette,
     clarity: p.clarity,
     dehaze: p.dehaze,

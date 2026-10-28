@@ -40,6 +40,7 @@ EditParams.vignette = whole-frame : a creative darkening of the frame's edge is 
 EditParams.lensFix = selection : the measured lens correction is radial and blind to what sits at that radius. Aimable since 2026-09-21 by AIM_LENS, the same bit as the manual hot-spot: one correction, two routes to it. IR-SCIENCE 9k and decision 015
 EditParams.lensBypass = not-pixels
 EditParams.forceBalance = not-pixels
+EditParams.profile = not-pixels
 EditParams.hsFix = selection : same radial blindness as lensFix, on the brightness half, and aimed by the same bit
 EditParams.lensPick = selection : a lens picked by hand chooses which radial curve lensFix and hsFix apply, so it carries their radial blindness and is aimed by the same bit (085's follow-through, 2026-09-30)
 EditParams.hsBypass = not-pixels

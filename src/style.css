@@ -515,6 +515,16 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
   color: var(--txt);
   font: 500 1rem/1.2 var(--ui);
 }
+/* THE PROFILE SWITCH, THE LINE UNDER THE SLIDERS AND THE DOOR (decision 102). The line says which profile or matrix the kelvin figure is read
+   through; it is the second text token on the panel's ground, the pairing the slider labels already ship, and it is never a .note, which
+   "Explanations off" hides. The switch is a real select (the base select rule gives it its 44px floor) and the door's two buttons are
+   full-width 44px buttons, so nothing here adds a size or a pairing the sweep does not already list. */
+.bal-scale { margin: 2px 0 8px; font: 0.8125rem/1.4 var(--ui); color: var(--txt-2); text-align: left; overflow-wrap: anywhere; }
+.bal-profile { margin: 0 0 4px; }
+/* 16px, as the typed boxes beside it are: a smaller control makes iOS zoom the page on focus. */
+.bal-profile select { font: 500 1rem/1.2 var(--ui); }
+.bal-door { margin: 0 0 6px; }
+.bal-door > button { margin: 4px 0; }
 .bal-hold { margin: 6px 0 4px; }
 .bal-hold > button { margin: 6px 0; }
 /* THE HELD BALANCE'S STANDING LINE (decision 101), in a row of its own under the top bar so every tab and the

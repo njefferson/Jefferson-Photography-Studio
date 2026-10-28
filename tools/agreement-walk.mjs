@@ -988,6 +988,81 @@ try {
       if (!/not armed|no preview|no export/.test(String(e && e.message))) fail(`${label}: the arm could not run — ${e}`);
     } finally { await page.close(); }
   }
+
+  // 6. THE WHITE BALANCE SET IN KELVIN, PREVIEW AGAINST EXPORT (record 102). The Temperature and Tint
+  //    sliders are two readings of the three gains through a camera profile, so a number typed into either
+  //    lands as gains, and the gains reach both renderers: the shader multiplies them in camera space,
+  //    `compileEdit` does the same in the export. The profile decides the two numbers and not the picture, so
+  //    this arm is what would find the screen and the saved file apart if the control ever wrote something
+  //    only one of them read. It has three claims, each with a way to fail. The typed numbers LAND (the
+  //    boxes read back what was asked within the track's own grid: 60 K and 4 units of tint, where the
+  //    grid is about 2 mired and 2 units of tint near the cool end of the scale). The move is SEEN (it moves
+  //    the photograph on screen past the hue or the lightness bar, or agreement proves nothing). And the
+  //    saved file agrees with the screen, by the same bars arm 4 uses. The frame is the aimed-mask practice
+  //    file, read through the matrix its own tags carry; the first run prints where it opens, and typing
+  //    3000 K and a tint of -40 moves both axes unless that frame already sits there.
+  {
+    const label = "temperature";
+    const page = await br.newPage({ viewport: { width: 1000, height: 820 }, acceptDownloads: true });
+    try {
+      await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+      await page.setInputFiles("#file", [AIM_FILE]);
+      await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+      await page.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
+      await page.waitForTimeout(2500);
+      await page.click("#ptab-basic");
+      await settledView(page);
+      const pre = await readView(page);
+      if (!pre) { fail(`${label}: the open photograph has no colour to read`); throw new Error("no preview"); }
+      const boxes = () => page.evaluate(() => [Number(document.getElementById("balTNum").value), Number(document.getElementById("balTiNum").value)]);
+      const was = await boxes();
+      for (const [id, v] of [["balTNum", "3000"], ["balTiNum", "-40"]]) {
+        await page.evaluate(([i, x]) => { const el = document.getElementById(i); el.value = x; el.dispatchEvent(new Event("change", { bubbles: true })); }, [id, v]);
+        await page.waitForTimeout(800);
+      }
+      await settledView(page);
+      const landed = await boxes();
+      console.log(`  ${label.padEnd(12)} the boxes read ${was[0]} K and tint ${was[1]} at open, and ${landed[0]} K and tint ${landed[1]} after 3000 K and tint -40 were typed`);
+      if (Math.abs(landed[0] - 3000) > 60 || Math.abs(landed[1] + 40) > 4) { fail(`${label}: the typed 3000 K and tint -40 read back as ${landed[0]} K and tint ${landed[1]}, so nothing below measures the number the arm describes`); throw new Error("not armed"); }
+      const shown = await readView(page);
+      if (!shown) { fail(`${label}: the preview has no colour to read`); throw new Error("no preview"); }
+      const armDh = dHist(pre.p, shown.p), armDl = Math.abs(pre.light - shown.light);
+      if (armDh <= HUE_BAR && armDl <= 8) { fail(`${label}: the typed temperature moves the photograph only ${armDh}deg and ${armDl.toFixed(1)} points on screen, under both bars, so agreement here would prove nothing`); throw new Error("not armed"); }
+      await page.click("#ptab-export");
+      await page.click("#exBtn");
+      await page.waitForFunction(
+        () => /^Ready —/.test(document.getElementById("exportStripText")?.textContent || ""),
+        null, { timeout: 600000 },
+      );
+      await page.waitForFunction(
+        () => { const a = document.getElementById("exportStripActions"); return a && !a.hidden; },
+        null, { timeout: 120000 },
+      );
+      const dl = page.waitForEvent("download", { timeout: 120000 });
+      dl.catch(() => {});
+      await page.click("#exportSave");
+      const file = await (await dl).path();
+      const b64 = readFileSync(file).toString("base64");
+      const saved = await page.evaluate(`(async () => {
+        const read = ${READ};
+        const img = new Image();
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = "data:image/jpeg;base64," + ${JSON.stringify(b64)}; });
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.getContext("2d").drawImage(img, 0, 0);
+        return read(c.getContext("2d").getImageData(0, 0, c.width, c.height).data);
+      })()`);
+      if (!saved) { fail(`${label}: the exported file has no colour to read`); throw new Error("no export"); }
+      const dh = dHist(shown.p, saved.p), dl2 = Math.abs(shown.light - saved.light);
+      console.log(`  ${label.padEnd(12)} shown biggest bin ${String(shown.hue).padStart(3)} (${(shown.share*100).toFixed(0)}%) light ${shown.light.toFixed(1)}% mean ${JSON.stringify(shown.mean)}   [3000 K and tint -40 typed; the arm moves the photograph ${armDh}deg and ${armDl.toFixed(1)} points]`);
+      console.log(`  ${"".padEnd(12)} saved biggest bin ${String(saved.hue).padStart(3)} (${(saved.share*100).toFixed(0)}%) light ${saved.light.toFixed(1)}% mean ${JSON.stringify(saved.mean)}`);
+      console.log(`  ${"".padEnd(12)} ${dh}deg of hue apart (bar ${HUE_BAR}), ${dl2.toFixed(1)} points of lightness (bar 8)`);
+      if (dh > HUE_BAR || dl2 > 8) fail(`${label}: the preview and the export disagree on a white balance set in kelvin — ${dh}deg and ${dl2.toFixed(1)} points. The temperature and tint are written as gains, and one renderer reads them differently.`);
+      else ok(`${label}: preview and export agree on a white balance set in kelvin`);
+    } catch (e) {
+      if (!/not armed|no preview|no export/.test(String(e && e.message))) fail(`${label}: the arm could not run — ${e}`);
+    } finally { await page.close(); }
+  }
 } finally { await br.close(); }
 console.log(bad ? `\n${bad} failed\n` : "\nevery path renders the same photograph the same way\n");
 process.exit(bad ? 1 : 0);

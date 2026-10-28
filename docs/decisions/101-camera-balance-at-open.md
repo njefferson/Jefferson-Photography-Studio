@@ -194,6 +194,11 @@ NIR_4027 at its own balance reads Temperature -72.5 and Tint -5.2 in that scale,
 at its own reads -86.5 and -2.8; held at the foliage-tapped balance (Temperature -62.6, Tint
 -5.7) NIR_3762 opened at the held gains and not at its own.
 
+**Changed 27 October 2026 (record 102, on staging):** the Temperature and Tint sliders and
+boxes described above no longer count steps of the gain track; they read the same three gains
+on Lightroom's scale (Temperature 2000 to 50000, Tint minus 150 to 150) through the camera's
+profile, and the hold, the kept names and Reset are untouched.
+
 The commit is the staging commit of this plan, whose subject opens New and reads: a white
 balance you set once now holds for every photo that follows, can be put on the whole set and
 kept under a name, with Temperature and Tint sliders above the gains.

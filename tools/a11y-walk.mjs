@@ -1112,17 +1112,22 @@ try {
     }
   }
   // ── 12 ─────────────────────────────────────────────────
-  // THE BALANCE CONTROLS (decision 101): Temperature and Tint above the three gains, a typed number beside
-  // each, the hold, the standing line that says a balance is held and names it, and the exit beside it. A
-  // new surface joins the sweep in the commit that creates it, so this section is that commit's share.
+  // THE BALANCE CONTROLS (decisions 101 and 102): Temperature (in kelvin) and Tint above the three gains, a
+  // typed number beside each, the profile switch above them and the door that loads a profile below them, the
+  // line that says which profile the figures are read through, the hold, the standing line that says a balance
+  // is held and names it, and the exit beside it. A new surface joins the sweep in the commit that creates it,
+  // so this section is that commit's share.
   //
   // WHAT IT ASSERTS, each as a standing claim. The controls exist in the Basic tab, named in words, 44px or
   // more where a finger lands; the typed boxes and the name box paint from the calibrated tokens (the text,
   // the ground and the rail are the tokens' own values, and clear 4.5 and 3 to 1); no input among them
   // carries a placeholder; the hold's announcements go to a live region that is in the page as served,
-  // empty, and outside anything hidden; and Temperature moves the gains the way the claim says (red up and
-  // blue down by the same number of steps, green untouched, so the sum of the three track positions, which
-  // is their geometric mean, stays put).
+  // empty, and outside anything hidden; and Temperature, in kelvin since record 102, moves the gains the way
+  // the claim says (a warmer white is red up against blue, and the sum of the three track positions, which is
+  // their geometric mean, stays put), with each thumb saying its reading in words, the line under the sliders
+  // naming the profile the figure goes through (in the page, and not as a note), the profile switch listing
+  // what is available and showing the one in force, and the door answering a file that is not for this
+  // photograph's camera, and one that is not a profile at all, in words, without moving a figure.
   //
   // THE STANDING LINE IS ASSERTED WHERE EVERY TAB AND THE STAGE SHOW IT, which is the claim a first build
   // got wrong by putting it inside the Basic tab: a state that changes what every raw opens at, visible from
@@ -1138,9 +1143,11 @@ try {
     const html = await fetch(`${BASE}/ir.html`).then((r) => r.text());
     if (/<p id="balLive" class="sr-only" role="status" aria-live="polite" aria-atomic="true"><\/p>/.test(html)) ok("the hold's announcements go to a live region, present and empty in the page as served");
     else fail("the hold's live region is not an empty role=status live region in the page as served");
-    const tags = [...html.matchAll(/<(?:input|button)\b[^>]*\bid="(?:balT|balTi|balTNum|balTiNum|balName|balHoldBtn|balApply|balBack)"[^>]*>/g)].map((m) => m[0]);
-    if (tags.length === 8 && !tags.some((t) => /\bplaceholder\s*=/.test(t))) ok("the eight balance controls are in the page as served and none carries a placeholder");
-    else fail(`the balance controls in the page as served: ${tags.length} of 8 found, ${tags.filter((t) => /\bplaceholder\s*=/.test(t)).length} with a placeholder`);
+    const tags = [...html.matchAll(/<(?:input|button)\b[^>]*\bid="(?:balT|balTi|balTNum|balTiNum|balName|balHoldBtn|balApply|balBack|profLoadBtn|profForgetBtn)"[^>]*>/g)].map((m) => m[0]);
+    if (tags.length === 10 && !tags.some((t) => /\bplaceholder\s*=/.test(t))) ok("the ten balance controls are in the page as served and none carries a placeholder");
+    else fail(`the balance controls in the page as served: ${tags.length} of 10 found, ${tags.filter((t) => /\bplaceholder\s*=/.test(t)).length} with a placeholder`);
+    if (/<select id="balProfile"><\/select>/.test(html) && /<p id="balScale" class="bal-scale"><\/p>/.test(html) && !/<p id="balScale"[^>]*\bclass="[^"]*\bnote\b/.test(html)) ok("the profile switch and the line under the sliders are in the page as served, and the line is not a note");
+    else fail("the profile switch or the line under the sliders is missing from the page as served, or the line is a note");
     const stripAt = html.indexOf('<div id="balStrip" class="bal-strip" hidden>');
     const stageAt = html.indexOf('<main id="stage">');
     const panelAt = html.indexOf('<aside id="panel"');
@@ -1175,19 +1182,19 @@ try {
           const label = (id) => (q(id)?.closest("label")?.textContent ?? "").replace(/\s+/g, " ").trim();
           const box = (id) => { const r = q(id).getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), fontPx: parseFloat(getComputedStyle(q(id)).fontSize) }; };
           return {
-            inBasic: ["balT", "balTi", "balTNum", "balTiNum", "balHoldBtn", "balName", "balApply"].every((id) => !!q(id)?.closest("#sec-basic")),
-            sliderNames: [label("balT"), label("balTi")],
+            inBasic: ["balT", "balTi", "balTNum", "balTiNum", "balHoldBtn", "balName", "balApply", "balProfile", "profLoadBtn", "balScale"].every((id) => !!q(id)?.closest("#sec-basic")),
+            sliderNames: [label("balT"), label("balTi"), label("balProfile")],
             typedNames: [q("balTNum").getAttribute("aria-label") ?? "", q("balTiNum").getAttribute("aria-label") ?? ""],
             nameLabel: label("balName"),
-            buttons: ["balHoldBtn", "balApply"].map((id) => [id, (q(id).textContent ?? "").trim(), box(id)]),
-            boxes: ["balTNum", "balTiNum", "balName"].map((id) => [id, box(id)]),
+            buttons: ["balHoldBtn", "balApply", "profLoadBtn"].map((id) => [id, (q(id).textContent ?? "").trim(), box(id)]),
+            boxes: ["balTNum", "balTiNum", "balName", "balProfile"].map((id) => [id, box(id)]),
             sliders: ["balT", "balTi"].map((id) => [id, box(id)]),
             exitHiddenAtRest: q("balStrip").hidden && q("balStrip").getClientRects().length === 0 && q("balHeld").textContent === "" && q("balHoldBtn").getAttribute("aria-pressed") === "false" && q("balApply").disabled,
             keptHiddenAtRest: q("balKeptRow").hidden,
             numbers: q("balTNum").type === "number" && q("balTiNum").type === "number",
           };
         });
-        if (at.inBasic) ok(`${where} Temperature, Tint, their boxes, the hold, the name and the set button are all in the Basic tab`); else fail(`${where} some balance control is outside the Basic tab`);
+        if (at.inBasic) ok(`${where} Temperature, Tint, their boxes, the profile switch, the line and the door, the hold, the name and the set button are all in the Basic tab`); else fail(`${where} some balance control is outside the Basic tab`);
         if (at.sliderNames.every((n) => n.length >= 8) && at.typedNames.every((n) => n.length >= 10) && at.nameLabel.length >= 10) ok(`${where} named in words: "${at.sliderNames.join('", "')}", boxes "${at.typedNames.join('", "')}", "${at.nameLabel}"`);
         else fail(`${where} a balance control's name is too short to say what it is: ${JSON.stringify([at.sliderNames, at.typedNames, at.nameLabel])}`);
         const small = [...at.buttons.filter(([, , b]) => b.w < 44 || b.h < 44).map(([id, , b]) => `#${id} ${b.w}x${b.h}`), ...at.boxes.filter(([, b]) => b.h < 44).map(([id, b]) => `#${id} ${b.w}x${b.h}`), ...at.sliders.filter(([, b]) => b.h < 28).map(([id, b]) => `#${id} ${b.w}x${b.h}`)];
@@ -1214,21 +1221,65 @@ try {
             const lab = document.getElementById(id).closest("label"), cs = getComputedStyle(lab);
             out.push({ id: `${id} label`, text: same(rgb(cs.color), token("color", "--txt-2")), ground: true, rail: true, textRatio: Math.round(ratio(rgb(cs.color), window.__composited(lab)) * 100) / 100, railRatio: 99 });
           }
+          // The line under the sliders (record 102): the second text token on the panel's ground, like the labels above it.
+          const scale = document.getElementById("balScale"), scs = getComputedStyle(scale);
+          out.push({ id: "balScale", text: same(rgb(scs.color), token("color", "--txt-2")), ground: true, rail: true, textRatio: Math.round(ratio(rgb(scs.color), window.__composited(scale)) * 100) / 100, railRatio: 99 });
           return out;
         });
         for (const p of paint) {
           if (p.text && p.ground && p.rail) ok(`${where} #${p.id} paints from the tokens (text, ground, rail)`); else fail(`${where} #${p.id} paints a colour of its own: token text ${p.text}, ground ${p.ground}, rail ${p.rail}`);
           if (p.textRatio >= 4.5 && p.railRatio >= 3) ok(`${where} #${p.id} text ${p.textRatio}:1 and rail ${p.railRatio === 99 ? "n/a" : p.railRatio + ":1"}`); else fail(`${where} #${p.id} text ${p.textRatio}:1 (floor 4.5), rail ${p.railRatio}:1 (floor 3)`);
         }
-        // 3 — one state: Temperature moves red up and blue down by the same steps, green not at all.
+        // 1b — THE PROFILE SWITCH (record 102): a real select, at least one entry, each entry in words, one selected, and the line under the
+        // sliders names the one selected and is words in the page and not a note.
+        const prof = await page.evaluate(() => {
+          const sel = document.getElementById("balProfile"), line = document.getElementById("balScale");
+          const opts = [...sel.options].map((o) => o.textContent ?? "");
+          return { tag: sel.tagName, count: opts.length, opts, selected: sel.options[sel.selectedIndex]?.textContent ?? "", line: line.textContent ?? "", lineIsNote: line.classList.contains("note"), lineShown: line.getClientRects().length > 0, rowShown: document.getElementById("balProfileRow").getClientRects().length > 0, doorShown: document.getElementById("balDoor").getClientRects().length > 0, forgetHidden: document.getElementById("profForgetBtn").hidden };
+        });
+        if (prof.tag === "SELECT" && prof.count >= 1 && prof.opts.every((t) => t.length >= 8) && prof.selected && prof.rowShown && prof.doorShown) ok(`${where} the profile switch is a select that lists ${prof.count} (${prof.opts.map((t) => `"${t}"`).join(", ")}) and shows "${prof.selected}"`);
+        else fail(`${where} the profile switch: ${JSON.stringify(prof)}`);
+        if (/^Read /.test(prof.line) && prof.line.includes(prof.selected.replace(/ \((?:in this file|loaded|no profile)\)$/, "")) && !prof.lineIsNote && prof.lineShown) ok(`${where} the line under the sliders names the profile in force and is not a note: "${prof.line}"`);
+        else fail(`${where} the line under the sliders reads "${prof.line}" for the selected "${prof.selected}" (a note ${prof.lineIsNote}, shown ${prof.lineShown})`);
+        if (prof.forgetHidden) ok(`${where} the forget button is hidden while the profile in force is not one the reader loaded`); else fail(`${where} the forget button shows for a profile the reader did not load`);
+        // 3 — one state, and in kelvin (record 102): five steps of the Temperature slider to the right are a warmer white, so red goes up
+        // against blue, the sum of the three track positions (the gains' geometric mean, the picture's overall level) stays where it
+        // was, the typed Kelvin box reads a higher number, the thumb says its reading in words, and Tint keeps its reading to within the
+        // grid.
+        const boxesNow = () => page.evaluate(() => ({ kelvin: Number(document.getElementById("balTNum").value), tint: Number(document.getElementById("balTiNum").value), valuetext: document.getElementById("balT").getAttribute("aria-valuetext") ?? "", tintText: document.getElementById("balTi").getAttribute("aria-valuetext") ?? "" }));
+        const before = await boxesNow();
         await page.evaluate(() => { const el = document.getElementById("balT"); el.value = String(Number(el.value) + 5); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
         await page.waitForTimeout(300);
         const moved = await gains();
-        const typed = await page.evaluate(() => [document.getElementById("balTNum").value, document.getElementById("balTiNum").value]);
-        const wantT = ((moved[0] - moved[2]) / 2).toFixed(1).replace(/^-0\.0$/, "0.0");
-        if (moved[0] - opened[0] === 5 && moved[2] - opened[2] === -5 && moved[1] === opened[1]) ok(`${where} Temperature +5 moved red +5 and blue -5 steps and left green alone (${opened.join("/")} to ${moved.join("/")}); the three positions still sum to ${moved[0] + moved[1] + moved[2]}`);
-        else fail(`${where} Temperature +5 moved the gains ${opened.join("/")} to ${moved.join("/")}`);
-        if (typed[0] === wantT) ok(`${where} the typed Temperature box follows the gains (${typed[0]})`); else fail(`${where} the typed Temperature box reads ${typed[0]}, the gains say ${wantT}`);
+        const typed = await boxesNow();
+        // THE GAINS MOVE ON WHOLE POSITIONS OF A 1300-STEP TRACK. Five steps of the thumb are about six mired, which at this white is one
+        // position: the first run of this section (step 208) read red up by one, green down by one and blue where it was, 585/674/726 to
+        // 586/673/726. The claim is red against blue, so that is what is read: red minus blue has to grow and the sum has to stay.
+        const sumOpened = opened[0] + opened[1] + opened[2], sumMoved = moved[0] + moved[1] + moved[2];
+        const riseOpened = opened[0] - opened[2], riseMoved = moved[0] - moved[2];
+        if (riseMoved > riseOpened && sumMoved === sumOpened) ok(`${where} Temperature +5 steps warmer put red up against blue (red minus blue ${riseOpened} to ${riseMoved}, gains ${opened.join("/")} to ${moved.join("/")}); the three positions still sum to ${sumMoved}`);
+        else fail(`${where} Temperature +5 moved the gains ${opened.join("/")} to ${moved.join("/")} (red minus blue ${riseOpened} to ${riseMoved}, sum ${sumOpened} to ${sumMoved})`);
+        if (Number.isFinite(before.kelvin) && typed.kelvin > before.kelvin) ok(`${where} the typed Temperature box follows the gains in kelvin (${before.kelvin} to ${typed.kelvin})`); else fail(`${where} the typed Temperature box reads ${typed.kelvin} after reading ${before.kelvin}; five steps warmer should read higher`);
+        if (typed.valuetext === `${typed.kelvin} kelvin` && /^tint -?\d+$/.test(typed.tintText)) ok(`${where} the thumbs say their readings in words ("${typed.valuetext}", "${typed.tintText}")`); else fail(`${where} the thumbs' spoken values are "${typed.valuetext}" and "${typed.tintText}", the boxes read ${typed.kelvin} and ${typed.tint}`);
+        if (Math.abs(typed.tint - before.tint) <= 2) ok(`${where} Tint kept its reading while Temperature moved (${before.tint} to ${typed.tint})`); else fail(`${where} Temperature moved Tint from ${before.tint} to ${typed.tint}`);
+        // 3b — THE DOOR. A profile whose camera is not this photograph's is kept and not offered, and the live region says so in words; a file that
+        // is not a profile is named as such; neither moves a figure. The practice file names no camera at all, so no profile can be for it.
+        const stand = Buffer.alloc(320);
+        stand.write("II", 0, "latin1"); stand.writeUInt16LE(17234, 2); stand.writeUInt32LE(8, 4); stand.writeUInt16LE(5, 8);
+        const entry = (n, tag, type, count, value) => { const at = 10 + n * 12; stand.writeUInt16LE(tag, at); stand.writeUInt16LE(type, at + 2); stand.writeUInt32LE(count, at + 4); stand.writeUInt32LE(value, at + 8); };
+        entry(0, 50708, 2, 12, 100); entry(1, 50721, 10, 9, 120); entry(2, 50778, 3, 1, 21); entry(3, 50779, 3, 1, 21); entry(4, 50936, 2, 14, 200);
+        stand.writeUInt32LE(0, 10 + 5 * 12);
+        stand.write("Walk Camera\0", 100, "latin1"); stand.write("Walk profile\0\0", 200, "latin1");
+        [1, 0, 0, 0, 1, 0, 0, 0, 1].forEach((v, i) => { stand.writeInt32LE(v, 120 + i * 8); stand.writeInt32LE(1, 124 + i * 8); });
+        const boxesBefore = await boxesNow();
+        await page.setInputFiles("#profFile", { name: "walk.dcp", mimeType: "application/octet-stream", buffer: stand });
+        const said = await page.waitForFunction(() => /camera profile/.test(document.getElementById("balLive")?.textContent ?? ""), null, { timeout: 10000 }).then(() => page.evaluate(() => document.getElementById("balLive").textContent)).catch(() => "");
+        if (/kept on this device/.test(said) && /None is for this photograph's camera/.test(said)) ok(`${where} loading a profile for another camera says so in words: "${said}"`); else fail(`${where} loading a profile for another camera announced "${said}"`);
+        await page.setInputFiles("#profFile", { name: "walk.jpg", mimeType: "image/jpeg", buffer: Buffer.from("not a profile at all, just some text that is long enough to read") });
+        const refused = await page.waitForFunction(() => /not a camera profile|could not be read|names no camera/.test(document.getElementById("balLive")?.textContent ?? ""), null, { timeout: 10000 }).then(() => true).catch(() => false);
+        if (refused) ok(`${where} a file that is not a camera profile is named as such in the live region`); else fail(`${where} a file that is not a camera profile was not refused in words`);
+        const boxesAfter = await boxesNow();
+        if (boxesAfter.kelvin === boxesBefore.kelvin && boxesAfter.tint === boxesBefore.tint) ok(`${where} loading profiles moved no figure (${boxesAfter.kelvin} K, tint ${boxesAfter.tint})`); else fail(`${where} loading profiles moved the figures from ${boxesBefore.kelvin} K and ${boxesBefore.tint} to ${boxesAfter.kelvin} K and ${boxesAfter.tint}`);
         // 4 — hold it, and the standing line, the exit, the set button and the announcement all follow.
         await press("#balHoldBtn");
         const heldUp = await page.waitForFunction(() => document.getElementById("balHoldBtn").getAttribute("aria-pressed") === "true" && !document.getElementById("balStrip").hidden && (document.getElementById("balLive").textContent ?? "").length > 0, null, { timeout: 10000 }).then(() => true).catch(() => false);

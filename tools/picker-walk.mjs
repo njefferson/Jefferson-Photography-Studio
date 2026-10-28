@@ -44,6 +44,7 @@ const PATHS = [
   { id: "batchFiles",        via: "button", btn: null },
   { id: "lookFile",          via: "button", btn: "lookImportBtn" },
   { id: "lutFile",           via: "button", btn: "lutImportBtn" },
+  { id: "profFile",          via: "button", btn: "profLoadBtn" },
 ];
 
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });

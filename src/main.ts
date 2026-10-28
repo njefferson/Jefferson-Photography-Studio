@@ -79,6 +79,8 @@ import { getPreview, putPreview, prunePreviews, clearPreviews, previewStats, PRE
 import { fnv1a } from "./stamp";
 import * as LensStore from "./lensstore";
 import * as Balance from "./balancestore";
+import * as Prof from "./camprofile";
+import { KELVIN_MAX, KELVIN_MIN, TINT_MAX, TINT_MIN } from "./kelvin";
 import { readExifSubset, type ExifSubset } from "./exif";
 import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
 import {
@@ -645,15 +647,22 @@ const ui = {
   lookHie: $("lookHie") as HTMLButtonElement,
 };
 
-/** THE BALANCE CONTROLS' ELEMENTS (decision 101): Temperature and Tint with their typed numbers, the hold, its name, the standing strip
- *  with its sentence and its exit, the set button, the kept list and the standing live region. Declared here, beside `ui`, because
- *  `syncToUI` reaches them and runs early. The strip is outside the panel (a row of its own under the top bar), so every tab and the
- *  stage show it. */
+/** THE BALANCE CONTROLS' ELEMENTS (decisions 101 and 102): Temperature (in kelvin) and Tint with their typed numbers, the profile switch
+ *  with the door that loads a profile and the button that forgets a loaded one, the line that says which profile or matrix the figures are
+ *  read through, the hold, its name, the standing strip with its sentence and its exit, the set button, the kept list and the standing live
+ *  region. Declared here, beside `ui`, because `syncToUI` reaches them and runs early. The strip is outside the panel (a row of its own
+ *  under the top bar), so every tab and the stage show it. */
 const balUi = {
   t: $("balT") as HTMLInputElement,
   tNum: $("balTNum") as HTMLInputElement,
   ti: $("balTi") as HTMLInputElement,
   tiNum: $("balTiNum") as HTMLInputElement,
+  scale: $("balScale") as HTMLElement,
+  profile: $("balProfile") as HTMLSelectElement,
+  profileRow: $("balProfileRow") as HTMLElement,
+  door: $("balDoor") as HTMLElement,
+  load: $("profLoadBtn") as HTMLButtonElement,
+  forget: $("profForgetBtn") as HTMLButtonElement,
   rowT: $("balRowT") as HTMLElement,
   rowTi: $("balRowTi") as HTMLElement,
   hold: $("balHoldBtn") as HTMLButtonElement,
@@ -670,8 +679,20 @@ const balUi = {
 /** WHAT THE BALANCE CONTROLS REMEMBER BETWEEN PRESSES. `held` is the kept balance every raw opens at (null when none), read from the
  *  store by `refreshHeld`; `keep` is the slider the reader's hand is on, which `updateBalanceUI` leaves alone so a thumb under a finger is
  *  not moved to the nearest grid point mid-drag; `nameDefault` is the date-and-time name the box was last given, so a name the reader typed
- *  is told from one the app wrote. An object rather than three `let`s, because `syncToUI` reads it before the module has run its way down. */
-const balState: { held: Balance.KeptBalance | null; keep: HTMLInputElement | null; nameDefault: string } = { held: null, keep: null, nameDefault: "" };
+ *  is told from one the app wrote; `profileSig` is the list the profile switch was last built from, so a redraw that changes nothing leaves
+ *  an open list alone. An object rather than a handful of `let`s, because `syncToUI` reads it before the module has run its way down. */
+const balState: { held: Balance.KeptBalance | null; keep: HTMLInputElement | null; nameDefault: string; profileSig: string } = { held: null, keep: null, nameDefault: "", profileSig: "" };
+/** What each decoded photograph's file says about its camera, found once from its own bytes (`Prof.photoCamera`). Declared here with the rest of the balance state because `syncToUI` reaches it before the module has run its way down. */
+const photoCameras = new WeakMap<object, Prof.PhotoCamera>();
+/** The camera facts for the moment nothing is open: a raw of the Z 50, the body the stock matrix falls back to. */
+const NO_PHOTO_CAMERA: Prof.PhotoCamera = Prof.photoCamera(true, undefined);
+// THE TWO SLIDERS' ENDS are Adobe's (record 102) and come from src/balancestore.ts and src/kelvin.ts; ir.html carries the same four numbers for
+// the page as served, and tools/join-fold-check.mjs holds the two to each other. The Temperature thumb's value is minus the mired figure, so
+// right is warmer.
+balUi.t.min = String(-Balance.TEMPERATURE_MIRED_FAR);
+balUi.t.max = String(-Balance.TEMPERATURE_MIRED_NEAR);
+balUi.ti.min = String(TINT_MIN);
+balUi.ti.max = String(TINT_MAX);
 
 const hsUi = {
   card: $("hsCard") as HTMLElement,
@@ -1719,6 +1740,10 @@ function syncFromUI() {
     fromPos(Number(ui.wbG.value), WB_LO, WB_HI, WB_STEPS),
     fromPos(Number(ui.wbB.value), WB_LO, WB_HI, WB_STEPS),
   ];
+  // `params.profile` is NOT read back here (record 102): the profile switch shows the profile in force, which is the reader's saved choice
+  // only when one was made, so reading it back would turn every slider press into a saved choice. Its own `change` handler
+  // (`balanceProfileInput`) writes it, `applySnapshot` restores it, and `syncToUI` draws it. The fifth of the five places, for this field,
+  // is that handler rather than the list of range inputs below.
   if (!tm) {
     params.exposure = fromPos(Number(ui.expo.value), EX_LO, EX_HI);
     params.hue = Number(ui.hue.value);
@@ -1878,11 +1903,12 @@ ui.irAutoWb.addEventListener("click", () => {
   flushRecord();
 });
 
-// --- TEMPERATURE, TINT AND THE HELD BALANCE (decision 101, option 3 with option 2 beneath it) ---------------------------------
+// --- TEMPERATURE, TINT AND THE HELD BALANCE (decisions 101 and 102, option 3 with option 2 beneath it) ---------------------------
 // The camera's own balance cannot be had from its raw file (IR-SCIENCE.md section 3), so the one that suits a scene is found by the
-// reader, on one photograph, and then wanted on the next. These controls are that: Temperature and Tint are the gains read two more
-// ways, a balance can be HELD so every raw that opens afterwards starts at it, put on the photographs already open, and kept under a
-// name that survives a reload, a new session and another card. src/balancestore.ts has the scale and the store; this is the page's side.
+// reader, on one photograph, and then wanted on the next. These controls are that: Temperature (in kelvin, Adobe's scale) and Tint are
+// the gains read two more ways, through the camera profile in use (record 102), a balance can be HELD so every raw that opens afterwards
+// starts at it, put on the photographs already open, and kept under a name that survives a reload, a new session and another card.
+// src/kelvin.ts has the arithmetic, src/camprofile.ts the profiles and src/balancestore.ts the scale and the store; this is the page's side.
 
 /** Read the held balance from the store into `balState`. Takes nothing and returns nothing. What it must satisfy: after it,
  *  `balState.held` is null or a kept balance that passed `balanceProblem`, so the open path can put its gains straight on a photograph. */
@@ -1897,9 +1923,42 @@ function announceBalance(words: string): void {
   window.requestAnimationFrame(() => { balUi.live.textContent = words; });
 }
 
-/** A number as the typed boxes show it: one decimal, and never a minus sign on a zero. @param v  the number. @returns its text. */
+/** A number as the typed boxes show it: a whole number, as Adobe's integer settings are, and never a minus sign on a zero. @param v  the kelvin figure or the tint. @returns its text. */
 function balText(v: number): string {
-  return (Math.abs(v) < 0.05 ? 0 : v).toFixed(1);
+  const n = Math.round(v);
+  return String(n === 0 ? 0 : n);
+}
+
+/** What the open photograph's file says about its camera, found once from its own bytes.
+ *  Takes nothing and returns the facts (`Prof.photoCamera`), or the Z 50's for the moment nothing is open. What it must satisfy: one per decoded photograph, so a redraw costs a map lookup; it is the matrices the gains really act through, so a figure and the picture cannot disagree about them. */
+function photoCamera(): Prof.PhotoCamera {
+  if (!current) return NO_PHOTO_CAMERA;
+  let c = photoCameras.get(current);
+  if (!c) {
+    c = Prof.photoCamera(current.isRaw, currentFile?.bytes);
+    photoCameras.set(current, c);
+  }
+  return c;
+}
+
+/** Every way the open photograph can be read, and the one it is read through now.
+ *  Takes nothing. Returns `choices` (what the switch lists) and `choice` (the entry in force, or null when the photograph has no matrix to read through at all).
+ *  What it must satisfy: the entry is the one the rules in src/camprofile.ts pick from the photograph's own saved choice (`params.profile`), the held balance's, the reader's last switch for this camera, and what the file and the device offer; it is recomputed from the store each time, so a profile loaded a moment ago is in the list now. */
+function balanceProfile(): { cam: Prof.PhotoCamera; choices: Prof.ProfileChoice[]; choice: Prof.ProfileChoice | null } {
+  const cam = photoCamera();
+  const choices = Prof.choicesFor(cam, Prof.loadedFor(cam.keys));
+  const choice = Prof.chooseProfile(choices, params.profile, current && current.isRaw ? balState.held?.profile : undefined, Prof.lastChoice(cam.keys));
+  return { cam, choices, choice };
+}
+
+/** Where the Temperature thumb stands for a white. @param mired  the white's inverse temperature. @returns the thumb's value: minus the mired figure rounded to a whole step and held to Adobe's two ends. */
+function balTempSlot(mired: number): number {
+  return Math.max(-Balance.TEMPERATURE_MIRED_FAR, Math.min(-Balance.TEMPERATURE_MIRED_NEAR, balRound(-mired)));
+}
+
+/** Where the Tint thumb stands for a white. @param tint  the white's tint. @returns the thumb's value: the tint rounded to a whole step and held to Adobe's range. */
+function balTintSlot(tint: number): number {
+  return Math.max(TINT_MIN, Math.min(TINT_MAX, balRound(tint)));
 }
 
 /** A reading as the thumb shows it: the nearest whole number, with a half going up and the float noise of a logarithm (a reading that is
@@ -1917,18 +1976,48 @@ function syncWbSliders(): void {
   ui.wbB.value = String(toPos(params.wb[2], WB_LO, WB_HI, WB_STEPS));
 }
 
-/** Show the open photograph's balance as Temperature and Tint, and show the hold. Takes nothing and returns nothing.
- *  What it must satisfy: the two sliders and their numbers are the gains in `params.wb` read by `readBalance`, so they agree with the three
- *  gain sliders whatever last moved them (a tap, Undo, a look, a slider); the slider in `balState.keep` is left where the hand put it,
- *  and a number box with the focus is left to be typed in; the standing strip (its sentence and its exit, outside the panel so every tab
- *  and the stage show it), the hold button's pressed state and the set button follow `balState.held`. */
+/** Show the open photograph's balance as Temperature (in kelvin) and Tint, name the profile they are read through, and show the hold. Takes
+ *  nothing and returns nothing.
+ *  What it must satisfy: the two sliders and their numbers are the gains in `params.wb` read by `readBalance` through the profile in force,
+ *  so they agree with the three gain sliders whatever last moved them (a tap, Undo, a look, a slider, the profile switch); the slider in
+ *  `balState.keep` is left where the hand put it, and a number box with the focus is left to be typed in; gains that describe no white leave
+ *  the thumbs where they were and empty the boxes; a white past an end of Adobe's scale rests the thumb at that end and the box reads its
+ *  figure, and the line says so; each thumb carries its reading in words (`aria-valuetext`), because its own value is minus a mired figure;
+ *  the profile switch lists what is available for the photograph's camera and shows the one in force, and is rebuilt only when that list
+ *  changes, so a redraw never closes an open list; the line under the sliders is words and not a note, so "Explanations off" does not hide
+ *  it; the standing strip (its sentence and its exit, outside the panel so every tab and the stage show it), the hold button's pressed state
+ *  and the set button follow `balState.held`. */
 function updateBalanceUI(): void {
-  const r = Balance.readBalance(params.wb);
-  const place = (v: number, lim: number) => String(Math.max(-lim, Math.min(lim, balRound(v))));
-  if (balState.keep !== balUi.t) balUi.t.value = place(r.t, Balance.TEMPERATURE_LIMIT);
-  if (balState.keep !== balUi.ti) balUi.ti.value = place(r.ti, Balance.TINT_LIMIT);
-  if (document.activeElement !== balUi.tNum) balUi.tNum.value = balText(r.t);
-  if (document.activeElement !== balUi.tiNum) balUi.tiNum.value = balText(r.ti);
+  const { cam, choices, choice } = balanceProfile();
+  const r = choice ? Balance.readBalance(params.wb, choice.spec) : null;
+  if (r) {
+    if (balState.keep !== balUi.t) balUi.t.value = String(balTempSlot(r.mired));
+    if (balState.keep !== balUi.ti) balUi.ti.value = String(balTintSlot(r.tint));
+    if (document.activeElement !== balUi.tNum) balUi.tNum.value = balText(r.kelvin);
+    if (document.activeElement !== balUi.tiNum) balUi.tiNum.value = balText(r.tint);
+  } else {
+    if (document.activeElement !== balUi.tNum) balUi.tNum.value = "";
+    if (document.activeElement !== balUi.tiNum) balUi.tiNum.value = "";
+  }
+  balUi.t.setAttribute("aria-valuetext", r ? `${balText(r.kelvin)} kelvin` : "no white");
+  balUi.ti.setAttribute("aria-valuetext", r ? `tint ${balText(r.tint)}` : "no white");
+  const sig = choices.map((c) => `${c.token}\n${c.label}`).join("\n\n");
+  if (sig !== balState.profileSig) {
+    balState.profileSig = sig;
+    balUi.profile.replaceChildren(...choices.map((c) => { const o = document.createElement("option"); o.value = c.token; o.textContent = c.label; return o; }));
+  }
+  if (choice && balUi.profile.value !== choice.token) balUi.profile.value = choice.token;
+  balUi.profile.disabled = choices.length < 2;
+  // A picked mask hides the two sliders (applyMaskTargetUI), because a mask gets a warmth of its own and never a whole-photo white point; the
+  // profile switch, its door and the line go with them, and the sliders' own hidden state is the one source of that fact.
+  const masked = balUi.rowT.hidden;
+  const showProfile = !!current && cam.isRaw && !masked;
+  balUi.profileRow.hidden = !showProfile;
+  balUi.door.hidden = !showProfile;
+  balUi.scale.hidden = masked;
+  balUi.forget.hidden = !(choice && choice.kind === "loaded");
+  const past = r && (r.kelvin < KELVIN_MIN || r.kelvin > KELVIN_MAX) ? ` This white is ${r.kelvin < KELVIN_MIN ? "cooler" : "warmer"} than the scale reaches (${balText(r.kelvin)} K), so the thumb rests at its end and the box reads the figure.` : "";
+  balUi.scale.textContent = choice ? `${choice.words}${past}` : "No colour matrix could be read from this photograph, so the Temperature and Tint have nothing to read through.";
   const held = balState.held;
   balUi.hold.setAttribute("aria-pressed", String(!!held));
   balUi.strip.hidden = !held;
@@ -1942,33 +2031,51 @@ function updateBalanceUI(): void {
  *  Returns nothing. Writes `params.wb` through `moveBalance`, so the gains land on whole track positions with their geometric mean
  *  unchanged and the exposure untouched.
  *  What it must satisfy: a control pressed at the value it already shows moves nothing (the rule `slider-own-value-walk` holds for every
- *  slider); the other axis keeps its exact reading, so moving Temperature never drags Tint; and the move is drawn at once, with the
- *  slider's drag coalesced into one undo step by `draw` and a typed number recorded as its own step.
+ *  slider); the other axis keeps its exact reading, so moving Temperature never drags Tint; the move is drawn at once, with the
+ *  slider's drag coalesced into one undo step by `draw` and a typed number recorded as its own step; a typed figure beyond Adobe's scale
+ *  is held to its end; and a white no gains can show on this photograph moves nothing and says so in the live region.
  *  A SLIDER MOVES THE BALANCE BY HOW FAR IT WAS MOVED, a typed number says where the balance goes. The thumb shows the reading rounded
- *  to a whole number, and a reading can sit half a step away from it (Temperature is half a track step wherever the red and blue
- *  positions differ by an odd number), so asking for the thumb's new whole number outright would sometimes ask for a point as near the
- *  old one as the new one and move nothing. The move is the thumb's distance from the value it was showing, added to the reading, which
- *  lands on a grid point whenever the reading is on one. A typed number is an absolute ask and lands on the nearest point the grid has. */
+ *  to a whole step and a reading can sit a fraction of a step away from it, so asking for the thumb's new whole number outright would
+ *  sometimes ask for a point as near the old one as the new one and move nothing. The move is the thumb's distance from the value it was
+ *  showing, added to the reading (Temperature's thumb is minus the mired figure, so a step right is a step warmer), which lands on a grid
+ *  point whenever the reading is on one. A typed number is an absolute ask, in kelvin for Temperature, and lands on the nearest point the
+ *  grid has; the box then shows what the gains really read as. */
 function balanceInput(axis: "t" | "ti", source: "slider" | "number"): void {
   const slider = axis === "t" ? balUi.t : balUi.ti;
   const box = axis === "t" ? balUi.tNum : balUi.tiNum;
   if (!current) { updateBalanceUI(); return; }
-  const cur = Balance.readBalance(params.wb);
-  const here = axis === "t" ? cur.t : cur.ti;
-  const lim = axis === "t" ? Balance.TEMPERATURE_LIMIT : Balance.TINT_LIMIT;
+  const { choice } = balanceProfile();
+  const cur = choice ? Balance.readBalance(params.wb, choice.spec) : null;
+  if (!choice || !cur) {
+    updateBalanceUI();
+    announceBalance("These gains describe no white, so the temperature and tint cannot move them. Move a gain slider or press Auto.");
+    return;
+  }
   const typed = source === "number";
   if (typed && box.value.trim() === "") { updateBalanceUI(); return; }
   const raw = Number(typed ? box.value : slider.value);
   if (!Number.isFinite(raw)) { updateBalanceUI(); return; }
-  const shown = typed ? Number(balText(here)) : Math.max(-lim, Math.min(lim, balRound(here)));
+  const thumb = axis === "t" ? balTempSlot(cur.mired) : balTintSlot(cur.tint);
+  const shown = typed ? Number(balText(axis === "t" ? cur.kelvin : cur.tint)) : thumb;
   if (raw === shown) return; // pressed at the value it already shows
-  const target = typed ? raw : here + (raw - shown);
-  params.wb = Balance.moveBalance(axis === "t" ? { t: target, ti: cur.ti } : { t: cur.t, ti: target }, params.wb);
+  let want: Balance.BalanceWant;
+  if (axis === "t") want = { mired: typed ? 1e6 / Math.min(KELVIN_MAX, Math.max(KELVIN_MIN, raw)) : cur.mired - (raw - thumb), tint: cur.tint };
+  else want = { mired: cur.mired, tint: typed ? Math.min(TINT_MAX, Math.max(TINT_MIN, raw)) : cur.tint + (raw - thumb) };
+  const next = Balance.moveBalance(want, params.wb, choice.spec);
+  if (!next) {
+    updateBalanceUI();
+    announceBalance("No gains can show that white on this photograph, so nothing moved.");
+    return;
+  }
+  params.wb = next;
   balState.keep = typed ? null : slider;
   syncWbSliders();
   updateBalanceUI();
   balState.keep = null;
-  if (typed) box.value = balText(Balance.readBalance(params.wb)[axis]);
+  if (typed) {
+    const after = Balance.readBalance(params.wb, choice.spec);
+    box.value = after ? balText(axis === "t" ? after.kelvin : after.tint) : "";
+  }
   draw();
   if (typed) flushRecord();
 }
@@ -1976,6 +2083,83 @@ for (const [axis, slider, box] of [["t", balUi.t, balUi.tNum], ["ti", balUi.ti, 
   slider.addEventListener("input", () => balanceInput(axis, "slider"));
   box.addEventListener("change", () => balanceInput(axis, "number"));
 }
+
+/** The reader's switch of the profile the Temperature and Tint are read through.
+ *  Takes nothing (it reads the switch's value) and returns nothing. Writes `params.profile`, remembers the choice as the one to open the next photograph from this camera under, and says in the live region what the figures read as now.
+ *  What it must satisfy: one undo step (the settled edit is recorded first, so the switch is its own step and Undo restores the profile it replaced); the three gains and every pixel are untouched, so nothing is drawn again; a choice that names nothing available now is passed over and the list redrawn as it stands. */
+function balanceProfileInput(): void {
+  if (!current) { updateBalanceUI(); return; }
+  const { cam, choices } = balanceProfile();
+  const picked = choices.find((c) => c.token === balUi.profile.value);
+  if (!picked) { updateBalanceUI(); return; }
+  flushRecord();
+  params.profile = picked.token;
+  Prof.rememberChoice(cam.keys, picked.token);
+  updateBalanceUI();
+  const r = Balance.readBalance(params.wb, picked.spec);
+  announceBalance(`${picked.name}. The temperature and tint now read ${r ? `${balText(r.kelvin)} kelvin and tint ${balText(r.tint)}` : "no white"}; the gains and the picture are as they were.`);
+  flushRecord();
+}
+balUi.profile.addEventListener("change", balanceProfileInput);
+
+/** Forget the loaded profile the Temperature and Tint are read through now. Takes nothing and returns nothing. What it must satisfy: only a profile the reader loaded can be forgotten (the button is hidden for the file's own profile and the stock matrix); a photograph that had chosen it reads under the rules' next pick, and the saved choice is left as it is, passed over while nothing answers to it. */
+function forgetLoadedProfile(): void {
+  const { cam, choice } = balanceProfile();
+  if (!choice || choice.kind !== "loaded") { updateBalanceUI(); return; }
+  const key = cam.keys.find((k) => Prof.loadedFor([k]).some((p) => `loaded:${p.name}` === choice.token));
+  if (key && Prof.forgetProfile(key, choice.name)) {
+    updateBalanceUI();
+    announceBalance(`Forgot ${choice.name}.`);
+  } else {
+    announceBalance("This device would not forget that profile.");
+  }
+}
+balUi.forget.addEventListener("click", forgetLoadedProfile);
+
+/** Read the files the profile door was given and keep every camera profile in them.
+ *  @param files  what the picker returned: profile files and zips of them, in any mixture.
+ *  Returns nothing (a promise that settles when every file is read). A zip is routed by its first bytes, not its name; each profile is kept under the camera it names; the reader is told how many were kept, how many were for the open photograph's camera, and what could not be read.
+ *  What it must satisfy: nothing is applied to the photograph by loading (the profile only becomes one of the switch's entries, and the rules decide whether it is the one in force); a file that is not a profile is named as such and costs the rest nothing; a device that refuses to keep them is told so. */
+async function loadCameraProfiles(files: File[]): Promise<void> {
+  const found: Prof.CameraProfile[] = [];
+  const notes: string[] = [];
+  let unreadable = 0, tooBig = 0, beyond = 0;
+  for (const f of files) {
+    try {
+      if (isZip(await f.slice(0, 4).arrayBuffer())) {
+        const pack = await Prof.readProfilePack(f);
+        found.push(...pack.profiles);
+        unreadable += pack.unreadable; tooBig += pack.tooBig; beyond += pack.beyond;
+        if (!pack.profiles.length && !pack.unreadable && !pack.tooBig) notes.push(`${f.name} holds no .dcp camera profiles.`);
+        continue;
+      }
+      if (f.size > Prof.PROFILE_FILE_MAX) { tooBig++; continue; }
+      const got = Prof.readProfileFile(new Uint8Array(await f.arrayBuffer()), f.name.replace(/\.[^.]+$/, ""));
+      if ("profile" in got) found.push(got.profile); else notes.push(got.problem);
+    } catch {
+      unreadable++;
+    }
+  }
+  const kept = found.length ? Prof.keepProfiles(found) : { stored: 0, full: 0, refused: false };
+  const keys = photoCamera().keys;
+  const forThis = found.filter((p) => keys.includes(Prof.cameraKey(p.camera))).length;
+  const parts: string[] = [];
+  if (kept.refused) parts.push("This device would not keep them, so none were stored.");
+  else if (kept.stored) {
+    parts.push(`${kept.stored} camera profile${kept.stored === 1 ? "" : "s"} kept on this device.`);
+    if (current && current.isRaw) parts.push(forThis ? `${forThis} ${forThis === 1 ? "is" : "are"} for this photograph's camera, and ${forThis === 1 ? "is" : "are"} in the profile list now.` : "None is for this photograph's camera, so none is offered for it; a profile is offered only for the camera it names.");
+  } else if (!found.length) parts.push("No camera profile was loaded.");
+  if (kept.full) parts.push(`${kept.full} did not fit (${Prof.PROFILES_KEPT_MAX} is the most kept).`);
+  if (tooBig) parts.push(`${tooBig} ${tooBig === 1 ? "was" : "were"} too large to be a camera profile.`);
+  if (unreadable) parts.push(`${unreadable} could not be read.`);
+  if (beyond) parts.push(`${beyond} more in the pack were left unread (${Prof.PROFILE_PACK_ENTRIES} is the most read from one).`);
+  parts.push(...notes.slice(0, 3));
+  updateBalanceUI();
+  announceBalance(parts.join(" "));
+  toast(parts.slice(0, 2).join(" "), 4200 + parts.length * 1200);
+}
+balUi.load.addEventListener("click", () => openPicker("profFile"));
+registerPicker("profFile", (files) => { void loadCameraProfiles(files); });
 
 /** The open photograph's balance WITHOUT any look's bias, on the gain sliders' grid.
  *  Takes nothing. Returns the three gains `params.wb` holds divided by the bias the active look baked in (`lookBias`), each put on the
@@ -2085,7 +2269,7 @@ balUi.hold.addEventListener("click", () => {
     toast("This photograph was developed by the camera, so its balance is not an infrared white point. Hold a balance set on a raw.", 4600);
     return;
   }
-  const rec = Balance.keepBalance(nameForHold(), currentBaseGains());
+  const rec = Balance.keepBalance(nameForHold(), currentBaseGains(), balanceProfile().choice?.token);
   if (!rec) { toast("This browser would not keep the balance, so it cannot be held.", 4200); return; }
   Balance.setHeld(rec.id);
   refreshHeld();
@@ -4377,6 +4561,10 @@ function applySnapshot(s: Snapshot) {
   // a return all put the lens back to what the edit says (085's
   // follow-through). No control holds it, so syncFromUI never reads it back.
   params.lensPick = s.params.lensPick ? { ...s.params.lensPick } : null;
+  // The profile switch from the SNAPSHOT directly, as the pick above: an edit stored before the switch existed, or one the reader never
+  // switched, has none, and that must mean "not chosen" and never the live photograph's choice, which the `{ ...params, ...s.params }`
+  // merge would otherwise hand it. The switch is drawn from `params.profile` by `syncToUI` below.
+  if (s.params.profile) params.profile = s.params.profile; else delete params.profile;
   hotspotFromPick();
   syncLensTexture();
   params.vignette = c.vignette;
@@ -5352,28 +5540,42 @@ function editValuesLine(): string {
     if (!el.id || seen.has(el.id) || el.dataset.mirror) continue;
     seen.add(el.id);
     const m = multiplier[el.id];
-    rows.push({ id: el.id, name: controlName(el.id), value: m === undefined ? el.value : `${el.value} (×${m.toFixed(4)})` });
+    // The Temperature thumb's own value is minus a mired figure (record 102), which says nothing to a reader of the report; it prints what the thumb says aloud instead.
+    const said = el.id === "balT" || el.id === "balTi" ? el.getAttribute("aria-valuetext") : null;
+    rows.push({ id: el.id, name: controlName(el.id), value: said ?? (m === undefined ? el.value : `${el.value} (×${m.toFixed(4)})`) });
   }
   const used = new Map<string, number>();
   for (const r of rows) used.set(r.name, (used.get(r.name) ?? 0) + 1);
   return rows.map((r) => `${(used.get(r.name) ?? 0) > 1 ? `${r.name} [${r.id}]` : r.name} ${r.value}`).join(" · ");
 }
 
-/** THE HELD BALANCE, FOR THE REPORT (decision 101).
+/** THE HELD BALANCE, FOR THE REPORT (decisions 101 and 102).
  *  Takes nothing; reads `balState.held`, the store's list and the open photograph's gains. Returns one sentence: "none held" with the
- *  count kept, or the held balance's name, its three gains and its Temperature and Tint, each followed by what the open photograph reads
- *  now, in the app's own scale (never Kelvin). A kept record the store had to set aside as unusable is counted, never hidden.
- *  What it must satisfy: the five numbers it prints are the ones the sliders show, so a report can be matched to the screen by eye, and it
- *  holds no photograph's name. The balance's own name is the reader's text and is printed on purpose. Consumer: the report's Held balance row. */
+ *  count kept, or the held balance's name, its three gains and its Temperature (in kelvin) and Tint, each followed by what the open
+ *  photograph reads now, through the profile or matrix in force. A kept record the store had to set aside as unusable is counted, never hidden.
+ *  What it must satisfy: the numbers it prints are the ones the sliders show, so a report can be matched to the screen by eye, the profile
+ *  they are read through is named in the sentence, and it holds no photograph's name. The balance's own name is the reader's text and is
+ *  printed on purpose. Consumer: the report's Held balance row. */
 function heldBalanceLine(): string {
   const kept = Balance.listBalances().length;
   const dropped = Balance.droppedBalances ? `; ${Balance.droppedBalances} unusable record${Balance.droppedBalances === 1 ? "" : "s"} set aside` : "";
-  const r = Balance.readBalance(params.wb);
-  const now = current ? `the open photograph reads Temperature ${balText(r.t)} and Tint ${balText(r.ti)}` : "nothing open";
+  const { choice } = balanceProfile();
+  const say = (g: Balance.Gains) => { const r = choice ? Balance.readBalance(g, choice.spec) : null; return r ? `${balText(r.kelvin)} K and tint ${balText(r.tint)}` : "no white"; };
+  const through = choice ? ` (through ${choice.name})` : "";
+  const now = current ? `the open photograph reads ${say(params.wb)}${through}` : "nothing open";
   const h = balState.held;
   if (!h) return `none held, so raws open at their own automatic balance; ${kept} kept; ${now}${dropped}`;
-  const hr = Balance.readBalance(h.gains);
-  return `"${h.name}" — red ${h.gains[0].toFixed(4)} · green ${h.gains[1].toFixed(4)} · blue ${h.gains[2].toFixed(4)}, Temperature ${balText(hr.t)} and Tint ${balText(hr.ti)} (the app's own scale, not Kelvin); every raw opens at it; ${kept} kept; ${now}${dropped}`;
+  return `"${h.name}" — red ${h.gains[0].toFixed(4)} · green ${h.gains[1].toFixed(4)} · blue ${h.gains[2].toFixed(4)}, ${say(h.gains)}${through}${h.profile ? `; kept with the choice ${h.profile}` : ""}; every raw opens at it; ${kept} kept; ${now}${dropped}`;
+}
+
+/** THE OPEN PHOTOGRAPH'S BALANCE AS ADOBE'S SCALE, FOR THE REPORT'S BALANCE ROW (decision 102).
+ *  Takes nothing; reads `params.wb` and the profile in force. Returns a clause such as "reads as 10056 K and tint 30 through Infrared Temp -100 (loaded; this photograph's saved switch)", or "reads as no white" when the gains describe none.
+ *  What it must satisfy: the two numbers are the ones the sliders show for the same gains, and the clause names the profile or matrix they go through, which kind it is, and whether the reader's switch saved it with this photograph or the default rules picked it, so a report can be matched to the screen by eye and a figure is never read without its profile. */
+function balanceKelvinWords(): string {
+  const { choice } = balanceProfile();
+  const r = choice ? Balance.readBalance(params.wb, choice.spec) : null;
+  if (!choice || !r) return "reads as no white";
+  return `reads as ${balText(r.kelvin)} K and tint ${balText(r.tint)} through ${choice.name} (${choice.kind}; ${params.profile ? "this photograph's saved switch" : "the default rules"})`;
 }
 
 /** WHICH LOOK THE PHOTOGRAPH WEARS, by the name its button prints.
@@ -5542,7 +5744,7 @@ function wireVersionMenu() {
       // gray-world balance, the exposure, the denoise measurement and the sky
       // selection read it. The walk reads these two lines back.
       { k: "Correction order", v: current?.linear ? `on the linear raw at decode, before the balance and the selection — ${current.lensApplied?.gains ? `strength ${current.lensApplied.strength} laid on the pixels` : "nothing laid on the pixels (no profile matched, or the strength is set to 0)"}` : current ? "inside the grade — an 8-bit source has no linear copy to correct first" : "nothing open" },
-      { k: "Balance", v: current ? `white balance ${params.wb.map((x) => x.toFixed(4)).join(" · ")} — the balance it opened at (gray-world, or the held one) unless moved since` : "nothing open" },
+      { k: "Balance", v: current ? `white balance ${params.wb.map((x) => x.toFixed(4)).join(" · ")} — the balance it opened at (gray-world, or the held one) unless moved since — ${balanceKelvinWords()}` : "nothing open" },
       // THE HELD BALANCE (decision 101): whether raws open at one, which, its name, its gains and its Temperature and Tint, and what the
       // open photograph reads now. The name is the reader's own text, printed on purpose so the report says which balance was held.
       { k: "Held balance", v: heldBalanceLine() },
@@ -8667,9 +8869,11 @@ function applyMaskTargetUI(): void {
   updateToneWidget();
   maskWarmthRow.hidden = !m;
   for (const r of wbGainRows) r.hidden = !!m;
-  // Temperature and Tint are the same three gains read two other ways, so they stand down on the same condition (decision 101).
+  // Temperature and Tint are the same three gains read two other ways, so they stand down on the same condition (decision 101), and the
+  // profile switch, its door and the line under them go with them: `updateBalanceUI` hides those from the sliders' own hidden state (102).
   balUi.rowT.hidden = !!m;
   balUi.rowTi.hidden = !!m;
+  updateBalanceUI();
   // Inert: undo whatever the last pick set, then set it again for this one.
   document.querySelectorAll("[data-mask-inert]").forEach((el) => {
     (el as HTMLElement).inert = false;
@@ -13843,6 +14047,9 @@ function establishFreshEdit() {
   // A photograph opens with no lens picked by hand: a pick is this edit's, and
   // the last photograph's must not reach this one (085's follow-through).
   params.lensPick = null;
+  // NOR DOES THE LAST PHOTOGRAPH'S PROFILE SWITCH (record 102): a photograph that has not been switched reads under the rules' own pick,
+  // which includes what the reader last used for this camera, and that is where a carried choice comes from.
+  delete params.profile;
   lookBias = [1, 1, 1];
   lookWb = null;
   // NORMALISE THE MEASUREMENTS TO WHAT THE SLIDERS CAN HOLD, BEFORE ANYTHING

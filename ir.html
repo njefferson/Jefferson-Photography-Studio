@@ -750,21 +750,43 @@
                  point (042), so while a mask is picked this takes the place of
                  the three gains below. -->
             <label id="maskWarmthRow" hidden>Warmth <input id="maskWarmth" type="range" min="-1" max="1" step="0.01" value="0" /></label>
-            <!-- TEMPERATURE AND TINT ARE THE THREE GAINS BELOW, READ TWO OTHER WAYS (decision
-                 101): one state, so moving either one moves the gain sliders on screen and
+            <!-- TEMPERATURE AND TINT ARE THE THREE GAINS BELOW, READ TWO OTHER WAYS (decisions
+                 101 and 102): one state, so moving either one moves the gain sliders on screen and
                  moving a gain slider moves these. Each has its number beside it, typeable. They
-                 are the app's own scale and not Kelvin (src/balancestore.ts says how they are
-                 read off the gain track), and they hide with the gains while a mask is picked,
-                 because a mask gets a warmth of its own and never a whole-photo white point.
-                 No input here carries a placeholder: a hint inside a box is gone the moment
-                 something is typed in it, and the typed number is the answer. -->
+                 are Adobe's scale, Temperature in kelvin from 2000 to 50000 and Tint from -150 to
+                 150, read through a camera profile: the switch above them lists the profile the
+                 file carries, the ones loaded for this camera and the camera's own matrix
+                 (src/kelvin.ts has the arithmetic, src/camprofile.ts the choice, and
+                 src/balancestore.ts the scale and the store). The Temperature thumb's value is
+                 minus the mired figure, so right is warmer, and it carries its reading in words
+                 (aria-valuetext); the four numbers on the two sliders are the store's, and
+                 tools/join-fold-check.mjs holds the two to each other. They hide with the gains
+                 while a mask is picked, because a mask gets a warmth of its own and never a
+                 whole-photo white point, and the switch, the line and the door go with them.
+                 #balScale says which profile the figures go through and is not a .note, so
+                 "Explanations off" does not hide it. No input here carries a placeholder: a hint
+                 inside a box is gone the moment something is typed in it, and the typed number is
+                 the answer. -->
+            <div class="bal-profile" id="balProfileRow">
+              <label>Profile <small>the Temperature and Tint are read through it</small> <select id="balProfile"></select></label>
+            </div>
             <div class="bal-row" id="balRowT">
-              <label>Temperature <small>red against blue</small> <input id="balT" type="range" min="-300" max="300" step="1" value="0" /></label>
-              <input id="balTNum" class="bal-num" type="number" inputmode="decimal" step="any" aria-label="Temperature, typed" />
+              <label>Temperature <small>cooler to warmer</small> <input id="balT" type="range" min="-500" max="-20" step="1" value="-200" /></label>
+              <input id="balTNum" class="bal-num" type="number" inputmode="decimal" step="any" aria-label="Temperature in kelvin, typed" />
             </div>
             <div class="bal-row" id="balRowTi">
-              <label>Tint <small>magenta against green</small> <input id="balTi" type="range" min="-200" max="200" step="1" value="0" /></label>
+              <label>Tint <small>green to magenta</small> <input id="balTi" type="range" min="-150" max="150" step="1" value="0" /></label>
               <input id="balTiNum" class="bal-num" type="number" inputmode="decimal" step="any" aria-label="Tint, typed" />
+            </div>
+            <p id="balScale" class="bal-scale"></p>
+            <div class="bal-door" id="balDoor">
+              <button id="profLoadBtn" type="button" class="full-btn">Load a camera profile&hellip;</button>
+              <button id="profForgetBtn" type="button" class="full-btn" hidden>Forget this loaded profile</button>
+              <!-- NO accept, for the reason the colour-table import's input gives (#lutFile): on an iPad the Files picker greys out a type
+                   the system has no identifier for, and a .dcp is registered to nothing. A picked file is read by its own tags, and a zip
+                   is routed by its first bytes. -->
+              <input id="profFile" type="file" hidden />
+              <p class="note">Pick a camera profile (a <strong>.dcp</strong> file), or a <strong>.zip</strong> holding a whole pack of them. Each is kept on this device under the camera it names and offered only for photographs from that camera. A profile never changes the picture: it decides what the Temperature and Tint read.</p>
             </div>
             <label>Red gain <input id="wbR" type="range" min="0" max="1300" step="1" value="585" /></label>
             <label>Green gain <input id="wbG" type="range" min="0" max="1300" step="1" value="585" /></label>
@@ -785,7 +807,7 @@
                 <h3 class="mask-saved-title">Kept balances</h3>
                 <div id="balKept" class="mask-list"></div>
               </div>
-              <p class="note">Temperature and Tint are this app's own scale, not Kelvin. Temperature is the red gain against the blue and Tint is the green gain against the other two, each counted in equal steps of the gain sliders, and moving either leaves the picture as bright as it was. Hold keeps the balance you have for every raw you open next. Put it on the set applies it to the photographs already open, as one step you can undo on each. A held balance is kept under its name, here and on the next day, whatever card the photographs come from. Photographs the camera has already developed (JPEG, HEIC) are never touched.</p>
+              <p class="note">Temperature is in kelvin and Tint runs from minus 150 to 150, the scale Lightroom shows for a raw file, read through the camera profile named under the sliders; moving either leaves the picture as bright as it was, and the three gain sliders above stay the exact state. A raw from an infrared camera lands inside that scale under a profile made for infrared, and may sit past an end of it under the camera's own matrix, where the thumb rests at the end and the box reads the figure. For a photograph the camera has already developed, the figures are relative to its own white. Hold keeps the balance you have for every raw you open next. Put it on the set applies it to the photographs already open, as one step you can undo on each. A held balance is kept under its name, here and on the next day, whatever card the photographs come from. Photographs the camera has already developed (JPEG, HEIC) are never touched.</p>
             </div>
             <label>Recover highlights <input id="recover" type="range" min="0" max="1" step="0.01" value="0" /></label>
             <p class="note">Takes the false colour out of genuinely blown (sensor-clipped) areas for your current white balance, keeping their brightness &mdash; where every colour clipped the area goes clean neutral, and where only one did, the colour the others recorded stays. It re-aims live as you rebalance. Set automatically at open when the frame has clipping; 0 = untouched.</p>
@@ -1632,7 +1654,7 @@
            src/raw/nef.ts and src/raw/dngRaw.ts (levels from the file's own
            tags), color.ts sensorPitchMicrons
            (diffraction.cam) and hotspotProfiles.ts (the app's own lens rig). -->
-      <p class="note">Where the numbers come from: a DNG's colour is converted with the camera matrix it carries; a Nikon NEF carries none, so the Z&nbsp;50 uses Adobe's published matrix and the D5300 the one Rob Shea's <em>Infrared Temp &minus;100</em> profile writes. Black and white levels are read from the file itself. Temperature and Tint on the Basic tab are this app's own scale, not Kelvin. The diffraction limits are from Rob Shea's <a href="https://diffraction.cam" target="_blank" rel="noopener">diffraction.cam</a>, and the lens profiles that ship were measured with this app's own lens rig.</p>
+      <p class="note">Where the numbers come from: a DNG's colour is converted with the camera matrix it carries; a Nikon NEF carries none, so the Z&nbsp;50 uses Adobe's published matrix and the D5300 the one Rob Shea's <em>Infrared Temp &minus;100</em> profile writes. Black and white levels are read from the file itself. Temperature on the Basic tab is in kelvin and Tint runs from minus 150 to 150, read the way Lightroom reads a raw file, through a camera profile: the one the file carries, one you load for your camera, or the camera's own matrix. For a photograph the camera already developed they are relative to its own white. The diffraction limits are from Rob Shea's <a href="https://diffraction.cam" target="_blank" rel="noopener">diffraction.cam</a>, and the lens profiles that ship were measured with this app's own lens rig.</p>
       <p class="more-row">
         <a href="./fonts/OFL.txt" target="_blank" rel="noopener">Fonts &mdash; SIL Open Font License &rarr;</a>
       </p>
@@ -1871,7 +1893,7 @@
           sends them straight into an editable session.</li>
           <li>On open, <strong>raw photos are auto-balanced</strong> (white balance, exposure, denoise, blown-highlight recovery when the frame needs it, and <strong>Restore depth</strong>); JPEG/HEIC open as the camera rendered them, with measured denoise only &mdash; until you pick a Look, which balances them first, because a false-colour look needs colours something has already pulled apart. A camera file with all its colour in ONE band is the exception: balancing it invents the second band by crushing red, so the app leaves it alone, says so beside the looks, and offers <strong>Balance it anyway</strong> if you want that rendering on that photograph. Every one of those lands on a slider you can see and undo, your original file is never changed, and <strong>Hold: the bare decode</strong> on the Basic tab shows the photograph with those automatics off any time.</li>
           <li><strong>Tap foliage</strong> in the photo to fine-tune white balance — the classic IR move. Tapping a blown-out spot is refused and says so: there is no colour recorded in it to balance from.</li>
-          <li><strong>Hold a balance for every raw.</strong> Once a photograph looks right, press <strong>Hold this balance for every raw</strong> on the Basic tab and each raw you open next starts there instead of at its own automatic balance. While one is held, a line under the top bar says so and names it, on every tab, with <strong>Back to the automatic</strong> beside it to end it. The Temperature, Tint and gain sliders show the held balance, and Undo and Reset work on it. <strong>Put the held balance on every photo in this set</strong> does the same for the photographs already open. A held balance is kept under a name on this device, so another day or another card can use it. Temperature and Tint are this app's own scale, not Kelvin.</li>
+          <li><strong>Hold a balance for every raw.</strong> Once a photograph looks right, press <strong>Hold this balance for every raw</strong> on the Basic tab and each raw you open next starts there instead of at its own automatic balance. While one is held, a line under the top bar says so and names it, on every tab, with <strong>Back to the automatic</strong> beside it to end it. The Temperature, Tint and gain sliders show the held balance, and Undo and Reset work on it. <strong>Put the held balance on every photo in this set</strong> does the same for the photographs already open. A held balance is kept under a name on this device, so another day or another card can use it, and it remembers which profile you had on. Temperature is in kelvin and Tint runs from minus 150 to 150, read through the profile named under the sliders; <strong>Load a camera profile</strong> adds one for your camera, and the switch above the sliders chooses between them.</li>
           <li><strong>The usual shortcuts work.</strong> <strong>Cmd/Ctrl&#8202;+&#8202;Z</strong> undoes and <strong>Cmd&#8202;+&#8202;Shift&#8202;+&#8202;Z</strong> (or <strong>Ctrl&#8202;+&#8202;Y</strong>) redoes. You can <strong>drag photos onto the window</strong> or <strong>paste</strong> one to open it. <strong>Esc</strong> closes any panel, and on a home-screen install the <strong>Back</strong> gesture closes the panel instead of leaving the app.</li>
           <li><strong>Double-tap any slider</strong> to put it back where the photo opened. Most of them don't start at zero — white balance, exposure and denoise open at values measured from your frame — so this returns that one slider to its opening value, the way <strong>Reset</strong> does for all of them at once. Quality goes back to its usual setting instead, since that one is yours rather than the photo's. Restore depth strength goes back to 100% — the full correction worked out for the frame in front of you, which is where every photo opens. Lens correction strength goes back to 1, the full correction, for the same reason, or to 0 on a photo whose lens has no profile.</li>
           <li>Pick a <strong>Look</strong>, adjust sliders to taste, then <strong>Export &amp; Save</strong>.</li>

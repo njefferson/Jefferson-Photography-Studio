@@ -627,6 +627,11 @@ What exists that this item will use, so a second one does not get written
       wrong for the look. And a 3–7% move in the white point swings the sky
       from blue to grey. So the white point cannot be fixed under today's look,
       only with the look derived again at it, which is 066's ground (Depends).
+    - **The reader's own move of the white point, built on staging 27 October 2026
+      (record 102).** The Temperature and Tint sliders on the Basic tab now read the
+      white on Lightroom's scale through the camera's profile; a move of either is the
+      reader's, on one photograph, and the opening balance stays the one found from the
+      data, so this option's finding stands.
 
 11. **FAILED ITS BARS OFF THE APP'S STATE, 2026-09-30, and not rendered: a
     cloud is what stands above the photograph's own clear sky at the same
