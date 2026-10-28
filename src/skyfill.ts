@@ -39,8 +39,15 @@ export const FILL_TOL_MAX = SKY_GROW_SPREAD_MAX * SKY_GROW_TOL;
  *  it changes every stored fill, the way changing the guide would. Not tuned on
  *  any frame; the renders and the device decide whether it is right. */
 export const FILL_LUMA_PER_CHROMA = 4;
-/** Where the Tolerance slider starts, as a position from 0 to 1. */
-export const FILL_POSITION_DEFAULT = 0.5;
+/** Where the Tolerance slider starts, as a position from 0 to 1. It is 0.35, set
+ *  from three renders of NIR_3461's pylon with one stroke through the tower's upper
+ *  gaps at the positions 0.5, 0.35 and 0.2 (decision 065, Outcome): at 0.5 the fill
+ *  filled most of the gaps and also spilled into the dark grass at the frame's
+ *  corners and right edge; at 0.35 it filled most of the upper tower's gaps and
+ *  stayed inside the tower; at 0.2 it kept inside the tower and filled only a small
+ *  patch of it. It is only the slider's starting place: a stroke stores the
+ *  tolerance it was made with, so no saved edit reads this number. */
+export const FILL_POSITION_DEFAULT = 0.35;
 
 /** A rectangle of guide pixels, inclusive at both ends. */
 export interface SkyFillRect {

@@ -827,7 +827,7 @@ cannot describe something the code does not say about itself.
 - **`src/sky.ts`** (722 lines) — Classical sky detection (mask type 4).
 - **`src/sky.worker.ts`** (160 lines) — The sky selection, built off the main thread on a lane of its own.
 - **`src/skyClient.ts`** (224 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
-- **`src/skyfill.ts`** (340 lines) — Fill by hand on the Sky mask: a stroke through the gaps the colour grow cannot walk to, grown from every point it crosses into the connected pixels of similar colour and brightness (decision 065).
+- **`src/skyfill.ts`** (347 lines) — Fill by hand on the Sky mask: a stroke through the gaps the colour grow cannot walk to, grown from every point it crosses into the connected pixels of similar colour and brightness (decision 065).
 - **`src/skyfine.ts`** (1152 lines) — The sky selection refined to the picture's own edges.
 - **`src/skyhorizon.ts`** (608 lines) — Where the sky ENDS, as a horizon line the photograph itself draws — one border depth per display column, found by the published method rather than invented here.
 - **`src/skymap.ts`** (447 lines) — The sky's colour, smoothed AFTER the look has amplified it — a small map rebuilt per edit, blended back in by the sky's own selection.

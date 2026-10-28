@@ -140,6 +140,19 @@ ships in the build on staging, so the route it refines exists without 048's
 record closing first, and above 028, because the fill covers 028's case by hand
 where the cap declines.
 
+## Outcome
+
+**The default Tolerance is 0.35, set 26 October 2026.** Fill by hand shipped to staging with its slider starting at 0.5, a number the build's own comment said was not tuned on any frame. The previous plan rendered NIR_3461's pylon, whose Sky matte leaves the tower's whole upper section and base out, with one stroke through the tower's upper gaps at three slider positions, and the default rests on those three pictures, each opened again here.
+
+- **At 0.5** the stroke filled much of the sky between the girders and also spilled: yellow patches stand in the dark grass at the bottom left and bottom right corners and along the right edge. The matte went from 68.86 percent of the canvas to 77.73. A second stroke read 76.48, and two single taps in the gaps spilled the same way (75.44 and 77.89).
+- **At 0.35** most of the upper tower's gaps are filled and the grass carries no yellow at all; the horizon reads clean. The first stroke read 70.55 percent and the second 72.37, the second also taking a round patch of sky in the tower's lower block.
+- **At 0.2** nothing spills either, and only a small patch inside the upper tower is filled (69.41 and 70.53 percent).
+
+So 0.35 is the position where the fill reaches the gaps it exists for without leaving the tower. It is one frame: that it suits a lattice on another frame is not measured, and neither is the luma-to-colour ratio that sits beside it. The slider still runs the whole range, so a reader who wants more or less moves it. Nothing else changed: a stroke stores the tolerance it was made with, so no saved edit reads the default, and the Tolerance note under the slider is as it was.
+
+The other way to stop the spill is to ignore a seed unlike the stroke's majority, so that a stroke landing on a strut does not seed the strut. It is a separate piece of work, open, and is not what this default does.
+
 ## Looked at
 
+- NIR_3461.NEF, 2026-10-26: the previous plan's renders of the Sky matte after one Fill by hand stroke through the tower's upper section, at the slider positions 0.5, 0.35 and 0.2, opened again here, whole frame. At 0.5 the tower's gaps are filled and yellow patches stand in the grass at the bottom corners and the right edge; at 0.35 the upper tower is mostly yellow between its girders, its lower block stays dark and the grass carries no yellow; at 0.2 only a small patch inside the upper tower is yellow, the rest of the tower stays dark and the grass carries none.
 - NIR_3461, 2026-09-25, in Aerochrome with the lens profile at 1: the photo, the Sky mask's matte alone, the matte with a Colour mask on blue sky added, and with a second on cloud added; full frame and at full size on the near pylon at the left edge of the frame.

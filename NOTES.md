@@ -3092,8 +3092,17 @@ user-scalable=no.
   connected pixels of similar colour and brightness on the grow's own guide, is
   stored with its tolerance among the mask's hand corrections and is replayed in
   order with the other two, so Reach and Feather keep it. Not yet measured: how
-  the default Tolerance and the luma-to-colour ratio suit a lattice, and how a
-  drag feels on the tablet.
+  the luma-to-colour ratio suits a lattice, and how a drag feels on the tablet.
+  **The default Tolerance moved to 0.35 on 26 October 2026**, set from three
+  renders of NIR_3461's pylon with one stroke through the tower's upper gaps
+  (record 065's Outcome): at 0.5 the fill also spilled into the grass at the
+  frame's corners, at 0.35 it filled most of the upper tower's gaps and stayed in
+  the tower, at 0.2 it stayed in and filled only a small patch.
+  **What survives (2026-10-26):** Fill by hand is as built, with its Tolerance
+  slider and the note beside it; only the slider's starting place moved, from 0.5
+  to 0.35, and a stroke stores the tolerance it was made with, so no saved edit
+  changes. Still open: the device pass on how a drag feels, and whether a seed
+  unlike the stroke's majority should be ignored.
 - [ ] **Aerochrome is rendered from a model of the film, not tuned toward it** <!-- decision: 066 -->
   **Shown as:** Aerochrome built the way the film worked, so the sky goes dark and foliage stays red without the halos.
   Measured at full resolution 2026-09-25: tuning the look toward the film's

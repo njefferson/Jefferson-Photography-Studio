@@ -1,12 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=60c8d4c065d5a851
-diffhash=5cceb58d406c4572
+planhash=496304b0da9fe762
+diffhash=1591fd5ab2ff4c21
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 13 is the last of the thirteen. It moves VERSION from 2.66 to 2.67, as the Versioning section of the app's notes asks for the release commit, and writes the NOTES.md staging entry for this version. It also carries the internal fixes the step's Files list names: the repository-finding defaults of the checks in tools/ (each taking its root from its own file's place, as tools/contract-check.mjs does), the token check's silent zero made a failure, the decisions check's percentage case, the two comments in src/export.ts, src/debug.ts and src/diagnostic.ts made to say what the code does, and the Found queue lines in NOTES.md, each gaining a clause saying what this work did. Nothing under the app's behaviour changes in this patch. All touched paths are in the step's Files list.
-# 
-# What was judged: the approved plan's Files and step 194 text, and the whole patch read in full. The status shows the seventeen staged paths and nothing else.
-# 
-# One note for the owner, recorded here and not changed by this patch: the staging entry's wording says main is moved to the earlier commit before this sequence lands. That promotion was refused by the session's permission check and has not happened, so the entry's sentence about it does not yet hold. The entry is the record of the plan's intention and is left as the sequence has it.
-# 
-# Shape: no table or grid, no quotation or attribution of the owner, no chat link and no trailer. The new prose is written as the record asks.
+# IN-SCOPE: Sequence patch 01 of step 208 changes five files and nothing else: NOTES.md (the Tolerance default's record in the sky-fill entry), docs/ARCHITECTURE.md (one line count), docs/decisions/065 (an Outcome section and its Looked at line), ir.html (the Tolerance slider's starting value, 0.5 to 0.35) and src/skyfill.ts (the default constant and its comment). The change is the starting place of one slider on the Sky mask's Fill by hand control, the one the approved plan named for this sequence. Stored strokes keep the tolerance they were made with, so no saved edit moves. The patch was read whole, and it touches no file outside the plan's Files list for this working copy.
