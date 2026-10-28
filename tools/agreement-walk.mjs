@@ -209,6 +209,29 @@ const HUE_BAR = 15;
 const GEO_CELL = 20;
 const GEO_SEE = 30;
 const GEO_AGREE = 2;
+// THE COLOUR-ONLY ARMS' BAR (a mask's own Shadow colour). That stage scales a dark
+// pixel's colour toward its grey and keeps its hue and very nearly its lightness, so
+// the two measures every other arm uses, the hue histogram's distance and the median
+// lightness, move by little or nothing when it works, and an arm built on them alone
+// would refuse itself as "moves the photograph only a degree". The channel means see
+// it: colour moving toward grey pulls red and blue toward each other, and the means
+// are the figure this file's header says agree to 0.2 of 255 between the screen and
+// the saved file on the honest pair. An arm that says `means: true` is armed by
+// moving ONE channel mean MEAN_SEE levels on screen, and its screen and its saved
+// file must agree to MEAN_AGREE in every channel, on top of the two bars above. Both
+// numbers are stated from that header and from record 078's two levels of mean
+// colour between a build that honours a setting and one that ignores it; neither was
+// read off a run of these arms, which the run in step 202 prints on every line so the
+// numbers can be argued with there.
+const MEAN_SEE = 2.5;
+const MEAN_AGREE = 2;
+/** A 2-point 3D LUT that trades red and blue, written for the LUT strength arm.
+ *  Takes nothing. It is the text of a .cube file: eight lines, red index fastest,
+ *  each the corner's colour with its red and blue exchanged. What the arm relies on:
+ *  applied at full strength it turns every hue the picture holds to its mirror
+ *  across green, which moves the hue histogram by far more than HUE_BAR wherever
+ *  there is colour. */
+const SWAP_CUBE = 'TITLE "Walk swap"\nLUT_3D_SIZE 2\n0 0 0\n0 0 1\n0 1 0\n0 1 1\n1 0 0\n1 0 1\n1 1 0\n1 1 1\n';
 // WHAT THE PAGE DOES TO READ THE GRID, as text both page calls share: the canvas the
 // reader sees, averaged to 48 columns by as many rows as its shape gives, in two
 // steps so a large source is not sampled sparsely. Returns RGBA bytes of the cells.
@@ -650,7 +673,11 @@ try {
   //    (the sky moves a sixth of the wheel), the Sky band shifted +60 (the band
   //    runs BEFORE the mask stage, so this one holds the early weight, as
   //    Foliage's walk did), and the grade with strong midtone and highlight
-  //    wheels. The saved file has to move with the screen.
+  //    wheels. The saved file has to move with the screen. The Luminance and the
+  //    curve follow, then the last two stages the arms left unwalked: the mask's
+  //    LUT strength, which needs a LUT laid on the whole photograph first
+  //    (`prep`), and its Shadow colour, which scales colour toward grey and keeps
+  //    the hue, so only the channel means (`means`) can see it.
   const MASK_ARMS = [
     { label: "mask mixer", what: "a Sky mask's mixer, every band +60", check: "hslHue", want: "60",
       set: async (page) => {
@@ -685,12 +712,60 @@ try {
       } },
     // The overall Luminance, the last stage but the LUT (042, stage 2b): the
     // shader sums the heads' offsets inside the loop that folds their weights,
-    // compileEdit sums them from the weights it kept. Its LUT-strength twin has
-    // no arm here: it needs a LUT applied, and join-fold-check holds that sum on
-    // the export's path alone.
+    // compileEdit sums them from the weights it kept. Its LUT-strength twin is the
+    // "mask LUT" arm below, which lays a LUT on first.
     { label: "mask luminance", what: "a Sky mask's Luminance, +0.75", check: "lum", want: "0.75",
       set: async (page) => {
         await setMaskValue(page, "lum", "0.75");
+      } },
+    // THE MASK'S OWN LUT STRENGTH (042, stage 2b). The LUT file stays the whole
+    // photograph's and the strength is an offset the mask adds where it reaches, so
+    // this arm lays a LUT on the whole photograph first (`prep`, before the bare
+    // view is read, so picking the mask is still held to changing nothing) and then
+    // takes the strength out of the Sky mask altogether, -1. The LUT trades red and
+    // blue, so the sky Aerochrome makes blue is orange under it and turns blue again
+    // inside the mask: the hue histogram moves by far more than its bar if the mask
+    // took the offset, and the shader and the export each have their own sum of it
+    // (compileEdit's from the weights it kept, the shader's inside the loop that
+    // folds them; join-fold-check holds the CPU sum alone). A screen that ignored
+    // the offset would show the orange sky and the saved file the blue one.
+    { label: "mask LUT", what: "a Sky mask's LUT strength, -1, over a LUT that trades red and blue at full strength, under Aerochrome", check: "lutStrength", want: "-1",
+      look: "lookEir", after: { skySmooth: "0" },
+      prep: async (page) => {
+        await page.setInputFiles("#lutFile", { name: "swap.cube", mimeType: "text/plain", buffer: Buffer.from(SWAP_CUBE) });
+        await page.waitForFunction(() => !document.getElementById("lutActive")?.hidden, null, { timeout: 30000 });
+        const said = await page.evaluate(() => document.getElementById("lutActiveName")?.textContent ?? "");
+        if (!/Walk swap/.test(said)) { fail(`mask LUT: the LUT row says "${said}" and not the colour table the arm imported, so nothing below measures it`); throw new Error("not armed"); }
+        await page.waitForTimeout(1500);
+      },
+      set: async (page) => {
+        await setMaskValue(page, "lutStrength", "-1");
+      } },
+    // THE MASK'S OWN SHADOW COLOUR (042, stage 2b, built last). An offset on the
+    // colour KEPT in the dark end, so -1 takes all of it out wherever the mask
+    // reaches; the shader and compileEdit each add the offset to the amount the whole
+    // photograph and a saved aim leave, weighted by the mask's weight as its loop
+    // folded it. The stage scales colour toward grey and keeps the hue, so this arm
+    // is measured by the channel means (`means`), which a loss of colour moves and
+    // the two measures every other arm uses do not.
+    // THE SKY IS NOT WHERE THE STAGE HAS COLOUR TO TAKE OUT. This arm first sat on the
+    // Sky mask, on the premise that the sky under Aerochrome is a dark teal, and its
+    // first run (step 208, this frame under Aerochrome, sky smoothing 0) read the
+    // premise off the screen: the Shadow colour at its lowest on the whole photo moved
+    // the largest channel mean 20.9 levels, on the Sky mask 1.1 and on the Sky mask
+    // inverted 22.0. The stage keys on luminance, and on this frame the colour it can
+    // take out is outside the sky. So the arm inverts the Sky mask (the mask place's
+    // Invert, in `place` below) and the bars are as they were: an arm that moves the
+    // screen 1.1 levels against a bar of 2.5 cannot tell a build that ignores the
+    // offset from one that honours it.
+    { label: "mask shadows", what: "a Sky mask's Shadow colour, -1 (all the colour out of the dark end), on the inverted Sky mask, under Aerochrome", check: "shadowSat", want: "-1",
+      look: "lookEir", after: { skySmooth: "0" }, means: true,
+      place: async (page) => {
+        await page.click("#mInvert");
+        await page.waitForTimeout(800);
+      },
+      set: async (page) => {
+        await setMaskValue(page, "shadowSat", "-1");
       } },
     // The mask's own master curve (042, stage 2b), lifting the shadows and the
     // midtones: the shader reads a row of the curve texture that compileEdit
@@ -780,6 +855,9 @@ try {
         await page.waitForTimeout(2500);
       }
       for (const [id, v] of Object.entries(arm.after ?? {})) await setValue(page, id, v);
+      // What an arm needs on the whole photograph BEFORE its mask exists (a LUT laid on),
+      // done ahead of the bare view so that picking the mask is still held to changing nothing.
+      if (arm.prep) await arm.prep(page);
       const bare = await settledView(page);
       // A geometry arm keeps the bare photograph on its grid, so what the box changed can be told from the scene's own edges.
       const bareCells = arm.geometry ? await page.evaluate(`(() => { ${GEO_JS} return Array.from(grid(view, view.width, view.height)); })()`) : null;
@@ -820,12 +898,16 @@ try {
       // two arms moved the frame 0.4 points and passed with the export's half
       // thrown away, which is what this refuses.
       const armDh = dHist(pre.p, shown.p), armDl = Math.abs(pre.light - shown.light);
+      // A COLOUR-ONLY ARM IS ALSO SEEN BY THE CHANNEL MEANS (MEAN_SEE, above): the largest
+      // of the three means' change on screen, in levels of 255. Every arm prints it.
+      const armMean = Math.max(...shown.mean.map((m, i) => Math.abs(m - pre.mean[i])));
+      const meanSeen = !!arm.means && armMean > MEAN_SEE;
       // A GEOMETRY ARM IS EXEMPT FROM THIS ONE, because its effect is only inside a box
       // that covers a third of the frame and the two whole-frame measures cannot be
       // expected to clear their bars on that. Its own proof that it is seen is the
       // cell control below, which has to count cells over a bar for a box a column out.
-      if (armDh <= HUE_BAR && armDl <= 8 && !arm.geometry) { fail(`${label}: the arm moves the photograph only ${armDh}deg and ${armDl.toFixed(1)} points on screen, under both bars, so agreement here would prove nothing`); throw new Error("not armed"); }
-      if (arm.geometry) console.log(`  ${label.padEnd(12)} the arm moves the photograph ${armDh}deg and ${armDl.toFixed(1)} points on screen`);
+      if (armDh <= HUE_BAR && armDl <= 8 && !arm.geometry && !meanSeen) { fail(`${label}: the arm moves the photograph only ${armDh}deg and ${armDl.toFixed(1)} points on screen${arm.means ? ` and ${armMean.toFixed(1)} levels of the largest channel mean (bar ${MEAN_SEE})` : ""}, under every bar it is read by, so agreement here would prove nothing`); throw new Error("not armed"); }
+      if (arm.geometry || arm.means) console.log(`  ${label.padEnd(12)} the arm moves the photograph ${armDh}deg, ${armDl.toFixed(1)} points and ${armMean.toFixed(1)} levels of the largest channel mean on screen`);
       await page.click("#ptab-export");
       await page.click("#exBtn");
       await page.waitForFunction(
@@ -856,7 +938,10 @@ try {
       console.log(`  ${label.padEnd(12)} shown biggest bin ${String(shown.hue).padStart(3)} (${(shown.share*100).toFixed(0)}%) light ${shown.light.toFixed(1)}% mean ${JSON.stringify(shown.mean)}   [${arm.what}]`);
       console.log(`  ${"".padEnd(12)} saved biggest bin ${String(saved.hue).padStart(3)} (${(saved.share*100).toFixed(0)}%) light ${saved.light.toFixed(1)}% mean ${JSON.stringify(saved.mean)}`);
       console.log(`  ${"".padEnd(12)} ${dh}deg of hue apart (bar ${HUE_BAR}), ${dl2.toFixed(1)} points of lightness (bar 8)`);
-      if (dh > HUE_BAR || dl2 > 8) fail(`${label}: the preview and the export disagree on ${arm.what} — ${dh}deg and ${dl2.toFixed(1)} points. The shader and compileEdit read the mask's values or its weight differently.`);
+      // THE CHANNEL MEANS, for an arm that is seen by them: the screen's against the saved file's, the largest of the three.
+      const dMean = Math.max(...shown.mean.map((m, i) => Math.abs(m - saved.mean[i])));
+      if (arm.means) console.log(`  ${"".padEnd(12)} ${dMean.toFixed(1)} levels of the largest channel mean apart (bar ${MEAN_AGREE})`);
+      if (dh > HUE_BAR || dl2 > 8 || (arm.means && dMean > MEAN_AGREE)) fail(`${label}: the preview and the export disagree on ${arm.what} — ${dh}deg and ${dl2.toFixed(1)} points${arm.means ? ` and ${dMean.toFixed(1)} levels of the largest channel mean` : ""}. The shader and compileEdit read the mask's values or its weight differently.`);
       else ok(`${label}: preview and export agree on ${arm.what}`);
       if (arm.geometry) {
         // WHERE THE EFFECT STOPS, CELL BY CELL. The photograph on screen and the

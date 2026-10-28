@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=496304b0da9fe762
-diffhash=c487d6715c1e17ff
+diffhash=33c87c2c232e9ec6
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 03 of step 208 changes two files: src/share.ts, where a short confirmation is kept in view while a window opens over it (a watcher on dialogs opening and closing, and a host choice that prefers the dialog holding focus), and docs/ARCHITECTURE.md, one line count for that module. Both are the approved sequence's own work for this step. The patch was read whole, and it touches no file outside the plan's Files list.
+# IN-SCOPE: Sequence patch 04 of step 208 changes one file, tools/agreement-walk.mjs: two colour-only arms for the Sky mask's LUT strength and its Shadow colour, the channel-mean measure they are read by, and the walk's own comments. It is a test instrument with no reader-facing change, and it is the change the approved sequence names for this step. The Shadow colour arm was moved to the inverted Sky mask after its first run, as the step 208 report records, and the patch carries that change. The patch was read whole, and it touches no file outside the plan's Files list.
