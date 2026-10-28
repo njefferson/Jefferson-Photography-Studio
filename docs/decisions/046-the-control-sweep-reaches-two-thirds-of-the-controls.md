@@ -38,6 +38,23 @@ and finish dialogs (`session*`, `finish*`, five), the quick look (`ql*`,
 three), and installed-only or failure-only states (`shareBtn`, `a2hsInstall`,
 `a2hsClose`, `glLostReload`). The other fifteen are single controls.
 
+**The floating lesson button, read to the end on 2026-10-26.** `ir.html#lessonShow` is
+the "?" that Got it raises when a lesson card was open with learn mode off, and the
+walk could not press it. The question was whether any route puts the card up with
+learn mode off, so `src/main.ts` was searched for every use of the card, the chips and
+learn mode, and read by line from the place its NUL bytes stop a search to its end.
+There is none, and the
+button is one nobody can reach in the shipped app. The card is raised in three places:
+`showLesson`, called by a numbered chip (the rail is hidden whenever learn mode is off,
+and Home, opening any photograph and Exit lessons each hide it) and by the practice
+gallery's open straight after it turns learn mode on; the return from Home, which
+restores a parked card only if learn mode is on; and the button's own press. Got it
+raises the button only when learn mode is off. So the walk's line in `.control-allow`
+stays, and now says it is read: the state is a call to `showLesson` with learn mode
+off, which nothing makes, and a route that did would be a decision about where the call
+lives, not a control to add, so none is built. The button and its handler are dead code
+until then.
+
 ## Looked up
 
 **Nothing outside bears on it, and that is the honest answer.** This is not a
