@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=496304b0da9fe762
-diffhash=5f811707aee7dc34
+diffhash=b2f4eed5f94be222
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 09 of step 208 changes NOTES.md only, adding the open findings of the last plan to the queue (Q-JPS-115 to Q-JPS-146). Each line records a finding that was left open and is not fixed here. No code, no reader-facing copy and no record changes. The patch was read whole, and it touches no file outside the plan's Files list.
+# IN-SCOPE: Sequence patch 10 of step 208 changes IR-SCIENCE.md (the superseded markers on the earlier Kelvin and channel blocks, and the research section on Lightroom's Temperature and Tint through the camera profile), NOTES.md (the roadmap entry for record 102, marked open and not built) and adds docs/decisions/102, the record the approved plan's research step wrote. It is research and record work only, with no code and no reader-facing behaviour changed. The patch was read whole, and it touches no file outside the plan's Files list.

@@ -2742,6 +2742,26 @@ user-scalable=no.
 > ships as **2.0**, not 1.2 (owner call, 2026-07-18). The big-image / full-bleed direction
 > continues as the parallel design track below.
 
+- [ ] **The whole-photo white balance is Lightroom's Temperature and Tint, read through the camera's profile** <!-- decision: 102 -->
+  **Shown as:** Temperature and Tint on the Basic tab will read the way Lightroom reads a raw file, on its 2000 to 50000 scale and its minus 150 to 150 tint, through the camera profile in use, with a switch for the profiles you have loaded.
+  Researched on 27 October 2026 and not yet built. The Temperature and Tint on staging count
+  steps of the three gain sliders (the 24 October pair of record 101), and a 25 October plan
+  that read them as Kelvin through the camera's stock matrix was never applied; Lightroom
+  shows neither. Lightroom reads a raw file's white through the camera profile chosen in its
+  profile browser, which for these photographs is Rob Shea's Infrared Temp -100 or -50, each
+  with two colour matrices blended by the white's own temperature. Read through them by
+  Adobe's own conversion, the data-found balances of 32 Nikon Z 50 raws land at 7414 K to
+  13211 K under -100 (median 10056 K) and 2948 K to 3526 K under -50 (median 3232 K), inside
+  Lightroom's scale both times. The chosen shape reads the profile the file embeds, else one
+  the reader loads for the camera through a door like the colour-table import, else the
+  camera's stock matrix; a switch beside the sliders chooses between them and is saved with
+  the photograph's edit; the three gains stay beneath as the exact state. The shared test
+  folders hold no DNG, so the conversion cannot be compared with Lightroom's own figures from
+  them, and whether the app may carry the two Z 50 profiles inside itself is a question of
+  terms the files and the pages do not settle. See
+  `docs/decisions/102-the-whole-photo-white-balance-is-lightrooms-temperature-and-tint-read-through-the-cameras-profile.md`
+  and IR-SCIENCE.md section 3.
+
 - [ ] **Wires, pylons and roof fittings sit inside the look's sky selection, and the sky stages colour them** <!-- decision: 087 -->
   **Shown as:** internal
   Seen on both devices 2026-10-11, on production 2.65.13 and staging 2.65.14: under

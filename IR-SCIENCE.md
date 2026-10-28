@@ -203,6 +203,14 @@ still open after this.
   - The Z 50 Online Manual and darktable's preset table: as cited in the paragraph
     above.
 
+**SUPERSEDED on 27 October 2026 by record 102 and the two blocks after this one;
+kept for its readings.** The pages named below were fetched and read whole on 25 and
+27 October, so the statement that they were not fetched no longer holds; and the last
+paragraph of this block, which defines the app's Temperature and Tint on the camera's
+own three channels and says a Kelvin and tint pair through the camera matrix was not
+built, is replaced by Lightroom's Temperature and Tint read through the camera's
+profile (record 102).
+
 **The published infrared method for setting a balance, read 2026-10-23, and the
 scale the app builds on it.** Two pages of Rob Shea's site, robsheaphotography.com,
 were read on 23 October 2026 through the summaries a web search returned for them,
@@ -246,6 +254,241 @@ A Kelvin and tint pair through the camera matrix was not built: these raws' whit
 points lie below the scale the stock profiles cover, which is the limit the shifted
 profile exists to get round. The two pages do not settle whether the camera can store
 a measured balance; section 3's paragraphs above still stand on that.
+
+**Step 200's build of 25 October 2026, superseded on 27 October (record 102), kept as
+readings.** A plan of 25 October built the Temperature and Tint as a Kelvin pair read
+through the camera's STOCK matrix: the Planckian locus computed from Planck's law and the
+CIE 1931 observer below the SDK's table, one row of that table corrected, the sliders in
+mired, and their ends read off this camera's raws. Its patch was cut and never applied,
+so none of it is in this tree. What it read is kept here, each with how it was taken:
+
+- **The SDK's `dng_temperature.cpp`**, a copy of Adobe's SDK 1.4 file of 2012 in a third
+  party's repository on the raw GitHub host: a 31-row table from Wyszecki and Stiles
+  (second edition, page 228), a tint scale of minus 3000 per unit of distance in CIE 1960
+  uv, and below 1667 K an inverse that extends the last two rows in a straight line.
+  Downloaded whole and read whole by that plan, and read whole again on 27 October.
+- **One row of that table is out.** The row for 325 mired prints u as 0.24702, where
+  Planck's law summed against the CIE 1931 observer gives 0.24792 there and the other 29
+  rows agree with the same computation to within 6 units of 0.00001: a gap of 90 units,
+  about 2.7 units of tint. The printed Wyszecki and Stiles table was not read.
+- **The straight-line extension leaves the locus.** Against Planck's law it is out by
+  0.5 units of tint at 1600 K, 4.3 at 1429 K, 14.8 at 1250 K, 54 at 1000 K and 258 at
+  667 K. Planck's law with the second radiation constant 0.014388 metre kelvin, 380 to
+  780 nm at 5 nm against the observer table in RawTherapee's `colortemp.cc`, reproduced
+  the SDK's other 30 rows to within 2.2 units of 0.00001 in u and 6.0 in v. That file's
+  row for 360 nm prints a y a hundred times its neighbours' (a slipped decimal) and was
+  not used; darktable's `temperature.c` defines its tint by dividing the white's Y and is
+  not orthogonal to the locus by its own comments. Both read at the functions that matter
+  and not line by line.
+- **Thirty-two Nikon Z 50 raws of the shared test folders, no profile.** Opened at the
+  balance the app opens them at and read through the stock Z 50 matrix: 1651 K to 1733 K
+  (median 1688 K), 577 to 606 mired (median 592), tint minus 91.4 to minus 65.1 (median
+  minus 81.1). The slider ends that plan took from this were 1575 K to 1825 K and a tint
+  of minus 118 to minus 38, the data's own span moved outward by its own span.
+
+Why it is superseded: it shows figures Lightroom never shows for this camera. Lightroom
+puts an infrared white inside its own 2000 K to 50000 K scale by a camera profile shifted
+for infrared (below), so its figures for these raws are not 1700 K and minus 80; the
+stock-matrix pair put every raw at the cool edge of the SDK's table and took its slider
+ends from the raws instead of from Lightroom's scale; and the locus below the table and
+the corrected row depart from the table as Adobe printed it, which is the nearest reading
+available of the arithmetic that gives Lightroom's figures. The corrected row differs by
+2.7 units of tint at one temperature and no source read says Lightroom corrects it.
+
+**Lightroom's Temperature and Tint, read through the camera's profile (record 102), read
+27 October 2026.** The profile method of section 4 (Route 2) is also how Lightroom's own
+sliders reach an infrared white. What was read, and how each source was read:
+
+- **What the sliders are, for a raw file (Adobe).**
+  - The Lightroom Classic help page on image tone and color, read at its Temp and Tint
+    entries (lines 7300 to 7389 of the saved page): Temp "sets how yellow/warm or
+    blue/cool your photo looks", works "using the Kelvin color temperature scale", takes a
+    typed Kelvin value, and "you can adjust the color temperature as if you were changing
+    a setting in a camera during capture" for a raw file; for JPEG, TIFF and PSD files
+    the scale is minus 100 to 100 instead. Tint "sets how green or magenta your photo is":
+    left (negative) adds green, right (positive) adds magenta. The rest of the page was
+    not read.
+  - Adobe's XMP Camera Raw namespace, the source file of the documentation page (Adobe's
+    xmp-docs repository on the raw GitHub host, 52 lines, read whole): crs:Temperature is
+    an Integer, "Range 2000 to 50000"; crs:Tint is an Integer, "Range -150 to 150";
+    crs:WhiteBalance is one of As Shot, Auto, Daylight, Cloudy, Shade, Tungsten,
+    Fluorescent, Flash and Custom; crs:CameraProfile is the profile's name as text. The
+    schema gives ranges and no definition of either scale.
+- **The conversion (the DNG SDK).** Adobe's SDK 1.4 in the same third party's copy:
+  `dng_color_spec.cpp`, `dng_camera_profile.cpp`, `dng_temperature.cpp`,
+  `dng_xy_coord.cpp` and `.h`, `dng_tag_codes.h` and `dng_tag_values.h`, each downloaded
+  whole and read whole. Adobe's own copy was not reached (an address tried in the last plan
+  answered 404, and a mirror host refused); the id lines name the 1.4 files of May to July 2012.
+  - Between the two calibrations (`FindXYZtoCamera`). The white's own temperature decides.
+    At or below the first calibration's temperature the first matrix is used whole, at or
+    above the second's the second whole, and between them the first matrix's weight is
+    (1/T minus 1/T2) over (1/T1 minus 1/T2), linear in mired. The colour matrix, the
+    forward matrix and the camera calibration are blended by that one weight. A profile
+    with one matrix, or two equal temperatures, is treated as one matrix at 5000 K.
+  - The calibration temperatures come from the illuminant codes
+    (`IlluminantToTemperature`): Standard light A and tungsten 2850, ISO studio tungsten
+    3200, D50 5000, D55 and daylight 5500, D65 and cloudy weather 6500, D75 and shade
+    7500, and the fluorescents at the midpoints of their ranges. The codes are in
+    `dng_tag_values.h`: 17 is Standard light A, 20 D55, 21 D65, 22 D75, 23 D50. The
+    accessor that hands the temperatures to the colour specification is in the header
+    `dng_camera_profile.h`, which was not fetched; the file's own `HueSatMapForWhite`
+    uses the two calibration temperatures the same way, and the port below assumes the
+    accessor returns that function of the two codes.
+  - Matrices on load. A colour matrix is scaled so its greatest coordinate for the D50
+    white is 1 when it falls outside 0.99 to 1.01, then rounded to four places. A
+    forward matrix is rounded to four places and normalized so equal camera values map
+    to exactly the D50 white (the profile is judged valid when they map within 0.01).
+    Both profiles read below pass those checks.
+  - A neutral to an xy (`NeutralToXY`). Start at D50. At most 30 passes: the xy picks a
+    blended colour matrix; the inverse of that matrix times the camera neutral gives an
+    XYZ; its xy is the next estimate. It stops when the step is under 1e-7 in x plus y and
+    averages the last two estimates if it does not settle. The neutral may be of any
+    scale. The camera neutral is the reciprocal of the gains.
+  - An xy to a neutral (`SetWhiteXY`). The blended colour matrix times the white's XYZ
+    (Y = 1), scaled to a greatest entry of 1 and pinned to 0.001 to 1; the gains are the
+    reciprocals.
+  - A temperature and tint to an xy and back (`dng_temperature.cpp`). The 31 rows as
+    printed, from 0 to 600 mired, row 325 included; one unit of tint is a three-thousandth
+    of a distance in CIE 1960 uv. A positive tint is a white above the locus, on the green
+    side, which Adobe's help describes as the slider's magenta end (the photograph is
+    corrected toward magenta). Read by the port below the SDK's own standard whites give:
+    Standard light A 2854.9 K with tint minus 0.06; D50 5000.7 K, 9.56; D55 5502.3 K,
+    9.99; D65 6503.7 K, 9.77; D75 7506.4 K, 9.75.
+  - Below the table. `Set_xy_coord` keeps the temperature at 1667 K for a white beyond
+    the last row (its loop sets the distance to zero there) and carries the rest in the
+    tint along the last row's line; `Get_xy_coord` extrapolates the last two rows in a
+    straight line. The two directions are not mirror images below 1667 K. No white among
+    the raws read below came near it. At the other end the table stops at 10 mired, so
+    the SDK's temperature does not pass 100000 K.
+  - The instrument: `step206-sdk.mjs` in the session scratchpad, a line-for-line port of
+    those functions, made to fail first (the table's own 200 mired row reads 5000 K and a
+    tint of 0; a tint of 50 turned into an xy and read back reads 50; a planted table
+    moved by 0.01 in u misses by 291 K and 12 of tint; the eight matrices below pass the
+    SDK's checks and a planted forward matrix fails). It is a port of Adobe's sample code
+    of 2012. That Lightroom's shipped conversion is this arithmetic is NOT shown here.
+- **The profiles (the two files provided).** `Nikon_Z_50_Infrared_temp_-100.dcp` and
+  `Nikon_Z_50_Infrared_temp_-50.dcp` (109934 and 109932 bytes), read tag by tag with the
+  app's own TIFF reader (`src/raw/tiff.ts`, which tests only the first header byte for
+  the byte order, so the profile magic text passes): one IFD of 17 entries each.
+  - Same in both: UniqueCameraModel Nikon Z 50; CalibrationIlluminant1 17 (2850 K) and
+    CalibrationIlluminant2 21 (6500 K); ProfileCalibrationSignature com.adobe; the two
+    ForwardMatrix tags, ForwardMatrix1 0.4744, 0.3845, 0.1054, 0.2230, 0.7472, 0.0298,
+    0.0876, 0.0014, 0.7361 and ForwardMatrix2 0.4477, 0.3629, 0.1537, 0.2534, 0.7005,
+    0.0461, 0.1133, 0.0028, 0.7090; the hue and saturation tables (dimensions 90 by 25 by
+    1, two tables of 6750 values); the look table (36 by 8 by 16, 13824 values); a tone
+    curve of 7 points; ProfileEmbedPolicy 0; ProfileCopyright, whose text is the author's
+    name alone. No encoding tags, no baseline exposure offset, no default black render.
+  - Infrared Temp -100: ColorMatrix1 1.5713, -0.5289, 0.0166, -0.5096, 0.8821, 0.0571,
+    -0.0281, 0.0575, 0.2011; ColorMatrix2 1.4355, -0.3609, -0.0282, -0.6298, 0.9721,
+    0.0608, -0.1199, 0.1279, 0.1931.
+  - Infrared Temp -50: ColorMatrix1 1.7552, -0.7357, 0.0444, -0.5692, 1.2270, 0.1532,
+    -0.0314, 0.0800, 0.5395; ColorMatrix2 1.6334, -0.5114, -0.0771, -0.7166, 1.3774,
+    0.1662, -0.1364, 0.1812, 0.5276.
+  - So the two profiles differ ONLY in their colour matrices, as the D5300 pair read from
+    Lightroom DNGs in section 4 did. The colour matrices decide the Temperature and Tint
+    mapping and, through the weight above, how the forward matrices are blended.
+  - Terms. The copyright tag is the name alone and the pages state no terms. The embed
+    policy value 0 is, in the SDK's own comment, "freely embedable and copyable into
+    installations that encounter this profile, so long as the profile is only used to
+    process DNG files". This app would also read a NEF through such a profile, which that
+    comment does not cover. Whether the app may hold the matrices inside itself or must
+    take the profile from a file the reader picks is not settled by the tag or the pages.
+- **What the pages say about choosing between the two (Rob Shea's pages, each fetched
+  whole and read whole).**
+  - *Which infrared profile should I use?* (https://robsheaphotography.com/2025/07/18/which-infrared-profile.html;
+    published 18 July 2025, updated 21 September 2026): "The pack includes two profiles
+    for each camera, a negative 50 temperature shift and a negative 100 temperature
+    shift. These negative values represent a downward shift in color temperature, which
+    is required for white balancing the lower color temperatures of infrared light." "For
+    images shot with a 550 or 590 nanometer filter, use Infrared Temp -100 as these
+    filters need the most temperature shift. For images shot with a 720 nanometer filter,
+    I use Infrared Temp -50. These images still require a temperature shift, but just not
+    as much. If I use a 665 nanometer filter, which falls in the middle of the other
+    filters, I can use either one. If you're using an 830 nanometer or greater filter, you
+    don't need these profiles." "For color infrared images, when using your picker to set a
+    white balance, the color neutral elements of your image should be free from a color cast, regardless of which
+    of the two profiles you're using. If the temperature value is too close to 2,000 or
+    too close to 50,000, then you might not have a good white balance. Switch to the
+    other profile and try again. Ultimately, the numerical value of the temperature
+    slider is less important than the ability to separate your colors."
+  - *White Balancing Color Infrared Photography* (published 3 June 2025, updated 21
+    September 2026): "Select a Profile: Choose either Infrared Temp -50 or Infrared Temp
+    -100. Start with -100 for a more significant temperature shift." "Adjust White
+    Balance: Use the white balance picker and click on a neutral element in your image,
+    such as clouds or pavement." "Since the profile has shifted the temperature scale,
+    the values no longer represent actual Kelvin values. This isn’t as important as
+    achieving a white balance that cleanly separates the colors of your sky and foliage."
+  - *Infrared Profile Pack* (https://robsheaphotography.com/infrared-profile-pack/; the
+    page's own update stamp is 5 October 2026): "While the labels in Lightroom and Camera
+    will continue to display as 2,000 to 50,000, the actual temperature values supported
+    will be lower. This allows you to select a desired color temperature value within the
+    range of the slider. It’s as if we shifted the slider to support values from 0 to
+    25,000. Two profiles are included for each camera; Infrared Temp -50 and Infrared
+    Temp -100. Different combinations of cameras and infrared high-pass filters may react
+    differently to temperature shifts. This is why two profiles are included." "If the
+    color temperature value falls between 2,000 and 50,000, you should have a suitable
+    white balance." "If the color temperature is exactly 2,000 or 50,000, switch to the
+    other profile and repeat these steps." Where it is offered: "Subscribe to my
+    newsletter to access this free download." The page lists 496 camera models, Nikon Z 50
+    among them, and filters "from 515 to 780 nm".
+  - *Do I need custom profiles for infrared photography?* (published 26 December 2024,
+    updated 21 September 2026): the profiles come from the Adobe DNG Profile Editor or
+    from the pack, "two profiles for each camera support high-pass filters from 550 to
+    720 nanometers" (the page's video transcript); the editors that need a profile and
+    the editors that do not are the lists the 24 October block above gives.
+  - What the pages do not say, and so is not guessed: how close to 2,000 or 50,000 is
+    "too close" (the pack page says "exactly"); anything about carrying a profile from
+    one photograph to the next; anything about a NEF, whose profile Lightroom's profile
+    browser picks; any terms for the profiles beyond the free download.
+- **Where this camera's raws land under each profile (the SDK's method, the port).**
+  The data-found balances of the 32 Nikon Z 50 raws above, as step 200 printed their
+  gains, read as neutrals (the reciprocals).
+  - Infrared Temp -100: 7414 K to 13211 K, median 10056 K (76 to 135 mired, median 100);
+    tint 27.7 to 35.3, median 30.3. Every one has weight 0 on the first (tungsten)
+    matrix, so the second (D65) matrix alone, and the iteration settles in 3 passes.
+  - Infrared Temp -50: 2948 K to 3526 K, median 3232 K (284 to 339 mired, median 310);
+    tint minus 57.0 to minus 35.3, median minus 50.0. The weight on the first matrix is
+    0.66 to 0.94; 6 or 7 passes.
+  - Temperature and tint back to gains: within 0.000 percent under -100 and within 0.008
+    percent under -50.
+  - Neither profile puts any of the 32 near the ends of Lightroom's scale (2,000 K and
+    50,000 K), the sign Rob Shea's pages give for switching. No range is chosen from these
+    figures. The stock-matrix figures of step 200 above (median 1688 K and minus 81.1)
+    are the same photographs with no profile.
+  - What the SDK's method predicts for a Z 50 NEF at As Shot, where the camera's recorded
+    daylight pair (red 1.8574, blue 1.4668, green 1) is the neutral's reciprocal: under
+    -100, 100000 K with a tint of 227.1 (the SDK's own table limit, so Lightroom's
+    slider would sit at its 50000 end with the tint past its 150); under -50, 10653 K
+    with a tint of 133.7. This is the SDK's arithmetic and not a reading of Lightroom.
+- **The DNGs in the closed set of test photographs.** `tools/owner-images.json` holds 444 files and none has a name
+  ending in DNG (the 27 lines that mention .dng are the practice copies of NEF entries),
+  and the Lightroom DNG exports named in the comments of `src/color.ts` as carrying the
+  D5300 profile are not in it. So there is no file whose Lightroom Temperature and Tint
+  are known beside its embedded profile and as-shot neutral, and the conversion cannot
+  be compared with Lightroom's own figures from the closed set: it is held to the SDK's
+  points, and the one reading only Lightroom can give, a Z 50 NEF's figures under a named
+  profile at As Shot, is for a device pass.
+- **What the app does with a profile today.** A NEF names no profile and carries no
+  forward matrix; it is rendered through the per-model stock matrix and its white is
+  found from the data. A DNG is rendered from ONE calibration set (`dngCalibration` ranks
+  D65, D55, D75, D50, daylight, untagged, then the rest, over all three sets) through its
+  forward matrix when it has one (`dngCameraToSrgb`): the two sets are not blended by the
+  white's temperature, the profile's name (tag 50936), the as-shot neutral and white
+  (50728, 50729) and the XMP block are not read, and the hue and saturation tables, the
+  look table and the tone curve are not applied. Under -100 an infrared white takes
+  weight 0 on the first set, which is the set the app already renders from; under -50 the
+  weight on the first set is 0.66 to 0.94, so Lightroom would blend the forward matrices
+  and the app's one set would differ by the small gap between them. What a profile door
+  would reuse: the TIFF reader (it reads a profile file as it stands), and the zip index
+  and the prefix reader of `src/zip.ts` through `src/lutpack.ts`'s shape, since the pack
+  arrives as a zip.
+- **Not read, or not known.** Adobe's own copy of the SDK files; the header
+  `dng_camera_profile.h`; the printed Wyszecki and Stiles table; the profile pack's
+  readme and any terms in it (the pack sits behind a newsletter sign-up and was not
+  fetched); the author's page on installing profiles and the 2022 page with the same title as
+  the 2025 one, both linked from pages read and not fetched; the rest of Adobe's help
+  page; how Lightroom's shipped code differs from the 2012 sample, if it does; what
+  Lightroom displays for a Z 50 NEF under either profile.
 
 **So an infrared raw converter has to find the white point from the data.**
 That is what gray-world does here and what this app's "no 2000K floor" claim has
@@ -350,7 +593,9 @@ camera neutral — so they are white-balance calibrations, not two colour
 renderings, and with the app's white balance found from the data they now
 render alike. The profile's hue/saturation tables are still not applied. A NEF
 names no profile, so the D5300 NEF default stays the "-100" ColorMatrix
-(color.ts).
+(color.ts). The method was researched on 27 October 2026 as Lightroom's Temperature
+and Tint read through the profile's two colour matrices, with the two Z 50 profiles
+read tag by tag and the SDK's conversion read whole: section 3, record 102.
 
 **Route 3 — monochrome.** See section 2. Under-served here.
 
