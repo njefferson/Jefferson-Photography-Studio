@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=496304b0da9fe762
-diffhash=d6221b47887f1fc3
+diffhash=c487d6715c1e17ff
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 02 of step 208 changes NOTES.md only, one paragraph of the 2.67 staging entry. It says the sequence landed on staging in thirteen commits and that main was not moved, because the push that would have moved it was refused by the session's permission check. The approved plan's step 210 names exactly that record as the place the promotion's outcome goes. The patch was read whole, and it touches no file outside the plan's Files list.
+# IN-SCOPE: Sequence patch 03 of step 208 changes two files: src/share.ts, where a short confirmation is kept in view while a window opens over it (a watcher on dialogs opening and closing, and a host choice that prefers the dialog holding focus), and docs/ARCHITECTURE.md, one line count for that module. Both are the approved sequence's own work for this step. The patch was read whole, and it touches no file outside the plan's Files list.

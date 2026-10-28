@@ -18,6 +18,56 @@ export function isStandaloneApp(): boolean {
 
 let toastEl: HTMLDivElement | null = null;
 let toastTimer = 0;
+let toastWatch: MutationObserver | null = null;
+
+/** WHERE WORDS CAN BE SEEN RIGHT NOW. Takes nothing. Returns the open dialog
+ *  holding the focus, else the first open dialog, else the page's body.
+ *
+ *  A modal <dialog> paints in the top layer, ABOVE any fixed element — a toast
+ *  confirming a copy made from inside Help was invisible (review find,
+ *  2026-07-15). So the words are mounted inside the open dialog when there is one.
+ *
+ *  AND THE ONE ON TOP when two are open, which is the one holding the focus: a
+ *  modal makes everything under it inert, so focus can only be in the top one.
+ *  The first open dialog in DOCUMENT order is not that — a Keep refused while
+ *  the busy card was up put its toast inside the busy card, under the Quick
+ *  look the reader was pressing it in (decision 075).
+ *
+ *  What the caller relies on: the element returned is the one a reader looking
+ *  at the screen now sees on top, so a toast mounted there is not covered. */
+function toastHost(): HTMLElement {
+  const focused = document.activeElement?.closest<HTMLElement>("dialog[open]");
+  return focused ?? document.querySelector<HTMLElement>("dialog[open]") ?? document.body;
+}
+
+/** KEEP THE TOAST WHERE IT SHOWS WHILE IT IS UP. Takes nothing; returns nothing.
+ *  Moves the toast's one element to where `toastHost` says words can be seen now,
+ *  and does nothing when it is there already or no toast has been made.
+ *
+ *  Why it runs after the toast was mounted and not only when it is: a dialog that
+ *  OPENS after the words went up is modal and covers a toast left in the body,
+ *  and a dialog that CLOSES takes a toast mounted inside it away with it. Keeping
+ *  the words where a reader can see them is done by watching dialogs open and
+ *  close, since nothing that raises or takes down a card tells the toast.
+ *  What the caller relies on: after it returns the toast is not inside a closed
+ *  dialog and not under an open one. */
+function placeToast(): void {
+  if (!toastEl) return;
+  const host = toastHost();
+  if (toastEl.parentElement !== host) host.appendChild(toastEl);
+}
+
+/** Start watching dialogs open and close, once. Takes nothing; returns nothing.
+ *  A dialog's `open` attribute is what a modal opening and closing changes, so
+ *  that attribute, anywhere in the page, is the one thing watched, and the work
+ *  done on each change is `placeToast`, which moves one element and changes no
+ *  attribute, so it cannot call itself. A browser without MutationObserver keeps
+ *  the placing at the moment the words are shown, as before. */
+function watchDialogs(): void {
+  if (toastWatch || typeof MutationObserver !== "function") return;
+  toastWatch = new MutationObserver(placeToast);
+  toastWatch.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ["open"] });
+}
 
 /** A small, self-styled confirmation (used for the copy-link fallback and the
  *  look-sharing flows), so it looks the same on every surface regardless of
@@ -26,20 +76,13 @@ let toastTimer = 0;
  *  Takes `msg`, the words, and `ms`, how long they stay. Returns nothing; it
  *  mounts one reused element and fades it out after `ms`. What callers rely
  *  on: the words land somewhere the reader can SEE, which with a modal open
- *  means inside the modal on top — see the host choice below. */
+ *  means inside the modal on top (`toastHost`), and they STAY where a reader can
+ *  see them while they are up, even when a card opens over them a moment after
+ *  they were said (`placeToast`). */
 export function toast(msg: string, ms = 2200): void {
-  // A modal <dialog> paints in the top layer, ABOVE any fixed element — a
-  // toast confirming a copy made from inside Help was invisible (review find,
-  // 2026-07-15). Mount the toast inside the open dialog when there is one.
-  //
-  // AND THE ONE ON TOP when two are open, which is the one holding the focus: a
-  // modal makes everything under it inert, so focus can only be in the top one.
-  // The first open dialog in DOCUMENT order is not that — a Keep refused while
-  // the busy card was up put its toast inside the busy card, under the Quick
-  // look the reader was pressing it in (decision 075).
-  const focused = document.activeElement?.closest<HTMLElement>("dialog[open]");
-  const host = focused ?? document.querySelector<HTMLElement>("dialog[open]") ?? document.body;
+  const host = toastHost();
   if (toastEl && toastEl.parentElement !== host) { toastEl.remove(); toastEl = null; }
+  watchDialogs();
   if (!toastEl) {
     toastEl = document.createElement("div");
     toastEl.setAttribute("role", "status");

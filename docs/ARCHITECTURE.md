@@ -823,7 +823,7 @@ cannot describe something the code does not say about itself.
 - **`src/savefile.ts`** (66 lines) — GETTING A FILE OUT OF THE APP, and the one decision that governs it.
 - **`src/session.ts`** (599 lines) — Crash-safe store for a photo SESSION — the set you opened and are moving between, each photo keeping its own edit.
 - **`src/shadowcast.ts`** (252 lines) — THE SHADOW'S OWN ILLUMINANT, MEASURED FROM THIS PHOTOGRAPH (decision 034).
-- **`src/share.ts`** (156 lines) — Share / copy-link for the INSTALLED (standalone) app.
+- **`src/share.ts`** (199 lines) — Share / copy-link for the INSTALLED (standalone) app.
 - **`src/sky.ts`** (722 lines) — Classical sky detection (mask type 4).
 - **`src/sky.worker.ts`** (160 lines) — The sky selection, built off the main thread on a lane of its own.
 - **`src/skyClient.ts`** (224 lines) — The main thread's door to the sky worker (sky.worker.ts): hand it the 1024 px copy a decode came back with and get the selection as a promise.
