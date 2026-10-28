@@ -24,7 +24,7 @@
 // in this directory and roughly eighteen were not, including the export gate.
 //
 //   python3 -m http.server 8131 --directory dist   (in another shell)
-//   node tools/export-bytes-walk.mjs
+//   node tools/export-bytes-walk.mjs [--port=8131]
 //
 //   npm install --no-save esbuild playwright-core axe-core
 //
@@ -42,7 +42,9 @@ import { requireFreshDist } from "./fresh-dist.mjs";
 requireFreshDist();
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";
+// THE PORT THE BUILD IS SERVED ON, from --port like every walk that has one (walk-all.mjs passes it).
+const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
+const DIR ="/home/user/Jefferson-Photography-Studio/public/examples";
 const TWO = ["canopy.dng","hillside.dng"].map(f=>`${DIR}/${f}`);
 const INTERFERE = process.argv.includes("--interfere");
 // GLOW IS THE ONE THE EXPORT READS LATE. Everything else is folded in before
@@ -95,7 +97,7 @@ try {
       };
     });
   }
-  await p.goto("http://127.0.0.1:8131/ir.html");
+  await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
   await p.setInputFiles("#file", TWO);
   await p.waitForFunction((n)=>document.querySelectorAll("#sessionThumbs .session-thumb").length===n, TWO.length, {timeout:300000});
   await p.waitForFunction(()=>{const t=[...document.querySelectorAll("#sessionThumbs .session-thumb")];return t.every(x=>!x.disabled);},null,{timeout:300000});

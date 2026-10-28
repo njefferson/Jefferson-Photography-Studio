@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=496304b0da9fe762
-diffhash=60dcd2cc0d347639
+diffhash=70c8fe6efc926408
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 07 of step 208 changes two files: .control-allow, the one line that declares the floating lesson button as unreachable and says how that was read, and docs/decisions/046, a paragraph recording the same reading. Both are the control sweep's own declaration files and record, and the approved sequence carries them for this step. No source file and no reader-facing behaviour changes. The patch was read whole, and it touches no file outside the plan's Files list.
+# IN-SCOPE: Sequence patch 08 of step 208 changes src/main.ts (two batch-key separators written as an escape instead of a raw NUL byte, so the file holds no NUL bytes; behaviour of the batch's done-set is the same) and eight walk files under tools/ (each reads a --port flag where it hardcoded 8131, and the sweep keeps the one walk that brings its own server off the build's port). No reader-facing change. The patch was read whole, and it touches only src/ and tools/, which the plan's Files list names.

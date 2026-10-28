@@ -2,7 +2,7 @@
 // THE DECIDING KEYS, AND WHETHER THEY CAN BE REACHED AT ALL.
 //
 //   python3 -m http.server 8131 --directory dist   (in another shell)
-//   node tools/quicklook-keys-walk.mjs
+//   node tools/quicklook-keys-walk.mjs [--port=8131]
 //
 // NOT in .branch-guard's `also=`: it drives a real browser against a real
 // build, which is tens of seconds, not milliseconds. Run it before any release
@@ -35,7 +35,9 @@ import { requireFreshDist } from "./fresh-dist.mjs";
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
 
-const BASE = "http://127.0.0.1:8131";
+// THE PORT THE BUILD IS SERVED ON, from --port like every walk that has one (walk-all.mjs passes it).
+const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
+const BASE = `http://127.0.0.1:${PORT}`;
 const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";
 const SET_A = ["canopy.dng", "hillside.dng", "lodge.dng", "NIR_1830.dng"].map((f) => `${DIR}/${f}`);
 const SET_B = ["NIR_1873.dng", "NIR_1877.dng"].map((f) => `${DIR}/${f}`);

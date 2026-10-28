@@ -20853,14 +20853,14 @@ async function runBatch(files: File[]) {
     for (const m of await frameMetas()) {
       taken.add(m.name);
       totalBytes += m.size;
-      if (m.srcName !== undefined) doneInputs.add(`${m.srcName} ${m.srcSize}`);
+      if (m.srcName !== undefined) doneInputs.add(`${m.srcName}\0${m.srcSize}`);
     }
 
     for (let i = 0; i < files.length; i++) {
       if (batchStopRequested) { stoppedEarly = "user"; batchRemaining = files.slice(i); break; }
       if (totalBytes > BATCH_BYTE_BUDGET || heapNearFull()) { stoppedEarly = "memory"; batchRemaining = files.slice(i); break; }
       const f = files[i];
-      if (doneInputs.has(`${f.name} ${f.size}`)) { alreadyDone++; continue; }
+      if (doneInputs.has(`${f.name}\0${f.size}`)) { alreadyDone++; continue; }
       busyText.textContent = `Processing ${i + 1} / ${files.length} — ${f.name}`;
       try {
         const imported = guardLocation(await importFile(f));
@@ -20917,7 +20917,7 @@ async function runBatch(files: File[]) {
         // numbers describe exactly the set that's in the zip.
         if (noLens) noHotspot++;
         totalBytes += bytes.length;
-        doneInputs.add(`${f.name} ${f.size}`);
+        doneInputs.add(`${f.name}\0${f.size}`);
       } catch (err) {
         skipped.push(`${f.name} (${(err as Error).message})`);
       }

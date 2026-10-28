@@ -13,11 +13,13 @@
 // NOT in .branch-guard's `also=`: it drives a real browser. Run it before a
 // release, or through tools/walk-all.mjs, which finds it on disk.
 //
-// IT BRINGS ITS OWN SERVER, which no other walk here does — twelve of them also
-// ignore --port and hardcode :8131, so ignoring the argument is not what makes
-// this one different. What makes it different is that the behaviour under test
-// is a behaviour OF THE SERVER, so it cannot measure whatever is already
-// serving dist. It starts its own on :8137 (or --port) and closes it again.
+// IT BRINGS ITS OWN SERVER, which no other walk here does — five of them still
+// ignore --port and hardcode :8131 (the other six that did now read it), so
+// ignoring the argument is not what makes this one different. What makes it
+// different is that the behaviour under test is a behaviour OF THE SERVER, so it
+// cannot measure whatever is already serving dist. It starts its own on :8137 (or
+// --port) and closes it again. tools/walk-all.mjs therefore does not hand it the
+// port the build is served on: that port is taken, and the walk would refuse it.
 //
 // WHY IT NEEDS ITS OWN SERVER, and why no existing walk could have caught this.
 // Every other walk here is served by `python3 -m http.server`, which returns

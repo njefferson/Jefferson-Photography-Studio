@@ -27,6 +27,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const only = (process.argv.find((a) => a.startsWith("--only=")) || "").split("=")[1];
 const pick = only ? only.split(",").map((s) => s.trim()).filter(Boolean) : null;
+// A WALK THAT BRINGS ITS OWN SERVER is not handed the port the build is served on. It
+// would try to bind that port, find the server already holding it and refuse, and the
+// sweep would report a failure that is about the sweep and not the build. It keeps the
+// port its own --port defaults to (8137), which it opens and closes itself.
+const OWN_SERVER = new Set(["offline-shell-walk.mjs"]);
 
 const walks = readdirSync(here)
   .filter((f) => f.endsWith("-walk.mjs"))
@@ -47,7 +52,7 @@ requireFreshDist();
 const run = (file) =>
   new Promise((res) => {
     const t0 = Date.now();
-    const p = spawn(process.execPath, [join(here, file), `--port=${PORT}`], { stdio: ["ignore", "pipe", "pipe"] });
+    const p = spawn(process.execPath, OWN_SERVER.has(file) ? [join(here, file)] : [join(here, file), `--port=${PORT}`], { stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     p.stdout.on("data", (d) => (out += d));
     p.stderr.on("data", (d) => (out += d));

@@ -10,20 +10,22 @@
 // in this directory and roughly eighteen were not, including the export gate.
 //
 //   python3 -m http.server 8131 --directory dist   (in another shell)
-//   node tools/verdicts-walk.mjs
+//   node tools/verdicts-walk.mjs [--port=8131]
 //
 //   npm install --no-save esbuild playwright-core axe-core
 //
 // NOT in .branch-guard's `also=`: it drives a real browser and decodes RAW
 // files. Run it before a release, or through tools/walk-all.mjs.
 // PICK AND REJECT ON THE SESSION — durable, painted by the reconcile, and not
-// an edit. Needs dist/ served on :8131.
+// an edit. Needs dist/ served on :8131, or on the port --port names.
 import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
-const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";
+// THE PORT THE BUILD IS SERVED ON, from --port like every walk that has one (walk-all.mjs passes it).
+const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
+const DIR ="/home/user/Jefferson-Photography-Studio/public/examples";
 const FOUR = ["canopy.dng","hillside.dng","lodge.dng","NIR_1830.dng"].map(f=>`${DIR}/${f}`);
 let failed=0;
 const check=(n,g,w)=>{const ok=JSON.stringify(g)===JSON.stringify(w);if(!ok)failed++;console.log(`${ok?"ok  ":"FAIL"}  ${n}\n        got ${JSON.stringify(g)} want ${JSON.stringify(w)}`);};
@@ -71,7 +73,7 @@ try {
   const p = await ctx.newPage();
   p.on("pageerror", e => { console.log("FAIL  page error: " + e.message); failed++; });
   p.on("dialog", d => d.accept());
-  await p.goto("http://127.0.0.1:8131/ir.html");
+  await p.goto(`http://127.0.0.1:${PORT}/ir.html`);
   await openSet(p, FOUR);
 
   await stepTo(p, 1); await key(p, "x");
@@ -149,7 +151,7 @@ try {
     const c2 = await b.newContext({ viewport: { width: 1280, height: 950 } });
     const q = await c2.newPage();
     q.on("pageerror", e => { console.log("FAIL  page error: " + e.message); failed++; });
-    await q.goto("http://127.0.0.1:8131/ir.html");
+    await q.goto(`http://127.0.0.1:${PORT}/ir.html`);
     await q.setInputFiles("#quickFiles", FOUR);
     await q.waitForFunction((n)=>{const c=document.getElementById("qlCount");return !!c&&!document.getElementById("qlGrid")?.dataset.busy&&document.querySelectorAll("#qlGrid .ql-cell").length===n;}, FOUR.length, {timeout:300000});
     await q.keyboard.press("p");
