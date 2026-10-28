@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=496304b0da9fe762
-diffhash=70c8fe6efc926408
+diffhash=5f811707aee7dc34
 verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 08 of step 208 changes src/main.ts (two batch-key separators written as an escape instead of a raw NUL byte, so the file holds no NUL bytes; behaviour of the batch's done-set is the same) and eight walk files under tools/ (each reads a --port flag where it hardcoded 8131, and the sweep keeps the one walk that brings its own server off the build's port). No reader-facing change. The patch was read whole, and it touches only src/ and tools/, which the plan's Files list names.
+# IN-SCOPE: Sequence patch 09 of step 208 changes NOTES.md only, adding the open findings of the last plan to the queue (Q-JPS-115 to Q-JPS-146). Each line records a finding that was left open and is not fixed here. No code, no reader-facing copy and no record changes. The patch was read whole, and it touches no file outside the plan's Files list.
