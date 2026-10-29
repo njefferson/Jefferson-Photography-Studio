@@ -1,12 +1,8 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=34f2f15157ff7c2f
-diffhash=e05588ec597f2fb5
-verdict=IN-SCOPE: every changed file is in the Files list, and every change is the typed Temperature and Tint fix and its record.
-# IN-SCOPE: every changed file is in the Files list, and every change is the typed Temperature and Tint fix and its record.
+planhash=c805edb43e76a412
+diffhash=538c0316c7aa4715
+verdict=IN-SCOPE: the working copy changes ident-guard.mjs, ledger.mjs and NOTES.md, all three named in the plan Files list and all answering step 230
+# IN-SCOPE: the working copy changes ident-guard.mjs, ledger.mjs and NOTES.md, all three named in the plan Files list and all answering step 230
 # 
-# Judged by this agent from the git diff stat and the diff of src/balancestore.ts, src/main.ts, ir.html and docs/ARCHITECTURE.md. The eight changed files are .plan-scope, IR-SCIENCE.md, NOTES.md, docs/decisions/102 (record 102), docs/ARCHITECTURE.md, ir.html, src/balancestore.ts and src/main.ts. All eight are named in the Files list. No file outside it is changed, and src/tile.ts, src/kelvin.ts, src/diagnostic.ts and .contract-allow are untouched.
-# 
-# Source: src/balancestore.ts adds exactBalance, the exact gains for a typed number with the geometric mean held, and its header states the two routes. src/main.ts adds the exactWb remembrance set, uses exactBalance in balanceInput for a typed number only, and keeps the stored gains in syncFromUI while the sliders still stand at their nearest positions. Each of these is what the plan's stage 2 asked for. The contract comments in main.ts are the ones the plan required for the functions it edited. ir.html changes one note's wording to say a typed number is taken exactly. docs/ARCHITECTURE.md changes only the two line counts and no description.
-# 
-# Not judged here: the content of IR-SCIENCE.md, record 102 and NOTES.md, which were judged by path and by the diff stat only. The check's own output shows the owner's messages and the earlier verdict, which was not used as the basis of this one.
+# The diff of the app working copy on staging touches three files only. ident-guard.mjs gains the per-thread ledger read first, the harness saved print path passing, and the exponent figure passing. ledger.mjs gains the per-thread ledger file with its thread key and path function. NOTES.md gains Put right in step 230 clauses on Q-JPS-20 and Q-JPS-143 to Q-JPS-146, and no other queue line changes. Each change answers a Found key named in the plan. Nothing outside the Files list is changed. git status lists only these three files as modified, with .plan-scope and .claude/PLAN not yet written, which the scope record itself produces.

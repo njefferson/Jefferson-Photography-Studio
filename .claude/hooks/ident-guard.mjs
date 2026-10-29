@@ -125,6 +125,45 @@
 // one `plan-guard.sh` makes, and in each case the question was which failure
 // leaves somebody able to act.
 //
+// ## TWO LEDGERS, THE CALLING THREAD'S OWN FIRST
+//
+// `ledger.mjs` records every result twice: in a file shared by every thread of
+// the session and in a file for the thread that made the call (`main`, or
+// `agent-<id>` from the `agent_id` the payload carries). This checks the
+// calling thread's own file first and the shared one for what is still missing.
+// With the shared file alone, a status print, a review's reads or a sibling
+// agent's listing pushed a thread's own print off the front of the cap and an
+// honest value was refused (Q-JPS-20, Q-JPS-143). A value no thread printed is
+// in neither file and is still refused. The rejected alternative was reading
+// the thread's transcript when the ledger misses: it parses many megabytes for
+// one lookup, depends on the transcript's layout, and holds the session's own
+// words beside the tool results, which would let a value the session produced
+// vouch for itself.
+//
+// ## A PATH THE HARNESS WROTE
+//
+// The harness saves a long result, and a hook's output, in a file under
+// `<transcript folder>/<session id>/tool-results/`, and the next call names
+// that file to read it. The file's name carries a run of hex characters this
+// session never typed or printed, so the call was refused (Q-JPS-144,
+// Q-JPS-145). A path passes when it begins with that folder, is made of plain
+// name characters with no `.` or `..` segment, and the file is there on disk.
+// The folder comes from the payload's own `session_id` and `transcript_path`,
+// the second form covering a subagent whose transcript sits beneath the
+// session's folder. A path under any other folder, a path that leaves the
+// folder, a file that is not there and a hex run beside the path in the same
+// call are all still held to the ledgers.
+//
+// ## A FIGURE IN EXPONENT FORM
+//
+// Digits, then `e` or `E`, then one to three digits (or a sign and one to three
+// digits) is a number and not an identifier, the same reading as a run of
+// decimal digits alone (Q-JPS-146). The exponent is bounded at three digits
+// because a number does not need more and a longer tail reads as a hex run. A
+// hex run that happens to be digits around a single `e` passes as a number: for
+// a 7-character short form that is roughly one in a hundred, and it falls with
+// every added character.
+//
 // ## WHAT IT CANNOT SEE
 //
 //   - A value the owner typed in chat. It was read by a person, not by a tool,
@@ -132,10 +171,12 @@
 //     gate asks for anyway: go and read it — run the command that prints it.
 //   - A token assembled inside the tool call from pieces, or built by the
 //     shell. The gate sees the pieces.
-//   - A token that has scrolled off the front of a trimmed ledger. Refused,
+//   - A token that has scrolled off the front of the calling thread's own
+//     trimmed ledger, which only that thread's own prints can fill. Refused,
 //     although honest. `ledger.mjs` documents why that direction was chosen.
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { ledgerPath, LEDGER_CAP } from './ledger.mjs';
+import { posix } from 'node:path';
+import { ledgerPath, threadLedgerPath, LEDGER_CAP } from './ledger.mjs';
 
 /** English words spelled entirely out of a-f, seven characters or longer.
  *  A LIST and never a pattern — see the header. It grows only on a MEASURED
@@ -164,7 +205,10 @@ export const HEX_WORDS = new Set([
  *  git's describe form, which git resolves to the commit after it. A run of
  *  decimal digits alone is a number, not an identifier: the first version
  *  refused 3600000, a byte count and a date. A forty-character SHA with no
- *  letter in it has odds near seven in a billion. */
+ *  letter in it has odds near seven in a billion.
+ *
+ *  A figure in exponent form is a number too: digits, then `e`, then a short
+ *  exponent (see the header). It is dropped the same way. */
 export function hexTokens(serialised) {
   const s = String(serialised ?? '');
   const seen = new Set();
@@ -174,6 +218,10 @@ export function hexTokens(serialised) {
     const at = m.index + m[0].length - tok.length;
     const low = tok.toLowerCase();
     if (/^\d+$/.test(tok)) continue;
+    // A figure in exponent form: digits, `e`, one to three digits; or digits and
+    // `e` with a signed one-to-three-digit exponent after it. See the header.
+    if (/^\d+e\d{1,3}$/i.test(tok)) continue;
+    if (/^\d+e$/i.test(tok) && /^[+-]\d{1,3}(?![0-9a-z])/i.test(s.slice(m.index + m[0].length))) continue;
     if (HEX_WORDS.has(low)) continue;
     // `#rrggbbaa`. The six-digit form is already under the floor; the
     // eight-digit one is not, and this repository's stylesheets use it. Narrow
@@ -199,6 +247,50 @@ export function hexTokens(serialised) {
 export function unread(tokens, knownText) {
   const known = String(knownText ?? '').toLowerCase();
   return tokens.filter((t) => !known.includes(t.toLowerCase()));
+}
+
+/** The folders in which the harness itself saves a long result or a hook's output.
+ *  Takes the hook payload (`session_id` and `transcript_path` are read; missing
+ *  fields are tolerated); returns the folder paths, each ending in a slash, or
+ *  an empty list when the payload does not name a session and a transcript.
+ *  What the caller relies on: a folder is returned only for the session the
+ *  call belongs to, so a print saved for another session is not passed, and
+ *  every folder is `<session folder>/tool-results/` for a session folder taken
+ *  from the transcript's own place, either beside the main transcript or above
+ *  a subagent's. A transcript path with a `..` segment, or that is not
+ *  absolute, yields none. */
+export function savedPrintRoots(payload = {}) {
+  const sid = String(payload?.session_id ?? payload?.sessionId ?? '');
+  const tp = String(payload?.transcript_path ?? payload?.transcriptPath ?? '');
+  if (!/^[A-Za-z0-9_-]+$/.test(sid) || !posix.isAbsolute(tp)) return [];
+  if (tp.split('/').includes('..')) return [];
+  const roots = new Set([`${posix.dirname(tp)}/${sid}/tool-results/`]);
+  const at = tp.indexOf(`/${sid}/`);
+  if (at >= 0) roots.add(`${tp.slice(0, at + sid.length + 1)}/tool-results/`);
+  return [...roots];
+}
+
+/** The serialised tool input with each path the harness saved a print to taken out.
+ *  Takes the serialised input, the folders from `savedPrintRoots`, and an
+ *  existence test (the file system's, unless a caller supplies one); returns
+ *  the input with each such path replaced by plain words that hold no hex run.
+ *  What the caller relies on: a path is taken out only when it begins with one
+ *  of the folders, continues in plain name characters with no `.` or `..`
+ *  segment, and the file is there. Anything else in the input, a hex run beside
+ *  the path included, is returned untouched and is searched for in the ledgers
+ *  as before. Nothing is taken out for a file that is not there, so a name
+ *  made up to look like a saved print passes nothing. */
+export function withoutSavedPrints(serialised, roots, exists = existsSync) {
+  let s = String(serialised ?? '');
+  for (const root of roots) {
+    const escaped = root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`${escaped}([A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*)`, 'g');
+    s = s.replace(re, (whole, rest) => {
+      if (rest.split('/').some((seg) => seg === '.' || seg === '..')) return whole;
+      return exists(root + rest) ? 'harness-saved-print' : whole;
+    });
+  }
+  return s;
 }
 
 /** The refusal, in the shape this family's PreToolUse hooks all use.
@@ -235,11 +327,16 @@ function main() {
   let serial = '';
   try { serial = JSON.stringify(input) ?? ''; } catch { serial = String(input); }
 
+  // A path the harness itself saved a print to is not an identifier anyone
+  // produced; it is taken out before the search. See the header.
+  serial = withoutSavedPrints(serial, savedPrintRoots(p));
+
   const tokens = hexTokens(serial);
   if (!tokens.length) return 0; // nothing to check; the ledger is irrelevant
 
   const file = ledgerPath(p);
-  if (!existsSync(file)) {
+  const own = threadLedgerPath(p);
+  if (!existsSync(file) && !existsSync(own)) {
     deny(
       `No identifier ledger at ${file}, and this call carries ${tokens.length === 1
         ? 'a hex identifier' : `${tokens.length} hex identifiers`}: ${tokens.join(', ')}.\n\n`
@@ -252,11 +349,17 @@ function main() {
     );
   }
 
-  let known = '';
-  try { known = readFileSync(file, 'utf8'); } catch (e) {
-    deny(`The identifier ledger at ${file} could not be read (${e?.message ?? e}), and this `
-      + `call carries: ${tokens.join(', ')}. Refusing rather than assuming.`);
-  }
+  // One ledger file's text, empty when there is no such file. A file that is
+  // there and cannot be read is a refusal, as it always was.
+  const readLedger = (f) => {
+    if (!existsSync(f)) return '';
+    try { return readFileSync(f, 'utf8'); } catch (e) {
+      deny(`The identifier ledger at ${f} could not be read (${e?.message ?? e}), and this `
+        + `call carries: ${tokens.join(', ')}. Refusing rather than assuming.`);
+    }
+    return '';
+  };
+  let known = readLedger(own);
   // The harness's OWN envelope — session id, cwd, transcript path — is text
   // this call was HANDED, not text produced by the model, so a hex run in it
   // is read and not recalled. `tool_input` is excluded: that is the thing
@@ -266,11 +369,16 @@ function main() {
     known += `\n${JSON.stringify({ ...p, tool_input: undefined, toolInput: undefined })}`;
   } catch { /* envelope is a bonus, never a requirement */ }
 
-  const bad = unread(tokens, known);
+  // The calling thread's own ledger and the envelope first; the shared ledger
+  // only for what is still missing, so a call that this thread's own file
+  // answers reads one file.
+  let bad = unread(tokens, known);
+  if (bad.length) bad = unread(bad, readLedger(file));
   if (!bad.length) return 0;
 
-  let size = 0;
-  try { size = statSync(file).size; } catch { /* reported as 0 */ }
+  const sizeOf = (f) => { try { return statSync(f).size; } catch { return 0; } };
+  const size = sizeOf(file);
+  const ownSize = sizeOf(own);
   deny(
     `${bad.length === 1 ? 'This hex identifier does' : 'These hex identifiers do'} not appear `
     + `anywhere in what this session has actually read: ${bad.join(', ')}\n\n`
@@ -284,8 +392,9 @@ function main() {
     + '`git log`, a list, a fetch — and use what comes back. Never extend a short form to a '
     + 'long one: this gate allows shortening a value it has seen and refuses lengthening one, '
     + 'because the start of a SHA is not the SHA.\n\n'
-    + `(Ledger: ${file}, ${size} bytes, capped at ${LEDGER_CAP}. A value read long enough ago `
-    + 'to have scrolled off is refused although it was honest — read it again.)',
+    + `(This thread's ledger: ${own}, ${ownSize} bytes; the shared ledger: ${file}, ${size} bytes; `
+    + `each capped at ${LEDGER_CAP}. A value this thread read long enough ago to have scrolled off its `
+    + 'own ledger is refused although it was honest — read it again.)',
   );
 }
 

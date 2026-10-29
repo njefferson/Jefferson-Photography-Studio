@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // A VALUE THIS SESSION NEVER READ IS A VALUE THIS SESSION INVENTED.
 //
-// A `PostToolUse` hook. It appends the RESULT of every tool call to one
-// rolling, session-local file. Nothing here refuses anything — this is only
+// A `PostToolUse` hook. It appends the RESULT of every tool call to two
+// rolling, session-local files, one shared by every thread of the session and
+// one for the calling thread alone. Nothing here refuses anything — this is only
 // the record. `ident-guard.mjs` beside it is the refusal, and it is useless
 // without this file: the two are wired together or neither is.
 //
@@ -49,6 +50,25 @@
 // REFUSAL and can never produce a false pass. The remedy when it bites is the
 // one the guard asks for anyway — go and read the value again.
 //
+// ## ONE LEDGER PER THREAD, BESIDE THE SHARED ONE
+//
+// The shared file is one file for the main thread and every agent, so whatever
+// the other threads print pushes a thread's own earlier print off its front: a
+// status print, a review's reads or a sibling agent's listing is enough. Twice
+// an honest value an agent had printed in its own run was refused for that
+// reason (Q-JPS-20, Q-JPS-143). So each thread has a file of its own as well:
+// `main` for the main thread and `agent-<id>` for a subagent, the id being the
+// `agent_id` the hook payload carries. Every result is appended to both.
+// Another thread's output cannot trim a thread's own file; only what that
+// thread prints can. The shared file is kept because a value another thread
+// printed was always usable by this one, and the guard checks the calling
+// thread's file first and the shared one after it.
+//
+// Both files are capped and trimmed the same way, so a thread that itself
+// prints more than the cap still loses its oldest print. That limit is stated
+// and not hidden: it is the same safe direction, a false refusal and never a
+// false pass.
+//
 // ## IT NEVER FAILS THE TOOL CALL
 //
 // Everything is wrapped and the exit code is always 0. A PostToolUse hook that
@@ -66,6 +86,10 @@
 // rule, one of them updated, is the defect class this repo has the most
 // lessons about. A guard reading a different file from the one the ledger
 // writes would refuse everything, forever, with nothing to see.
+//
+// A thread's own file is that same path with `.` and the thread key appended
+// (`threadLedgerPath`), derived by one exported function in both hooks for the
+// same reason.
 //
 // ## IT IS IMPORTABLE
 //
@@ -97,6 +121,34 @@ export function ledgerPath(payload = {}, env = process.env) {
     ?? env.CLAUDE_CODE_SESSION_ID ?? env.CLAUDE_SESSION_ID ?? 'no-session',
   ).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 96);
   return join(tmpdir(), `claude-ident-ledger-${key}.txt`);
+}
+
+/** Which thread of the session a hook payload belongs to.
+ *  Takes the hook payload (any shape; missing fields are tolerated); returns
+ *  `main` for the main thread and `agent-<id>` for a subagent, the id reduced
+ *  to a safe filename charset and at most 96 characters.
+ *  What the caller relies on: the SAME payload field names the thread in a
+ *  PreToolUse and a PostToolUse call (`agent_id`, present only when the call is
+ *  a subagent's), so the guard reading a thread's file lands on the file the
+ *  recorder wrote for that thread. The main thread and every agent get distinct
+ *  keys, and an agent whose id is the word main still differs from the main
+ *  thread. */
+export function threadKey(payload = {}) {
+  const id = payload?.agent_id ?? payload?.agentId;
+  if (id == null || String(id) === '') return 'main';
+  return `agent-${String(id).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 96)}`;
+}
+
+/** Where ONE THREAD's own ledger lives.
+ *  Takes the hook payload and an environment object; returns an absolute path:
+ *  the shared ledger's path with `.` and the thread key appended.
+ *  What the caller relies on: `ident-guard.mjs` calls this with ITS payload and
+ *  must land on the file this hook wrote with ITS payload, as `ledgerPath`
+ *  does, so the path may depend only on what a PreToolUse and a PostToolUse
+ *  call of one thread share: the session id, the environment override and the
+ *  thread key. The result never equals the shared ledger's path. */
+export function threadLedgerPath(payload = {}, env = process.env) {
+  return `${ledgerPath(payload, env)}.${threadKey(payload)}`;
 }
 
 /** The text of a tool result, whatever shape the harness sent it in.
@@ -164,7 +216,14 @@ function main() {
   try { raw = readFileSync(0, 'utf8'); } catch { return; }
   let p = null;
   try { p = JSON.parse(raw); } catch { return; } // nothing to record, nothing to say
-  appendToLedger(ledgerPath(p), readText(p));
+  const text = readText(p);
+  // TWICE, each on its own: the shared file for the whole session and the file
+  // of the thread that made the call. One failing must not stop the other.
+  for (const file of [ledgerPath(p), threadLedgerPath(p)]) {
+    try { appendToLedger(file, text); } catch (e) {
+      try { process.stderr.write(`ledger.mjs: ${file}: ${e?.message ?? e}\n`); } catch { /* ignore */ }
+    }
+  }
 }
 
 // ONLY WHEN RUN, NEVER WHEN IMPORTED. See the header.
