@@ -1,8 +1,18 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=c805edb43e76a412
-diffhash=538c0316c7aa4715
-verdict=IN-SCOPE: the working copy changes ident-guard.mjs, ledger.mjs and NOTES.md, all three named in the plan Files list and all answering step 230
-# IN-SCOPE: the working copy changes ident-guard.mjs, ledger.mjs and NOTES.md, all three named in the plan Files list and all answering step 230
+planhash=52bea50c20484df3
+diffhash=cf6634871499d138
+verdict=IN-SCOPE: the four edited documents and the one new record sit inside the records folder and document entries the plan names, and the one reworded line of record 024 is the edit the plan's step 241 reads as inside that folder entry, and no source or tool file has changed
+# IN-SCOPE: the four edited documents and the one new record sit inside the records folder and document entries the plan names, and the one reworded line of record 024 is the edit the plan's step 241 reads as inside that folder entry, and no source or tool file has changed
 # 
-# The diff of the app working copy on staging touches three files only. ident-guard.mjs gains the per-thread ledger read first, the harness saved print path passing, and the exponent figure passing. ledger.mjs gains the per-thread ledger file with its thread key and path function. NOTES.md gains Put right in step 230 clauses on Q-JPS-20 and Q-JPS-143 to Q-JPS-146, and no other queue line changes. Each change answers a Found key named in the plan. Nothing outside the Files list is changed. git status lists only these three files as modified, with .plan-scope and .claude/PLAN not yet written, which the scope record itself produces.
+# Reading of the working copy on staging at the time of this verdict, against the plan of 29 October at its current hash.
+# 
+# Changed, not staged: IR-SCIENCE.md (a 29 October block in section 3), NOTES.md (Q-JPS-150 clause, Q-JPS-151 and the roadmap bullet), docs/decisions/102 (one context paragraph and three Rejected entries marked closed on 29 October), and docs/decisions/024 (one line, the bold span of its measured counts reworded so the decisions check stops reading a three-digit number as a citation of record 103).
+# 
+# New, not staged: docs/decisions/103, the one new record the plan's Files list names under the records folder.
+# 
+# Lane A made no change to any tracked file (step 239 report), so no source or tool file is owed a commit.
+# 
+# The plan's Files list names docs/decisions/ as a folder entry with one new record, and step 241 of the plan says every record file below that folder is inside Files, including the reworded line of record 024, which the decisions check forced in step 240 and whose report records the reason. This verdict reads the plan that way. The earlier verdict on file, which disagreed about record 024, belonged to another plan and is not carried forward.
+# 
+# Nothing outside the Files list is staged, and no file of the profile files is in the diff.

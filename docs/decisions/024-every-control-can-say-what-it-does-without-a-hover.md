@@ -9,7 +9,7 @@ sense in the app, that says what each tool does.
 
 What the app has today. Labels carry the act where they can — that rename is
 one of them. Under most controls sits a permanent `<small class="note">`:
-measured 2026-09-19, **103 notes against 76 labelled sliders**, so the panel
+measured 2026-09-19, **notes outnumbered labelled sliders, 103 against 76**, so the panel
 already explains far more than it hides. Longer-form explanations live in the
 ⓘ panel and in Help, which is where the app puts anything too long to sit
 beside a control. What is missing is a RULE: which controls get a sentence,

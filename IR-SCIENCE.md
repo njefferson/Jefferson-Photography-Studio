@@ -568,6 +568,110 @@ figure, the function that gave it is named.
 - **What the app does not read.** No code reads a DNG's own As Shot neutral (tags 50728 and
   50729); the app reads each DNG's profile and finds the white from the data.
 
+**An infrared white with no profile loaded, read 29 October 2026 (record 103).** The blocks above
+put an infrared white inside Adobe's scale through a camera profile. This block asks what the
+Temperature and Tint should read when none is loaded, where the camera's stock matrix puts every
+infrared white from this camera at or below 1734 K. Nothing was rendered and no picture was
+opened: every figure is a reading of the gains, taken by scratch harnesses made to fail first over
+the app's own conversion, balance store, track functions and decoder bundled from the working
+copy. The whites are 37 data-found gains: the 32 shared raws' as step 200 printed them (to three
+decimals), four more raws of the shared folders and the keep file's photograph, decoded with the
+app's own decoder and read at the balance the page opens them at. The white the keep file's own
+edit holds is read apart, as a hand-set white.
+
+- **What the author's two profile files change, as arithmetic.** Read with the app's own reader
+  against the stock matrix the app holds for the camera. Each file's daylight (6500 K) colour
+  matrix is the stock matrix with its three XYZ columns multiplied by three constants: the worst
+  entry miss over the largest entry is 0.00002 for both files, the middle constant is the unit,
+  the X constant is above it and the Z constant below it by equal amounts, and that amount is
+  twice as large in the file that shifts more as in the other. The 2850 K matrix of each file is
+  not a scaling of the stock matrix (a miss of 0.11 and 0.14), and the app holds no 2850 K matrix
+  for the camera. So a camera neutral read through a file has the stock reading's X divided by the
+  larger constant and its Z by the smaller, which moves the white toward blue. Across the 32 raws
+  the file that shifts more moves every white by 465 to 503 mired (median 493) and its tint by +96
+  to +127; the other by 261 to 294 mired (median 283) and +29 to +35. The spread of the 32 whites
+  in mired, highest minus lowest, grows from 23.0 through the stock matrix to 59.2 and 55.6, and
+  the order of the 32 changes in 18 or 19 places because the stock reading holds five of them at
+  the table's last row. The medians reproduce record 102's, 10056 K and 3232 K. The file that
+  shifts more calls daylight a camera neutral much nearer to these whites than the stock matrix
+  does (the largest log-ratio from the raws' median gains is 0.33, against 0.95 for the stock
+  matrix and 0.72 for the other file), which is why its readings come out near 10000 K, the
+  geometric middle of Adobe's two ends in mired. The profiles are the author's work and are not
+  carried: no matrix, table or constant of either file is written here or anywhere in the
+  repository.
+- **A fact in the source, not asked:** `NIKON_D5300_COLOR_MATRIX` in `src/color.ts` is, by its own
+  comment, the shifting profile's daylight matrix for the D5300 read from Lightroom DNGs, so for
+  that body the stock reading is already a shifted one.
+- **darktable**, `src/iop/temperature.c` (2233 lines) and `src/common/illuminants.h` (587 lines)
+  of the master branch, fetched by a script through the session's proxy from the raw GitHub host
+  and read whole. Range: 1901 K to 25000 K (lines 49 and 50), tint 0.135 to 2.326, channel
+  coefficients 0 to 8; the temperature slider is created over exactly that range (2134 to 2136).
+  Method: Planck's law summed against the CIE 1931 observer below 4000 K and the CIE daylight
+  series from 4000 K (286 to 393); the tint divides Y and the file's own comments call it not
+  orthogonal to the locus (377, 399, 421). Below its lowest row: the requested temperature is
+  clamped to 1901 K before anything is computed (380 and 381) and the inverse, a binary search on
+  Z over X, clamps its answer to the limits (405 to 428), so a cooler white reads 1901 K and its
+  place survives only in the three coefficients. The colour calibration's locus is a spline fit
+  stated valid from 1667 K to 25000 K (illuminants.h 156 to 177; the reverse lookup scans the same
+  span, 540 to 580).
+- **RawTherapee**, `rtengine/colortemp.h` (647 lines, read whole) and `rtengine/colortemp.cc`
+  (459371 bytes) of the dev branch, same host and method. The code was read line by line (lines 1
+  to 36, 165 to 239, 4200 to 4310, 4580 to 4740, 4990 to 5120); the numeric spectral tables
+  between them were searched and not paged, and a search of the file for the temperature limits
+  and the black body finds every use. Range: 1500 K to 60000 K (colortemp.h 31 and 32). Method:
+  the white is computed directly from Planck's law at or below 4000 K, with no isotherm table
+  (colortemp.cc 4606 to 4609, 5017 to 5078), and the temperature is clipped at 1500 K
+  (178 to 189); the inverse is a binary search between the two limits (209 to 230). Robertson's
+  31-row isotherm table appears only in a function documented as valid from 1666.7 K and
+  returning -1 below it (4212, 4293 to 4295), used in the colour-rendering block only (4852). That
+  copy of the table prints u of 0.24792 at 325 mired (4258), the value Planck's law gives, where
+  Adobe's SDK prints 0.24702: a second copy of the table corroborates the digit slip in the row
+  record 102 keeps as Adobe printed it. Keeping it stands, since Lightroom's figures are the
+  convention.
+- **Adobe's SDK below 1667 K** (the saved whole copies of step 200 and 206, read again). Set_xy_coord
+  holds a cooler white at the last row, 1666.7 K, and carries the rest in the tint; Get_xy_coord
+  extrapolates the last two rows in a straight line. No source read computes the isotherms below
+  1667 K from the table; both darktable and RawTherapee compute the white from Planck's law
+  instead and clamp at a floor (1901 K and 1500 K).
+- **The table's warm end, from the page's own measurement of the keep file's hand-set white
+  (gains with the largest on red and the smallest on blue, the red and blue swap on).** It reads
+  45993 K inside the scale through the stock matrix and 100000 K, the clamp of the 10 mired row
+  with the rest of the distance in a tint of 216 and 97, through either of the author's files;
+  a ten-step move toward cooler changes the red-to-blue gain ratio by 0.05 to 0.09 in the first
+  case and from 2.60 to 0.94 and 1.66 in the second. Through the shift computed in this block
+  the same state reads 100000 K and a tint of 116 to 204. The warm end is the cool end's twin:
+  a white bluer than the last row is held at it and the rest is carried in the tint, so a move
+  from there is discontinuous. The extension chosen first below the table does not touch it,
+  because no white read through the stock matrix comes near it.
+- **Where the stock matrix stops expressing a white.** With the SDK's pin of a thousandth per
+  channel, a channel falls under a thousandth of the largest at 535 K for tints of -90, -80 and
+  -65 and at 1060 K for tint 0. Typed whole kelvin from 1400 K to 2200 K at four tints read back
+  as typed in 644 of 644 cases through Planck rows below the table, against 428 of 644 through
+  the app's conversion today.
+- **The candidates, 37 data-found whites each.** Today (stock matrix, 2000 K to 50000 K): inside
+  the scale 0, the thumb at the cool end on all 37, a drag toward cooler moves nothing; readings
+  1666.7 to 1733.9 K, five of them held at 1666.7 K. The scale extended below the table by Planck's
+  law with a floor of 1500 K, and with a floor of 500 K: inside 37, a drag and a ten-step jump
+  each way right on 37, typed whole numbers read back as typed on 37; readings 1650.9 to 1733.9 K;
+  room to the cool end 61 to 90 mired at the coolest whites (1500 K floor); the hand-set white
+  stays at 45975 K. A shift computed from the camera's own stock matrix and the data-found white
+  (the stock matrix with its X and Z columns scaled so that the found white reads at the middle of
+  the thumb, 260 mired, 3846 K): the same 37 of 37; typed-back worst miss 0.020 percent against
+  0.302 for the extended locus; per photograph every raw opens at the same number; with one shift
+  fixed per camera from the 32 raws' median white the other five raws read 3767 K to 4091 K and
+  the 32 by leave-one-out 3591 K to 4098 K; the hand-set white reads past the scale from a
+  placement of the found white at 3500 K upward and inside it from 3000 K downward; placed at
+  10000 K the computed scales were within about 6 percent of the shifting file's. darktable's
+  clamp: every white reads 1901 K, 0 of 37, typing back the shown whole numbers misses by up to
+  13.9 percent. The planted-white control: the extended locus gives gains identical to today's
+  above the table (0.0000 percent) and 1.2 percent different from today's straight-line
+  extension at 1500 K; the shifted reading of a photograph's own white gives its own gains to
+  within 0.005 percent. Record 103 chooses the extended locus first and keeps the shift.
+- **Not read, or not known.** The spectral data tables of colortemp.cc; Adobe's own SDK copy; what
+  Lightroom shows for a white cooler than its own table; whether a visible-light raw would want
+  the computed shift at all (the stock reading is already inside the scale for it, and none is
+  among the shared files).
+
 **So an infrared raw converter has to find the white point from the data.**
 That is what gray-world does here and what this app's "no 2000K floor" claim has
 always meant. The floor belongs to KELVIN sliders on stock profiles, because no

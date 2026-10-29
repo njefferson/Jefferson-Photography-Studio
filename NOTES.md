@@ -2267,7 +2267,8 @@ Q-JPS-146: the same guard reads a figure in exponent form with six or more digit
 Q-JPS-147: at the same Temperature, Tint and profile the app's picture is darker than Lightroom's JPEG in the sky by 3 to 75 levels in a channel and in the shadow by 10 to 80, and higher in contrast, on five exports of one Z 50 photograph; the white balance does not explain it, and none of the candidates is separated: the profile's hue and saturation tables, its tone curve, its baseline exposure, Lightroom's default rendering and the app's automatic exposure (steps 223 and 225).
 Q-JPS-148: a DNG made under Lightroom's Adobe Color look carries a table for it that nothing in the app reads, and under Adobe Standard the app's grass band is a flat pink where Lightroom's shows its blades; whether the look explains it is not separated (steps 223 and 225).
 Q-JPS-149: no code reads a DNG's own As Shot neutral (tags 50728 and 50729), and all five exports carry the camera's recorded 5200 K pair there, so a DNG's As Shot reading is a function of its profile alone: 5101 K and tint 18 under Adobe Standard, 10653 K and 134 under -50, 100000 K and 227 under -100 (steps 223 and 225).
-Q-JPS-150: at open under Adobe Standard the page reads 1667 K and tint -70 where the same file's Temperature in Lightroom is 5100 K and the app's own reading of the camera's recorded pair is 5101 K, because a raw opens at the balance found from its data by the standing ruling; nothing changes it here (steps 223 and 225).
+Q-JPS-150: at open under Adobe Standard the page reads 1667 K and tint -70 where the same file's Temperature in Lightroom is 5100 K and the app's own reading of the camera's recorded pair is 5101 K, because a raw opens at the balance found from its data by the standing ruling; nothing changes it here (steps 223 and 225). Record 103 (29 October 2026) measures how that white can read inside the scale with no profile loaded; the opening balance stays the one found from the data (step 240).
+Q-JPS-151: a white that reads at an end of the SDK's table makes a move discontinuous: the keep file's hand-set gains read 100000.0 K (the 10 mired row's clamp, tint 216 and 97.2) under the two pack profiles, and a ten-step move toward cooler there changes the red-to-blue gain ratio from 2.6010 to 0.9353 and 1.6620, where through the stock matrix the same gains read 45993.0 K inside the scale and the same moves change it by 0.05 to 0.09; the cool end has the same shape (a raw's opening white through the stock matrix reads 1729 K with the thumb at its end, and a move toward cooler cannot be made). Record 103 (29 October 2026) measures the cool end and chooses to extend the locus below the table; the warm end, a white bluer than 100000 K, keeps the clamp and is not answered there (steps 239 and 240).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -2805,6 +2806,23 @@ user-scalable=no.
   to fail first. There are no Lightroom-made pairs to compare with, because the shared
   folders hold no DNG. Not yet measured: Lightroom's own figures for a Z 50 raw, and how the
   sliders and the switch feel on the tablet.
+
+- [ ] **An infrared white reads inside the scale with no profile loaded** <!-- decision: 103 -->
+  **Shown as:** An infrared photograph's white will read inside the Temperature and Tint scale from the moment it opens, with room to move it either way and typed numbers landing exactly, without loading a camera profile.
+  Researched on 29 October 2026, not built. Through the camera's own matrix every infrared white
+  measured (37 of them) reads between 1667 K and 1734 K, cooler than the 2000 K at the scale's
+  end, so the thumb rests at its cool end and a drag toward cooler moves nothing. Two ways to put
+  the white inside the scale were measured, and both give a drag each way, typed numbers that land
+  and a reading inside the scale on all 37. Chosen first: extend the table below 1667 K by Planck's
+  law and lower the thumb's cool end to 1500 K (no placement number, the same reading for the same
+  white on every photograph, and the keep file's hand-set white stays inside the scale, but the
+  figures are ones Lightroom never shows). Kept: compute a shift from the camera's own matrix and
+  the photograph's found white, the way the author's profile does it (figures inside Adobe's own
+  scale, but not Kelvin, one number at open on every photograph, and the keep file's hand-set white
+  leaves the scale for most placements). darktable's clamp and carrying the author's profiles were
+  measured and rejected. See
+  `docs/decisions/103-an-infrared-white-reads-inside-the-scale-with-no-profile-loaded.md` and
+  IR-SCIENCE.md section 3. The build plan waits on the reader's word on the end result.
 
 - [ ] **Wires, pylons and roof fittings sit inside the look's sky selection, and the sky stages colour them** <!-- decision: 087 -->
   **Shown as:** internal

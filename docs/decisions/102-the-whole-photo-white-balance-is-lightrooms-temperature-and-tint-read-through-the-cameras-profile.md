@@ -40,6 +40,8 @@ changes, where this app keeps the gains and re-reads the two numbers. The same c
 the Temperature and Tint boxes landing up to 34 K from a typed number, because a typed number was
 put on the gain sliders' grid; that is put right, and Measured below has the figures.
 
+Record 103 (29 October 2026) answers what the two numbers should read when no profile is loaded and an infrared white sits past the cool end of this scale; read it before changing the stock reading.
+
 ## Looked up
 
 Everything below is also listed, with how each was read, in IR-SCIENCE.md section 3.
@@ -169,13 +171,21 @@ Do not write a second one of any of these.
   an infrared white inside its own scale through the profile, where the stock matrix puts every
   raw from this camera at 1651 K to 1733 K, the cool edge of the SDK's table; its slider ends
   were taken from the raws rather than from Lightroom's scale, which is a range chosen by data
-  where the scale is Lightroom's to give. Its readings are kept as readings.
+  where the scale is Lightroom's to give. Its readings are kept as readings. **Closed on 29 October
+  2026 by record 103, with the reason:** record 103 measured the scale below the table (Planck's
+  law over the app's own rows, a floor of 1500 K taken from a source) on 37 data-found whites, and
+  with no profile loaded it gives a reading inside the scale, a drag each way and typed numbers
+  that land on all 37, so the locus below the table no longer stands as a bar; it is that record's
+  first option. The range read off the raws stays rejected.
 - **The Planck correction of the SDK's table row.** The 325 mired row prints u as 0.24702 where
   Planck's law and the other 29 rows give 0.24792. Lightroom's figures are the convention and the
   table as Adobe printed it is the nearest reading of the arithmetic behind them; the correction
   would differ from it by 2.7 units of tint at one temperature, with no source read saying
   Lightroom corrects it. The same reason rejects the locus computed below the table: with the
-  profile, no white among the 32 raws comes near 1667 K.
+  profile, no white among the 32 raws comes near 1667 K. **That second sentence is closed on 29
+  October 2026 by record 103:** with no profile loaded all 37 whites measured read at or below
+  1734 K and five are below 1667 K, and the locus computed below the table is what record 103
+  chooses first. The Planck correction of the 325 row stays rejected.
 - **The channel-defined pair of 24 October.** It counts steps of a track a reader coming from
   Lightroom has never been told the meaning of, and its second reason, that infrared whites lie
   under the stock profiles' floor, is a fact about the stock profile that a shifted profile
@@ -190,6 +200,10 @@ Do not write a second one of any of these.
   and no licence, the embed policy of 0 allows copying only while a profile is used to process
   DNG files in the SDK's own words and this app would read NEFs through it, and the pages state no
   terms. The door takes the file the reader holds, which needs no permission the reader lacks.
+  **Closed on 29 October 2026 by record 103, with the reason:** the question is answered without
+  the files. The daylight matrix of each is the camera's stock matrix with its X and Z columns
+  scaled by two constants, which the app can compute for itself from its own matrix and the data,
+  and the first option of record 103 needs no shift at all; nothing of either file is carried.
 - **Moving the opening balance, or reading the camera's recorded one.** Record 101's Rejected and
   record 069's option 10: the recorded balance is the preset's daylight default, and moving the
   white point at open under today's look broke the look.
