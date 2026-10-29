@@ -7,7 +7,11 @@
 //
 // THE TEMPERATURE THUMB IS SPACED IN MIRED. A kelvin figure is not a uniform scale (200 K is a small step at 6000 K and a large one at 2000 K), and the SDK works in mired (a million over the kelvin figure) throughout: its table, its interpolation and the weight it gives a profile's two calibrations. So the thumb stands where the white's mired figure puts it between the schema's two ends, one step to a mired, and the number beside it is the kelvin figure. No source read says how Lightroom spaces its own thumb; this spacing is this app's choice, it moves no figure, and the ends and every number are Adobe's.
 //
-// ONE STATE, THREE GAINS. Nothing here is stored as a Temperature or a Tint. They are views of the three gains, read by `readBalance` and moved by `moveBalance`, and the only things kept are gains. Moving either number leaves the SUM of the three track positions alone, which is exactly the geometric mean of the gains, so a move changes the white point and not the overall level (the exposure is not touched). Because the move lands on whole track positions of the gain sliders (1300 equal ratio steps up from 0.02, `WB_GAIN_*` in decode.ts), the gains it writes are the ones the gain sliders can show and read back, so a later press on any other slider rounds nothing (the rule `snapGain` in tile.ts keeps for every writer of a balance). A kept or held balance stores gains, so it renders exactly as before and reads out as a temperature and a tint through whichever profile the photograph is read through.
+// ONE STATE, THREE GAINS. Nothing here is stored as a Temperature or a Tint. They are views of the three gains, read by `readBalance`, moved by `moveBalance` (a slider's drag) and set by `exactBalance` (a number typed into a box), and the only things kept are gains. Either way the geometric mean of the gains is left alone, so a move changes the white point and not the overall level (the exposure is not touched).
+//
+// TWO ROUTES, AND WHY. A slider's drag lands on whole track positions of the gain sliders (1300 equal ratio steps up from 0.02, `WB_GAIN_*` in decode.ts), so the gains it writes are the ones the gain sliders can show and read back, and a later press on any other slider rounds nothing (the rule `snapGain` in tile.ts keeps for every writer of a balance). A TYPED NUMBER LANDS ON THE NUMBER. Landing it on that grid too read back as much as 34 K from a Lightroom figure typed in (8634 K for a typed 8600; measured on 28 October against five Lightroom exports of one photograph, IR-SCIENCE.md section 3), because the grid is coarser than a whole kelvin or a whole unit of tint wherever the scale is steep. So `exactBalance` hands back the SDK's own gains for the typed pair, not rounded to the track; the gain sliders rest at their nearest positions, and main.ts keeps those exact gains (it remembers that it made them) until a gain slider is itself moved, when the balance takes the sliders' whole steps as it always did.
+//
+// A kept or held balance stores whatever gains it is given as numbers, so it renders exactly as before and reads out as a temperature and a tint through whichever profile the photograph is read through. What main.ts hands it (the hold passes the gains put on the grid) is main.ts's.
 //
 // WHAT IS KEPT. A kept balance is a name, three gains and, optionally, the profile choice its reader had on when it was kept (so it reads out under the same profile at the next photograph), in localStorage the way a lens profile is kept (lensstore.ts): it survives a reload, a new session and a different memory card, because none of them depends on the photograph it was made on. One kept balance at a time can be HELD, and the page opens every raw at the held gains instead of the gray-world ones. This file only keeps and moves numbers; opening and applying are main.ts's.
 
@@ -91,6 +95,22 @@ export function moveBalance(want: BalanceWant, from: Gains, spec: ColourSpec): G
   if (!best) return null;
   const p = best.p;
   return [trackVal(p[0], WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS), trackVal(p[1], WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS), trackVal(p[2], WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS)];
+}
+
+/** The gains for a typed temperature and tint, EXACTLY, at the overall level the starting gains have.
+ *  @param want  the temperature (as its inverse, `mired`) and the tint asked for.
+ *  @param from  the gains the number is typed over; only their overall level (the geometric mean) is read, at full precision and not rounded to the track, so typing again and again cannot walk the brightness. For gains already on the track it is the level `moveBalance` holds.
+ *  @param spec  what the gains are read through.
+ *  @returns the SDK's gains for the wanted white (`whiteToGains`) scaled by one common factor to the level of `from`, NOT put on the track's grid; null when the wanted white gives a channel no light, `from` is not three positive finite gains, or a scaled gain falls outside the track `WB_GAIN_LO`..`WB_GAIN_HI`, where the sliders cannot show it and `balanceProblem` would refuse a kept copy.
+ *  What it must satisfy: `readBalance` of the result gives back the wanted kelvin and tint to the conversion's own round trip (step 223 measured 0.0430 K and 0.0000 of tint at worst on the five Lightroom exports), so a whole number typed in reads back as itself in the box; the geometric mean of the result is that of `from`, so the exposure needs no change and the picture is as bright as it was. The result is off the grid on purpose: the gain sliders show `snapGain` of each gain (the nearest position), and a caller that stores it must keep it against a later read of the sliders (main.ts `syncFromUI`). Consumers: main.ts `balanceInput`, for a number typed into either box; a slider's drag takes `moveBalance`, which keeps the grid. */
+export function exactBalance(want: BalanceWant, from: Gains, spec: ColourSpec): Gains | null {
+  if (!from.every((g) => Number.isFinite(g) && g > 0)) return null;
+  const ideal = whiteToGains(spec, 1e6 / want.mired, want.tint);
+  if (!ideal) return null;
+  const k = geometricMean(from) / geometricMean(ideal);
+  const out: Gains = [ideal[0] * k, ideal[1] * k, ideal[2] * k];
+  if (!out.every((g) => Number.isFinite(g) && g >= WB_GAIN_LO && g <= WB_GAIN_HI)) return null;
+  return out;
 }
 
 /** The exposure that keeps a photograph's overall level when its gains change, for a photograph that is not open and so cannot be measured.

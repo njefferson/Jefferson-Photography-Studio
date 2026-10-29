@@ -1,6 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=496304b0da9fe762
-diffhash=c263727906168b80
-verdict=IN-SCOPE
-# IN-SCOPE: Sequence patch 11 of step 208 is the Temperature and Tint change the approved plan names. It changes 19 files, all inside the plan's Files list: the controls and scope declarations (.control-allow, .scope-allow), NOTES.md (the 2.68 entry and the record 102 roadmap line), VERSION (2.67 to 2.68, the release's middle number), docs/ARCHITECTURE.md and two decision records (069, 101, each one line of Changed or a note), ir.html (the Basic tab's Temperature and Tint in kelvin and tint, the profile switch, the door, the line under the sliders), the balance store, the new kelvin and camera-profile modules, src/main.ts and src/pipeline.ts (the new optional profile field, its five places), src/style.css, tools/.preview-pipeline (the preview record), the a11y, agreement, join-fold and picker walks. The reader-visible change is the one the approved sequence describes; nothing outside it. The patch was read whole across its full length, and it touches no file outside the plan's Files list.
+planhash=34f2f15157ff7c2f
+diffhash=e05588ec597f2fb5
+verdict=IN-SCOPE: every changed file is in the Files list, and every change is the typed Temperature and Tint fix and its record.
+# IN-SCOPE: every changed file is in the Files list, and every change is the typed Temperature and Tint fix and its record.
+# 
+# Judged by this agent from the git diff stat and the diff of src/balancestore.ts, src/main.ts, ir.html and docs/ARCHITECTURE.md. The eight changed files are .plan-scope, IR-SCIENCE.md, NOTES.md, docs/decisions/102 (record 102), docs/ARCHITECTURE.md, ir.html, src/balancestore.ts and src/main.ts. All eight are named in the Files list. No file outside it is changed, and src/tile.ts, src/kelvin.ts, src/diagnostic.ts and .contract-allow are untouched.
+# 
+# Source: src/balancestore.ts adds exactBalance, the exact gains for a typed number with the geometric mean held, and its header states the two routes. src/main.ts adds the exactWb remembrance set, uses exactBalance in balanceInput for a typed number only, and keeps the stored gains in syncFromUI while the sliders still stand at their nearest positions. Each of these is what the plan's stage 2 asked for. The contract comments in main.ts are the ones the plan required for the functions it edited. ir.html changes one note's wording to say a typed number is taken exactly. docs/ARCHITECTURE.md changes only the two line counts and no description.
+# 
+# Not judged here: the content of IR-SCIENCE.md, record 102 and NOTES.md, which were judged by path and by the diff stat only. The check's own output shows the owner's messages and the earlier verdict, which was not used as the basis of this one.

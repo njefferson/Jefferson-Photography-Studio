@@ -467,7 +467,10 @@ sliders reach an infrared white. What was read, and how each source was read:
   are known beside its embedded profile and as-shot neutral, and the conversion cannot
   be compared with Lightroom's own figures from the closed set: it is held to the SDK's
   points, and the one reading only Lightroom can give, a Z 50 NEF's figures under a named
-  profile at As Shot, is for a device pass.
+  profile at As Shot, is for a device pass. **Corrected on 28 October: five Lightroom exports
+  of one Z 50 photograph were provided after this was written, so the conversion has been
+  compared with Lightroom's own figures; the block below has them. The reading at As Shot is
+  still for a device pass, because every export reads Custom.**
 - **What the app does with a profile today.** A NEF names no profile and carries no
   forward matrix; it is rendered through the per-model stock matrix and its white is
   found from the data. A DNG is rendered from ONE calibration set (`dngCalibration` ranks
@@ -489,6 +492,81 @@ sliders reach an infrared white. What was read, and how each source was read:
   the 2025 one, both linked from pages read and not fetched; the rest of Adobe's help
   page; how Lightroom's shipped code differs from the 2012 sample, if it does; what
   Lightroom displays for a Z 50 NEF under either profile.
+
+**Lightroom's own Temperature and Tint, compared with the app's conversion on five
+Lightroom exports of one photograph, read 28 October 2026.** The block above held that
+no file's Lightroom figures were known beside its embedded profile. Five Lightroom
+exports of the 3467 image (the Z 50 photograph the session chose on 27 October), each a
+DNG and a JPEG, were then provided in the session, and each DNG was read tag by tag on
+28 October with the app's own tag reader (`src/raw/tiff.ts`, `src/camprofile.ts` and
+`src/kelvin.ts`, bundled from the working tree). No raw was opened and no Drive or
+network call was made for it; the ten exports are the only photographs read. The figures
+are from the reports of the two plans that read and rendered them; where the app gave a
+figure, the function that gave it is named.
+
+- **The five edits.**
+  - Adobe Standard at 5100 K and tint +18, the DNG carrying a Look named Adobe Color at
+    amount 1 and its table.
+  - Infrared Temp -50 at 5100 K and +18.
+  - Infrared Temp -100 at 5100 K and +18.
+  - Infrared Temp -100 at 8600 K and +27.
+  - The same as the fourth with Saturation +100.
+- **What every DNG keeps and says.** The mosaic is kept (the raw image's photometric value
+  is the colour-filter-array one, not linear raw; 5600 by 3728, 16 bits). Each embeds its
+  profile by name, with that profile's hue and saturation tables (90 by 30 by 1 in the Adobe
+  Color export, 90 by 25 by 1 in the other four). The camera's recorded pair is the As Shot
+  neutral in all five (0.5384, 1.0000, 0.6818, as gains 1.8574, 1.0000, 1.4668: the 5200 K
+  default the camera writes for a preset slot with no measured value), tag 50729 is absent,
+  and WhiteBalance reads Custom in all five; none reads As Shot. Under -50 and -100 the
+  embedded colour matrices are the two profile files' of the 27 October block. The JPEGs
+  carry the develop fields too (Software "Adobe Lightroom 9.6 (Windows)"), at 5568 by 3712.
+- **The conversion's round trips.** `whiteToGains` at each export's pair and `gainsToWhite`
+  back: 5100.0 K and 18.0 for the three at 5100 and +18 (misses 0.0088 to 0.0089 K and 0.0000
+  of tint), and 8600.0 K and 27.0 for the two at 8600 and +27 (0.0430 K and 0.0000), all
+  within 0.05 K and 0.0000 of tint.
+- **The app's As Shot reading of the recorded pair, `gainsToWhite` through each embedded
+  profile.** 5101.0 K and tint 18.0 under Adobe Standard (first matrix weight 0.214, 5
+  passes), 10652.7 K and 133.7 under -50 and 100000.0 K and 227.1 under -100 (the SDK's
+  table limit). Lightroom's own pair on the three edits is 5100 and +18 under all three. The
+  app's reading under Adobe Standard sits 1.0 K and 0.0 of tint from Lightroom's pair; the
+  files do not say the edit began from the recorded pair (they read Custom), so that
+  agreement is read as a pointer.
+- **The opposite choice, stated as what the exports measured.** The same two numbers, 5100
+  and +18, sit on three edits under three profiles, while the app's reading of one neutral
+  under those profiles is three different pairs. So Lightroom keeps the two numbers and moves
+  the gains when the profile changes, where this app keeps the gains and re-reads the two
+  numbers through whichever profile is in force. The normalised gains each export's pair
+  means (smallest 1, `whiteToGains`): 1.8571, 1.0000, 1.4670 under Adobe Standard; 1.0000,
+  1.1727, 2.0132 under -50; 1.0000, 2.2751, 5.5377 under -100; and 1.0000, 1.9424, 3.4239
+  for 8600 and +27 under -100. That the three edits were made by changing the profile on one
+  edit is not recorded in the files.
+- **The chosen pair against the data-found balance.** The page's opening balance, the one
+  found from the data, reads 1666.7 K and tint -70.2 under Adobe Standard, 3068.6 K and
+  -46.7 under -50 and 8800.1 K and 27.7 under -100; the boxes read 1667 and -70, 3061 and
+  -47, 8799 and 27. The pair chosen in Lightroom, 8600 and +27 under -100, differs from the
+  data-found gains (1.0000, 1.9311, 3.3710) by 0.6 percent in green and 1.6 percent in blue.
+  Under Adobe Standard the page opens at 1667 K where Lightroom's pair for the same file is
+  5100; the opening balance stays the one found from the data, by the standing ruling.
+- **The grid's misses, before the fix of 28 October and after.** Typing each export's pair
+  into the Temperature and Tint boxes landed on the gain track's 1300 steps and read back
+  5092 K and 17, 5115 K and 17, 5074 K and 18, 8634 K and 26 and 8634 K and 26: misses of
+  8, 15, 26, 34 and 34 K and of 1, 1, 0, 1 and 1 in tint. A typed number now takes the exact
+  gains for it: the five readings are 0 K and 0 of tint off, also after the Exposure
+  slider is pressed, and the three gain sliders rest within 0.89 of a step of the exact
+  gains. A drag or tap on a gain slider still moves by whole steps.
+- **The pictures.** The app's renders (swap released, the file's own profile, the pair
+  typed, no look) set beside Lightroom's JPEGs at the same Temperature, Tint and profile:
+  the same hue family in four of the five (the fifth has Saturation +100); the app darker
+  in the sky by 3 to 75 levels in a channel and in the shadow by 10 to 80, and higher in
+  contrast; under Adobe Standard the app's grass band a flat pink where Lightroom's shows
+  its blades. The balance does not explain it. Not separated: the profile's hue and
+  saturation tables, its tone curve, its baseline exposure, Lightroom's default rendering
+  and the app's automatic exposure (x1.6184 at open, against Lightroom's Exposure 0.00).
+  The Adobe Color look is a table the app does not read, and whether it explains the flat
+  pink is not separated. The five renders after the fix, opened beside the five before it,
+  read the same to the eye and differ by one level in a channel at most.
+- **What the app does not read.** No code reads a DNG's own As Shot neutral (tags 50728 and
+  50729); the app reads each DNG's profile and finds the white from the data.
 
 **So an infrared raw converter has to find the white point from the data.**
 That is what gray-world does here and what this app's "no 2000K floor" claim has

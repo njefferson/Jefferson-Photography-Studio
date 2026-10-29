@@ -686,6 +686,18 @@ const balState: { held: Balance.KeptBalance | null; keep: HTMLInputElement | nul
 const photoCameras = new WeakMap<object, Prof.PhotoCamera>();
 /** The camera facts for the moment nothing is open: a raw of the Z 50, the body the stock matrix falls back to. */
 const NO_PHOTO_CAMERA: Prof.PhotoCamera = Prof.photoCamera(true, undefined);
+/** THE BALANCES A TYPED TEMPERATURE OR TINT STORED AT EXACT GAINS (record 102), each remembered by its three gains' text, so a gain that has been through Undo, Redo, Reset or a return to the photograph is recognised by its value and not by which array holds it. Declared here beside the rest of the balance state because `syncFromUI` reads it before the module has run its way down. The set holds only what the typed path made, on purpose: a tap on foliage, the IR tab's Auto and the open all store gains that the next `syncFromUI` is MEANT to put on the sliders' grid, and nothing that is not in the set is spared that. At most `EXACT_WB_MAX` are kept, the oldest forgotten first; an exact balance forgotten is snapped by the next read of the sliders, which is what every balance did before this. */
+const exactWb = new Set<string>();
+const EXACT_WB_MAX = 200;
+/** The key a set of gains is remembered by. @param g  three gains. @returns their text at full precision, which a number writes and reads back exactly, so a snapshot's copy of an exact balance has the key the original had. */
+function wbKey(g: ArrayLike<number>): string { return `${g[0]},${g[1]},${g[2]}`; }
+/** Remember a balance the typed path stored at exact gains. @param g  the gains `exactBalance` made. Returns nothing; forgets the oldest when the set is full. What it must satisfy: `isExactWb(g)` is true afterwards. */
+function rememberExactWb(g: ArrayLike<number>): void {
+  exactWb.add(wbKey(g));
+  if (exactWb.size > EXACT_WB_MAX) { const oldest = exactWb.values().next().value; if (oldest !== undefined) exactWb.delete(oldest); }
+}
+/** Whether the typed path stored this balance at exact gains. @param g  three gains. @returns true only for gains `rememberExactWb` was given and has not forgotten. */
+function isExactWb(g: ArrayLike<number>): boolean { return exactWb.has(wbKey(g)); }
 // THE TWO SLIDERS' ENDS are Adobe's (record 102) and come from src/balancestore.ts and src/kelvin.ts; ir.html carries the same four numbers for
 // the page as served, and tools/join-fold-check.mjs holds the two to each other. The Temperature thumb's value is minus the mired figure, so
 // right is warmer.
@@ -1735,11 +1747,21 @@ function syncFromUI() {
   // A PICKED MASK TAKES THE CONTROLS THAT FOLLOW IT (042, stage 2): those
   // write to the mask below, and the whole photo's own values stay as they are.
   const tm = overlayReady ? targetMask() : null;
-  params.wb = [
-    fromPos(Number(ui.wbR.value), WB_LO, WB_HI, WB_STEPS),
-    fromPos(Number(ui.wbG.value), WB_LO, WB_HI, WB_STEPS),
-    fromPos(Number(ui.wbB.value), WB_LO, WB_HI, WB_STEPS),
-  ];
+  // THE THREE GAINS COME OFF THE THREE SLIDERS, EXCEPT A TYPED BALANCE THE SLIDERS STILL STAND AT (record 102). A Temperature or Tint typed
+  // into its box stores the SDK's exact gains, and the gain sliders can only rest at the nearest of their 1300 positions, so reading them
+  // back here on the next press of ANY control (the Exposure slider, a tab, Undo) would put the typed balance back on the grid and the box
+  // would read up to 34 K from what was typed. While the stored gains are ones the typed path made and all three sliders still stand at
+  // the nearest positions of them, nobody has moved a gain slider, so the stored gains stay. A gain slider that is dragged or tapped
+  // leaves its position, the test fails, and all three are read off the sliders as they always were. Every other writer of a balance is
+  // outside the set and is read off the sliders here exactly as before.
+  const wbPos = [Number(ui.wbR.value), Number(ui.wbG.value), Number(ui.wbB.value)];
+  if (!(isExactWb(params.wb) && wbPos.every((p, i) => p === toPos(params.wb[i], WB_LO, WB_HI, WB_STEPS)))) {
+    params.wb = [
+      fromPos(wbPos[0], WB_LO, WB_HI, WB_STEPS),
+      fromPos(wbPos[1], WB_LO, WB_HI, WB_STEPS),
+      fromPos(wbPos[2], WB_LO, WB_HI, WB_STEPS),
+    ];
+  }
   // `params.profile` is NOT read back here (record 102): the profile switch shows the profile in force, which is the reader's saved choice
   // only when one was made, so reading it back would turn every slider press into a saved choice. Its own `change` handler
   // (`balanceProfileInput`) writes it, `applySnapshot` restores it, and `syncToUI` draws it. The fifth of the five places, for this field,
@@ -2028,18 +2050,21 @@ function updateBalanceUI(): void {
 /** A Temperature or Tint move by the reader's hand: the slider, or a number typed into its box.
  *  @param axis  "t" for Temperature, "ti" for Tint.
  *  @param source  "slider" for the range input's own events, "number" for the typed box's change.
- *  Returns nothing. Writes `params.wb` through `moveBalance`, so the gains land on whole track positions with their geometric mean
- *  unchanged and the exposure untouched.
+ *  Returns nothing. Writes `params.wb` with the geometric mean of the gains unchanged and the exposure untouched: through `moveBalance`
+ *  for a slider, so the gains land on whole track positions, and through `exactBalance` for a typed number, so the gains are the SDK's
+ *  own for the number and are remembered as exact (`rememberExactWb`), with the three gain sliders set to their nearest positions.
  *  What it must satisfy: a control pressed at the value it already shows moves nothing (the rule `slider-own-value-walk` holds for every
  *  slider); the other axis keeps its exact reading, so moving Temperature never drags Tint; the move is drawn at once, with the
  *  slider's drag coalesced into one undo step by `draw` and a typed number recorded as its own step; a typed figure beyond Adobe's scale
- *  is held to its end; and a white no gains can show on this photograph moves nothing and says so in the live region.
+ *  is held to its end; a white no gains can show on this photograph moves nothing and says so in the live region; and a typed whole
+ *  number reads back in its box as itself, because the box is read from the stored gains through the profile in force.
  *  A SLIDER MOVES THE BALANCE BY HOW FAR IT WAS MOVED, a typed number says where the balance goes. The thumb shows the reading rounded
  *  to a whole step and a reading can sit a fraction of a step away from it, so asking for the thumb's new whole number outright would
  *  sometimes ask for a point as near the old one as the new one and move nothing. The move is the thumb's distance from the value it was
  *  showing, added to the reading (Temperature's thumb is minus the mired figure, so a step right is a step warmer), which lands on a grid
- *  point whenever the reading is on one. A typed number is an absolute ask, in kelvin for Temperature, and lands on the nearest point the
- *  grid has; the box then shows what the gains really read as. */
+ *  point whenever the reading is on one. A typed number is an absolute ask, in kelvin for Temperature, and takes the exact gains for it
+ *  (until 28 October 2026 it landed on the nearest point the gain track's grid has, which read back up to 34 K from the number typed); the
+ *  box then shows what the stored gains read as, which is the number typed. */
 function balanceInput(axis: "t" | "ti", source: "slider" | "number"): void {
   const slider = axis === "t" ? balUi.t : balUi.ti;
   const box = axis === "t" ? balUi.tNum : balUi.tiNum;
@@ -2061,13 +2086,14 @@ function balanceInput(axis: "t" | "ti", source: "slider" | "number"): void {
   let want: Balance.BalanceWant;
   if (axis === "t") want = { mired: typed ? 1e6 / Math.min(KELVIN_MAX, Math.max(KELVIN_MIN, raw)) : cur.mired - (raw - thumb), tint: cur.tint };
   else want = { mired: cur.mired, tint: typed ? Math.min(TINT_MAX, Math.max(TINT_MIN, raw)) : cur.tint + (raw - thumb) };
-  const next = Balance.moveBalance(want, params.wb, choice.spec);
+  const next = typed ? Balance.exactBalance(want, params.wb, choice.spec) : Balance.moveBalance(want, params.wb, choice.spec);
   if (!next) {
     updateBalanceUI();
     announceBalance("No gains can show that white on this photograph, so nothing moved.");
     return;
   }
   params.wb = next;
+  if (typed) rememberExactWb(next);
   balState.keep = typed ? null : slider;
   syncWbSliders();
   updateBalanceUI();
@@ -5525,7 +5551,9 @@ function controlName(id: string): string {
  *  nothing is open. What it must satisfy: the value is the control's own, after the
  *  automatics at open and the lift have written to it and `syncToUI` has put it on the
  *  slider's step, which is the number a reader would read off the screen and the number
- *  the next `syncFromUI` takes back; a name used twice is told apart by its id. The four
+ *  the next `syncFromUI` takes back (the three gain sliders after a typed Temperature or
+ *  Tint are the one exception: they rest at the nearest step and the multiplier beside
+ *  each is the stored exact gain); a name used twice is told apart by its id. The four
  *  sliders on a logarithmic track (Exposure and the three gains) also print the
  *  multiplier the pipeline takes, `params` as it stands, because a track position says
  *  nothing about how much light it is. While a mask is picked the controls that follow

@@ -30,7 +30,15 @@ inside Lightroom's 2000 K to 50000 K scale and inside its tint range both times,
 balances through the stock matrix with no profile read 1651 K to 1733 K. The shared test
 folders hold no DNG at all, so there is no file whose Lightroom Temperature and Tint are known
 beside its embedded profile, and the conversion cannot be compared with Lightroom's own figures
-from them.
+from them. That held until 28 October. Five Lightroom exports of one Z 50 photograph, the 3467
+image, were then provided in the session, each a DNG that carries Lightroom's own Temperature and
+Tint beside its embedded profile, and the conversion was compared with them. It reads each pair
+back within 0.05 K and 0 of tint; it reads the camera's recorded neutral under Adobe Standard at
+5101 K and a tint of 18 where the export's pair is 5100 and 18; and the exports carry the same
+pair under three profiles, so Lightroom keeps the two numbers and moves the gains when the profile
+changes, where this app keeps the gains and re-reads the two numbers. The same comparison found
+the Temperature and Tint boxes landing up to 34 K from a typed number, because a typed number was
+put on the gain sliders' grid; that is put right, and Measured below has the figures.
 
 ## Looked up
 
@@ -72,6 +80,13 @@ Everything below is also listed, with how each was read, in IR-SCIENCE.md sectio
 - **Adobe's Lightroom Classic help page** on image tone and color, read at its Temp and Tint
   entries: Temp is on the Kelvin scale for a raw file; Tint left adds green and right adds
   magenta.
+- **Five Lightroom exports of the 3467 image, read on 28 October**, each a DNG with its JPEG,
+  provided in the session: three edited at 5100 K and a tint of +18 under Adobe Standard (with
+  Lightroom's Adobe Color look), Infrared Temp -50 and Infrared Temp -100, and two at 8600 K and
+  +27 under -100, the second with Saturation +100. Each DNG was read tag by tag with the app's own
+  tag reader and each JPEG's develop fields by a walk of its metadata segments; the JPEGs' pictures
+  were set beside the app's renders of the DNGs (Looked at). No raw was opened and no network call
+  was made for it. IR-SCIENCE.md section 3 has every figure and how each was read.
 - **Not read:** Adobe's own copy of the SDK files; the header `dng_camera_profile.h`; the printed
   Wyszecki and Stiles table; the pack's readme and any terms in it (behind a newsletter sign-up,
   not fetched); the author's page on installing profiles; how Lightroom's shipped code differs
@@ -205,12 +220,83 @@ data-found gains that the 25 October plan printed (no photograph was rendered or
   9.56; D55 5502.3 K, 9.99; D65 6503.7 K, 9.77; D75 7506.4 K, 9.75.
 - The SDK's method for a Z 50 NEF at As Shot (the camera's recorded daylight pair) reads
   100000 K and a tint of 227.1 under -100 and 10653 K and 133.7 under -50. That is arithmetic,
-  and Lightroom's own reading of such a file is the one figure this research could not take.
+  and on 27 October Lightroom's own reading of such a file was the one figure this research could
+  not take. The 28 October block below compares the conversion with five exports; a Lightroom
+  reading of a Z 50 raw at As Shot is still not taken, because every export reads Custom.
+
+On 28 October 2026, on the five Lightroom exports of the 3467 image, by the app's own tag reader
+and its conversion (`gainsToWhite` and `whiteToGains` in `src/kelvin.ts`), the instruments made to
+fail first; figures from the two reports of the plans that read and rendered them.
+
+- Every export keeps the mosaic (the raw image's photometric value is the colour-filter-array one,
+  not linear raw), embeds its profile and the profile's hue and saturation tables, carries the
+  camera's recorded pair as its As Shot neutral (gains 1.8574, 1.0000, 1.4668, the 5200 K default
+  the camera writes for a preset slot holding no measured value) and reads WhiteBalance Custom.
+  None reads As Shot. The matrices embedded under -50 and -100 are the two profile files'.
+- Round trips, the export's pair through `whiteToGains` and back through `gainsToWhite`: 5100.0 K
+  and 18.0 back for the three edits at 5100 and +18 (misses 0.0088 to 0.0089 K and 0.0000 of
+  tint) and 8600.0 K and 27.0 for the two at 8600 and +27 (0.0430 K and 0.0000): within 0.05 K
+  and 0.0000 of tint.
+- The app's As Shot reading of the recorded pair under each export's profile: 5101.0 K and tint
+  18.0 under Adobe Standard (the first matrix's weight 0.214, 5 passes), 10652.7 K and 133.7 under
+  -50, 100000.0 K and 227.1 under -100 (the SDK's table limit). The exports carry 5100 and +18
+  under all three. So Lightroom keeps the two numbers and moves the gains when the profile
+  changes, and this app keeps the gains and re-reads the two numbers: the opposite choice. The
+  normalised gains the export's pair means (smallest 1, from `whiteToGains`): 1.8571, 1.0000,
+  1.4670 under Adobe Standard; 1.0000, 1.1727, 2.0132 under -50; 1.0000, 2.2751, 5.5377 under
+  -100 at 5100 and +18; and 1.0000, 1.9424, 3.4239 under -100 at 8600 and +27.
+- The data-found balance the page opens at reads 1666.7 K and tint -70.2 under Adobe Standard,
+  3068.6 K and -46.7 under -50, and 8800.1 K and 27.7 under -100; the page's boxes read 1667 and
+  -70, 3061 and -47, 8799 and 27. The chosen pair, 8600 and +27 under -100, differs from the
+  data-found gains (1.0000, 1.9311, 3.3710) by 0.6 percent in green and 1.6 percent in blue.
+- The grid, before this fix: a typed pair put on the gain track's 1300 steps read back 8, 15, 26,
+  34 and 34 K from the number typed and 1, 1, 0, 1, 1 of tint (5100 typed read 5092, 5115 and
+  5074; 8600 typed read 8634 twice), and a later press of any other slider kept the miss. After:
+  0 K and 0 of tint on all five, the same after a press of the Exposure slider, the three gain
+  sliders resting within 0.89 of a step of the exact gains, the opening balance unchanged. The five
+  renders after the change, opened beside the five before it, read the same to the eye; the
+  region means (open sky, lit foliage, a shadow) differ by at most one level in a channel, and the
+  whole-picture mean difference is 0.13 to 0.27 levels.
+- The app's renders against Lightroom's JPEGs at the same Temperature, Tint and profile: the same
+  hue family in four of the five (the fifth carries Saturation +100); the app darker in the sky by
+  3 to 75 levels in a channel and in the shadow by 10 to 80, and higher in contrast; the grass
+  band a flat pink under Adobe Standard where Lightroom's keeps its blades. The balance does not
+  explain the difference. Not separated: the profile's hue and saturation tables, its tone curve,
+  its baseline exposure, Lightroom's default rendering and the app's automatic exposure. The Adobe
+  Color look, a table the export carries in a structure of its own, is read by nothing in the app,
+  and no code reads a DNG's own As Shot neutral.
 
 ## Looked at
 
-Nothing was rendered for this record and no photograph was opened for it; every figure above is a
-reading of numbers, and none is evidence about how a photograph looks.
+The research of 27 October rendered nothing and opened no photograph; every figure under that date
+in Measured is a reading of numbers, and none is evidence about how a photograph looks. On 28
+October five sheets were opened, one per export, each Lightroom's JPEG export on the left beside
+the app's render of its DNG export on the right, drawn before the typed-number fix, so the app's
+side sits at the numbers the grid gave, with the swap off and no look.
+
+- The 3467 image, edited at 5100 K and tint +18 under Adobe Standard with Lightroom's Adobe Color
+  look; the app's side at 5092 K and 17. Both halves are red-pink all over. Lightroom's sky is a
+  bright coral to orange-red with pale streaks and the app's a darker crimson-rose, near maroon in
+  the top corners; the building is salmon-pink in both, a little pinker and flatter in the app; the
+  grass band reads cream-pink with its blades in Lightroom's and as one flat saturated pink with
+  almost no texture in the app's, the fence posts and wires the only detail left.
+- The 3467 image, edited at 5100 K and tint +18 under Infrared Temp -50; the app's side at 5115 K
+  and 17. The closest pair: a dusty rose to mauve in both, the same pale-pink building and the
+  same pale-pink grass with its blades. Lightroom's sky is a lighter pink-mauve and the app's the
+  same hue, darker and browner toward the top corners; the app's shadows are browner and darker.
+- The 3467 image, edited at 5100 K and tint +18 under Infrared Temp -100; the app's side at 5074 K
+  and 18. Blue-lavender in both. Lightroom's sky is a pale airy grey-blue and the app's a deep
+  slate to navy at the top; the grass is near-white lavender with texture in both; the shaded wall
+  is a mid lavender-blue in Lightroom's and a deeper blue-grey in the app's, with stronger contrast
+  between the building's panels.
+- The 3467 image, edited at 8600 K and tint +27 under Infrared Temp -100; the app's side at 8634 K
+  and 26. Near neutral in both. Lightroom's sky is a light warm grey with a faint khaki tint and
+  the app's a neutral grey, charcoal toward the top corners; the grass is white to very pale grey
+  with texture in both, the app's greyer; the app's shadows and doorway are darker.
+- The 3467 image, edited as the fourth with Saturation +100; the app's side at 8634 K and 26. In
+  Lightroom's half the sky is a warm tan to gold, strongest at the left, with a cooler bluish-white
+  building face and bluish-grey shadows; the app's half is the same near-neutral grey picture as
+  the fourth sheet's, because the app sets no saturation.
 
 ## Depends
 
