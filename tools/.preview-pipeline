@@ -1,5 +1,3 @@
 # Written by tools/preview-version-check.mjs --record. Not hand-edited.
-version=101
-hash=4531a01285fef740
-# Recorded WITHOUT a version bump. The evidence the pictures did not change:
-proven=src/pipeline.ts differs from the build before it by one optional field of EditParams (profile) and its copy in cloneParams; no render path reads that field and stampOf does not carry it; every other hashed source and the four hashed functions of src/main.ts are the previous build's, read by a diff against the head (step207-preview.mjs)
+version=102
+hash=52669c43fb0b5b67

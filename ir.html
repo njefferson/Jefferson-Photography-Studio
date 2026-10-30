@@ -753,8 +753,10 @@
             <!-- TEMPERATURE AND TINT ARE THE THREE GAINS BELOW, READ TWO OTHER WAYS (decisions
                  101 and 102): one state, so moving either one moves the gain sliders on screen and
                  moving a gain slider moves these. Each has its number beside it, typeable. They
-                 are Adobe's scale, Temperature in kelvin from 2000 to 50000 and Tint from -150 to
-                 150, read through a camera profile: the switch above them lists the profile the
+                 are Adobe's scale, Temperature in kelvin and Tint from -150 to 150, read through
+                 a camera profile, with the Temperature thumb reaching below Adobe's 2000 K to the
+                 coolest white the camera's gains can show (537 K, decision 103; Adobe's scale
+                 runs 2000 to 50000). The switch above them lists the profile the
                  file carries, the ones loaded for this camera and the camera's own matrix
                  (src/kelvin.ts has the arithmetic, src/camprofile.ts the choice, and
                  src/balancestore.ts the scale and the store). The Temperature thumb's value is
@@ -771,7 +773,7 @@
               <label>Profile <small>the Temperature and Tint are read through it</small> <select id="balProfile"></select></label>
             </div>
             <div class="bal-row" id="balRowT">
-              <label>Temperature <small>cooler to warmer</small> <input id="balT" type="range" min="-500" max="-20" step="1" value="-200" /></label>
+              <label>Temperature <small>cooler to warmer</small> <input id="balT" type="range" min="-1862" max="-20" step="1" value="-200" /></label>
               <input id="balTNum" class="bal-num" type="number" inputmode="decimal" step="any" aria-label="Temperature in kelvin, typed" />
             </div>
             <div class="bal-row" id="balRowTi">
@@ -1649,12 +1651,13 @@
       </p>
       <!-- §7e item 5: where the numbers come from. Written from what src/ uses:
            color.ts (the Z 50 matrix is Adobe's published coefficients; the
-           D5300's is the one the Rob Shea Infrared Temp -100 profile writes into
-           a Lightroom DNG; a DNG's own ColorMatrix wins over both, decode.ts),
+           D5300's is the body's own matrix from LibRaw's camera table, divided
+           by 10000 as the Z 50's is; a DNG's own ColorMatrix wins over both,
+           decode.ts),
            src/raw/nef.ts and src/raw/dngRaw.ts (levels from the file's own
            tags), color.ts sensorPitchMicrons
            (diffraction.cam) and hotspotProfiles.ts (the app's own lens rig). -->
-      <p class="note">Where the numbers come from: a DNG's colour is converted with the camera matrix it carries; a Nikon NEF carries none, so the Z&nbsp;50 uses Adobe's published matrix and the D5300 the one Rob Shea's <em>Infrared Temp &minus;100</em> profile writes. Black and white levels are read from the file itself. Temperature on the Basic tab is in kelvin and Tint runs from minus 150 to 150, read the way Lightroom reads a raw file, through a camera profile: the one the file carries, one you load for your camera, or the camera's own matrix. For a photograph the camera already developed they are relative to its own white. The diffraction limits are from Rob Shea's <a href="https://diffraction.cam" target="_blank" rel="noopener">diffraction.cam</a>, and the lens profiles that ship were measured with this app's own lens rig.</p>
+      <p class="note">Where the numbers come from: a DNG's colour is converted with the camera matrix it carries; a Nikon NEF carries none, so the Z&nbsp;50 uses Adobe's published matrix and the D5300 its own matrix from LibRaw's camera table. Black and white levels are read from the file itself. Temperature on the Basic tab is in kelvin and Tint runs from minus 150 to 150, read the way Lightroom reads a raw file, through a camera profile: the one the file carries, one you load for your camera, or the camera's own matrix. For a photograph the camera already developed they are relative to its own white. The diffraction limits are from Rob Shea's <a href="https://diffraction.cam" target="_blank" rel="noopener">diffraction.cam</a>, and the lens profiles that ship were measured with this app's own lens rig.</p>
       <p class="more-row">
         <a href="./fonts/OFL.txt" target="_blank" rel="noopener">Fonts &mdash; SIL Open Font License &rarr;</a>
       </p>

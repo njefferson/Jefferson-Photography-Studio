@@ -759,11 +759,11 @@ later, that decoder (or shooting Lossless NEF) is the prerequisite.
 87 modules. Each line is that file's own opening comment, so this
 cannot describe something the code does not say about itself.
 
-- **`src/balancestore.ts`** (259 lines) — Kept white balances, and the Temperature and Tint that read and move a balance on Adobe's scale without changing how bright the picture is.
+- **`src/balancestore.ts`** (302 lines) — Kept white balances, and the Temperature and Tint that read and move a balance on Adobe's scale without changing how bright the picture is.
 - **`src/batchstore.ts`** (174 lines) — Crash-safe store for finished batch frames.
 - **`src/camprofile.ts`** (364 lines) — Camera profiles for the Temperature and Tint: reading one from a file's tags, keeping the ones the reader loads for a camera, and listing what a photograph can be read through.
 - **`src/chooser.ts`** (65 lines) — Two-door landing page.
-- **`src/color.ts`** (245 lines) — Camera color science.
+- **`src/color.ts`** (244 lines) — Camera color science.
 - **`src/cubeimport.ts`** (181 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (543 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
 - **`src/debug.ts`** (2397 lines) — The test page behind the version number.
@@ -776,7 +776,7 @@ cannot describe something the code does not say about itself.
 - **`src/export.worker.ts`** (78 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (429 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (3900 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (3910 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
@@ -790,7 +790,7 @@ cannot describe something the code does not say about itself.
 - **`src/iconpicker.ts`** (202 lines) — Home-Screen icon picker for the installed Studio launcher.
 - **`src/import.ts`** (162 lines) — Hardened image import.
 - **`src/keepfile.ts`** (258 lines) — THE KEEP FILE: a photograph the reader owns, as one file they hold.
-- **`src/kelvin.ts`** (273 lines) — A white as Adobe's raw editors name it, a temperature in kelvin and a tint, read through a camera profile's colour matrices, and the three channel gains that make such a white neutral.
+- **`src/kelvin.ts`** (416 lines) — A white as Adobe's raw editors name it, a temperature in kelvin and a tint, read through a camera profile's colour matrices, and the three channel gains that make such a white neutral.
 - **`src/lensbackup.ts`** (84 lines) — HAS ANY OF THIS EVER LEFT THE DEVICE — its own file, deliberately.
 - **`src/lensflat.ts`** (237 lines) — The measured lens correction as a flat-field pass on the LINEAR working copy, applied at decode before anything is measured or graded (decision 021; IR-SCIENCE.md §9c — RawPedia, the DNG GainMap, Ligh
 - **`src/lensprofile.ts`** (1103 lines) — Measuring an IR lens's hot-spot ON THE DEVICE, from flat frames, per channel.
@@ -806,10 +806,10 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (22786 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (22863 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (479 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks"), and for the KEPT SKY MAP of each photograph, in a database of its own ("ips-skymaps").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
-- **`src/pipeline.ts`** (3534 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
+- **`src/pipeline.ts`** (3574 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.
 - **`src/platform.ts`** (181 lines) — WHAT IS ACTUALLY IN FRONT OF THE PERSON — asked once, in one place.
 - **`src/previewcache.ts`** (220 lines) — THE SAME FOLDER, OPENED AGAIN, DECODED EVERY FILE AGAIN.
 - **`src/qr.ts`** (303 lines) — Minimal QR encoder — byte mode, error-correction level M, versions 1..26 — written from the public ISO/IEC 18004 spec, no third-party code (the app's no-third-party-IP stance).
@@ -839,7 +839,7 @@ cannot describe something the code does not say about itself.
 - **`src/straighten.ts`** (279 lines) — FINDING THE ANGLE A FRAME IS OFF BY.
 - **`src/swupdate.ts`** (458 lines) — THE STANDING "A NEW VERSION IS WAITING" STRIP, for all three PWAs (Doctrine §7h).
 - **`src/theme.ts`** (115 lines) — Day/night mode, shared across every page.
-- **`src/tile.ts`** (883 lines) — A strip tile drawn from plain inputs, so the page and the decode worker draw the same picture.
+- **`src/tile.ts`** (887 lines) — A strip tile drawn from plain inputs, so the page and the decode worker draw the same picture.
 - **`src/toggletip.ts`** (134 lines) — A CONTROL'S OWN SENTENCE, REACHED BY A FINGER — the toggletip of decision 024.
 - **`src/verdlg.ts`** (135 lines) — THE "THIS BUILD" PANEL — what changed, and the report to send (Doctrine §7d, §7f).
 - **`src/verstamp.ts`** (41 lines) — THE BUILD STAMP, WRITTEN AT BOOT (Doctrine §7b) — the version visible on every page, so a reader reporting a problem can say which build they are on without being asked to go looking for it.

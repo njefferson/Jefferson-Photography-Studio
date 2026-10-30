@@ -51,7 +51,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP, keepSkyMap, getKeptSkyMap, keptSkyMapHint, photographStamp, digestBytes } from "./maskstore";
-import { cloneParams, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, MASK_CURVE_LEN, maskCurvesStraight, radialLocal, radialPoint, type MaskLayer, type FixStroke, type CropRect, BRUSH_MAX_EDGE, skyReference, SKY_SAT_SECOND_GATE, type SkyMap } from "./pipeline";
+import { cloneParams, screenGainsOf, screenGainsNeutral, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, MASK_CURVE_LEN, maskCurvesStraight, radialLocal, radialPoint, type MaskLayer, type FixStroke, type CropRect, BRUSH_MAX_EDGE, skyReference, SKY_SAT_SECOND_GATE, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache, type HealSolves } from "./heal";
@@ -80,7 +80,7 @@ import { fnv1a } from "./stamp";
 import * as LensStore from "./lensstore";
 import * as Balance from "./balancestore";
 import * as Prof from "./camprofile";
-import { KELVIN_MAX, KELVIN_MIN, TINT_MAX, TINT_MIN } from "./kelvin";
+import { ADOBE_KELVIN_MIN, KELVIN_MAX, KELVIN_MIN, TINT_MAX, TINT_MIN, type ColourSpec } from "./kelvin";
 import { readExifSubset, type ExifSubset } from "./exif";
 import { setupInstalledShare, setupInstallFromApp, toast } from "./share";
 import {
@@ -680,8 +680,13 @@ const balUi = {
  *  store by `refreshHeld`; `keep` is the slider the reader's hand is on, which `updateBalanceUI` leaves alone so a thumb under a finger is
  *  not moved to the nearest grid point mid-drag; `nameDefault` is the date-and-time name the box was last given, so a name the reader typed
  *  is told from one the app wrote; `profileSig` is the list the profile switch was last built from, so a redraw that changes nothing leaves
- *  an open list alone. An object rather than a handful of `let`s, because `syncToUI` reads it before the module has run its way down. */
-const balState: { held: Balance.KeptBalance | null; keep: HTMLInputElement | null; nameDefault: string; profileSig: string } = { held: null, keep: null, nameDefault: "", profileSig: "" };
+ *  an open list alone; `shown` is the value each slider last stood at (null until one is known), which a drag measures its distance from:
+ *  a drag moves the white by how far the slider moved since its last event and never by how far it stands from a thumb that rests at an
+ *  end (record 104, the drag); `drag` is the white the hand has asked for so far on the grid route (the swap off), not rounded to the gain
+ *  track, with the gains that route wrote for it, so a drag that moves a mired at a time adds up instead of rounding back to the same grid
+ *  point at every event; it is used only while `params.wb` is still exactly those gains. An object rather than a handful of `let`s, because
+ *  `syncToUI` reads it before the module has run its way down. */
+const balState: { held: Balance.KeptBalance | null; keep: HTMLInputElement | null; nameDefault: string; profileSig: string; shown: { t: number | null; ti: number | null }; drag: { gains: Balance.Gains; want: Balance.BalanceWant } | null } = { held: null, keep: null, nameDefault: "", profileSig: "", shown: { t: null, ti: null }, drag: null };
 /** What each decoded photograph's file says about its camera, found once from its own bytes (`Prof.photoCamera`). Declared here with the rest of the balance state because `syncToUI` reaches it before the module has run its way down. */
 const photoCameras = new WeakMap<object, Prof.PhotoCamera>();
 /** The camera facts for the moment nothing is open: a raw of the Z 50, the body the stock matrix falls back to. */
@@ -1766,6 +1771,10 @@ function syncFromUI() {
   // only when one was made, so reading it back would turn every slider press into a saved choice. Its own `change` handler
   // (`balanceProfileInput`) writes it, `applySnapshot` restores it, and `syncToUI` draws it. The fifth of the five places, for this field,
   // is that handler rather than the list of range inputs below.
+  // `params.wbScreen` (record 104) is not read back here either, for the same reason in the other direction: no control holds it. The
+  // Temperature and Tint boxes write it (`balanceInput`, while the swap is on), `cloneParams` copies it, `applySnapshot` restores it from
+  // the snapshot, and `syncToUI` draws the boxes that stand for it through `updateBalanceUI`; the list of range inputs further down has
+  // no slider to add for it.
   if (!tm) {
     params.exposure = fromPos(Number(ui.expo.value), EX_LO, EX_HI);
     params.hue = Number(ui.hue.value);
@@ -1832,7 +1841,7 @@ function syncToUI() {
   ui.wbR.value = String(toPos(params.wb[0], WB_LO, WB_HI, WB_STEPS));
   ui.wbG.value = String(toPos(params.wb[1], WB_LO, WB_HI, WB_STEPS));
   ui.wbB.value = String(toPos(params.wb[2], WB_LO, WB_HI, WB_STEPS));
-  updateBalanceUI(); // and the two numbers they stand for, with the hold's state
+  updateBalanceUI(); // and the two numbers they stand for (the gains and, with the swap on, the screen-side gains), with the hold's state
   ui.expo.value = String(toPos(params.exposure, EX_LO, EX_HI));
   ui.dn.value = String(params.denoise);
   ui.chroma.value = String(params.chroma ?? 0);
@@ -1918,6 +1927,7 @@ ui.irAutoWb.addEventListener("click", () => {
   const next = grayWorldWB(current);
   params.exposure = clamp(exposureHoldingNeutral(current, grayWorldMeans(current), params.wb, params.exposure, next), EX_LO, EX_HI);
   params.wb = next;
+  delete params.wbScreen; // a balance found from the data starts from none of the screen-side trim (record 104)
   lookBias = [1, 1, 1];
   lookWb = null;
   syncToUI();
@@ -1990,6 +2000,14 @@ function balRound(v: number): number {
   return Math.round(v + 1e-6);
 }
 
+/** The white the open picture shows, as the Temperature and Tint boxes read it (record 104).
+ *  @param spec  what the gains are read through (the profile in force).
+ *  @returns the reading of the camera-space gains together with the screen-side gains, which only exist while the swap is on (`screenGainsOf`); null when they describe no white.
+ *  What it must satisfy: with the swap off, or with no screen-side gains, it is `readBalance(params.wb, spec)` exactly, as before the screen-side gains existed; with the swap on it is the white of the picture shown, so a drag toward warmer raises it as the picture warms. The one place the page reads the open photograph's white. */
+function shownReading(spec: ColourSpec): Balance.BalanceReading | null {
+  return Balance.readShown(params.wb, screenGainsOf(params), spec);
+}
+
 /** Put the three gain sliders where `params.wb` stands, and nothing else. Takes nothing and returns nothing. What it must satisfy: the
  *  same three writes `syncToUI` makes, so a Temperature or Tint move shows on the gains without waiting for the whole panel to be rewritten. */
 function syncWbSliders(): void {
@@ -2011,10 +2029,11 @@ function syncWbSliders(): void {
  *  and the set button follow `balState.held`. */
 function updateBalanceUI(): void {
   const { cam, choices, choice } = balanceProfile();
-  const r = choice ? Balance.readBalance(params.wb, choice.spec) : null;
+  const r = choice ? shownReading(choice.spec) : null;
   if (r) {
-    if (balState.keep !== balUi.t) balUi.t.value = String(balTempSlot(r.mired));
-    if (balState.keep !== balUi.ti) balUi.ti.value = String(balTintSlot(r.tint));
+    // The value each thumb is set to is remembered, because the next drag event measures its distance from it (`balanceInput`).
+    if (balState.keep !== balUi.t) { balUi.t.value = String(balTempSlot(r.mired)); balState.shown.t = Number(balUi.t.value); }
+    if (balState.keep !== balUi.ti) { balUi.ti.value = String(balTintSlot(r.tint)); balState.shown.ti = Number(balUi.ti.value); }
     if (document.activeElement !== balUi.tNum) balUi.tNum.value = balText(r.kelvin);
     if (document.activeElement !== balUi.tiNum) balUi.tiNum.value = balText(r.tint);
   } else {
@@ -2038,7 +2057,12 @@ function updateBalanceUI(): void {
   balUi.door.hidden = !showProfile;
   balUi.scale.hidden = masked;
   balUi.forget.hidden = !(choice && choice.kind === "loaded");
-  const past = r && (r.kelvin < KELVIN_MIN || r.kelvin > KELVIN_MAX) ? ` This white is ${r.kelvin < KELVIN_MIN ? "cooler" : "warmer"} than the scale reaches (${balText(r.kelvin)} K), so the thumb rests at its end and the box reads the figure.` : "";
+  // Beyond the scale's ends the thumb rests at the end and the box reads the figure. Between the scale's cool end and Lightroom's own
+  // 2000 K the white is inside this app's scale and below Lightroom's, which the line says in words (record 103).
+  const past = !r ? ""
+    : r.kelvin < KELVIN_MIN || r.kelvin > KELVIN_MAX ? ` This white is ${r.kelvin < KELVIN_MIN ? "cooler" : "warmer"} than the scale reaches (${balText(r.kelvin)} K), so the thumb rests at its end and the box reads the figure.`
+    : r.kelvin < ADOBE_KELVIN_MIN ? ` This white (${balText(r.kelvin)} K) is below Lightroom's scale, which stops at ${ADOBE_KELVIN_MIN} K; this app reads it from Planck's law${cam.isRaw ? ` down to ${KELVIN_MIN} K, the coolest white this camera's gains can show` : ", as far as this photograph's colours reach"}.`
+    : "";
   balUi.scale.textContent = choice ? `${choice.words}${past}` : "No colour matrix could be read from this photograph, so the Temperature and Tint have nothing to read through.";
   const held = balState.held;
   balUi.hold.setAttribute("aria-pressed", String(!!held));
@@ -2050,9 +2074,12 @@ function updateBalanceUI(): void {
 /** A Temperature or Tint move by the reader's hand: the slider, or a number typed into its box.
  *  @param axis  "t" for Temperature, "ti" for Tint.
  *  @param source  "slider" for the range input's own events, "number" for the typed box's change.
- *  Returns nothing. Writes `params.wb` with the geometric mean of the gains unchanged and the exposure untouched: through `moveBalance`
- *  for a slider, so the gains land on whole track positions, and through `exactBalance` for a typed number, so the gains are the SDK's
- *  own for the number and are remembered as exact (`rememberExactWb`), with the three gain sliders set to their nearest positions.
+ *  Returns nothing. WITH THE SWAP OFF it writes `params.wb` with the geometric mean of the gains unchanged and the exposure untouched:
+ *  through `moveBalance` for a slider, so the gains land on whole track positions, and through `exactBalance` for a typed number, so the
+ *  gains are the SDK's own for the number and are remembered as exact (`rememberExactWb`), with the three gain sliders set to their
+ *  nearest positions. WITH THE SWAP ON it writes `params.wbScreen` instead (`screenForWhite`, exact for a drag and a typed number alike)
+ *  and leaves `params.wb` alone, because the swap sits after the gains and a move of the gains warms the picture the wrong way (record
+ *  104); the box and the thumbs read the white of the gains and the screen-side gains together (`shownReading`).
  *  What it must satisfy: a control pressed at the value it already shows moves nothing (the rule `slider-own-value-walk` holds for every
  *  slider); the other axis keeps its exact reading, so moving Temperature never drags Tint; the move is drawn at once, with the
  *  slider's drag coalesced into one undo step by `draw` and a typed number recorded as its own step; a typed figure beyond Adobe's scale
@@ -2060,9 +2087,14 @@ function updateBalanceUI(): void {
  *  number reads back in its box as itself, because the box is read from the stored gains through the profile in force.
  *  A SLIDER MOVES THE BALANCE BY HOW FAR IT WAS MOVED, a typed number says where the balance goes. The thumb shows the reading rounded
  *  to a whole step and a reading can sit a fraction of a step away from it, so asking for the thumb's new whole number outright would
- *  sometimes ask for a point as near the old one as the new one and move nothing. The move is the thumb's distance from the value it was
- *  showing, added to the reading (Temperature's thumb is minus the mired figure, so a step right is a step warmer), which lands on a grid
- *  point whenever the reading is on one. A typed number is an absolute ask, in kelvin for Temperature, and takes the exact gains for it
+ *  sometimes ask for a point as near the old one as the new one and move nothing. The move is the distance the slider moved since its
+ *  last event (`balState.shown`: the value it was last set to or dragged to), added to the white asked for at the last event while the
+ *  gains are still the ones that ask produced (`balState.drag`, the grid route) and to the reading otherwise (Temperature's thumb is minus
+ *  the mired figure, so a step right is a step warmer). The sum is not rounded to the grid before it is added to, so ten events of one
+ *  step and one event of ten steps ask for the same white and land within one gain-track step of each other. It is NOT the distance
+ *  from the thumb the reading gives: a white past an end of the scale has its thumb held at the end, and measuring every event from
+ *  there added the whole distance again at each event, so ten one-step events and one ten-step event ended apart (step 239's fourth
+ *  finding). A typed number is an absolute ask, in kelvin for Temperature, and takes the exact gains for it
  *  (until 28 October 2026 it landed on the nearest point the gain track's grid has, which read back up to 34 K from the number typed); the
  *  box then shows what the stored gains read as, which is the number typed. */
 function balanceInput(axis: "t" | "ti", source: "slider" | "number"): void {
@@ -2070,7 +2102,7 @@ function balanceInput(axis: "t" | "ti", source: "slider" | "number"): void {
   const box = axis === "t" ? balUi.tNum : balUi.tiNum;
   if (!current) { updateBalanceUI(); return; }
   const { choice } = balanceProfile();
-  const cur = choice ? Balance.readBalance(params.wb, choice.spec) : null;
+  const cur = choice ? shownReading(choice.spec) : null;
   if (!choice || !cur) {
     updateBalanceUI();
     announceBalance("These gains describe no white, so the temperature and tint cannot move them. Move a gain slider or press Auto.");
@@ -2081,25 +2113,52 @@ function balanceInput(axis: "t" | "ti", source: "slider" | "number"): void {
   const raw = Number(typed ? box.value : slider.value);
   if (!Number.isFinite(raw)) { updateBalanceUI(); return; }
   const thumb = axis === "t" ? balTempSlot(cur.mired) : balTintSlot(cur.tint);
-  const shown = typed ? Number(balText(axis === "t" ? cur.kelvin : cur.tint)) : thumb;
+  // WHERE THE SLIDER STOOD BEFORE THIS EVENT: the value it was last set to or last dragged to (`balState.shown`), and the white's own
+  // thumb only when none is known. A drag is the distance the slider moved since its last event, so a white that sits past an end of the
+  // scale, where the thumb rests clamped, is not measured again from that end by every event (record 104, the drag).
+  const was = balState.shown[axis] ?? thumb;
+  const shown = typed ? Number(balText(axis === "t" ? cur.kelvin : cur.tint)) : was;
   if (raw === shown) return; // pressed at the value it already shows
+  // WHERE A GRID-ROUTE DRAG STARTS FROM: the white the hand asked for at its last event when the gains are still exactly the ones that ask
+  // produced (`balState.drag`), and the white the gains read as otherwise. The grid is coarser than a mired in places, so a drag that
+  // adds a mired to a reading that sits on a grid point rounds back to the same point at every event and never leaves it; adding to the
+  // white last asked for is what makes ten one-step events and one ten-step event land together. The swap-on route is exact and needs none.
+  const d = balState.drag;
+  const dragging = !typed && !params.swapRB && d !== null && d.gains.every((g, i) => g === params.wb[i]);
+  const base = dragging && d ? d.want : { mired: cur.mired, tint: cur.tint };
   let want: Balance.BalanceWant;
-  if (axis === "t") want = { mired: typed ? 1e6 / Math.min(KELVIN_MAX, Math.max(KELVIN_MIN, raw)) : cur.mired - (raw - thumb), tint: cur.tint };
-  else want = { mired: cur.mired, tint: typed ? Math.min(TINT_MAX, Math.max(TINT_MIN, raw)) : cur.tint + (raw - thumb) };
-  const next = typed ? Balance.exactBalance(want, params.wb, choice.spec) : Balance.moveBalance(want, params.wb, choice.spec);
-  if (!next) {
-    updateBalanceUI();
-    announceBalance("No gains can show that white on this photograph, so nothing moved.");
-    return;
+  if (axis === "t") want = { mired: typed ? 1e6 / Math.min(KELVIN_MAX, Math.max(KELVIN_MIN, raw)) : base.mired - (raw - was), tint: base.tint };
+  else want = { mired: base.mired, tint: typed ? Math.min(TINT_MAX, Math.max(TINT_MIN, raw)) : base.tint + (raw - was) };
+  if (params.swapRB) {
+    // THE SWAP IS ON, so the sensor's red gain lands on the screen's blue and a move of the camera-space gains would warm the picture the
+    // wrong way. The move goes to the SCREEN-SIDE gains (record 104), exactly, a drag and a typed number alike; the camera-space gains
+    // stay where they are, before the swap.
+    const screen = Balance.screenForWhite(want, params.wb, choice.spec);
+    if (!screen) {
+      updateBalanceUI();
+      announceBalance("No gains can show that white on this photograph, so nothing moved.");
+      return;
+    }
+    if (screenGainsNeutral(screen)) delete params.wbScreen; else params.wbScreen = screen;
+    balState.drag = null;
+  } else {
+    const next = typed ? Balance.exactBalance(want, params.wb, choice.spec) : Balance.moveBalance(want, params.wb, choice.spec);
+    if (!next) {
+      updateBalanceUI();
+      announceBalance("No gains can show that white on this photograph, so nothing moved.");
+      return;
+    }
+    params.wb = next;
+    if (typed) rememberExactWb(next);
+    balState.drag = typed ? null : { gains: [next[0], next[1], next[2]], want };
   }
-  params.wb = next;
-  if (typed) rememberExactWb(next);
   balState.keep = typed ? null : slider;
   syncWbSliders();
   updateBalanceUI();
   balState.keep = null;
+  if (!typed) balState.shown[axis] = raw; // the slider stays where the hand put it, and the next event is measured from here
   if (typed) {
-    const after = Balance.readBalance(params.wb, choice.spec);
+    const after = shownReading(choice.spec);
     box.value = after ? balText(axis === "t" ? after.kelvin : after.tint) : "";
   }
   draw();
@@ -2219,6 +2278,7 @@ function applyBalanceToOpen(gains: Balance.Gains): void {
   const next = gains.map((g, i) => snapGain(clamp(g * lookBias[i], WB_LO, WB_HI))) as Balance.Gains;
   params.exposure = snapExposure(clamp(exposureHoldingNeutral(current, grayWorldMeans(current), params.wb, params.exposure, next), EX_LO, EX_HI));
   params.wb = next;
+  delete params.wbScreen; // a held balance is gains only (record 104); the screen-side trim was made on another white
   syncToUI();
   draw();
   flushRecord();
@@ -2315,6 +2375,7 @@ balUi.back.addEventListener("click", () => {
     // its slider's grid so the sliders read back exactly what the open wrote.
     const next = grayWorldWB(current).map(snapGain) as Balance.Gains;
     params.wb = next;
+    delete params.wbScreen; // back at the automatic balance means none of the screen-side trim (record 104)
     params.exposure = snapExposure(clamp(autoExposure(current, next), EX_LO, EX_HI));
     lookBias = [1, 1, 1];
     lookWb = null;
@@ -4555,6 +4616,12 @@ function applySnapshot(s: Snapshot) {
   params.exposure = c.exposure;
   params.recover = c.recover ?? 0;
   params.swapRB = c.swapRB;
+  // The screen-side gains from the SNAPSHOT directly (record 104), as the profile switch below: an edit stored before the field existed
+  // has none, and that must mean one, one, one and never the live photograph's, which the `{ ...params, ...s.params }` merge above would
+  // otherwise hand it. Undo, Redo, Reset and a return to the photograph all come through here, so one dropped would be a move undone by
+  // the next press of anything. The boxes are drawn from it by `syncToUI` (through `updateBalanceUI`).
+  if (s.params.wbScreen && !screenGainsNeutral(s.params.wbScreen)) params.wbScreen = [s.params.wbScreen[0], s.params.wbScreen[1], s.params.wbScreen[2]];
+  else delete params.wbScreen;
   params.hue = c.hue;
   params.sat = c.sat;
   params.contrast = c.contrast;
@@ -5588,20 +5655,21 @@ function heldBalanceLine(): string {
   const kept = Balance.listBalances().length;
   const dropped = Balance.droppedBalances ? `; ${Balance.droppedBalances} unusable record${Balance.droppedBalances === 1 ? "" : "s"} set aside` : "";
   const { choice } = balanceProfile();
-  const say = (g: Balance.Gains) => { const r = choice ? Balance.readBalance(g, choice.spec) : null; return r ? `${balText(r.kelvin)} K and tint ${balText(r.tint)}` : "no white"; };
+  // The open photograph is read as the boxes read it (the gains with the screen-side gains while the swap is on, record 104); a held balance is gains only.
+  const say = (g: Balance.Gains, screen: Balance.ScreenGains | null = null) => { const r = choice ? Balance.readShown(g, screen, choice.spec) : null; return r ? `${balText(r.kelvin)} K and tint ${balText(r.tint)}` : "no white"; };
   const through = choice ? ` (through ${choice.name})` : "";
-  const now = current ? `the open photograph reads ${say(params.wb)}${through}` : "nothing open";
+  const now = current ? `the open photograph reads ${say(params.wb, screenGainsOf(params))}${through}` : "nothing open";
   const h = balState.held;
   if (!h) return `none held, so raws open at their own automatic balance; ${kept} kept; ${now}${dropped}`;
   return `"${h.name}" — red ${h.gains[0].toFixed(4)} · green ${h.gains[1].toFixed(4)} · blue ${h.gains[2].toFixed(4)}, ${say(h.gains)}${through}${h.profile ? `; kept with the choice ${h.profile}` : ""}; every raw opens at it; ${kept} kept; ${now}${dropped}`;
 }
 
 /** THE OPEN PHOTOGRAPH'S BALANCE AS ADOBE'S SCALE, FOR THE REPORT'S BALANCE ROW (decision 102).
- *  Takes nothing; reads `params.wb` and the profile in force. Returns a clause such as "reads as 10056 K and tint 30 through Infrared Temp -100 (loaded; this photograph's saved switch)", or "reads as no white" when the gains describe none.
+ *  Takes nothing; reads `params.wb`, the screen-side gains while the swap is on (record 104) and the profile in force. Returns a clause such as "reads as 10056 K and tint 30 through Infrared Temp -100 (loaded; this photograph's saved switch)", or "reads as no white" when the gains describe none.
  *  What it must satisfy: the two numbers are the ones the sliders show for the same gains, and the clause names the profile or matrix they go through, which kind it is, and whether the reader's switch saved it with this photograph or the default rules picked it, so a report can be matched to the screen by eye and a figure is never read without its profile. */
 function balanceKelvinWords(): string {
   const { choice } = balanceProfile();
-  const r = choice ? Balance.readBalance(params.wb, choice.spec) : null;
+  const r = choice ? shownReading(choice.spec) : null;
   if (!choice || !r) return "reads as no white";
   return `reads as ${balText(r.kelvin)} K and tint ${balText(r.tint)} through ${choice.name} (${choice.kind}; ${params.profile ? "this photograph's saved switch" : "the default rules"})`;
 }
@@ -14078,6 +14146,9 @@ function establishFreshEdit() {
   // NOR DOES THE LAST PHOTOGRAPH'S PROFILE SWITCH (record 102): a photograph that has not been switched reads under the rules' own pick,
   // which includes what the reader last used for this camera, and that is where a carried choice comes from.
   delete params.profile;
+  // NOR THE LAST PHOTOGRAPH'S SCREEN-SIDE GAINS (record 104): they are the Temperature and Tint move made on that photograph while the swap
+  // was on, and this one opens at the balance found from its own data, with none.
+  delete params.wbScreen;
   lookBias = [1, 1, 1];
   lookWb = null;
   // NORMALISE THE MEASUREMENTS TO WHAT THE SLIDERS CAN HOLD, BEFORE ANYTHING
@@ -15201,6 +15272,8 @@ function tileInputsFor(maxEdge: number, lens: LensCurve | null, own: Snapshot | 
     base,
     own: op ? {
       wb: [...op.wb] as [number, number, number], exposure: op.exposure, recover: op.recover, swapRB: op.swapRB,
+      // The screen-side gains are the photograph's own (record 104): a tile of an edited photograph is a claim about its picture, which they move.
+      wbScreen: op.wbScreen ? [...op.wbScreen] as [number, number, number] : undefined,
       tone: [...op.tone] as typeof op.tone, sky: [...op.sky] as typeof op.sky, foliage: [...op.foliage] as typeof op.foliage,
       lensFix: op.lensFix, lensBypass: op.lensBypass, hsFix: op.hsFix, hsBypass: op.hsBypass, forceBalance: op.forceBalance,
     } : null,
@@ -21408,7 +21481,9 @@ recoverBtn.addEventListener("click", async () => {
 // via the share sheet where one exists: the installed iOS app ignores a bare
 // a[download], so these buttons used to silently do nothing there.
 ui.cubeBtn.addEventListener("click", () => {
-  const text = generateCube(params, { includeWB: ui.profWB.checked, title: baseName() });
+  // The screen-side gains (record 104) are part of the white balance, which the bake leaves out unless the reader asked for it, so they go
+  // with `wb` and `exposure`: a reusable creative LUT must not carry the Temperature move made on one frame.
+  const text = generateCube(ui.profWB.checked ? params : { ...params, wbScreen: undefined }, { includeWB: ui.profWB.checked, title: baseName() });
   void saveBlob(new Blob([text], { type: "text/plain" }), `${baseName()}.cube`);
 });
 
@@ -22207,6 +22282,7 @@ canvas.addEventListener("click", (e) => {
   const next = unitMinGains([mean / r, mean / g, mean / b]);
   params.exposure = clamp(exposureHoldingNeutral(current, sample.lin, params.wb, params.exposure, next), EX_LO, EX_HI);
   params.wb = next;
+  delete params.wbScreen; // the tapped spot is neutral in camera space; a screen-side trim left on would tint it (record 104)
   lookBias = [1, 1, 1]; // fresh neutral WB — no look bias baked in
   syncToUI();
   draw();
@@ -22229,6 +22305,7 @@ canvas.addEventListener("click", (e) => {
  *  clipped camera-native raw) in one shot — the same baseline open applies. */
 function autoAdjust(img: DecodedImage) {
   params.wb = grayWorldWB(img);
+  delete params.wbScreen; // Auto is the balance found from the data, with none of the screen-side trim (record 104)
   params.exposure = autoExposure(img, params.wb);
   params.denoise = estimateDenoise(img);
   params.recover = img.camMatrix ? autoRecover(img) : 0;

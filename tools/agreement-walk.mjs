@@ -1001,6 +1001,10 @@ try {
   //    saved file agrees with the screen, by the same bars arm 4 uses. The frame is the aimed-mask practice
   //    file, read through the matrix its own tags carry; the first run prints where it opens, and typing
   //    3000 K and a tint of -40 moves both axes unless that frame already sits there.
+  //    SINCE RECORD 104 THE FRAME'S SWAP IS ON (a raw opens with it on), so the typed number is written as the
+  //    screen-side gains `wbScreen`, applied AFTER the swap in the shader and in `compileEdit`, and the camera-space
+  //    gains stay where they were. This arm is therefore also what reads the new stage in the preview against the
+  //    same stage in the export; the direction of a drag, and its landing, are tools/temperature-walk.mjs's.
   {
     const label = "temperature";
     const page = await br.newPage({ viewport: { width: 1000, height: 820 }, acceptDownloads: true });

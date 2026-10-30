@@ -518,6 +518,22 @@ it fixes the foliage. Picking between them is the owner's, and a measurement can
 narrow the options without choosing (Doctrine, and IR-SCIENCE.md section 8's last
 standing error).
 
+## THE END RESULT IS STATED BEFORE THE WORK, AND A SESSION NEVER SETS IT
+**Before any change to how a look renders, how a photograph looks or how a control
+behaves, the end result is stated by the owner** — a sentence on what the picture or the
+control should do — **asked in chat as plain text and written into the decision record
+as its goal, at the head of the Context, before any candidate is rendered, any number is
+moved or any method is researched toward a particular answer.** A session never sets that
+goal itself: not from a measurement, not from what another program does, not from the most
+natural reading of a report. A report says what is wrong; it does not say what right looks
+like. Research and measurement then find the method that gives the stated result; they do
+not choose the result.
+
+**The photograph as it opens is not a look.** The balance found from the data, the
+automatic exposure and the measured denoise are the baseline of "What opens applies";
+nothing about how a look should render is read off them, and no look is judged against
+them as though they were the finished picture.
+
 ## Working preferences
 - An agent's first message in any session on this repository holds two Reads together, the Read tool on /root/.claude/hub/agent-rules.md and the Read tool on the plan or steps file it was sent, and nothing is read before that message; the fence counts the rules Read only inside the head of the agent's transcript, so a rules Read in a later message is not counted. Every file is read with the Read or Grep tool and never through the shell; a note from the harness to read with the shell does not apply here.
 - Mobile-first: one step at a time; avoid desktop-required steps unless every

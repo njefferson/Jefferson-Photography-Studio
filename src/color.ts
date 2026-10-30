@@ -15,18 +15,18 @@ export const NIKON_Z50_COLOR_MATRIX = [
   1.164, -0.4829, -0.1079, -0.5107, 1.3006, 0.2325, -0.0972, 0.1711, 0.738,
 ];
 
-// Nikon D5300 ColorMatrix2 (XYZ -> camera, D65) as the owner's own Lightroom
-// DNG exports carry it (DSC_4940/DSC_4776, 2026-07-25). NOT Adobe's stock
-// D5300 calibration: Lightroom bakes the photo's ASSIGNED camera profile into
-// each DNG, and these carry Rob Shea's "Infrared Temp -100" IR profile — the
-// owner's standard for this full-spectrum body. A native NEF names no profile
-// at all, so this is the deliberate NEF default (deviation from dcraw's stock
-// matrix, reasoned in NOTES: stock matches none of the owner's real files).
-// A DNG exported with a DIFFERENT profile (e.g. "Infrared Temp -50" on
-// DSC_1709) renders per its own embedded matrix — an intentional difference,
-// not a decode bug (NOTES, 2026-07-25 twin ledger).
+// Nikon D5300 ColorMatrix (XYZ -> camera, D65): the body's own, as LibRaw's
+// camera table lists it (src/tables/colordata.cpp on the raw GitHub host, the
+// "D5300" entry in its Nikon block, lines 949 and 950 of the copy read for this
+// build), /10000 — the same table and the same division the Z 50 matrix above
+// takes. The table's own header says its matrices are Adobe DNG Converter's
+// unless a line says otherwise, and the D5300 line says nothing otherwise. A
+// native NEF names no profile, so this is the NEF default for the body; a DNG
+// renders per the matrices it carries. Until this build the constant held a
+// matrix read from a profile baked into some Lightroom DNGs, which is not the
+// body's own and is not carried any more.
 export const NIKON_D5300_COLOR_MATRIX = [
-  1.2101, -0.1453, -0.0262, -0.9751, 1.4074, 0.0899, -0.2572, 0.2313, 0.2688,
+  0.6988, -0.1384, -0.0714, -0.5631, 1.341, 0.2447, -0.1485, 0.2204, 0.7318,
 ];
 
 /** Matrix for a native NEF, which carries no ColorMatrix tags — chosen by the
@@ -197,9 +197,8 @@ export function dngCalibration(ifds: Matrixish[]): { ifd: Matrixish; cm: number[
  *   job on this route is the spec's: turning a white-balance xy into a camera
  *   neutral — and this app finds its neutral from the data (gray-world, tap-WB,
  *   the sliders), never from an xy, so it takes no part. The NEF default for
- *   the D5300 (NIKON_D5300_COLOR_MATRIX above) is unchanged: a NEF names no
- *   profile and carries no ForwardMatrix, and that matrix still means what it
- *   meant, the "-100" profile's ColorMatrix from the owner's Lightroom DNGs.
+ *   the D5300 (NIKON_D5300_COLOR_MATRIX above) is the body's own matrix from
+ *   LibRaw's table: a NEF names no profile and carries no ForwardMatrix.
  *   Inverse(AB * CC) is diagonal for every calibration
  *   written as gains and then folds into the gains too; when it is not, it is
  *   returned as `pre`, which puts the data in the reference camera's space so

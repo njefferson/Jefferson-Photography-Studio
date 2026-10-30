@@ -1,6 +1,6 @@
 // CPU version of the GPU edit pipeline, kept numerically identical to the
 // fragment shader in gl.ts so exports match the on-screen preview exactly.
-// Order: white balance -> channel swap -> hue -> saturation -> contrast -> gamma.
+// Order: white balance -> channel swap -> hue -> screen-side gains (record 104, `wbScreen`, only with the swap on) -> saturation -> contrast -> gamma.
 
 import type { HealSpot } from "./heal";
 import type { WarpField } from "./warp";
@@ -13,6 +13,16 @@ export interface EditParams {
   wb: [number, number, number];
   exposure: number;
   swapRB: boolean;
+  /** THE SCREEN-SIDE GAINS (record 104): red, green and blue of the picture AS SHOWN, product one,
+   *  applied AFTER the red and blue swap, the 3x3 mixer and the hue turn and BEFORE saturation and the
+   *  per-colour bands. While the swap is on, the sensor's red gain reaches the screen's blue, so a
+   *  Temperature or Tint move that changed the gains warmed the picture the wrong way; the controls
+   *  change THESE instead, and the camera-space balance (`wb`, found from the data, set by a tap, held or
+   *  kept) stays where it was, before the swap. Read only while `swapRB` is on (`screenGainsOf`); absent
+   *  means one, one, one, which renders exactly as an edit without the field always has. Per-shot
+   *  corrective like `wb`: a saved look does not carry it, the .cube bake leaves it out unless the
+   *  white balance is baked, and `stampOf` does not hold it. */
+  wbScreen?: [number, number, number];
   /** Degrees; a turn of hue about the Rec.709 luminance axis in linear light
    *  (hueRotate), so brightness and grey are kept. Positive raises HSV hue. */
   hue: number;
@@ -450,6 +460,29 @@ export function mix3IsIdentity(m: number[] | undefined): boolean {
   if (!m) return true;
   for (let i = 0; i < 9; i++) if (Math.abs((m[i] ?? MIX3_DEFAULT[i]) - MIX3_DEFAULT[i]) > 1e-6) return false;
   return true;
+}
+
+/** The screen-side gains that change nothing (record 104): one, one, one, which is what an edit with no `wbScreen` field renders with. */
+export const WB_SCREEN_DEFAULT: [number, number, number] = [1, 1, 1];
+
+/** Whether a set of screen-side gains changes nothing.
+ *  @param g  the gains (an edit's `wbScreen`), or undefined for an edit that has none.
+ *  @returns true when `g` is absent or each of its three numbers is within a millionth of one.
+ *  What it must satisfy: it is the one test of "nothing to apply", read by `cloneParams` (an absent field stays absent), `screenGainsOf` and the page, so an untouched photograph's stored edit carries no new key. */
+export function screenGainsNeutral(g: ArrayLike<number> | undefined): boolean {
+  if (!g) return true;
+  for (let i = 0; i < 3; i++) if (!(Math.abs((g[i] ?? 1) - 1) <= 1e-6)) return false;
+  return true;
+}
+
+/** The screen-side gains an edit renders with, or null when they change nothing (record 104).
+ *  @param p  an edit, or just the two fields: the swap flag and the screen-side gains (a tile's own edit passes the same two).
+ *  @returns the three gains when the swap is on and they are not one, one, one; null when the swap is off or they are neutral.
+ *  What it must satisfy: it is the ONE place the swap gates the gains, read by `compileEdit`, by the shader's uniform upload (src/gl.ts) and by the page's reading of the Temperature and Tint, so the picture and the box cannot disagree about whether they apply; with the swap off the render is today's, whatever the field holds. */
+export function screenGainsOf(p: Pick<EditParams, "swapRB" | "wbScreen">): [number, number, number] | null {
+  if (!p.swapRB || screenGainsNeutral(p.wbScreen)) return null;
+  const g = p.wbScreen!;
+  return [g[0], g[1], g[2]];
 }
 
 /** Master strength of a full-amount wheel — one number, shared verbatim by
@@ -1933,6 +1966,8 @@ export function cloneParams(p: EditParams): EditParams {
     wb: [...p.wb] as [number, number, number],
     exposure: p.exposure,
     swapRB: p.swapRB,
+    // Absent stays absent (record 104): a neutral `wbScreen` is the same as none, and a key that is there at one, one, one would be a second spelling of "not moved" in every stored edit and every comparison of two.
+    ...(p.wbScreen && !screenGainsNeutral(p.wbScreen) ? { wbScreen: [p.wbScreen[0], p.wbScreen[1], p.wbScreen[2]] as [number, number, number] } : {}),
     hue: p.hue,
     sat: p.sat,
     contrast: p.contrast,
@@ -2816,6 +2851,8 @@ export function compileEdit(
   const wr = p.wb[0] * ex, wg = p.wb[1] * ex, wb = p.wb[2] * ex;
   const recover = p.recover ?? 0;
   const swap = p.swapRB;
+  // The screen-side gains, or null (record 104); applied per pixel after the hue turn below.
+  const screenG = screenGainsOf(p);
   const sat = p.sat;
   const con = p.contrast;
   const [tr, tg, tb] = p.tint;
@@ -3111,6 +3148,9 @@ export function compileEdit(
       hueRotate(r, g, b, hueCos, hueSin, hueTmp);
       nr = hueTmp[0]; ng = hueTmp[1]; nb = hueTmp[2];
     }
+    // The SCREEN-SIDE GAINS (record 104): after the swap, the mixer and the hue turn, before
+    // saturation — the shader's `c *= u_wbScreen`. Null (the swap off, or one, one, one) costs nothing.
+    if (screenG) { nr *= screenG[0]; ng *= screenG[1]; nb *= screenG[2]; }
     const luma = nr * REC709[0] + ng * REC709[1] + nb * REC709[2];
     // Match the shader: saturation boosts fade out in deep shadows
     // (smoothstep(0.02, 0.20, luma)) so they don't amplify chroma noise.

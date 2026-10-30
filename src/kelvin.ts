@@ -2,10 +2,15 @@
 //
 // THE CONVENTION IS ADOBE'S DNG SDK (version 1.4), and this file is a port of the functions it names, nothing added (record 102; IR-SCIENCE.md section 3 lists every source and how each was read). From `dng_temperature.cpp`: the 31-row table from Wyszecki and Stiles AS ADOBE PRINTS IT, row 325 included, the tint scale of minus 3000 per unit of distance in CIE 1960 uv, `Set_xy_coord` and `Get_xy_coord`. From `dng_color_spec.cpp`: the colour matrix blended between the profile's two calibrations by the white's own temperature (`FindXYZtoCamera`), a camera neutral turned into an xy by up to thirty passes from D50 (`NeutralToXY`), and an xy turned into a neutral (`SetWhiteXY`). From `dng_camera_profile.cpp`: the temperatures its illuminant codes stand for and the way a colour matrix is normalised. From `dng_xy_coord.cpp`: the pins on an xy.
 //
-// WHAT IS NOT DONE, ON PURPOSE. No locus is computed below the table (the SDK keeps a white cooler than 1667 K at 1667 K and carries the rest in the tint, and says so in `xyToTempTint`), the table's one odd row is not corrected, and nothing here is read off any photograph: the scale is the schema's (`KELVIN_MIN` to `KELVIN_MAX`, `TINT_MIN` to `TINT_MAX`) and it is the caller's to rest a control at an end for a white outside it. That the shipped converter of Adobe's editors is this arithmetic is not shown by anything read; it is the SDK's sample code of 2012.
+// BELOW THE SDK'S TABLE THE LOCUS IS COMPUTED (record 103; IR-SCIENCE.md section 3, 29 October 2026). The SDK's table ends at 1667 K, it keeps a white cooler than that at 1667 K and carries the rest in the tint, and its inverse extends the last two rows in a straight line, which leaves Planck's law by 4 tint units at 1429 K and by far more below. An infrared white point lives down there. So the table is followed, in mired, by rows from 625 to 2000 mired (1600 K to 500 K) in steps of 25: each row's locus point is Planck's law summed against the CIE 1931 observer (`OBSERVER` below, `planckLocusUv`), and its line across the locus is the oriented normal to the locus there. The SDK's own 31 rows, and every reading and move from 1667 K upward, are exactly as the SDK prints and computes them. This is the 25 October build's method laid over the app's own rows (row 325 as Adobe prints it); the range is not read off any photograph: the scale's cool end is the lowest white this camera's three gains can express (`KELVIN_MIN`).
+//
+// WHAT IS NOT DONE, ON PURPOSE. The table's one odd row is not corrected (a "correction" of one row is the thing to refuse), and nothing here is read off any photograph: the scale is `KELVIN_MIN` to `KELVIN_MAX`, `TINT_MIN` to `TINT_MAX`, and it is the caller's to rest a control at an end for a white outside it. That the shipped converter of Adobe's editors is this arithmetic is not shown by anything read; it is the SDK's sample code of 2012.
 
-/** The coolest and warmest temperature of Adobe's scale, in kelvin: crs:Temperature in Adobe's XMP Camera Raw namespace, "Range 2000 to 50000". */
-export const KELVIN_MIN = 2000;
+/** The coolest temperature of Adobe's own scale, in kelvin: crs:Temperature in Adobe's XMP Camera Raw namespace, "Range 2000 to 50000". Lightroom's thumb stops here; this app's goes lower (`KELVIN_MIN`), and the line under the sliders says when a white sits between the two. */
+export const ADOBE_KELVIN_MIN = 2000;
+/** The coolest temperature the Temperature thumb and its typed box reach, in kelvin: the lowest white this camera's three gains can express at the tints of an infrared white (record 103). Measured on 29 October 2026 over the Z 50 matrix at tints from minus 91.4 to minus 65.2: the lowest white whose three gains read back the asked kelvin and keep the smallest channel above a thousandth of the largest runs from 535.25 K (tint minus 65.2) to 536.95 K (tint minus 91.4), so the floor is the whole kelvin at or above the dearest of them and a typed number from here up lands at every one of those tints. Below the Planck rows' last row (500 K) nothing is computed, and below this a white gives a channel less than a thousandth of the largest, which the SDK's pin cannot reproduce. tools/join-fold-check.mjs holds this to the thumb in ir.html. */
+export const KELVIN_MIN = 537;
+/** The warmest temperature of Adobe's scale, in kelvin: crs:Temperature, "Range 2000 to 50000". */
 export const KELVIN_MAX = 50000;
 /** The tint range of the same namespace, crs:Tint, "Range -150 to 150". A positive tint is a white on the green side of the locus, which the editors' help describes as the slider's magenta end. */
 export const TINT_MIN = -150;
@@ -58,6 +63,144 @@ const D50_Y = 0.3585;
 const MAX_PASSES = 30;
 const SETTLED = 1e-7;
 
+/** The wavelength of the first row of `OBSERVER`, in nanometres, and the step between rows. */
+const OBSERVER_FIRST_NM = 380;
+const OBSERVER_STEP_NM = 5;
+
+/** The CIE 1931 2 degree standard observer, 380 to 780 nm at 5 nm: the three colour matching functions [x-bar, y-bar, z-bar] that turn a spectrum into X, Y and Z, 81 rows. The source is the CIE's published 1931 standard observer table; these values were copied from the 25 October build's data file, which took them from the 2 degree table in RawTherapee's rtengine/colortemp.cc (cie_colour_match_jd2, 350 to 830 nm at 5 nm) and rounded them to six places. The rows below 380 nm are left out on purpose: that table's row for 360 nm carries a y value a hundred times its neighbours' (a slipped decimal point), and a black body at or under 6500 K puts nothing measurable there. The y column peaks at exactly 1 at 555 nm and the x column reads 1.0622 at 600 nm, as the published table does. Used only by `planckLocusUv`. */
+const OBSERVER: ReadonlyArray<readonly [number, number, number]> = [
+  [0.001368, 0.000039, 0.00645], // 380 nm
+  [0.002236, 0.000064, 0.01055], // 385 nm
+  [0.004243, 0.00012, 0.02005], // 390 nm
+  [0.00765, 0.000217, 0.03621], // 395 nm
+  [0.01431, 0.000396, 0.06785], // 400 nm
+  [0.02319, 0.00064, 0.1102], // 405 nm
+  [0.04351, 0.00121, 0.2074], // 410 nm
+  [0.07763, 0.00218, 0.3713], // 415 nm
+  [0.13438, 0.004, 0.6456], // 420 nm
+  [0.21477, 0.0073, 1.03905], // 425 nm
+  [0.2839, 0.0116, 1.3856], // 430 nm
+  [0.3285, 0.01684, 1.62296], // 435 nm
+  [0.34828, 0.023, 1.74706], // 440 nm
+  [0.34806, 0.0298, 1.7826], // 445 nm
+  [0.3362, 0.038, 1.77211], // 450 nm
+  [0.3187, 0.048, 1.7441], // 455 nm
+  [0.2908, 0.06, 1.6692], // 460 nm
+  [0.2511, 0.0739, 1.5281], // 465 nm
+  [0.19536, 0.09098, 1.28764], // 470 nm
+  [0.1421, 0.1126, 1.0419], // 475 nm
+  [0.09564, 0.13902, 0.81295], // 480 nm
+  [0.05795, 0.1693, 0.6162], // 485 nm
+  [0.03201, 0.20802, 0.46518], // 490 nm
+  [0.0147, 0.2586, 0.3533], // 495 nm
+  [0.0049, 0.323, 0.272], // 500 nm
+  [0.0024, 0.4073, 0.2123], // 505 nm
+  [0.0093, 0.503, 0.1582], // 510 nm
+  [0.0291, 0.6082, 0.1117], // 515 nm
+  [0.06327, 0.71, 0.07825], // 520 nm
+  [0.1096, 0.7932, 0.05725], // 525 nm
+  [0.1655, 0.862, 0.04216], // 530 nm
+  [0.22575, 0.91485, 0.02984], // 535 nm
+  [0.2904, 0.954, 0.0203], // 540 nm
+  [0.3597, 0.9803, 0.0134], // 545 nm
+  [0.43345, 0.99495, 0.00875], // 550 nm
+  [0.51205, 1, 0.00575], // 555 nm
+  [0.5945, 0.995, 0.0039], // 560 nm
+  [0.6784, 0.9786, 0.00275], // 565 nm
+  [0.7621, 0.952, 0.0021], // 570 nm
+  [0.8425, 0.9154, 0.0018], // 575 nm
+  [0.9163, 0.87, 0.00165], // 580 nm
+  [0.9786, 0.8163, 0.0014], // 585 nm
+  [1.0263, 0.757, 0.0011], // 590 nm
+  [1.0567, 0.6949, 0.001], // 595 nm
+  [1.0622, 0.631, 0.0008], // 600 nm
+  [1.0456, 0.5668, 0.0006], // 605 nm
+  [1.0026, 0.503, 0.00034], // 610 nm
+  [0.9384, 0.4412, 0.00024], // 615 nm
+  [0.85445, 0.381, 0.00019], // 620 nm
+  [0.7514, 0.321, 0.0001], // 625 nm
+  [0.6424, 0.265, 0.00005], // 630 nm
+  [0.5419, 0.217, 0.00003], // 635 nm
+  [0.4479, 0.175, 0.00002], // 640 nm
+  [0.3608, 0.1382, 0.00001], // 645 nm
+  [0.2835, 0.107, 0], // 650 nm
+  [0.2187, 0.0816, 0], // 655 nm
+  [0.1649, 0.061, 0], // 660 nm
+  [0.1212, 0.04458, 0], // 665 nm
+  [0.0874, 0.032, 0], // 670 nm
+  [0.0636, 0.0232, 0], // 675 nm
+  [0.04677, 0.017, 0], // 680 nm
+  [0.0329, 0.01192, 0], // 685 nm
+  [0.0227, 0.00821, 0], // 690 nm
+  [0.01584, 0.005723, 0], // 695 nm
+  [0.011359, 0.004102, 0], // 700 nm
+  [0.008111, 0.002929, 0], // 705 nm
+  [0.00579, 0.002091, 0], // 710 nm
+  [0.004109, 0.001484, 0], // 715 nm
+  [0.002899, 0.001047, 0], // 720 nm
+  [0.002049, 0.00074, 0], // 725 nm
+  [0.00144, 0.00052, 0], // 730 nm
+  [0.001, 0.000361, 0], // 735 nm
+  [0.00069, 0.000249, 0], // 740 nm
+  [0.000476, 0.000172, 0], // 745 nm
+  [0.000332, 0.00012, 0], // 750 nm
+  [0.000235, 0.000085, 0], // 755 nm
+  [0.000166, 0.00006, 0], // 760 nm
+  [0.000117, 0.000042, 0], // 765 nm
+  [0.000083, 0.00003, 0], // 770 nm
+  [0.000059, 0.000021, 0], // 775 nm
+  [0.000042, 0.000015, 0], // 780 nm
+];
+
+/** The second radiation constant of Planck's law, in metre kelvin: the value the 1931-era tables were made with. */
+const PLANCK_C2 = 0.014388;
+/** Where the computed rows start and stop, in mired, and their spacing (the SDK's own spacing near its cool end): 1600 K to 500 K. */
+const EXT_FIRST = 625;
+const EXT_LAST = 2000;
+const EXT_STEP = 25;
+
+/** A black body's place in CIE 1960 uv.
+ *  @param kelvin  the temperature, above 0.
+ *  @returns `u` and `v` of Planck's law summed against the CIE 1931 observer from 380 to 780 nm at 5 nm.
+ *  What it must satisfy: at 6500 K it is the Planckian locus's x of 0.3135 and y of 0.3237 turned into uv, and for every SDK row from 10 to 600 mired but the odd row at 325 (90 units off as printed, kept as printed) it lands within 7 units of 0.00001 of the row's u and v, and within 6 on the rows from 400 to 600 where the computed rows continue them (tools/join-fold-check.mjs holds all three; step 244 read 6.03 at the 10 mired row). Consumers: the rows below the SDK's table (`locusRows`), and that check. */
+export function planckLocusUv(kelvin: number): { u: number; v: number } {
+  let X = 0, Y = 0, Z = 0;
+  for (let i = 0; i < OBSERVER.length; i++) {
+    const lam = (OBSERVER_FIRST_NM + OBSERVER_STEP_NM * i) * 1e-9;
+    const power = 1 / (Math.pow(lam, 5) * (Math.exp(PLANCK_C2 / (lam * kelvin)) - 1));
+    X += OBSERVER[i][0] * power;
+    Y += OBSERVER[i][1] * power;
+    Z += OBSERVER[i][2] * power;
+  }
+  const d = X + 15 * Y + 3 * Z;
+  return { u: (4 * X) / d, v: (6 * Y) / d };
+}
+
+/** One row of the locus the conversions run on: inverse temperature in mired, the locus point in CIE 1960 uv, and the unit vector along the line across the locus there (an oriented normal). */
+interface LocusRow { r: number; u: number; v: number; nu: number; nv: number }
+
+let locusTable: LocusRow[] | null = null;
+
+/** The isotemperature rows the conversions run on, built once: the SDK's 31 rows exactly as it normalises them, then the computed ones from 625 to 2000 mired.
+ *  @returns the rows in order of increasing mired.
+ *  What it must satisfy: each SDK row carries the unit vector (1, slope) over its length, which is what the SDK's loops compute for it, so the readings and moves from 1667 K upward are the SDK's own to the last place a float keeps; each computed row carries a unit vector rotated a quarter turn from the locus tangent, pointing the way the SDK's last rows do (away from the green side), and not the SDK's slope, because the locus peaks in v near 1600 K, the slope passes through the vertical there, and two slopes of opposite sign are two vectors pointing opposite ways when the interpolation averages them. Consumers: `xyToTempTint` and `tempTintToXy`. */
+function locusRows(): LocusRow[] {
+  if (locusTable) return locusTable;
+  const out: LocusRow[] = SDK_TABLE.map(([r, u, v, slope]) => {
+    const len = Math.sqrt(1 + slope * slope);
+    return { r, u, v, nu: 1 / len, nv: slope / len };
+  });
+  for (let r = EXT_FIRST; r <= EXT_LAST; r += EXT_STEP) {
+    const p = planckLocusUv(1e6 / r);
+    const a = planckLocusUv(1e6 / (r - 0.5));
+    const b = planckLocusUv(1e6 / (r + 0.5));
+    const du = b.u - a.u, dv = b.v - a.v, len = Math.hypot(du, dv);
+    out.push({ r, u: p.u, v: p.v, nu: dv / len, nv: -du / len });
+  }
+  locusTable = out;
+  return out;
+}
+
 /** A 3x3 times a 3-vector. @param m  row-major. @param v  three numbers. @returns the product. */
 function mulMV(m: ReadonlyArray<number>, v: ReadonlyArray<number>): number[] {
   return [m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[3] * v[0] + m[4] * v[1] + m[5] * v[2], m[6] * v[0] + m[7] * v[1] + m[8] * v[2]];
@@ -82,31 +225,32 @@ function xyToXYZ(x: number, y: number): number[] {
   return [px / py, 1, (1 - px - py) / py];
 }
 
-/** A temperature and a tint for a chromaticity: the SDK's `Set_xy_coord`, line for line.
+/** A temperature and a tint for a chromaticity: the SDK's `Set_xy_coord`, line for line, over the SDK's rows and then the computed ones below them.
  *  @param x  CIE 1931 x of the white.
  *  @param y  its y.
  *  @returns `kelvin`, `mired` (a million over the kelvin figure) and `tint`; NaN in all three for a chromaticity with no uv.
- *  What it must satisfy: a white on the 200-mired row's own point reads 5000 K and a tint of 0; a tint that `tempTintToXy` made reads back as it was; and past the table's cool end (a white cooler than 1667 K) the temperature stays at the last row's and the rest is carried in the tint, exactly as the SDK's loop does, so the two directions are not mirror images there. Consumers: `gainsToWhite` and the calibration weight. */
+ *  What it must satisfy: a white on the 200-mired row's own point reads 5000 K and a tint of 0; a tint that `tempTintToXy` made reads back as it was, now also for a white cooler than 1667 K down to the last computed row (500 K); for every white the SDK's table covers (1667 K and warmer) the answer is the SDK's own, to the last place a float keeps, because the SDK's rows and their unit vectors are the same numbers and the loop is the same loop; and a white beyond the last computed row is read at that row with the rest carried in the tint, as the SDK reads a white beyond its own last row. Consumers: `gainsToWhite` and the calibration weight. */
 export function xyToTempTint(x: number, y: number): { kelvin: number; mired: number; tint: number } {
+  const R = locusRows();
   const den = 1.5 - x + 6 * y;
   const u = (2 * x) / den, v = (3 * y) / den;
   let lastDt = 0, lastDu = 0, lastDv = 0;
-  for (let index = 1; index <= 30; index++) {
-    let du = 1, dv = SDK_TABLE[index][3];
-    let len = Math.sqrt(1 + dv * dv);
-    du /= len; dv /= len;
-    let uu = u - SDK_TABLE[index][1], vv = v - SDK_TABLE[index][2];
+  for (let index = 1; index < R.length; index++) {
+    const row = R[index];
+    let du = row.nu, dv = row.nv;
+    let uu = u - row.u, vv = v - row.v;
     let dt = -uu * dv + vv * du;
-    if (dt <= 0 || index === 30) {
+    if (dt <= 0 || index === R.length - 1) {
       if (dt > 0) dt = 0;
       dt = -dt;
       const f = index === 1 ? 0 : dt / (lastDt + dt);
-      const mired = SDK_TABLE[index - 1][0] * f + SDK_TABLE[index][0] * (1 - f);
-      uu = u - (SDK_TABLE[index - 1][1] * f + SDK_TABLE[index][1] * (1 - f));
-      vv = v - (SDK_TABLE[index - 1][2] * f + SDK_TABLE[index][2] * (1 - f));
+      const prev = R[index - 1];
+      const mired = prev.r * f + row.r * (1 - f);
+      uu = u - (prev.u * f + row.u * (1 - f));
+      vv = v - (prev.v * f + row.v * (1 - f));
       du = du * (1 - f) + lastDu * f;
       dv = dv * (1 - f) + lastDv * f;
-      len = Math.sqrt(du * du + dv * dv);
+      const len = Math.sqrt(du * du + dv * dv);
       du /= len; dv /= len;
       return { kelvin: 1e6 / mired, mired, tint: (uu * du + vv * dv) * TINT_SCALE };
     }
@@ -115,24 +259,23 @@ export function xyToTempTint(x: number, y: number): { kelvin: number; mired: num
   return { kelvin: NaN, mired: NaN, tint: NaN };
 }
 
-/** A chromaticity for a temperature and a tint: the SDK's `Get_xy_coord`, line for line.
- *  @param kelvin  the temperature, above 0 (the SDK's table runs to 10 mired, so a figure past 100000 K reads as 100000 K's row extended).
+/** A chromaticity for a temperature and a tint: the SDK's `Get_xy_coord`, line for line, over the SDK's rows and then the computed ones below them.
+ *  @param kelvin  the temperature, above 0 (the SDK's table runs to 10 mired, so a figure past 100000 K reads as 100000 K's row extended; the computed rows run to 2000 mired, so a figure below 500 K reads as 500 K's row extended).
  *  @param tint  the tint in the SDK's units.
  *  @returns CIE 1931 `x` and `y`; NaN for a temperature that is not above 0.
- *  What it must satisfy: `xyToTempTint` of the result gives back the same kelvin and tint wherever the table covers the white (a temperature above 1667 K). Consumers: `whiteToGains`. */
+ *  What it must satisfy: `xyToTempTint` of the result gives back the same kelvin and tint wherever the rows cover the white (from 500 K to 100000 K); for a temperature of 1667 K and above the answer is the SDK's own, to the last place a float keeps; and below 1667 K it lies on Planck's law (a tint of 0), not on the straight line the SDK's last two rows would extend to. Consumers: `whiteToGains`. */
 export function tempTintToXy(kelvin: number, tint: number): { x: number; y: number } {
   if (!(kelvin > 0)) return { x: NaN, y: NaN };
+  const R = locusRows();
   const r = 1e6 / kelvin;
   const offset = tint * (1 / TINT_SCALE);
-  for (let index = 0; index <= 29; index++) {
-    if (r < SDK_TABLE[index + 1][0] || index === 29) {
-      const f = (SDK_TABLE[index + 1][0] - r) / (SDK_TABLE[index + 1][0] - SDK_TABLE[index][0]);
-      let u = SDK_TABLE[index][1] * f + SDK_TABLE[index + 1][1] * (1 - f);
-      let v = SDK_TABLE[index][2] * f + SDK_TABLE[index + 1][2] * (1 - f);
-      let uu1 = 1, vv1 = SDK_TABLE[index][3], uu2 = 1, vv2 = SDK_TABLE[index + 1][3];
-      const len1 = Math.sqrt(1 + vv1 * vv1), len2 = Math.sqrt(1 + vv2 * vv2);
-      uu1 /= len1; vv1 /= len1; uu2 /= len2; vv2 /= len2;
-      let uu3 = uu1 * f + uu2 * (1 - f), vv3 = vv1 * f + vv2 * (1 - f);
+  for (let index = 0; index <= R.length - 2; index++) {
+    if (r < R[index + 1].r || index === R.length - 2) {
+      const a = R[index], b = R[index + 1];
+      const f = (b.r - r) / (b.r - a.r);
+      let u = a.u * f + b.u * (1 - f);
+      let v = a.v * f + b.v * (1 - f);
+      let uu3 = a.nu * f + b.nu * (1 - f), vv3 = a.nv * f + b.nv * (1 - f);
       const len3 = Math.sqrt(uu3 * uu3 + vv3 * vv3);
       uu3 /= len3; vv3 /= len3;
       u += uu3 * offset; v += vv3 * offset;
@@ -242,7 +385,7 @@ function neutralToXy(spec: ColourSpec, neutral: ReadonlyArray<number>): { x: num
  *  @param spec  the profile's calibrations (`makeColourSpec`).
  *  @param gains  red, green and blue, each above 0, at any common level; the camera's neutral is their reciprocals.
  *  @returns `kelvin`, `mired`, `tint`, the chromaticity `x` and `y`, `weight` (the first calibration's share) and `passes`; or null when a gain is not above 0, a matrix cannot be inverted, or the white has no uv.
- *  What it must satisfy: it depends on the ratios between the gains only; `whiteToGains` of the result gives the same ratios back to within a hundredth of a percent wherever the table covers the white (above 1667 K); and a kelvin figure outside `KELVIN_MIN` to `KELVIN_MAX` is returned as it is, for the caller to rest a control at an end and print the figure. Consumers: the Temperature and Tint sliders, their typed boxes, the report. */
+ *  What it must satisfy: it depends on the ratios between the gains only; `whiteToGains` of the result gives the same ratios back to within a hundredth of a percent wherever the rows cover the white (500 K to 100000 K, so a typed whole number below the SDK's 1667 K reads back as typed); and a kelvin figure outside `KELVIN_MIN` to `KELVIN_MAX` is returned as it is, for the caller to rest a control at an end and print the figure. Consumers: the Temperature and Tint sliders, their typed boxes, the report. */
 export function gainsToWhite(spec: ColourSpec, gains: ArrayLike<number>): { kelvin: number; mired: number; tint: number; x: number; y: number; weight: number; passes: number } | null {
   if (!(gains[0] > 0 && gains[1] > 0 && gains[2] > 0)) return null;
   const xy = neutralToXy(spec, [1 / gains[0], 1 / gains[1], 1 / gains[2]]);

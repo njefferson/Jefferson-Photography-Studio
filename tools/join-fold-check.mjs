@@ -58,18 +58,18 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = mkdtempSync(join(tmpdir(), "joinfold-"));
 const entry = join(dir, "entry.ts");
 writeFileSync(entry, [
-  `export { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT, cloneParams } from ${JSON.stringify(join(repo, "src/pipeline.ts"))};`,
+  `export { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT, cloneParams, screenGainsOf, screenGainsNeutral } from ${JSON.stringify(join(repo, "src/pipeline.ts"))};`,
   // 102: the white balance on Adobe's scale through a camera profile: the SDK's arithmetic, the profiles, and the store that reads and moves it on the gain track.
-  `export { SDK_TABLE, KELVIN_MIN, KELVIN_MAX, TINT_MIN, TINT_MAX, xyToTempTint, tempTintToXy, illuminantToTemperature, normalizeColorMatrix, makeColourSpec, gainsToWhite, whiteToGains } from ${JSON.stringify(join(repo, "src/kelvin.ts"))};`,
+  `export { SDK_TABLE, KELVIN_MIN, ADOBE_KELVIN_MIN, planckLocusUv, KELVIN_MAX, TINT_MIN, TINT_MAX, xyToTempTint, tempTintToXy, illuminantToTemperature, normalizeColorMatrix, makeColourSpec, gainsToWhite, whiteToGains } from ${JSON.stringify(join(repo, "src/kelvin.ts"))};`,
   `export { cameraKey, profileProblem, readProfileFile, photoCamera, choicesFor, chooseProfile, renderedChoice, keepProfiles, loadedFor, forgetProfile, lastChoice, rememberChoice } from ${JSON.stringify(join(repo, "src/camprofile.ts"))};`,
-  `export { readBalance, moveBalance, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR } from ${JSON.stringify(join(repo, "src/balancestore.ts"))};`,
+  `export { readBalance, moveBalance, exactBalance, shownGains, readShown, screenForWhite, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR } from ${JSON.stringify(join(repo, "src/balancestore.ts"))};`,
   `export { WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS } from ${JSON.stringify(join(repo, "src/decode.ts"))};`,
   `export { trackPos, trackVal } from ${JSON.stringify(join(repo, "src/tile.ts"))};`,
   `export { NIKON_Z50_COLOR_MATRIX, NIKON_D5300_COLOR_MATRIX } from ${JSON.stringify(join(repo, "src/color.ts"))};`,
 ].join("\n"));
 const out = join(dir, "bundle.mjs");
 await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
-const { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT, cloneParams, SDK_TABLE, KELVIN_MIN, KELVIN_MAX, TINT_MIN, TINT_MAX, xyToTempTint, tempTintToXy, illuminantToTemperature, normalizeColorMatrix, makeColourSpec, gainsToWhite, whiteToGains, cameraKey, profileProblem, readProfileFile, photoCamera, choicesFor, chooseProfile, renderedChoice, keepProfiles, loadedFor, forgetProfile, lastChoice, rememberChoice, readBalance, moveBalance, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS, trackPos, trackVal, NIKON_Z50_COLOR_MATRIX, NIKON_D5300_COLOR_MATRIX } = await import(pathToFileURL(out).href);
+const { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT, cloneParams, screenGainsOf, screenGainsNeutral, SDK_TABLE, KELVIN_MIN, ADOBE_KELVIN_MIN, planckLocusUv, KELVIN_MAX, TINT_MIN, TINT_MAX, xyToTempTint, tempTintToXy, illuminantToTemperature, normalizeColorMatrix, makeColourSpec, gainsToWhite, whiteToGains, cameraKey, profileProblem, readProfileFile, photoCamera, choicesFor, chooseProfile, renderedChoice, keepProfiles, loadedFor, forgetProfile, lastChoice, rememberChoice, readBalance, moveBalance, exactBalance, shownGains, readShown, screenForWhite, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS, trackPos, trackVal, NIKON_Z50_COLOR_MATRIX, NIKON_D5300_COLOR_MATRIX } = await import(pathToFileURL(out).href);
 
 let bad = 0;
 const near = (a, b) => Math.abs(a - b) < 1e-9;
@@ -241,7 +241,7 @@ check("an offset is added to the term a saved aim leaves", diff(pxh([{ ...neutra
   const isTrue = (name, cond) => { if (!cond) bad++; console.log(`${cond ? "ok  " : "FAIL"}  ${name}`); };
 
   // THE SCALE IS ADOBE'S: the schema's four numbers, and the table exactly as the SDK prints it (a "correction" of one row is the thing to refuse).
-  isTrue("Adobe's scale: 2000 to 50000 kelvin and minus 150 to 150 tint", KELVIN_MIN === 2000 && KELVIN_MAX === 50000 && TINT_MIN === -150 && TINT_MAX === 150);
+  isTrue("Adobe's scale: 2000 to 50000 kelvin and minus 150 to 150 tint; this app's thumb reaches below it to 537 K (record 103, measured in step 244)", ADOBE_KELVIN_MIN === 2000 && KELVIN_MIN === 537 && KELVIN_MAX === 50000 && TINT_MIN === -150 && TINT_MAX === 150);
   isTrue("the SDK's table has 31 rows and its 325 mired row carries u of 0.24702 as printed", SDK_TABLE.length === 31 && SDK_TABLE[19][0] === 325 && SDK_TABLE[19][1] === 0.24702);
   // THE SDK'S KNOWN POINTS. The 200 mired row's own point is 5000 K on the locus; the standard whites read as the SDK's own functions read them (the values step 206's independent port printed).
   {
@@ -260,7 +260,56 @@ check("an offset is added to the term a saved aim leaves", diff(pxh([{ ...neutra
     }
     within("D65 reads a daylight white, 6504 K: miss in kelvin", Math.abs(xyToTempTint(0.3127, 0.329).kelvin - 6504), 1);
     const cool = tempTintToXy(1500, 0), coolBack = xyToTempTint(cool.x, cool.y);
-    isTrue("a white cooler than the table's last row reads at 1667 K, as the SDK does (no locus is computed below the table)", Math.abs(coolBack.kelvin - 1666.7) < 1);
+    isTrue("a white cooler than the table's last row reads back as itself from the computed rows (record 103; the SDK's own port stopped at 1667 K)", Math.abs(coolBack.kelvin - 1500) < 0.5);
+    // THE COMPUTED ROWS DO NOT TOUCH THE SDK'S READINGS. The SDK's two loops are written out here over the table as printed, and from 1667 K up to 100000 K
+    // every reading and every move of the app's own functions equals theirs (step 244 measured 2212 whites at a miss of 0).
+    const sdkTT = (x, y) => {
+      const den = 1.5 - x + 6 * y, u = (2 * x) / den, v = (3 * y) / den;
+      let lastDt = 0, lastDu = 0, lastDv = 0;
+      for (let index = 1; index <= 30; index++) {
+        let du = 1, dv = SDK_TABLE[index][3];
+        let len = Math.sqrt(1 + dv * dv); du /= len; dv /= len;
+        let uu = u - SDK_TABLE[index][1], vv = v - SDK_TABLE[index][2];
+        let dt = -uu * dv + vv * du;
+        if (dt <= 0 || index === 30) {
+          if (dt > 0) dt = 0;
+          dt = -dt;
+          const f = index === 1 ? 0 : dt / (lastDt + dt);
+          const mired = SDK_TABLE[index - 1][0] * f + SDK_TABLE[index][0] * (1 - f);
+          uu = u - (SDK_TABLE[index - 1][1] * f + SDK_TABLE[index][1] * (1 - f));
+          vv = v - (SDK_TABLE[index - 1][2] * f + SDK_TABLE[index][2] * (1 - f));
+          du = du * (1 - f) + lastDu * f; dv = dv * (1 - f) + lastDv * f;
+          len = Math.sqrt(du * du + dv * dv); du /= len; dv /= len;
+          return { kelvin: 1e6 / mired, tint: (uu * du + vv * dv) * -3000 };
+        }
+        lastDt = dt; lastDu = du; lastDv = dv;
+      }
+      return { kelvin: NaN, tint: NaN };
+    };
+    let worstK = 0, worstT = 0, readings = 0;
+    for (let k = 1700; k <= 100000; k *= 1.05) for (const tint of [-150, -60, 0, 60, 150]) {
+      const xy = tempTintToXy(k, tint), a = xyToTempTint(xy.x, xy.y), b = sdkTT(xy.x, xy.y);
+      worstK = Math.max(worstK, Math.abs(a.kelvin - b.kelvin)); worstT = Math.max(worstT, Math.abs(a.tint - b.tint)); readings++;
+    }
+    isTrue(`${readings} whites from 1700 K to 100000 K read as the SDK's own loop reads them (largest miss ${worstK} K and ${worstT} of tint)`, readings > 100 && worstK < 1e-6 && worstT < 1e-6);
+    // THE PLANCK ROWS MEET THE SDK'S TABLE: the black body summed against the observer lands within 7 units of 0.00001 on every printed row from 10 to 600 mired
+    // but the one odd row, 325 (u of 0.24702 as printed, which this file does not correct), and within 6 on the rows from 400 to 600, which the computed rows continue (step 244 read 0.91 there).
+    let rowMiss = 0, rowAt = 0, nearMiss = 0, nearAt = 0;
+    for (const [r, u, v] of SDK_TABLE) {
+      if (r < 10 || r > 600 || r === 325) continue; // 325 reads 90 units off: the SDK's one odd row, kept as printed (read in step 244)
+      const p = planckLocusUv(1e6 / r), m = Math.max(Math.abs(p.u - u), Math.abs(p.v - v));
+      if (m > rowMiss) { rowMiss = m; rowAt = r; }
+      if (r >= 400 && m > nearMiss) { nearMiss = m; nearAt = r; }
+    }
+    within(`the black body lands on the SDK's printed rows (worst at ${rowAt} mired), miss in units of 0.00001`, rowMiss * 1e5, 7);
+    within(`the black body lands on the SDK's printed rows from 400 to 600 mired, where the computed rows continue them (worst at ${nearAt} mired), miss in units of 0.00001`, nearMiss * 1e5, 6);
+    // THE EXTENSION'S ROUND TRIP: a whole kelvin typed between the scale's cool end and 2200 K at the tints of an infrared white reads back as itself.
+    let ext = 0, extBad = 0;
+    for (const tint of [-90, -80, -65, 0]) for (let k = 540; k <= 2200; k += 5) {
+      const xy = tempTintToXy(k, tint), r = xyToTempTint(xy.x, xy.y);
+      ext++; if (Math.round(r.kelvin) !== k || Math.abs(r.tint - tint) > 0.05) extBad++;
+    }
+    isTrue(`${ext} whole kelvin from 540 K to 2200 K at tints minus 90, minus 80, minus 65 and 0 read back as typed (${extBad} did not)`, extBad === 0);
   }
   // THE COLOUR SPEC follows the SDK's constructor: one matrix at 5000 K when there is no second, an illuminant the SDK does not list, or two equal temperatures; otherwise the cooler calibration first.
   {
@@ -289,7 +338,7 @@ check("an offset is added to the term a saved aim leaves", diff(pxh([{ ...neutra
     ];
     for (const [name, spec] of SPECS) {
       let dm = 0, dt = 0, n = 0, ratio = 0;
-      for (let k = KELVIN_MIN; k <= KELVIN_MAX; k *= 1.1) for (const tint of [-60, -30, 0, 30, 60]) {
+      for (let k = ADOBE_KELVIN_MIN; k <= KELVIN_MAX; k *= 1.1) for (const tint of [-60, -30, 0, 30, 60]) {
         const g = whiteToGains(spec, k, tint);
         // The SDK pins a chromaticity inside the real ones (x plus y under 1) and a camera channel at a thousandth, so a white outside them is
         // not reproduced; the tint range is where the SDK's isotherms are one-to-one with the plane near the locus.
@@ -349,7 +398,81 @@ check("an offset is added to the term a saved aim leaves", diff(pxh([{ ...neutra
     const t = range("balT"), ti = range("balTi");
     isTrue(`ir.html's Temperature slider runs ${t ? t.join(" to ") : "nowhere"}, the store's ${-TEMPERATURE_MIRED_FAR} to ${-TEMPERATURE_MIRED_NEAR}`, !!t && t[0] === -TEMPERATURE_MIRED_FAR && t[1] === -TEMPERATURE_MIRED_NEAR);
     isTrue(`ir.html's Tint slider runs ${ti ? ti.join(" to ") : "nowhere"}, Adobe's ${TINT_MIN} to ${TINT_MAX}`, !!ti && ti[0] === TINT_MIN && ti[1] === TINT_MAX);
-    isTrue("the thumb's ends are Adobe's: 500 mired is 2000 K and 20 mired is 50000 K", TEMPERATURE_MIRED_FAR === 1e6 / KELVIN_MIN && TEMPERATURE_MIRED_NEAR === 1e6 / KELVIN_MAX);
+    isTrue("the thumb's ends: the cool end is the camera's own limit, 537 K (1862 mired), and the warm end is Adobe's, 20 mired is 50000 K", TEMPERATURE_MIRED_FAR === Math.round(1e6 / KELVIN_MIN) && TEMPERATURE_MIRED_FAR === 1862 && TEMPERATURE_MIRED_NEAR === 1e6 / KELVIN_MAX);
+  }
+  // THE REACH BELOW ADOBE'S 2000 K (record 103, built in step 244): with no profile loaded, the camera's stock matrix, a typed number from the scale's cool end up
+  // lands on the number, at every tint of an infrared white; the cool end is tight (a white a few kelvin under it is one the gains cannot express); and a typed 600 K,
+  // the case that was refused, lands.
+  {
+    const stock = makeColourSpec(NIKON_Z50_COLOR_MATRIX, undefined, null, undefined);
+    let landed = 0, asked = 0, worst = 0;
+    for (const tint of [-91.4, -85, -80, -75, -70, -65.2]) for (const k of [KELVIN_MIN, 540, 600, 800, 1000, 1500, 1667, 1700, 1999, 2500, 3000]) {
+      const g = whiteToGains(stock, k, tint);
+      asked++;
+      if (!g) continue;
+      const w = gainsToWhite(stock, g);
+      if (!w) continue;
+      worst = Math.max(worst, Math.abs(w.kelvin - k));
+      if (Math.abs(w.kelvin - k) < 0.5 && Math.abs(w.tint - tint) < 0.1) landed++;
+    }
+    isTrue(`${asked} typed whites from ${KELVIN_MIN} K to 3000 K at six infrared tints: ${landed} land on the number (largest miss ${worst.toFixed(4)} K)`, landed === asked);
+    const under = whiteToGains(stock, KELVIN_MIN - 2.5, -91.4), underW = under ? gainsToWhite(stock, under) : null;
+    isTrue("the cool end is tight: 2.5 K under it, at the tint it is dearest at (minus 91.4), the gains do not read back the white asked", !underW || Math.abs(underW.kelvin - (KELVIN_MIN - 2.5)) > 0.5);
+    // A typed 600 K by the exact route, over a raw's opening gains: the box reads 600.
+    const open = [1, 1.817, 2.765], gm = Math.cbrt(open[0] * open[1] * open[2]), from = open.map((v) => v / gm);
+    const tintAtOpen = readBalance(from, stock).tint;
+    const typed = exactBalance({ mired: 1e6 / 600, tint: tintAtOpen }, from, stock);
+    isTrue("a typed 600 K over a raw's opening gains lands: the box reads 600", !!typed && Math.round(readBalance(typed, stock).kelvin) === 600);
+  }
+  // RECORD 104, THE SCREEN-SIDE GAINS: while the red and blue swap is on, a Temperature or Tint move is made on three gains applied after the swap, so a warmer
+  // reading is a warmer picture. They are read together with the camera-space gains, move exactly (a drag and a typed number alike), and do nothing with the swap off.
+  {
+    const stock = makeColourSpec(NIKON_Z50_COLOR_MATRIX, undefined, null, undefined);
+    const open = [1, 1.817, 2.765], gm = Math.cbrt(open[0] * open[1] * open[2]), g0 = open.map((v) => v / gm);
+    const r0 = readBalance(g0, stock);
+    isTrue("with no screen-side gains the reading is the gains' own reading, and with one, one, one it is the same", readShown(g0, null, stock).kelvin === r0.kelvin && readShown(g0, [1, 1, 1], stock).kelvin === r0.kelvin);
+    const warmer = screenForWhite({ mired: r0.mired - 10, tint: r0.tint }, g0, stock);
+    const cooler = screenForWhite({ mired: r0.mired + 10, tint: r0.tint }, g0, stock);
+    isTrue("ten mired warmer gives screen-side gains that raise the screen's red against its blue, ten cooler lower it", !!warmer && !!cooler && warmer[0] / warmer[2] > 1 && cooler[0] / cooler[2] < 1);
+    isTrue("screen-side gains have a product of one", Math.abs(warmer[0] * warmer[1] * warmer[2] - 1) < 1e-9 && Math.abs(cooler[0] * cooler[1] * cooler[2] - 1) < 1e-9);
+    const back = readShown(g0, warmer, stock);
+    // The bars are the conversion's own round trip (gainsToWhite solves for the white by iteration; step 223 measured 0.0430 K at worst on five exports), not the route's.
+    within("the screen route lands: the reading after a ten mired move warmer is ten mired from where it started, miss in mired", Math.abs(back.mired - (r0.mired - 10)), 1e-3);
+    within("the screen route lands: tint stays, miss in tint", Math.abs(back.tint - r0.tint), 1e-3);
+    let worst600 = 0;
+    for (const k of [600, 1500, 3000, 6500]) { const s = screenForWhite({ mired: 1e6 / k, tint: r0.tint }, g0, stock); worst600 = Math.max(worst600, s ? Math.abs(readShown(g0, s, stock).kelvin - k) : 1e9); }
+    within("a typed 600, 1500, 3000 and 6500 K by the screen route read back as typed (the box rounds to a whole kelvin), largest miss in kelvin", worst600, 0.25);
+    isTrue("the screen route keeps the gains' level: the geometric mean of the gains shown equals that of the gains", Math.abs(Math.cbrt(shownGains(g0, warmer).reduce((p, v) => p * v, 1)) - Math.cbrt(g0.reduce((p, v) => p * v, 1))) < 1e-9);
+    // ten one-step moves added to the white asked for, and one ten-step move, end together
+    let ten = { mired: r0.mired, tint: r0.tint };
+    for (let i = 0; i < 10; i++) ten = { mired: ten.mired - 1, tint: ten.tint };
+    const sTen = screenForWhite(ten, g0, stock), sOne = screenForWhite({ mired: r0.mired - 10, tint: r0.tint }, g0, stock);
+    within("ten one-step moves and one ten-step move ask for the same screen-side gains, largest difference", Math.max(...sTen.map((v, i) => Math.abs(v - sOne[i]))), 1e-12);
+    // the grid route: one-step moves added to the white asked for (main.ts balanceInput's rule), against one ten-step move, within one gain-track step
+    const snapG = (g) => g.map((v) => trackVal(Math.round(trackPos(v, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS)), WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS));
+    /** The gains one gain-track step apart: red up by d positions and blue down by d, the sum of positions held. */
+    const trackShift = (g, d) => { const p = g.map((v) => Math.round(trackPos(v, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS))); p[0] += d; p[2] -= d; return p.map((q) => trackVal(q, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS)); };
+    const start = snapG(g0), rs = readBalance(start, stock);
+    let gg = start, asked = { mired: rs.mired, tint: rs.tint };
+    for (let i = 0; i < 10; i++) { asked = { mired: asked.mired - 1, tint: asked.tint }; gg = moveBalance(asked, gg, stock) || gg; }
+    const oneTen = moveBalance({ mired: rs.mired - 10, tint: rs.tint }, start, stock);
+    const stepMired = Math.abs(readBalance(trackShift(start, 1), stock).mired - rs.mired);
+    within("the grid route: ten one-step moves and one ten-step move end within one gain-track step, difference in mired", Math.abs(readBalance(gg, stock).mired - readBalance(oneTen, stock).mired), Math.max(stepMired, 1e-9));
+    // and the old way, each move added to the reading of the gains, would not have left the start (the defect step 244 found in its own first version)
+    let gOld = start;
+    for (let i = 0; i < 10; i++) { const c = readBalance(gOld, stock); gOld = moveBalance({ mired: c.mired - 1, tint: c.tint }, gOld, stock) || gOld; }
+    isTrue("the old way, each one-step move added to the reading, ends further from the ten-step move than one gain-track step (the reason the drag keeps the white asked for)", Math.abs(readBalance(gOld, stock).mired - readBalance(oneTen, stock).mired) > stepMired);
+    // pipeline: the stage is after the swap, only with the swap on, and one, one, one is no stage
+    isTrue("screenGainsOf: none with the swap off, none for one, one, one, the gains with the swap on", screenGainsOf({ swapRB: false, wbScreen: [1.2, 1, 1 / 1.2] }) === null && screenGainsOf({ swapRB: true, wbScreen: [1, 1, 1] }) === null && screenGainsOf({ swapRB: true }) === null && screenGainsOf({ swapRB: true, wbScreen: [1.2, 1, 1 / 1.2] })?.[0] === 1.2 && screenGainsNeutral([1, 1, 1]) && screenGainsNeutral(undefined) && !screenGainsNeutral([1.2, 1, 1 / 1.2]));
+    const pxw = (edit) => { const p = plain(); Object.assign(p, edit); const o = new Float32Array(4); compileEdit(p, undefined, 1.5)(0.5, 0.4, 0.3, o, 0, 0.5, 0.5); return o; };
+    const base = pxw({ swapRB: true }), warm = pxw({ swapRB: true, wbScreen: [1.2, 1, 1 / 1.2] }), cool = pxw({ swapRB: true, wbScreen: [1 / 1.2, 1, 1.2] });
+    isTrue("with the swap on, screen-side gains with more red than blue make the pixel redder against blue, and less red than blue make it bluer", warm[0] / warm[2] > base[0] / base[2] && cool[0] / cool[2] < base[0] / base[2]);
+    const offA = pxw({ swapRB: false }), offB = pxw({ swapRB: false, wbScreen: [1.2, 1, 1 / 1.2] });
+    isTrue("with the swap off the screen-side gains do nothing: the same pixel, to the last place", [0, 1, 2].every((k) => offA[k] === offB[k]));
+    const oneA = pxw({ swapRB: true }), oneB = pxw({ swapRB: true, wbScreen: [1, 1, 1] });
+    isTrue("one, one, one is no stage: the same pixel, to the last place", [0, 1, 2].every((k) => oneA[k] === oneB[k]));
+    const cl = cloneParams({ ...plain(), swapRB: true, wbScreen: [1.2, 1, 1 / 1.2] });
+    isTrue("cloneParams carries the screen-side gains as a copy, and a clone of an edit with none has none", Array.isArray(cl.wbScreen) && cl.wbScreen[0] === 1.2 && !("wbScreen" in cloneParams(plain())));
   }
   // THE PROFILES: reading one from a file's tags, the store, the list a photograph offers and the rule that picks one. The files are built here
   // from the stand-in matrices; no real profile is held.

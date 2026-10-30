@@ -367,28 +367,31 @@ sliders reach an infrared white. What was read, and how each source was read:
     SDK's checks and a planted forward matrix fails). It is a port of Adobe's sample code
     of 2012. That Lightroom's shipped conversion is this arithmetic is NOT shown here.
 - **The profiles (the two files provided).** `Nikon_Z_50_Infrared_temp_-100.dcp` and
-  `Nikon_Z_50_Infrared_temp_-50.dcp` (109934 and 109932 bytes), read tag by tag with the
+  `Nikon_Z_50_Infrared_temp_-50.dcp` (two files of nearly the same size), read tag by tag with the
   app's own TIFF reader (`src/raw/tiff.ts`, which tests only the first header byte for
-  the byte order, so the profile magic text passes): one IFD of 17 entries each.
-  - Same in both: UniqueCameraModel Nikon Z 50; CalibrationIlluminant1 17 (2850 K) and
-    CalibrationIlluminant2 21 (6500 K); ProfileCalibrationSignature com.adobe; the two
-    ForwardMatrix tags, ForwardMatrix1 0.4744, 0.3845, 0.1054, 0.2230, 0.7472, 0.0298,
-    0.0876, 0.0014, 0.7361 and ForwardMatrix2 0.4477, 0.3629, 0.1537, 0.2534, 0.7005,
-    0.0461, 0.1133, 0.0028, 0.7090; the hue and saturation tables (dimensions 90 by 25 by
-    1, two tables of 6750 values); the look table (36 by 8 by 16, 13824 values); a tone
-    curve of 7 points; ProfileEmbedPolicy 0; ProfileCopyright, whose text is the author's
-    name alone. No encoding tags, no baseline exposure offset, no default black render.
-  - Infrared Temp -100: ColorMatrix1 1.5713, -0.5289, 0.0166, -0.5096, 0.8821, 0.0571,
-    -0.0281, 0.0575, 0.2011; ColorMatrix2 1.4355, -0.3609, -0.0282, -0.6298, 0.9721,
-    0.0608, -0.1199, 0.1279, 0.1931.
-  - Infrared Temp -50: ColorMatrix1 1.7552, -0.7357, 0.0444, -0.5692, 1.2270, 0.1532,
-    -0.0314, 0.0800, 0.5395; ColorMatrix2 1.6334, -0.5114, -0.0771, -0.7166, 1.3774,
-    0.1662, -0.1364, 0.1812, 0.5276.
+  the byte order, so the profile magic text passes): one IFD in each, holding the same set of tags.
+  The matrices, table dimensions, counts and tag values the reading showed are taken out of this
+  file and each is given below in words; no matrix, table or constant of either file is written
+  anywhere in the repository.
+  - Same in both: UniqueCameraModel names the Z 50; CalibrationIlluminant1 is a tungsten-type
+    illuminant and CalibrationIlluminant2 a daylight one (the SDK's table above gives each its
+    temperature); ProfileCalibrationSignature is Adobe's reverse-domain text; the ForwardMatrix1
+    and ForwardMatrix2 tags each hold one matrix, and the two matrices are the same in both
+    files; the hue and saturation tables; the look table, a three-dimensional one; a tone
+    curve of a handful of points; ProfileEmbedPolicy at the SDK's first value; ProfileCopyright,
+    whose text is the author's name alone. No encoding tags, no baseline exposure offset, no
+    default black render.
+  - Infrared Temp -100: ColorMatrix1 and ColorMatrix2 each hold one matrix, their entries taken out
+    of this file. They showed a daylight matrix that is the camera's stock matrix with its three
+    XYZ columns scaled, and a tungsten matrix that is not a scaling of it (the 29 October block
+    below, on record 103, has the arithmetic in words).
+  - Infrared Temp -50: the same shape, its daylight matrix scaled about half as far; its entries
+    are taken out of this file too.
   - So the two profiles differ ONLY in their colour matrices, as the D5300 pair read from
     Lightroom DNGs in section 4 did. The colour matrices decide the Temperature and Tint
     mapping and, through the weight above, how the forward matrices are blended.
   - Terms. The copyright tag is the name alone and the pages state no terms. The embed
-    policy value 0 is, in the SDK's own comment, "freely embedable and copyable into
+    policy tag holds the SDK's first value, which is, in the SDK's own comment, "freely embedable and copyable into
     installations that encounter this profile, so long as the profile is only used to
     process DNG files". This app would also read a NEF through such a profile, which that
     comment does not cover. Whether the app may hold the matrices inside itself or must
@@ -462,8 +465,8 @@ sliders reach an infrared white. What was read, and how each source was read:
     with a tint of 133.7. This is the SDK's arithmetic and not a reading of Lightroom.
 - **The DNGs in the closed set of test photographs.** `tools/owner-images.json` holds 444 files and none has a name
   ending in DNG (the 27 lines that mention .dng are the practice copies of NEF entries),
-  and the Lightroom DNG exports named in the comments of `src/color.ts` as carrying the
-  D5300 profile are not in it. So there is no file whose Lightroom Temperature and Tint
+  and the Lightroom DNG exports that the comments of `src/color.ts` named, before the D5300's
+  matrix was replaced, as carrying the D5300 profile are not in it. So there is no file whose Lightroom Temperature and Tint
   are known beside its embedded profile and as-shot neutral, and the conversion cannot
   be compared with Lightroom's own figures from the closed set: it is held to the SDK's
   points, and the one reading only Lightroom can give, a Z 50 NEF's figures under a named
@@ -513,8 +516,8 @@ figure, the function that gave it is named.
   - The same as the fourth with Saturation +100.
 - **What every DNG keeps and says.** The mosaic is kept (the raw image's photometric value
   is the colour-filter-array one, not linear raw; 5600 by 3728, 16 bits). Each embeds its
-  profile by name, with that profile's hue and saturation tables (90 by 30 by 1 in the Adobe
-  Color export, 90 by 25 by 1 in the other four). The camera's recorded pair is the As Shot
+  profile by name, with that profile's hue and saturation tables (a different size in the Adobe
+  Color export from the other four). The camera's recorded pair is the As Shot
   neutral in all five (0.5384, 1.0000, 0.6818, as gains 1.8574, 1.0000, 1.4668: the 5200 K
   default the camera writes for a preset slot with no measured value), tag 50729 is absent,
   and WhiteBalance reads Custom in all five; none reads As Shot. Under -50 and -100 the
@@ -601,7 +604,10 @@ edit holds is read apart, as a hand-set white.
   repository.
 - **A fact in the source, not asked:** `NIKON_D5300_COLOR_MATRIX` in `src/color.ts` is, by its own
   comment, the shifting profile's daylight matrix for the D5300 read from Lightroom DNGs, so for
-  that body the stock reading is already a shifted one.
+  that body the stock reading is already a shifted one. **Put right by the plan of 29 October:**
+  the constant is now the body's own matrix as LibRaw's camera table lists it (the table's file
+  `colordata.cpp`, on the raw GitHub host), read and divided the way the Z 50's is, so for that
+  body the stock reading is the stock one.
 - **darktable**, `src/iop/temperature.c` (2233 lines) and `src/common/illuminants.h` (587 lines)
   of the master branch, fetched by a script through the session's proxy from the raw GitHub host
   and read whole. Range: 1901 K to 25000 K (lines 49 and 50), tint 0.135 to 2.326, channel
@@ -671,6 +677,70 @@ edit holds is read apart, as a hand-set white.
   Lightroom shows for a white cooler than its own table; whether a visible-light raw would want
   the computed shift at all (the stock reading is already inside the scale for it, and none is
   among the shared files).
+
+**What a Temperature move does to the picture you see with the red and blue swap on, read 29 October
+2026 (record 104).** The blocks above settle what the two numbers read. This block asks what a move
+of them does to the picture when the swap is on, which is its state at open and in most saved edits,
+and where in the render the move can act so that warmer warms what is shown. Every source below was
+fetched whole by a script through the environment's proxy and read with the Read tool; the lines are
+lines of the saved copies. The renders are the app's own tile at 480 pixels, opened before they were
+described; the figures are the patch's red over blue, the patch being the 3 percent of pixels with the
+least spread between channels, picked from the opening picture.
+
+- **The cause, from the source.** In `src/gl.ts` the gains (line 1146) and the camera matrix (line
+  1223) come before `if (u_swap) c = c.bgr;` (line 1226), and `src/pipeline.ts` states the same order in
+  its header. A Temperature move toward warmer raises the sensor's red gain against its blue gain; the
+  swap hands the red channel to the screen's blue. Measured on five raws at the opening white, ten
+  one-step moves toward warmer lower the patch's red over blue on 5 of 5 (from 1.00 to 0.91 to 0.92
+  through today's conversion) and a hundred steps lower it to 0.83 to 0.84; with the swap off the same
+  moves raise it on 5 of 5 (to 1.08 to 1.10 through today's conversion and 1.02 to 1.04 through the
+  extended locus, and 1.19 to 1.21 in a hundred). Tint toward magenta lowers the picture's
+  green over its red-blue mean with the swap on and off alike, because magenta is symmetrical in red
+  and blue: the swap reverses the red-blue axis only.
+- **The author's pages on swap profiles and white balance.** The Lightroom swap profiles page (lines
+  1069 to 1086) sets the profile first and then the picker on a neutral subject, with the balance
+  outside 2000 to 50000 answered by the other temperature shift; its lines 1130 to 1141 list four
+  tools whose colours are reversed under these profiles (Tone Curve Channels, HSL, Calibration and the
+  local Temp slider) and name Color Grading as unaffected. The manual and histogram page (lines 384 to
+  408 and 426 to 462) drags the global Temperature with the swap off, where the right end puts reds in
+  the highlights, and again after choosing a swap profile, where the right end puts the blues there:
+  the one source read that shows Lightroom's global Temperature under a swap profile shows it
+  reversed, as this app's is. The curves page (lines 366 to 378 and 462 to 468) sets the balance below
+  the swapping channel mixer layer, watching the swapped picture, and runs Camera Raw on the finished
+  layer for highlights and shadows with the colour temperature left alone. No page read says what
+  Camera Raw's Temperature does to a swapped rendered file.
+- **Adobe's namespace document** (`adobe/xmp-docs`, `crs.md`, 52 lines): Temperature 2000 to 50000 and
+  Tint minus 150 to 150 (lines 44 and 45); no IncrementalTemperature or IncrementalTint entry. Adobe's
+  help pages, which state a rendered file's relative scale, were not asked (the host is declined).
+- **darktable and RawTherapee keep the raw white balance upstream of every channel mixer, and each
+  offers an adaptation downstream of one.** darktable's `iop_order.c` puts white balance at 3.0,
+  demosaic at 8.0, the input profile at 28.0, colour calibration at 28.5, the RGB channel mixer at 39.0
+  and a colour correction module (a global white balance adjustment for shadows and highlights) at
+  55.0; colour calibration adapts first and mixes second, a second instance adapts the mixed picture,
+  and its temperature slider moved right makes the picture warmer. RawTherapee applies the white
+  balance multipliers as the image is read in (`improccoordinator.cc` line 775), the channel mixer in
+  `rgbProc` (line 1931; `improcfun.cc` lines 2152 to 2155 and 2301 to 2309), and its colour appearance
+  scene white, a temperature of its own, after both (line 2483; `improcfun.cc` lines 555 to 557 and 966
+  to 987).
+- **The candidates, five raws each at the opening white.** Gains acting after the swap, in the
+  screen's channels, the same ratio the swap-off move applies to the sensor's: ten steps toward warmer
+  raise the patch to 1.013 or 1.014 on 5 of 5, a hundred to 1.144 to 1.153, ten and a hundred cooler
+  lower it to 0.987 to 0.990 and 0.890 to 0.899; typed 600 K, 1500 K and 3000 K read back as typed on 5
+  of 5; the box rises with the picture; the picture at open is today's byte for byte. A move after the
+  swap is a third to a half as strong as the same move before it (ten steps: 1.2 to 1.3 percent
+  against 2.3 to 3.7). A Bradford adaptation in the screen's linear sRGB: ten steps 1.025 or 1.026, a hundred 1.245 to
+  1.261, a hundred cooler 0.710 to 0.731; its matrix depends on the white of the gains read through the
+  profile in force. The white read through the exchange of red and blue: every opening white reads
+  100000 K with a tint of minus 126 to minus 147, the thumb at its warm end, and a move toward warmer
+  moves nothing on 5 of 5.
+- **Where it must sit when a look has a mixer.** With a three-way rotation mixer (red from blue, green
+  from red, blue from green) and the swap on, a hundred steps toward warmer put before the mixer lower
+  the patch (1.000 to 0.985 and 0.984) and turn the picture mint green; put after the mixer and the hue
+  turn they raise it (to 1.142 on both frames) and warm it.
+- **Not read, or not known.** Adobe's help pages; what Camera Raw's Temperature does to a swapped
+  TIFF; a page of the author's that states in words what the global Temperature slider does to a swapped
+  picture; the rest of `improcfun.cc` and `colortemp.cc` beyond the lines named; the Tint's visible
+  direction on the device; any frame under a look other than the rotation mixer.
 
 **So an infrared raw converter has to find the white point from the data.**
 That is what gray-world does here and what this app's "no 2000K floor" claim has
@@ -774,8 +844,8 @@ only in ColorMatrix, which the spec uses only to turn a white-balance xy into a
 camera neutral — so they are white-balance calibrations, not two colour
 renderings, and with the app's white balance found from the data they now
 render alike. The profile's hue/saturation tables are still not applied. A NEF
-names no profile, so the D5300 NEF default stays the "-100" ColorMatrix
-(color.ts). The method was researched on 27 October 2026 as Lightroom's Temperature
+names no profile, so the D5300 NEF default is the body's own ColorMatrix from
+LibRaw's camera table (color.ts; it replaced a profile-derived one on 29 October 2026). The method was researched on 27 October 2026 as Lightroom's Temperature
 and Tint read through the profile's two colour matrices, with the two Z 50 profiles
 read tag by tag and the SDK's conversion read whole: section 3, record 102.
 

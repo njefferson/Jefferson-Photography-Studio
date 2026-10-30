@@ -526,7 +526,7 @@ export function solveLift(withColour: boolean, img: DecodedImage, params: EditPa
  *  `makeThumb` read straight off `own.params`, kept raw (undefined stays
  *  undefined) because `lensFix` and `forceBalance` fall back differently from
  *  how `cloneParams` defaults them. */
-export type TileOwn = Pick<EditParams, "wb" | "exposure" | "recover" | "swapRB" | "tone" | "sky" | "foliage" | "lensFix" | "lensBypass" | "hsFix" | "hsBypass" | "forceBalance">;
+export type TileOwn = Pick<EditParams, "wb" | "exposure" | "recover" | "swapRB" | "wbScreen" | "tone" | "sky" | "foliage" | "lensFix" | "lensBypass" | "hsFix" | "hsBypass" | "forceBalance">;
 
 /** EVERYTHING A TILE READS THAT IS NOT THE PHOTOGRAPH: plain data, structured-
  *  cloneable, taken at one moment by main.ts `tileInputsFor` so a tile is a
@@ -726,6 +726,10 @@ export function renderTile(img: DecodedImage, inp: TileInputs, skyFor: SkyFor): 
     // what opening WILL do, so it takes the claim from the same place the open
     // does. A photograph with its own edit keeps its own answer.
     swapRB: own ? own.swapRB : sessLook ? sessLook.swapRB : base!.swapRB,
+    // THE SCREEN-SIDE GAINS ARE THE PHOTOGRAPH'S OWN, never the open one's (record 104): they are the Temperature and Tint controls' move while
+    // the swap is on, so a strip tile of a photograph with its own edit carries them, and a photograph nobody has opened (no edit, so no move)
+    // has none. `inp.base` is a clone of the LIVE edit for that second case, which is another frame's answer, so this overrides it either way.
+    wbScreen: own ? own.wbScreen : undefined,
     // With a session look the mapping is the LOOK's; with none, the live mixer
     // rides into the next open untouched (establishFreshEdit does not clear it),
     // so the clone above is already the right answer and this leaves it alone.

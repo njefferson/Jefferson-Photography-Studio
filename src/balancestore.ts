@@ -1,6 +1,6 @@
 // Kept white balances, and the Temperature and Tint that read and move a balance on Adobe's scale without changing how bright the picture is.
 //
-// ADOBE'S SCALE, THROUGH THE CAMERA'S PROFILE (record 102; IR-SCIENCE.md section 3). The two numbers are what Lightroom shows for a raw file: Temperature in kelvin from 2000 to 50000 and Tint from minus 150 to 150, read from the three gains through a camera profile's colour matrices by the conversion Adobe's DNG SDK defines (src/kelvin.ts). Which profile is the photograph's own business (src/camprofile.ts lists them and picks one); this file takes the profile as a colour spec and neither knows nor stores which. An infrared white sits inside the scale under a profile made for infrared, and may sit past an end of it under the camera's stock matrix, where the thumb rests at the end and the typed box reads the figure.
+// ADOBE'S SCALE, THROUGH THE CAMERA'S PROFILE (record 102; IR-SCIENCE.md section 3). The two numbers are what Lightroom shows for a raw file: Temperature in kelvin from 2000 to 50000 and Tint from minus 150 to 150, read from the three gains through a camera profile's colour matrices by the conversion Adobe's DNG SDK defines (src/kelvin.ts). This app's Temperature reaches below Adobe's 2000 K, to the lowest white the camera's gains can show (record 103), by Planck's law where the SDK's table stops. Which profile is the photograph's own business (src/camprofile.ts lists them and picks one); this file takes the profile as a colour spec and neither knows nor stores which. An infrared white sits inside the scale under a profile made for infrared, and may sit past an end of it under the camera's stock matrix, where the thumb rests at the end and the typed box reads the figure.
 //
 //   Temperature  the white's colour temperature. Right is warmer: a higher temperature, a bluer white, red up against blue.
 //   Tint         the white's offset across the locus. Right is more magenta in the photograph (a white on the green side of the locus).
@@ -31,7 +31,7 @@ export interface BalanceWant { mired: number; tint: number }
 /** A balance kept under a name. `gains` are on the gain sliders' track; `made` is when it was kept, as the device's own clock wrote it; `profile` is the profile choice token its reader had on (src/camprofile.ts), absent for a balance kept before profiles existed. */
 export interface KeptBalance { id: string; name: string; gains: Gains; made: string; profile?: string }
 
-/** THE SLIDERS' ENDS ARE ADOBE'S, not the data's. The Temperature thumb's value is MINUS the mired figure, so right is warmer: it runs from `TEMPERATURE_MIRED_FAR` (500 mired, 2000 K, the left end) to `TEMPERATURE_MIRED_NEAR` (20 mired, 50000 K, the right end). The Tint slider runs from `TINT_MIN` to `TINT_MAX` of src/kelvin.ts. A white beyond them still reads and still moves; the thumb waits at the end and the typed number says where it really is. ir.html carries the same four numbers for the page as served, and tools/join-fold-check.mjs holds the two to each other. */
+/** THE SLIDERS' ENDS ARE THE SCALE'S, not the data's. The Temperature thumb's value is MINUS the mired figure, so right is warmer: it runs from `TEMPERATURE_MIRED_FAR` (1862 mired, `KELVIN_MIN` of 537 K, the lowest white this camera's gains can show, the left end; Adobe's own scale stops at 2000 K, `ADOBE_KELVIN_MIN`, and the line under the sliders says when a white sits between) to `TEMPERATURE_MIRED_NEAR` (20 mired, 50000 K, Adobe's warm end, the right end). The Tint slider runs from `TINT_MIN` to `TINT_MAX` of src/kelvin.ts. A white beyond them still reads and still moves; the thumb waits at the end and the typed number says where it really is. ir.html carries the same four numbers for the page as served, and tools/join-fold-check.mjs holds the two to each other. */
 export const TEMPERATURE_MIRED_FAR = Math.round(1e6 / KELVIN_MIN);
 export const TEMPERATURE_MIRED_NEAR = Math.round(1e6 / KELVIN_MAX);
 
@@ -111,6 +111,49 @@ export function exactBalance(want: BalanceWant, from: Gains, spec: ColourSpec): 
   const out: Gains = [ideal[0] * k, ideal[1] * k, ideal[2] * k];
   if (!out.every((g) => Number.isFinite(g) && g >= WB_GAIN_LO && g <= WB_GAIN_HI)) return null;
   return out;
+}
+
+/** Red, green and blue screen-side gains, product one: what a Temperature or Tint move changes while the red and blue swap is on (`EditParams.wbScreen`, record 104). */
+export type ScreenGains = [number, number, number];
+
+/** The gains the Temperature and Tint are read from, and moved through, while the swap is on (record 104).
+ *  @param gains  the camera-space gains, `params.wb`.
+ *  @param screen  the screen-side gains in force (`screenGainsOf` of the edit), or null when there are none to apply (the swap is off, or they are one, one, one).
+ *  @returns the gains themselves when `screen` is null; otherwise the gains multiplied by the screen-side gains element by element, in screen order against camera order (the screen's red gain on the red gain, which is the reading that makes a warmer picture read as a warmer white), and scaled by one common factor back to the gains' own geometric mean.
+ *  What it must satisfy: with `screen` null or one, one, one the result equals `gains`, so the box reads at open what record 103's reading gives; the geometric mean of the result is that of `gains`, so `readBalance` of it depends on the ratios alone; and raising the screen's red against its blue raises the result's red against its blue, which `readBalance` reads as a warmer white. Consumers: main.ts `updateBalanceUI` and `balanceInput`, the report's balance rows. */
+export function shownGains(gains: Gains, screen: ScreenGains | null): Gains {
+  if (!screen) return [gains[0], gains[1], gains[2]];
+  const c: Gains = [gains[0] * screen[0], gains[1] * screen[1], gains[2] * screen[2]];
+  const k = geometricMean(gains) / geometricMean(c);
+  return [c[0] * k, c[1] * k, c[2] * k];
+}
+
+/** The white the open picture shows, as the two numbers: the gains and the screen-side gains read together through the profile.
+ *  @param gains  the camera-space gains.
+ *  @param screen  the screen-side gains in force, or null (see `shownGains`).
+ *  @param spec  what the gains are read through.
+ *  @returns `readBalance` of `shownGains`, or null when they describe no white.
+ *  What it must satisfy: with `screen` null it is `readBalance(gains, spec)` exactly; with the swap on and a Temperature move made by `screenForWhite`, it reads back the white that was asked for. Consumers: main.ts `updateBalanceUI`, `balanceInput` and the report's balance rows. */
+export function readShown(gains: Gains, screen: ScreenGains | null, spec: ColourSpec): BalanceReading | null {
+  return readBalance(shownGains(gains, screen), spec);
+}
+
+/** The screen-side gains that make the picture show a wanted white, EXACTLY, with the camera-space gains left where they are (record 104).
+ *  @param want  the temperature (as its inverse, `mired`) and the tint asked for, a slider's drag and a typed number alike.
+ *  @param gains  the camera-space gains, which stay: only their overall level is read, at full precision.
+ *  @param spec  what the gains are read through.
+ *  @returns three gains with product one, such that `readShown(gains, result, spec)` reads the wanted white (the SDK's own gains for it, divided by the camera-space gains, element by element, and scaled to product one); null when the wanted white gives a channel no light, `gains` is not three positive finite numbers, or a result is not finite and above zero.
+ *  What it must satisfy: nothing is rounded to the gain track's grid, so a typed number reads back as itself and ten one-step moves land where one ten-step move lands; there is no bound but finite and positive, because these are not stored as a gain slider's position; with a white the same as the camera-space gains' own it returns one, one, one. Consumers: main.ts `balanceInput`, while the swap is on. */
+export function screenForWhite(want: BalanceWant, gains: Gains, spec: ColourSpec): ScreenGains | null {
+  if (!gains.every((g) => Number.isFinite(g) && g > 0)) return null;
+  const ideal = whiteToGains(spec, 1e6 / want.mired, want.tint);
+  if (!ideal) return null;
+  const k = geometricMean(gains) / geometricMean(ideal);
+  const s = [ideal[0] * k / gains[0], ideal[1] * k / gains[1], ideal[2] * k / gains[2]];
+  const m = Math.cbrt(s[0] * s[1] * s[2]);
+  if (!(m > 0) || !Number.isFinite(m)) return null;
+  const out: ScreenGains = [s[0] / m, s[1] / m, s[2] / m];
+  return out.every((v) => Number.isFinite(v) && v > 0) ? out : null;
 }
 
 /** The exposure that keeps a photograph's overall level when its gains change, for a photograph that is not open and so cannot be measured.
