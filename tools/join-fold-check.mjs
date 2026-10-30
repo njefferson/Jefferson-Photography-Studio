@@ -62,14 +62,14 @@ writeFileSync(entry, [
   // 102: the white balance on Adobe's scale through a camera profile: the SDK's arithmetic, the profiles, and the store that reads and moves it on the gain track.
   `export { SDK_TABLE, KELVIN_MIN, ADOBE_KELVIN_MIN, planckLocusUv, KELVIN_MAX, TINT_MIN, TINT_MAX, xyToTempTint, tempTintToXy, illuminantToTemperature, normalizeColorMatrix, makeColourSpec, gainsToWhite, whiteToGains } from ${JSON.stringify(join(repo, "src/kelvin.ts"))};`,
   `export { cameraKey, profileProblem, readProfileFile, photoCamera, choicesFor, chooseProfile, renderedChoice, keepProfiles, loadedFor, forgetProfile, lastChoice, rememberChoice } from ${JSON.stringify(join(repo, "src/camprofile.ts"))};`,
-  `export { readBalance, moveBalance, exactBalance, shownGains, readShown, screenForWhite, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR } from ${JSON.stringify(join(repo, "src/balancestore.ts"))};`,
+  `export { readBalance, moveBalance, exactBalance, shownGains, readShown, screenForWhite, openingBalanceAtLevel, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR } from ${JSON.stringify(join(repo, "src/balancestore.ts"))};`,
   `export { WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS } from ${JSON.stringify(join(repo, "src/decode.ts"))};`,
   `export { trackPos, trackVal } from ${JSON.stringify(join(repo, "src/tile.ts"))};`,
-  `export { NIKON_Z50_COLOR_MATRIX, NIKON_D5300_COLOR_MATRIX } from ${JSON.stringify(join(repo, "src/color.ts"))};`,
+  `export { NIKON_Z50_COLOR_MATRIX, NIKON_D5300_COLOR_MATRIX, camToSrgbLinear } from ${JSON.stringify(join(repo, "src/color.ts"))};`,
 ].join("\n"));
 const out = join(dir, "bundle.mjs");
 await build({ entryPoints: [entry], bundle: true, format: "esm", outfile: out, logLevel: "silent" });
-const { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT, cloneParams, screenGainsOf, screenGainsNeutral, SDK_TABLE, KELVIN_MIN, ADOBE_KELVIN_MIN, planckLocusUv, KELVIN_MAX, TINT_MIN, TINT_MAX, xyToTempTint, tempTintToXy, illuminantToTemperature, normalizeColorMatrix, makeColourSpec, gainsToWhite, whiteToGains, cameraKey, profileProblem, readProfileFile, photoCamera, choicesFor, chooseProfile, renderedChoice, keepProfiles, loadedFor, forgetProfile, lastChoice, rememberChoice, readBalance, moveBalance, exactBalance, shownGains, readShown, screenForWhite, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS, trackPos, trackVal, NIKON_Z50_COLOR_MATRIX, NIKON_D5300_COLOR_MATRIX } = await import(pathToFileURL(out).href);
+const { groupWeight, aimWeight, neutralMask, compileEdit, hslDefault, TONE_DEFAULT, CROP_DEFAULT, cloneParams, screenGainsOf, screenGainsNeutral, SDK_TABLE, KELVIN_MIN, ADOBE_KELVIN_MIN, planckLocusUv, KELVIN_MAX, TINT_MIN, TINT_MAX, xyToTempTint, tempTintToXy, illuminantToTemperature, normalizeColorMatrix, makeColourSpec, gainsToWhite, whiteToGains, cameraKey, profileProblem, readProfileFile, photoCamera, choicesFor, chooseProfile, renderedChoice, keepProfiles, loadedFor, forgetProfile, lastChoice, rememberChoice, readBalance, moveBalance, exactBalance, shownGains, readShown, screenForWhite, openingBalanceAtLevel, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS, trackPos, trackVal, NIKON_Z50_COLOR_MATRIX, NIKON_D5300_COLOR_MATRIX, camToSrgbLinear } = await import(pathToFileURL(out).href);
 
 let bad = 0;
 const near = (a, b) => Math.abs(a - b) < 1e-9;
@@ -473,6 +473,47 @@ check("an offset is added to the term a saved aim leaves", diff(pxh([{ ...neutra
     isTrue("one, one, one is no stage: the same pixel, to the last place", [0, 1, 2].every((k) => oneA[k] === oneB[k]));
     const cl = cloneParams({ ...plain(), swapRB: true, wbScreen: [1.2, 1, 1 / 1.2] });
     isTrue("cloneParams carries the screen-side gains as a copy, and a clone of an edit with none has none", Array.isArray(cl.wbScreen) && cl.wbScreen[0] === 1.2 && !("wbScreen" in cloneParams(plain())));
+  }
+  // RECORD 104, THE DOUBLE TAP (step 250): with the swap on, a double tap on Temperature or Tint puts the WHOLE balance back to the one the photograph opened at, at the
+  // level the gains have now, and clears the screen-side gains. The pure function that scales the opening gains, the pixel the cause turned on (a photograph whose saved
+  // camera-space gains put red far above blue shows no red after the swap, and the screen-side gains the old double tap wrote cannot give it back), and the routing in main.ts.
+  {
+    const stock = makeColourSpec(NIKON_Z50_COLOR_MATRIX, undefined, null, undefined);
+    const level = (g) => Math.cbrt(g[0] * g[1] * g[2]);
+    const opening = [1, 1.817, 2.765], saved = [2.9, 1.6, 1.15];
+    const restored = openingBalanceAtLevel(opening, saved);
+    isTrue("the opening balance at the level of the gains now: three gains come back", Array.isArray(restored) && restored.length === 3);
+    within("the opening balance at the level of the gains now: its geometric mean is the gains' own, largest miss as a fraction", Math.abs(level(restored) / level(saved) - 1), 1e-12);
+    within("the opening balance at the level of the gains now: red over blue is the opening's, miss as a fraction", Math.abs(restored[0] / restored[2] / (opening[0] / opening[2]) - 1), 1e-12);
+    within("the opening balance at the level of the gains now: green over blue is the opening's, miss as a fraction", Math.abs(restored[1] / restored[2] / (opening[1] / opening[2]) - 1), 1e-12);
+    const wr = readBalance(restored, stock), wo = readBalance(opening, stock);
+    within("the opening balance at the level of the gains now reads the opening white: miss in kelvin", Math.abs(wr.kelvin - wo.kelvin), 1e-6);
+    within("the opening balance at the level of the gains now reads the opening white: miss in tint", Math.abs(wr.tint - wo.tint), 1e-6);
+    const same = openingBalanceAtLevel(opening, opening);
+    within("the opening balance at the level of the opening gains is the opening gains: largest miss", Math.max(...same.map((v, i) => Math.abs(v - opening[i]))), 1e-12);
+    isTrue("a scaled gain that would leave the gain track gives nothing, and so do a gain of zero, a gain that is not a number and the wrong count", openingBalanceAtLevel([1, 1, 1], [WB_GAIN_LO / 2, WB_GAIN_LO / 2, WB_GAIN_LO / 2]) === null && openingBalanceAtLevel([1, 1, 1], [WB_GAIN_HI * 2, WB_GAIN_HI * 2, WB_GAIN_HI * 2]) === null && openingBalanceAtLevel([0, 1, 1], saved) === null && openingBalanceAtLevel([NaN, 1, 1], saved) === null && openingBalanceAtLevel(opening, [1, 1]) === null);
+    // THE PIXEL. An infrared sensor pixel (red far above blue), the swap on, saturation 2.4: with the saved camera-space gains the screen's red goes below zero and shows 0;
+    // the old double tap's screen-side gains for the opening white leave it at 0; the whole balance put back gives red.
+    const px = (edit) => { const p = plain(); Object.assign(p, { swapRB: true, sat: 2.4, exposure: 1.5 }, edit); const o = new Float32Array(4); compileEdit(p, camToSrgbLinear(NIKON_Z50_COLOR_MATRIX), 1.5)(0.15, 0.085, 0.055, o, 0, 0.5, 0.5); return o; };
+    const asSaved = px({ wb: saved });
+    const oldScreen = screenForWhite({ mired: wo.mired, tint: wo.tint }, saved, stock);
+    const oldTap = px({ wb: saved, wbScreen: oldScreen });
+    const newTap = px({ wb: restored });
+    isTrue(`the cause: with the saved camera-space gains the screen's red shows nothing (red ${asSaved[0].toFixed(3)}, blue ${asSaved[2].toFixed(3)})`, asSaved[0] < 0.01 && asSaved[2] > 0.3);
+    isTrue(`the old double tap's screen-side gains for the opening white leave the screen's red at nothing (red ${oldTap[0].toFixed(3)}) and cut it no further than that`, oldTap[0] < 0.01);
+    isTrue(`the whole balance put back gives the screen red (red ${newTap[0].toFixed(3)}, against ${asSaved[0].toFixed(3)} as saved)`, newTap[0] > 0.1 && newTap[0] > 10 * asSaved[0]);
+    // THE ROUTE in main.ts: the double tap's `back` sends Temperature and Tint to the helper with the swap on and no mask, the helper does the five things the record names, and
+    // the test refuses a planted source that has the old route.
+    const main = readFileSync(join(repo, "src/main.ts"), "utf8");
+    const routeOk = (src) => /if \(!tm && params\.swapRB && \(el === balUi\.t \|\| el === balUi\.ti\)\) \{\s*if \(!el\.disabled\) backToOpeningBalance\(\);\s*return;\s*\}/.test(src);
+    const planted = "const to = tm && mc ? String(mc.get(neutralMask(tm.type))) : (lensStrengthTarget(el) ?? PREF_SLIDER_DEFAULTS[el.id] ?? sliderDefaults.get(el.id));";
+    isTrue("the route test refuses a planted source that sends Temperature to its own slider default, and reads the real one", !routeOk(planted) && routeOk(main));
+    const helper = /function backToOpeningBalance\(\): void \{[^]*?\n\}/.exec(main);
+    const hb = helper ? helper[0] : "";
+    isTrue("the helper scales the opening gains to the level now, keeps them exact, clears the screen-side gains, redraws, and ends one undo step", /Balance\.openingBalanceAtLevel\(open, params\.wb\) \?\? open/.test(hb) && /rememberExactWb\(next\)/.test(hb) && /delete params\.wbScreen;/.test(hb) && /draw\(\);/.test(hb) && (hb.match(/flushRecord\(\);/g) || []).length === 2);
+    isTrue("the helper takes the baseline's own look bias off the opening gains and puts the look in force on, and says what the boxes read in the live region", /baseline!\.params\.wb\[i\] \/ baseline!\.lookBias\[i\]\) \* lookBias\[i\]/.test(hb) && /announceBalance\(/.test(hb));
+    isTrue("a balance that is already the opening one, with no screen-side gains, moves nothing", /screenGainsNeutral\(params\.wbScreen\) && next\.every/.test(hb));
+    isTrue("the slider's own default route is still there for every other slider and for the swap off", /sliderDefaults\.get\(el\.id\)/.test(main));
   }
   // THE PROFILES: reading one from a file's tags, the store, the list a photograph offers and the rule that picks one. The files are built here
   // from the stand-in matrices; no real profile is held.

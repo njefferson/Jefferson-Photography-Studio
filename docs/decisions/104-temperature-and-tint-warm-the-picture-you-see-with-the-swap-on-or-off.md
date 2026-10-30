@@ -2,6 +2,8 @@
 
 ## Context
 
+**The goal for a photograph opened from a keep file.** It stays editable. With the swap on it reaches red when Temperature moves toward warmer, as the same raw opened from its original file does, and a double tap on Temperature returns it to the balance it opened at; the number and the picture still move the same way.
+
 Records 102 and 103 settled what the Temperature and Tint numbers read: the three gains read through a
 camera profile or the stock matrix, with the locus extended below the SDK's table. Neither changes what
 the red and blue swap does to the picture. The swap is on for every raw at open and in most saved edits,
@@ -144,6 +146,34 @@ Do not write a second one of these.
    picture, which record 102 forbids, or the white the adaptation starts from is stored beside the one it
    goes to, which stores two Temperatures and Tints as such and gives up the one-state rule; and it adds a
    cone matrix and two colour-space matrices to the app.
+3. **With the swap on, a double tap on Temperature or Tint puts the whole balance back to the one the
+   photograph opened at: the camera-space gains return to the Reset baseline's gains, scaled by one common
+   factor to the level the current gains have (the baseline's own gains where a scaled gain would leave
+   the gain track), the screen-side gains are cleared, and it is one undo step with a sentence in the live
+   region. Chosen, in addition to option 1, after step 249's stage figures.** A photograph opened from a
+   keep file can carry camera-space gains that put red at 2.6 times blue; with the swap on its screen red
+   is then about a fourteenth of its blue after the matrix, the saturation takes red below zero on 99
+   percent of the frame, and screen-side gains, which act after the matrix, cannot give it back: the
+   double tap's own gains for such a photograph lower the screen red by two thirds, because
+   `screenForWhite` divides the ideal gains for the white asked for by the camera-space gains element by
+   element and the swap that follows exchanges the two ends. A drag, a typed number and every swap-off
+   move stay as they are. It touches `src/main.ts` (the double tap's `back` and a helper beside
+   `balanceInput`), `src/balancestore.ts` (a pure function for the scaled gains) and
+   `tools/join-fold-check.mjs` (its assertions), and it reopens no placement this record rejected: the
+   screen-side gains stay after the mixer and the hue turn.
+   **Built on staging by the plan of 30 October 2026, step 250.** `openingBalanceAtLevel` in
+   `src/balancestore.ts` scales the opening gains to the level the gains have now, and
+   `backToOpeningBalance` in `src/main.ts` writes them, remembers them as exact, clears the screen-side
+   gains and ends one undo step with a sentence in the live region; the double tap's `back` sends
+   `balT` and `balTi` to it with the swap on and no mask picked, and every other slider and the swap
+   off keep the slider's own default. The opening gains are the Reset baseline's with the baseline's
+   look bias taken off and the look in force's put on. `tools/join-fold-check.mjs` holds the function,
+   the pixel the cause turned on and the route. Measured on the built page, frame 3837 opened from its
+   keep file with the swap on: as saved the boxes read 45993 K and the picture's mean red is 0.07;
+   after the double tap they read 1729 K and tint minus 90 and the mean red is 100.44; Undo returns
+   the saved state and Redo the tapped one; a hundred one-step events toward warmer from there read
+   2090 K with a mean red of 117.04 against a blue of 66.3. Frame 3762 with the swap on reads red over
+   blue 1.0229 at open and 1.2364 after a hundred steps, the figures step 244 read before this change.
 
 ## Rejected
 
@@ -260,6 +290,17 @@ raws.
 - Frame 3762, swap off, the opening white, a hundred steps and ten steps toward warmer
   (f3762-off-start.png, f3762-off-warm100-c0x.png, f3762-off-warm10-c0x.png): a khaki-cream sky with lilac
   conifers, a peach and salmon sky at a hundred steps, ten steps near the start.
+- Frame 3837 opened from its keep file on the built page, step 250, each picture at 2800 by 1864 opened
+  with the Read tool before it was described (step250/keep-on-start.jpg and the others there): as saved
+  with the swap on, a flat cyan-blue wash over the whole frame, dark blue trunks, white-cyan foliage, the
+  table dim, no red; after a double tap on Temperature, a picture with colour again, maroon trunks and
+  shadows, dusty rose foliage, pale blue-white leaves at the top and in the foreground bushes, the
+  table visible, red speckle on the brightest leaves; Undo of the double tap the cyan-blue wash again,
+  Redo the rose picture again, neither told apart from its first capture by eye; a hundred steps toward
+  warmer from the tapped state, the same picture redder, the foliage rose and crimson, the pale leaves
+  cream rather than blue-white; with the swap off, as saved, a saturated red woodland. Frame 3762 with
+  the swap on, at open a pale teal sky, pale pink-white conifers and a dark bird, and after a hundred
+  steps toward warmer a grey-mauve sky and salmon conifers.
 - Frame 3837 under a three-way rotation mixer, a hundred steps toward warmer, the factor before the mixer
   and after it (f3837-mixer-start.png, f3837-mixer-factor-before.png, f3837-mixer-factor-after.png): a
   lavender-silver start; before the mixer the whole picture turns mint green, not warm; after it a warm

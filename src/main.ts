@@ -2169,6 +2169,39 @@ for (const [axis, slider, box] of [["t", balUi.t, balUi.tNum], ["ti", balUi.ti, 
   box.addEventListener("change", () => balanceInput(axis, "number"));
 }
 
+/** A double tap on Temperature or Tint while the swap is on: the whole balance goes back to the one the photograph opened at (record 104, Options item 3).
+ *  Takes nothing and returns nothing. Writes `params.wb` and clears `params.wbScreen`; the exposure, the look and every other control stay as they are.
+ *  WHY IT IS NOT THE SLIDER'S OWN DEFAULT. With the swap on a Temperature move is made on the screen-side gains, which act after the camera matrix and the
+ *  swap, so a photograph whose camera-space gains are not the ones it opened at (a kept photograph opened again, whose saved gains put red at 2.6 times blue)
+ *  cannot be brought back by them: the double tap's own gains for it lowered the screen's red by two thirds and no size of them reaches red (step 249's
+ *  stage figures, record 104). So the camera-space gains return to the Reset baseline's, with the active look's bias on them (`lookBias`; the baseline's own
+ *  bias taken off first), scaled by one common factor to the level the gains have now so the picture is as bright as it was (`openingBalanceAtLevel`; the
+ *  baseline's own gains where a scaled gain would leave the gain track), and the screen-side gains are cleared.
+ *  What it must satisfy: one undo step (the settled edit is recorded first, so a pending drag is its own step); a balance that is already the opening one,
+ *  with no screen-side gains, moves nothing and says nothing; afterwards the boxes read the opening white (`updateBalanceUI`), the gain sliders stand at the
+ *  gains' nearest positions, and the gains are remembered as exact so the next read of the sliders keeps them (`rememberExactWb`, as a typed number's are);
+ *  the live region says what the boxes now read. Consumer: `wireSliderReset`'s `back`, for `balT` and `balTi` with the swap on and no mask picked. */
+function backToOpeningBalance(): void {
+  if (!current || !baseline) return;
+  const open = [0, 1, 2].map((i) => (baseline!.params.wb[i] / baseline!.lookBias[i]) * lookBias[i]) as Balance.Gains;
+  const next = Balance.openingBalanceAtLevel(open, params.wb) ?? open;
+  if (screenGainsNeutral(params.wbScreen) && next.every((g, i) => Math.abs(g / params.wb[i] - 1) < 1e-9)) return;
+  flushRecord();
+  params.wb = next;
+  rememberExactWb(next);
+  delete params.wbScreen;
+  balState.drag = null;
+  syncWbSliders();
+  updateBalanceUI();
+  draw();
+  flushRecord();
+  const { choice } = balanceProfile();
+  const after = choice ? shownReading(choice.spec) : null;
+  announceBalance(after
+    ? `Temperature and Tint are back at the balance this photograph opened at: ${balText(after.kelvin)} kelvin and tint ${balText(after.tint)}.`
+    : "Temperature and Tint are back at the balance this photograph opened at.");
+}
+
 /** The reader's switch of the profile the Temperature and Tint are read through.
  *  Takes nothing (it reads the switch's value) and returns nothing. Writes `params.profile`, remembers the choice as the one to open the next photograph from this camera under, and says in the live region what the figures read as now.
  *  What it must satisfy: one undo step (the settled edit is recorded first, so the switch is its own step and Undo restores the profile it replaced); the three gains and every pixel are untouched, so nothing is drawn again; a choice that names nothing available now is passed over and the list redrawn as it stands. */
@@ -17291,6 +17324,13 @@ function wireSliderReset(): void {
     // read through the same `get` the switch shows it with (042, stage 2).
     const tm = overlayReady ? targetMask() : null;
     const mc = tm ? maskCtls().find((k) => k.el === el) : undefined;
+    // TEMPERATURE AND TINT WITH THE SWAP ON put the WHOLE balance back to the one the photograph opened at, not the one slider to its own
+    // opening value (record 104, Options item 3): a move there is made after the swap, which cannot undo camera-space gains the photograph
+    // did not open at. With the swap off, or a mask picked, the slider goes back as every other slider does.
+    if (!tm && params.swapRB && (el === balUi.t || el === balUi.ti)) {
+      if (!el.disabled) backToOpeningBalance();
+      return;
+    }
     const to = tm && mc ? String(mc.get(neutralMask(tm.type)))
       : (lensStrengthTarget(el) ?? PREF_SLIDER_DEFAULTS[el.id] ?? sliderDefaults.get(el.id));
     if (to === undefined || el.disabled || el.value === to) return;

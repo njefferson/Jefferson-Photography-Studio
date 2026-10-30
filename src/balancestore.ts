@@ -156,6 +156,20 @@ export function screenForWhite(want: BalanceWant, gains: Gains, spec: ColourSpec
   return out.every((v) => Number.isFinite(v) && v > 0) ? out : null;
 }
 
+/** The balance a photograph opened at, put back at the overall level the gains have now (record 104).
+ *  @param opening  the gains the photograph opened at, with any look's bias on them: red, green and blue, from the Reset baseline.
+ *  @param now  the gains in force; only their overall level (the geometric mean) is read, at full precision.
+ *  @returns `opening` multiplied by one common factor so that its geometric mean is that of `now`, NOT put on the gain track's grid; null when either set is not three positive finite gains, or a scaled gain falls outside the track `WB_GAIN_LO`..`WB_GAIN_HI`, where the sliders cannot show it and `balanceProblem` would refuse a kept copy (the caller then uses `opening` as it is).
+ *  What it must satisfy: the ratios between the three gains are `opening`'s, so `readBalance` of the result reads the white `readBalance(opening)` reads; the geometric mean is `now`'s, so the exposure needs no change and the picture is as bright as it was. The result is off the grid on purpose, as `exactBalance`'s is: a caller that stores it must keep it against a later read of the sliders (main.ts `rememberExactWb`). Consumers: main.ts `backToOpeningBalance`, for a double tap on Temperature or Tint while the swap is on, where the screen-side gains cannot bring a photograph back from camera-space gains it did not open at. */
+export function openingBalanceAtLevel(opening: Gains, now: Gains): Gains | null {
+  const ok = (g: Gains) => g.length === 3 && g.every((v) => Number.isFinite(v) && v > 0);
+  if (!ok(opening) || !ok(now)) return null;
+  const k = geometricMean(now) / geometricMean(opening);
+  const out: Gains = [opening[0] * k, opening[1] * k, opening[2] * k];
+  if (!out.every((g) => Number.isFinite(g) && g >= WB_GAIN_LO && g <= WB_GAIN_HI)) return null;
+  return out;
+}
+
 /** The exposure that keeps a photograph's overall level when its gains change, for a photograph that is not open and so cannot be measured.
  *  @param was  the gains the photograph has.
  *  @param exposure  the exposure it has.

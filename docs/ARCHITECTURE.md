@@ -759,7 +759,7 @@ later, that decoder (or shooting Lossless NEF) is the prerequisite.
 87 modules. Each line is that file's own opening comment, so this
 cannot describe something the code does not say about itself.
 
-- **`src/balancestore.ts`** (302 lines) — Kept white balances, and the Temperature and Tint that read and move a balance on Adobe's scale without changing how bright the picture is.
+- **`src/balancestore.ts`** (316 lines) — Kept white balances, and the Temperature and Tint that read and move a balance on Adobe's scale without changing how bright the picture is.
 - **`src/batchstore.ts`** (174 lines) — Crash-safe store for finished batch frames.
 - **`src/camprofile.ts`** (364 lines) — Camera profiles for the Temperature and Tint: reading one from a file's tags, keeping the ones the reader loads for a camera, and listing what a photograph can be read through.
 - **`src/chooser.ts`** (65 lines) — Two-door landing page.
@@ -806,7 +806,7 @@ cannot describe something the code does not say about itself.
 - **`src/macro/export.worker.ts`** (23 lines) — Full-resolution stacking runs here, OFF the main thread, so the long tiled render never janks the UI (the preview stack stays on the main thread — it's quick).
 - **`src/macro/main.ts`** (460 lines) — MACRO FOCUS-STACKING MODE: the second discipline, its own page and its own entry point.
 - **`src/macro/stack.ts`** (387 lines) — Macro focus-stacking engine (JPEG-first).
-- **`src/main.ts`** (22863 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
+- **`src/main.ts`** (22903 lines) — THE INFRARED EDITOR: its whole screen, its whole state, and the orchestration between them.
 - **`src/maskstore.ts`** (479 lines) — On-device store for SAVED MASKS (IndexedDB "ips-masks"), and for the KEPT SKY MAP of each photograph, in a database of its own ("ips-skymaps").
 - **`src/palette.ts`** (118 lines) — Palette family picker, shared across all three pages.
 - **`src/pipeline.ts`** (3574 lines) — CPU version of the GPU edit pipeline, kept numerically identical to the fragment shader in gl.ts so exports match the on-screen preview exactly.

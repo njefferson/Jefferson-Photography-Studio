@@ -1,12 +1,14 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=6b1d452594bfec80
-diffhash=e9a68a6f05152092
-verdict=IN-SCOPE: every changed path is named by the Files list and the diff matches steps 243 to 246
-# IN-SCOPE: every changed path is named by the Files list and the diff matches steps 243 to 246
+planhash=9b2395684e43f801
+diffhash=09484ec92091bc0a
+verdict=IN-SCOPE: all six changed files are named by the Files list, and the code is record 104's Options item 3 and nothing beyond it
+# IN-SCOPE: all six changed files are named by the Files list, and the code is record 104's Options item 3 and nothing beyond it
 # 
-# The working copy has nineteen changed tracked files and two new files. Each sits inside a Files entry. The records folder holds the new record 104 and the edited record 103. The tools folder holds the new walk file tools/temperature-walk.mjs, the edited join-fold and agreement walks and the preview pipeline record. The source files named by steps 244 and 245 carry the screen-side gains, the balance reach, the drag and the D5300 matrix, and no new file exists under the source folder. The instructions, the version file, the research file, the notes, the module map and the page's own note are each named by the Files list.
+# The working copy has six changed tracked files and no untracked file: NOTES.md, docs/ARCHITECTURE.md, the record 104 file, src/balancestore.ts, src/main.ts and tools/join-fold-check.mjs. The Files list names the notes, the module map, the record and tools/join-fold-check.mjs by path, and names src/ as a directory, so the two source files sit inside it. Record 104's Options item 3 names src/main.ts, src/balancestore.ts and tools/join-fold-check.mjs, and the source hunks touch exactly those files and no others.
 # 
-# The whole diff was read. Every hunk serves records 103 and 104 or the removal of the profile author's figures. No owner message or quotation appears in the diff.
+# The whole diff was read, hunk by hunk. It holds one new pure function in balancestore.ts that scales the opening gains to the level the gains have now, one helper in main.ts beside the balance listeners, one branch in the double tap's route for Temperature and Tint with the swap on and no mask picked, and a block of new checks in the join-fold file. The notes and the record carry the goal paragraph, the Options line, the Built line and the looked-at bullet that step 250 reports, and the module map carries line counts only. Every hunk serves the kept photograph case as record 104 states it.
 # 
-# Found, not put right: record 103 gained a built paragraph longer than the one line step 245 named. Its content matches the build and the step's report, so the verdict stands.
+# Read and recorded, not blocking. The Tint half of the double tap applies to any raw with the swap on, not only to a kept photograph; record 104 names Temperature or Tint, so it sits inside the approved build, and step 250 reports it as a found item. The helper also takes the look's bias off the baseline's gains and puts the look in force's bias on; record 104's Options line does not spell that out, but its Built line describes it. A doubt the reports read do not settle: step 249 reads no look in force on the keep file, while the saved grade carries the look's figures. For that file the look-bias handling is a no-op, so the case the diff targets is not changed by it, and the question is one for the pictures and the device pass.
+# 
+# No quotation of anyone and no attribution appears in the diff, the comments or the record lines. No trailer and no session link appears in any changed file.
