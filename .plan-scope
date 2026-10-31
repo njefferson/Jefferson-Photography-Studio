@@ -1,16 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=e246ea90dc0ad60e
-diffhash=42d4be5eda7ffb6d
-verdict=IN-SCOPE: the diff is the root manifest vite range and the lockfile vite entry, named by the Files list for step 254, and nothing beyond them
-# IN-SCOPE: the diff is the root manifest's vite range and the lockfile's vite entry, which the Files list names for step 254, and nothing beyond them
+diffhash=15265174bf53fb4f
+verdict=IN-SCOPE: one new paragraph in NOTES.md on staging after the 20 October promotion entry, and two queue lines in the same file, Q-JPS-11 rewritten and Q-JPS-96 removed as answered, and nothing else in the diff
+# IN-SCOPE: the diff is one new paragraph in NOTES.md on staging, placed directly after the entry for the 20 October promotion, and two queue lines in the same file: Q-JPS-11 rewritten to say what remains open on main, and Q-JPS-96 removed as answered.
 # 
-# The working copy has two changed tracked files and no untracked file: package.json and package-lock.json. The Files list names both for step 254. No file under asset-factory/ is changed, and neither are the scope record or the plan pointer yet.
+# The working copy has one changed tracked file, NOTES.md. The scope record changes only through this record. The paragraph and the two queue lines are the record the Files list names for step 255.
 # 
-# The whole diff was read, hunk by hunk. In package.json one line changes, the range of the build tool vite, from the caret on 6.4.4 to the caret on 6.4.5. In package-lock.json three things change: the root entry's copy of that same range, and the vite entry's version, its resolved address and its integrity line. No other package in the lockfile moved by version, typescript included; the runner compared every package path before and after and read one moved, none added, none removed.
+# The new paragraph names the update of the build and test tools by its subject only, states that main was moved to it as a fast-forward of main alone, lists the advisory entries the audit read on main that the move clears, names the four that stay open with the reason each stays open, and says the Temperature work and the kept-photograph fix stay on staging for the device pass. Each of these facts was established by the step 253 reads and by the move itself.
 # 
-# The owner's messages ask for the dependency vulnerabilities to be fixed, and the plan chose to move main by the earlier update alone and to fix anything new on staging. The diff moves one build tool past the single advisory the audit still named on staging's head, to the lowest release that the advisory's range leaves out and the caret range allows. The audit after the change reads zero vulnerabilities in every severity, the typecheck exits zero and one build exits zero.
-# 
-# Not blocking, and not decided here: the three high advisories against the sharp package in asset-factory stay open, because the plan scopes this step to the root manifest.
-# 
-# No quotation of anyone and no attribution appears in the diff or in this record. No trailer and no session link appears in any changed file.
+# Nothing in the diff goes beyond that: no code, no dependency file, no other notes entry, and no queue line other than the two named. The rewritten Q-JPS-11 line keeps its step numbers and adds what remains open and the GitHub count that is not yet reconciled. It attributes no decision to anyone, quotes no one, and no trailer or session link appears in any changed file.
