@@ -1,14 +1,16 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=9b2395684e43f801
-diffhash=09484ec92091bc0a
-verdict=IN-SCOPE: all six changed files are named by the Files list, and the code is record 104's Options item 3 and nothing beyond it
-# IN-SCOPE: all six changed files are named by the Files list, and the code is record 104's Options item 3 and nothing beyond it
+planhash=e246ea90dc0ad60e
+diffhash=42d4be5eda7ffb6d
+verdict=IN-SCOPE: the diff is the root manifest vite range and the lockfile vite entry, named by the Files list for step 254, and nothing beyond them
+# IN-SCOPE: the diff is the root manifest's vite range and the lockfile's vite entry, which the Files list names for step 254, and nothing beyond them
 # 
-# The working copy has six changed tracked files and no untracked file: NOTES.md, docs/ARCHITECTURE.md, the record 104 file, src/balancestore.ts, src/main.ts and tools/join-fold-check.mjs. The Files list names the notes, the module map, the record and tools/join-fold-check.mjs by path, and names src/ as a directory, so the two source files sit inside it. Record 104's Options item 3 names src/main.ts, src/balancestore.ts and tools/join-fold-check.mjs, and the source hunks touch exactly those files and no others.
+# The working copy has two changed tracked files and no untracked file: package.json and package-lock.json. The Files list names both for step 254. No file under asset-factory/ is changed, and neither are the scope record or the plan pointer yet.
 # 
-# The whole diff was read, hunk by hunk. It holds one new pure function in balancestore.ts that scales the opening gains to the level the gains have now, one helper in main.ts beside the balance listeners, one branch in the double tap's route for Temperature and Tint with the swap on and no mask picked, and a block of new checks in the join-fold file. The notes and the record carry the goal paragraph, the Options line, the Built line and the looked-at bullet that step 250 reports, and the module map carries line counts only. Every hunk serves the kept photograph case as record 104 states it.
+# The whole diff was read, hunk by hunk. In package.json one line changes, the range of the build tool vite, from the caret on 6.4.4 to the caret on 6.4.5. In package-lock.json three things change: the root entry's copy of that same range, and the vite entry's version, its resolved address and its integrity line. No other package in the lockfile moved by version, typescript included; the runner compared every package path before and after and read one moved, none added, none removed.
 # 
-# Read and recorded, not blocking. The Tint half of the double tap applies to any raw with the swap on, not only to a kept photograph; record 104 names Temperature or Tint, so it sits inside the approved build, and step 250 reports it as a found item. The helper also takes the look's bias off the baseline's gains and puts the look in force's bias on; record 104's Options line does not spell that out, but its Built line describes it. A doubt the reports read do not settle: step 249 reads no look in force on the keep file, while the saved grade carries the look's figures. For that file the look-bias handling is a no-op, so the case the diff targets is not changed by it, and the question is one for the pictures and the device pass.
+# The owner's messages ask for the dependency vulnerabilities to be fixed, and the plan chose to move main by the earlier update alone and to fix anything new on staging. The diff moves one build tool past the single advisory the audit still named on staging's head, to the lowest release that the advisory's range leaves out and the caret range allows. The audit after the change reads zero vulnerabilities in every severity, the typecheck exits zero and one build exits zero.
 # 
-# No quotation of anyone and no attribution appears in the diff, the comments or the record lines. No trailer and no session link appears in any changed file.
+# Not blocking, and not decided here: the three high advisories against the sharp package in asset-factory stay open, because the plan scopes this step to the root manifest.
+# 
+# No quotation of anyone and no attribution appears in the diff or in this record. No trailer and no session link appears in any changed file.
