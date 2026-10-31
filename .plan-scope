@@ -1,12 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=e246ea90dc0ad60e
-diffhash=15265174bf53fb4f
-verdict=IN-SCOPE: one new paragraph in NOTES.md on staging after the 20 October promotion entry, and two queue lines in the same file, Q-JPS-11 rewritten and Q-JPS-96 removed as answered, and nothing else in the diff
-# IN-SCOPE: the diff is one new paragraph in NOTES.md on staging, placed directly after the entry for the 20 October promotion, and two queue lines in the same file: Q-JPS-11 rewritten to say what remains open on main, and Q-JPS-96 removed as answered.
+planhash=1a1a8fdc17597eae
+diffhash=2a85eaf3d199832f
+verdict=IN-SCOPE: the diff is the asset tool's sharp moved from 0.33.5 to 0.35.5 in asset-factory/package.json and asset-factory/package-lock.json, plus two queue lines in NOTES.md, which are exactly the three files step 257 names.
+# IN-SCOPE: the diff is the asset tool's sharp moved from 0.33.5 to 0.35.5 in asset-factory/package.json and asset-factory/package-lock.json, plus two queue lines in NOTES.md, which are exactly the three files step 257 names.
 # 
-# The working copy has one changed tracked file, NOTES.md. The scope record changes only through this record. The paragraph and the two queue lines are the record the Files list names for step 255.
+# The working copy has four changed paths: asset-factory/package.json, asset-factory/package-lock.json, NOTES.md and the scope record, which changes only through this record. In the manifest the one direct dependency, sharp, moves from the range ^0.33.4 to ^0.35.5, and no other dependency of the asset tool is touched. In the lockfile every change is sharp's own tree: the sharp entry, its platform binary packages and their libvips packages moved to 0.35.5 and 1.3.4, the packages sharp's wasm build pulls in (@emnapi/runtime and tslib), a new @img/colour that replaces the removed color, color-convert, color-name, color-string, is-arrayish and simple-swizzle. The asset tool's audit after the install reads no vulnerability, and each call its source makes of sharp returned an image of the format and size asked for.
 # 
-# The new paragraph names the update of the build and test tools by its subject only, states that main was moved to it as a fast-forward of main alone, lists the advisory entries the audit read on main that the move clears, names the four that stay open with the reason each stays open, and says the Temperature work and the kept-photograph fix stay on staging for the device pass. Each of these facts was established by the step 253 reads and by the move itself.
-# 
-# Nothing in the diff goes beyond that: no code, no dependency file, no other notes entry, and no queue line other than the two named. The rewritten Q-JPS-11 line keeps its step numbers and adds what remains open and the GitHub count that is not yet reconciled. It attributes no decision to anyone, quotes no one, and no trailer or session link appears in any changed file.
+# In NOTES.md the line keyed Q-JPS-11 is rewritten to say what remained open on main, that both fixes are on staging and that both reach main with the next promotion, and one new queue line, Q-JPS-158, records that the earlier vite install removed four packages from node_modules that the lockfile does not name. No source file of the asset tool or the app is changed, no other notes entry is touched, nothing moves main, no decision is attributed to anyone, no one is quoted, and no trailer or session link appears in any changed file.
