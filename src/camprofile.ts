@@ -261,11 +261,19 @@ function times(a: ReadonlyArray<number>, b: ReadonlyArray<number>): number[] {
   return o;
 }
 
+/** A camera's name as this app's own labels write it, for the two bodies the app holds a stock matrix for.
+ *  @param model  the camera's model string as the file spells it (for example NIKON Z 50), or undefined.
+ *  @returns "Nikon D5300" or "Nikon Z 50" when `model` names that body, else null: a different body (a Z 50_2, a Z 6) and an absent model give null, so no camera is ever named wrongly.
+ *  What it must satisfy: it is the one source of the name `stockFor` puts in the stock matrix's name and words and of the name the sentence beside the Profile switch and the second load button carry, so those never spell one body two ways. Consumers: `stockFor`, `noProfileNotice` and `loadButtonWords`. */
+export function cameraLabel(model: string | undefined): "Nikon D5300" | "Nikon Z 50" | null {
+  return /D5300/i.test(model ?? "") ? "Nikon D5300" : /Z ?50\b/i.test(model ?? "") ? "Nikon Z 50" : null;
+}
+
 /** The stock matrix of a body, with the words that name it.
  *  @param model  the camera's model string, or undefined.
  *  @returns the matrix the decoder renders a NEF of that body through (`nikonColorMatrix`), a short name for the option, and the words for the line under the sliders; for a body the app holds no matrix for, the Z 50's, said plainly. */
 function stockFor(model: string | undefined): { name: string; words: string; spec: ColourSpec } | null {
-  const known = /D5300/i.test(model ?? "") ? "Nikon D5300" : /Z ?50\b/i.test(model ?? "") ? "Nikon Z 50" : null;
+  const known = cameraLabel(model);
   const spec = makeColourSpec(nikonColorMatrix(model), undefined, null, undefined);
   if (!spec) return null;
   return known
@@ -344,6 +352,30 @@ export function choicesFor(cam: PhotoCamera, loaded: ReadonlyArray<LoadedProfile
   return out;
 }
 
+/** Which rule of this file's header decided the choice a photograph reads under: the saved one, the held balance's, the reader's last switch for the camera, the profile the file embeds, the start of the pack's pair, the newest loaded profile, the camera's stock matrix, or the only choice there is. */
+export type ProfileRule = "saved" | "held" | "last" | "embedded" | "pair" | "newest" | "stock" | "only";
+
+/** The choice a photograph reads under, and the rule that decided it, by the order in this file's header.
+ *  @param choices  `choicesFor` for the photograph.
+ *  @param saved  the choice saved with the photograph's edit (`EditParams.profile`), or undefined.
+ *  @param held  the choice the held balance was kept under, or null.
+ *  @param last  the choice the reader last switched to for this camera (`lastChoice`), or null.
+ *  @returns `choice`, the chosen entry of `choices`, and `rule`, which rule chose it; both null when `choices` is empty. A token that names nothing now available (a loaded profile since forgotten, or one kept for another body) is passed over to the next rule, never an error.
+ *  What it must satisfy: with two loaded profiles named Infrared Temp -100 and Infrared Temp -50 and nothing else deciding, the -100 is chosen by `pair`; the choice is always one of `choices`; `chooseProfile` returns this function's `choice` and nothing else, so the switch and the report's "in force" words cannot name two different profiles. Consumers: `chooseProfile` and main.ts `balanceProfile`, which hands the rule to the report's Camera profiles row. */
+export function profileRule(choices: ReadonlyArray<ProfileChoice>, saved: string | null | undefined, held: string | null | undefined, last: string | null | undefined): { choice: ProfileChoice | null; rule: ProfileRule | null } {
+  const find = (t: string | null | undefined) => (t ? choices.find((c) => c.token === t) : undefined);
+  const byToken: Array<[ProfileRule, ProfileChoice | undefined]> = [["saved", find(saved)], ["held", find(held)], ["last", find(last)], ["embedded", choices.find((c) => c.kind === "embedded")]];
+  for (const [rule, choice] of byToken) if (choice) return { choice, rule };
+  const loaded = choices.filter((c) => c.kind === "loaded");
+  const start = loaded.find((c) => /infrared temp\s*[-−–]\s*100\b/i.test(c.name));
+  const other = loaded.find((c) => /infrared temp\s*[-−–]\s*50\b/i.test(c.name));
+  if (start && other) return { choice: start, rule: "pair" };
+  if (loaded[0]) return { choice: loaded[0], rule: "newest" };
+  const stock = choices.find((c) => c.kind === "stock");
+  if (stock) return { choice: stock, rule: "stock" };
+  return choices[0] ? { choice: choices[0], rule: "only" } : { choice: null, rule: null };
+}
+
 /** The choice a photograph reads under, by the order in this file's header.
  *  @param choices  `choicesFor` for the photograph.
  *  @param saved  the choice saved with the photograph's edit (`EditParams.profile`), or undefined.
@@ -352,12 +384,57 @@ export function choicesFor(cam: PhotoCamera, loaded: ReadonlyArray<LoadedProfile
  *  @returns the chosen entry of `choices`, or null when `choices` is empty. A token that names nothing now available (a loaded profile since forgotten, or one kept for another body) is passed over to the next rule, never an error.
  *  What it must satisfy: with two loaded profiles named Infrared Temp -100 and Infrared Temp -50 and nothing else deciding, the -100 is chosen; the result is always one of `choices`. */
 export function chooseProfile(choices: ReadonlyArray<ProfileChoice>, saved: string | null | undefined, held: string | null | undefined, last: string | null | undefined): ProfileChoice | null {
-  const find = (t: string | null | undefined) => (t ? choices.find((c) => c.token === t) : undefined);
-  const byRule = find(saved) ?? find(held) ?? find(last) ?? choices.find((c) => c.kind === "embedded");
-  if (byRule) return byRule;
-  const loaded = choices.filter((c) => c.kind === "loaded");
-  const start = loaded.find((c) => /infrared temp\s*[-−–]\s*100\b/i.test(c.name));
-  const other = loaded.find((c) => /infrared temp\s*[-−–]\s*50\b/i.test(c.name));
-  if (start && other) return start;
-  return loaded[0] ?? choices.find((c) => c.kind === "stock") ?? choices[0] ?? null;
+  return profileRule(choices, saved, held, last).choice;
+}
+
+/** The sentence that stands beside the Profile switch while the switch has nothing to change to because this device holds no profile for the photograph's camera.
+ *  @param cam  `photoCamera` for the photograph.
+ *  @param loaded  the profiles loaded for its camera (`loadedFor`).
+ *  @param choices  `choicesFor` for the photograph.
+ *  @returns the sentence, or null when none is due: for a photograph the camera already developed, for a file that names no camera (a loaded profile could never be matched to it), when any profile is loaded for the camera, and when the switch lists two or more choices.
+ *  What it must satisfy: it is non-null only while the switch is switched off (fewer than two choices, the rule in main.ts `updateBalanceUI`) and no loaded profile matches the camera, so the sentence never stands beside a switch that can be changed and a profile loaded for the camera always takes it away; it says the profile is held "here" (an installed app keeps storage of its own, so it never says "on this device"), names the camera as the app's own labels write it (`cameraLabel`: the Nikon Z 50 or the Nikon D5300) and says this photograph's camera for any other body, never as the file's maker field spells it, and says that a profile loaded with the button under it is what the switch offers. Consumer: main.ts `updateBalanceUI`, which shows it with the door's second button. */
+export function noProfileNotice(cam: PhotoCamera, loaded: ReadonlyArray<LoadedProfile>, choices: ReadonlyArray<ProfileChoice>): string | null {
+  if (!cam.isRaw || !cam.keys.length || loaded.length || choices.length >= 2) return null;
+  const label = cameraLabel(cam.model);
+  const who = label ? `the ${label}` : "this photograph's camera";
+  return `No camera profile is held here for ${who}, so this switch has nothing to change to. A profile loaded with the button under this sentence is what it offers.`;
+}
+
+/** The words on the second load button, the one under the sentence beside the Profile switch, which name the photograph's camera.
+ *  @param cam  `photoCamera` for the photograph.
+ *  @returns "Load a profile for the Nikon Z 50" or "Load a profile for the Nikon D5300" for those two bodies (`cameraLabel`), and "Load a profile for this photograph's camera" for any other; no ellipsis, the caller adds it.
+ *  What it must satisfy: it differs from the door's own "Load a camera profile" in its visible words and so in its accessible name, so no two controls on the Basic tab answer to the same name; it names a body only where the app's own labels know it, so no camera is ever named wrongly. Consumer: main.ts `updateBalanceUI`, which sets the button's text while the sentence shows. */
+export function loadButtonWords(cam: PhotoCamera): string {
+  const label = cameraLabel(cam.model);
+  return label ? `Load a profile for the ${label}` : "Load a profile for this photograph's camera";
+}
+
+/** The words for each rule, as the report's Camera profiles row says them. */
+const RULE_WORDS: Record<ProfileRule, string> = {
+  saved: "this photograph's saved switch",
+  held: "the held balance's choice",
+  last: "the last switch made for this camera",
+  embedded: "the profile the file carries",
+  pair: "the default rules, which start a pair of Infrared Temp profiles at -100",
+  newest: "the default rules, which take the newest loaded profile",
+  stock: "the default rules, which fall to the camera's own matrix while no profile is loaded for it",
+  only: "the only choice there is",
+};
+
+/** The report's Camera profiles row: what this device holds for the open photograph's camera, what the file carries, what the switch shows, and which choice is in force and why.
+ *  @param cam  `photoCamera` for the open photograph.
+ *  @param loaded  the profiles loaded for its camera (`loadedFor`).
+ *  @param picked  `profileRule` for the photograph: the choice in force and the rule that chose it.
+ *  @param listed  how many entries the switch lists on the screen now.
+ *  @param off  whether the switch is switched off on the screen now.
+ *  @returns one line of words: the profiles held for this camera by name (at most six, then a count), or that none is held for this camera; whether the file carries a profile of its own and its name; the switch's count and state; and the choice in force with its kind and the rule that chose it.
+ *  What it must satisfy: it names no file and nothing the reader wrote (a profile's own name is the profile file's text, as the Balance row already prints it); with no profile loaded it says "none is held for this camera"; the choice it names is the one `picked` holds, which is the one the switch shows, so a report tells none loaded from one loaded that the switch cannot choose. Consumer: the report's Camera profiles row in main.ts. */
+export function profilesLine(cam: PhotoCamera, loaded: ReadonlyArray<LoadedProfile>, picked: { choice: ProfileChoice | null; rule: ProfileRule | null }, listed: number, off: boolean): string {
+  if (!cam.isRaw) return "none apply; the camera already developed this file, which is read through its own colour space";
+  const names = loaded.map((p) => p.name);
+  const held = names.length ? `${names.length} held for this camera: ${names.slice(0, 6).join(", ")}${names.length > 6 ? ` and ${names.length - 6} more` : ""}` : "none is held for this camera";
+  const own = cam.embedded ? `the file carries its own: ${cam.embedded.name}` : "the file carries none";
+  const sw = `the switch lists ${listed} choice${listed === 1 ? "" : "s"} and is ${off ? "switched off" : "on"}`;
+  const force = picked.choice && picked.rule ? `in force: ${picked.choice.name} (${picked.choice.kind}), by ${RULE_WORDS[picked.rule]}` : "in force: none, no colour matrix could be read from this photograph";
+  return `${held}; ${own}; ${sw}; ${force}`;
 }

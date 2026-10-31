@@ -771,6 +771,18 @@
                  the answer. -->
             <div class="bal-profile" id="balProfileRow">
               <label>Profile <small>the Temperature and Tint are read through it</small> <select id="balProfile"></select></label>
+              <!-- WHY THE SWITCH IS OFF, in words, with the way out beside it. The switch lists a profile only for the photograph's own
+                   camera, so a device that has loaded none for it lists the camera's stock matrix alone and the browser switches the control
+                   off, which a tap cannot tell from a control that is broken. The sentence is script text
+                   (camprofile.ts noProfileNotice), is not a .note so "Explanations off" leaves it, and goes with the button when a profile
+                   for the camera is held. The button opens the same picker as the door below the sliders. Its words name the photograph's
+                   camera as the app's own labels write it (camprofile.ts loadButtonWords, set by main.ts updateBalanceUI), so this button and the
+                   door's, which both open the one picker, never answer to the same name; the words here are the ones for a camera the labels do
+                   not know, shown only until the script sets them. -->
+              <div class="bal-noprof" id="balNoProfile" hidden>
+                <p id="balNoProfileText" class="bal-scale"></p>
+                <button id="profLoadHere" type="button" class="full-btn">Load a profile for this photograph's camera&hellip;</button>
+              </div>
             </div>
             <div class="bal-row" id="balRowT">
               <label>Temperature <small>cooler to warmer</small> <input id="balT" type="range" min="-1862" max="-20" step="1" value="-200" /></label>

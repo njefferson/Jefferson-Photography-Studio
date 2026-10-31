@@ -660,6 +660,9 @@ const balUi = {
   scale: $("balScale") as HTMLElement,
   profile: $("balProfile") as HTMLSelectElement,
   profileRow: $("balProfileRow") as HTMLElement,
+  noProfile: $("balNoProfile") as HTMLElement,
+  noProfileText: $("balNoProfileText") as HTMLElement,
+  loadHere: $("profLoadHere") as HTMLButtonElement,
   door: $("balDoor") as HTMLElement,
   load: $("profLoadBtn") as HTMLButtonElement,
   forget: $("profForgetBtn") as HTMLButtonElement,
@@ -1974,13 +1977,13 @@ function photoCamera(): Prof.PhotoCamera {
 }
 
 /** Every way the open photograph can be read, and the one it is read through now.
- *  Takes nothing. Returns `choices` (what the switch lists) and `choice` (the entry in force, or null when the photograph has no matrix to read through at all).
- *  What it must satisfy: the entry is the one the rules in src/camprofile.ts pick from the photograph's own saved choice (`params.profile`), the held balance's, the reader's last switch for this camera, and what the file and the device offer; it is recomputed from the store each time, so a profile loaded a moment ago is in the list now. */
-function balanceProfile(): { cam: Prof.PhotoCamera; choices: Prof.ProfileChoice[]; choice: Prof.ProfileChoice | null } {
+ *  Takes nothing. Returns `choices` (what the switch lists), `choice` (the entry in force, or null when the photograph has no matrix to read through at all) and `rule` (which rule of src/camprofile.ts chose it, null with it).
+ *  What it must satisfy: the entry is the one the rules in src/camprofile.ts pick from the photograph's own saved choice (`params.profile`), the held balance's, the reader's last switch for this camera, and what the file and the device offer; it is recomputed from the store each time, so a profile loaded a moment ago is in the list now; the entry and the rule come from one call of `Prof.profileRule`, so the switch and the report's Camera profiles row name the same profile. */
+function balanceProfile(): { cam: Prof.PhotoCamera; choices: Prof.ProfileChoice[]; choice: Prof.ProfileChoice | null; rule: Prof.ProfileRule | null } {
   const cam = photoCamera();
   const choices = Prof.choicesFor(cam, Prof.loadedFor(cam.keys));
-  const choice = Prof.chooseProfile(choices, params.profile, current && current.isRaw ? balState.held?.profile : undefined, Prof.lastChoice(cam.keys));
-  return { cam, choices, choice };
+  const { choice, rule } = Prof.profileRule(choices, params.profile, current && current.isRaw ? balState.held?.profile : undefined, Prof.lastChoice(cam.keys));
+  return { cam, choices, choice, rule };
 }
 
 /** Where the Temperature thumb stands for a white. @param mired  the white's inverse temperature. @returns the thumb's value: minus the mired figure rounded to a whole step and held to Adobe's two ends. */
@@ -2055,6 +2058,18 @@ function updateBalanceUI(): void {
   const showProfile = !!current && cam.isRaw && !masked;
   balUi.profileRow.hidden = !showProfile;
   balUi.door.hidden = !showProfile;
+  // WHY THE SWITCH IS OFF, in words, with the door's button beside the words (`Prof.noProfileNotice`): the sentence and the button show while no
+  // profile is held here for this camera and go the moment one is loaded. The button's words name the photograph's camera as the app's own
+  // labels write it (`Prof.loadButtonWords`), so it and the door's button below the sliders never answer to the same name. A button that held
+  // the focus when it went hands it on, so the reader who loaded a profile with it is not left on nothing.
+  const notice = Prof.noProfileNotice(cam, Prof.loadedFor(cam.keys), choices);
+  balUi.noProfileText.textContent = notice ?? "";
+  if (notice) {
+    const loadWords = `${Prof.loadButtonWords(cam)}…`;
+    if (balUi.loadHere.textContent !== loadWords) balUi.loadHere.textContent = loadWords;
+  }
+  balUi.noProfile.hidden = !notice;
+  if (!notice && document.activeElement === balUi.loadHere) (balUi.profile.disabled ? balUi.load : balUi.profile).focus();
   balUi.scale.hidden = masked;
   balUi.forget.hidden = !(choice && choice.kind === "loaded");
   // Beyond the scale's ends the thumb rests at the end and the box reads the figure. Between the scale's cool end and Lightroom's own
@@ -2277,6 +2292,7 @@ async function loadCameraProfiles(files: File[]): Promise<void> {
   toast(parts.slice(0, 2).join(" "), 4200 + parts.length * 1200);
 }
 balUi.load.addEventListener("click", () => openPicker("profFile"));
+balUi.loadHere.addEventListener("click", () => openPicker("profFile"));
 registerPicker("profFile", (files) => { void loadCameraProfiles(files); });
 
 /** The open photograph's balance WITHOUT any look's bias, on the gain sliders' grid.
@@ -5697,6 +5713,14 @@ function heldBalanceLine(): string {
   return `"${h.name}" — red ${h.gains[0].toFixed(4)} · green ${h.gains[1].toFixed(4)} · blue ${h.gains[2].toFixed(4)}, ${say(h.gains)}${through}${h.profile ? `; kept with the choice ${h.profile}` : ""}; every raw opens at it; ${kept} kept; ${now}${dropped}`;
 }
 
+/** THE CAMERA PROFILES, FOR THE REPORT (decision 102): what this device holds for the open photograph's camera, what its file carries, what the switch shows, and which choice is in force and by which rule.
+ *  Takes nothing; reads `balanceProfile()`, the store's list for the camera and the switch as the screen has it (how many entries it lists and whether it is switched off). Returns the words (`Prof.profilesLine`).
+ *  What it must satisfy: the choice it names is the one the switch shows and the Balance row reads through, from one call of `balanceProfile`; with no profile loaded for the camera it says none is held for this camera, so a report tells none loaded from one loaded that the switch cannot choose; it names no file and nothing the reader wrote. Consumer: the report's Camera profiles row. */
+function cameraProfilesLine(): string {
+  const { cam, choice, rule } = balanceProfile();
+  return Prof.profilesLine(cam, Prof.loadedFor(cam.keys), { choice, rule }, balUi.profile.options.length, balUi.profile.disabled);
+}
+
 /** THE OPEN PHOTOGRAPH'S BALANCE AS ADOBE'S SCALE, FOR THE REPORT'S BALANCE ROW (decision 102).
  *  Takes nothing; reads `params.wb`, the screen-side gains while the swap is on (record 104) and the profile in force. Returns a clause such as "reads as 10056 K and tint 30 through Infrared Temp -100 (loaded; this photograph's saved switch)", or "reads as no white" when the gains describe none.
  *  What it must satisfy: the two numbers are the ones the sliders show for the same gains, and the clause names the profile or matrix they go through, which kind it is, and whether the reader's switch saved it with this photograph or the default rules picked it, so a report can be matched to the screen by eye and a figure is never read without its profile. */
@@ -5874,6 +5898,9 @@ function wireVersionMenu() {
       // selection read it. The walk reads these two lines back.
       { k: "Correction order", v: current?.linear ? `on the linear raw at decode, before the balance and the selection — ${current.lensApplied?.gains ? `strength ${current.lensApplied.strength} laid on the pixels` : "nothing laid on the pixels (no profile matched, or the strength is set to 0)"}` : current ? "inside the grade — an 8-bit source has no linear copy to correct first" : "nothing open" },
       { k: "Balance", v: current ? `white balance ${params.wb.map((x) => x.toFixed(4)).join(" · ")} — the balance it opened at (gray-world, or the held one) unless moved since — ${balanceKelvinWords()}` : "nothing open" },
+      // THE CAMERA PROFILES held for the open photograph's camera, the file's own, the switch as it stands and the choice in force with its rule,
+      // so a report tells none loaded from one loaded that cannot be chosen (`cameraProfilesLine`).
+      { k: "Camera profiles", v: current ? cameraProfilesLine() : "nothing open" },
       // THE HELD BALANCE (decision 101): whether raws open at one, which, its name, its gains and its Temperature and Tint, and what the
       // open photograph reads now. The name is the reader's own text, printed on purpose so the report says which balance was held.
       { k: "Held balance", v: heldBalanceLine() },

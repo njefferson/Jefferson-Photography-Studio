@@ -523,8 +523,8 @@ input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
 .bal-profile { margin: 0 0 4px; }
 /* 16px, as the typed boxes beside it are: a smaller control makes iOS zoom the page on focus. */
 .bal-profile select { font: 500 1rem/1.2 var(--ui); }
-.bal-door { margin: 0 0 6px; }
-.bal-door > button { margin: 4px 0; }
+.bal-door, .bal-noprof { margin: 0 0 6px; }
+.bal-door > button, .bal-noprof > button { margin: 4px 0; }
 .bal-hold { margin: 6px 0 4px; }
 .bal-hold > button { margin: 6px 0; }
 /* THE HELD BALANCE'S STANDING LINE (decision 101), in a row of its own under the top bar so every tab and the
