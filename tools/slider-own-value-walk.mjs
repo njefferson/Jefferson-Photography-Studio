@@ -118,13 +118,16 @@ const fingerprint = (p) => p.evaluate(() => {
   return `${c.width}x${c.height}:${x >>> 0}`;
 });
 
-/** Wait until the canvas has not changed for `quiet` ms AND the sky worker has no
- *  request outstanding and has been silent for `quiet` ms. The look's sky map is
+/** Wait until the canvas has not changed for `quiet` ms AND the sky workers have no
+ *  ask outstanding and have been silent for `quiet` ms. The look's sky map is
  *  asked of the worker after a look is pressed and lands seconds later in software
  *  graphics; a canvas that is merely still can be waiting for it, and a read taken
- *  then moves when it lands, which is not the press. A worker that never answers
- *  one request is waited for 60 s at most. Polls synchronous page state, never a
- *  Promise predicate (CLAUDE.md). Returns whether it settled. */
+ *  then moves when it lands, which is not the press. What is outstanding is counted
+ *  in INIT from the asks the workers answer, so the wait ends when the sky has
+ *  landed; it used to count the scene pieces the map lane is sent, which are never
+ *  answered, and ended only after a 60 s silence fallback. If an ask is never
+ *  answered the wait runs to `max`, says so, and returns false. Polls synchronous
+ *  page state, never a Promise predicate (CLAUDE.md). Returns whether it settled. */
 async function settle(p, quiet, max = 300000) {
   const t0 = Date.now();
   let last = "", since = Date.now();
@@ -132,10 +135,11 @@ async function settle(p, quiet, max = 300000) {
     const f = await fingerprint(p);
     if (f !== last) { last = f; since = Date.now(); }
     const w = await p.evaluate(() => ({ out: window.__sky.posted - window.__sky.answered, quiet: performance.now() - window.__sky.last }));
-    const workerStill = (w.out <= 0 && w.quiet >= quiet) || w.quiet >= 60000;
+    const workerStill = w.out <= 0 && w.quiet >= quiet;
     if (workerStill && Date.now() - since >= quiet) return true;
     await p.waitForTimeout(400);
   }
+  note(`(settle gave up after ${max / 1000} s: the canvas or the sky workers never went quiet)`);
   return false;
 }
 
@@ -167,18 +171,31 @@ const moveTo = (p, id, v) => p.evaluate(([id, v]) => {
   return el.value;
 }, [id, v]);
 
-/** Runs in the page before anything else: stamps the moment the sky worker's first
- *  answer is handed back, so the walk reads the picture after the look's sky has
- *  landed and not between the picture and the sky. */
+/** Runs in the page before anything else: counts what the sky workers are ASKED and
+ *  what they ANSWER, for `settle`, so the walk reads the picture after the look's sky
+ *  has landed and not between the picture and the sky. An ask is a selection ask (an `id`
+ *  and no `kind`) or a map ask (`kind: "map"`); the scene, chunk and drop messages
+ *  that feed the map lane are never answered and are not counted. A map ask is
+ *  answered twice when the lane builds a coarse map first (`stage: "coarse"`), and
+ *  only the last answer ends the ask, so a coarse answer is not counted. Only workers
+ *  whose script is sky.worker are wrapped. */
 function INIT() {
-  const M = (window.__sky = { delivered: null, posted: 0, answered: 0, last: performance.now() });
+  const M = (window.__sky = { posted: 0, answered: 0, last: performance.now() });
   const W = window.Worker;
   window.Worker = function (url, opts) {
     const w = new W(url, opts);
     if (/sky\.worker/.test(String(url))) {
       const post = w.postMessage.bind(w);
-      w.postMessage = (...a) => { M.posted++; M.last = performance.now(); return post(...a); };
-      w.addEventListener("message", () => { M.answered++; M.last = performance.now(); if (M.delivered === null) M.delivered = performance.now(); });
+      w.postMessage = (...a) => {
+        const m = a[0];
+        if (m && (m.kind === "map" || (m.kind === undefined && m.id !== undefined))) { M.posted++; M.last = performance.now(); }
+        return post(...a);
+      };
+      w.addEventListener("message", (e) => {
+        const d = e.data;
+        if (d && d.stage === "coarse" && d.failed === undefined) { M.last = performance.now(); return; }
+        M.answered++; M.last = performance.now();
+      });
     }
     return w;
   };
@@ -202,7 +219,11 @@ try {
       await p.waitForFunction(() => !document.getElementById("busy")?.hasAttribute("open"), null, { timeout: 300000 });
       // THE LOOK'S SKY BEFORE ANYTHING IS READ: the picture is up first and the
       // look's sky follows, and a read between the two moves when the sky lands.
-      await p.waitForFunction(() => window.__sky && window.__sky.delivered !== null, null, { timeout: 90000 }).catch(() => {});
+      // That is waited for by `settle`, which counts the asks the sky workers have
+      // been given and the answers they have handed back, here and after each look.
+      // Nothing asks them when a photograph opens (measured on this build: no ask in
+      // the 30 s after an open), so waiting here for a first answer only ran out
+      // its 90 s timeout, once for each frame.
       await settle(p, 4000);
       for (const [id, label] of LOOKS) {
         await p.evaluate((id) => document.getElementById(id).click(), id);

@@ -1,12 +1,16 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=3050be37f58a0665
-diffhash=ee989c1ee3109eb8
-verdict=IN-SCOPE: the six changed files are all in the step 259 Files list, and the diff is the route step 259 took, a sentence and a load button beside the Profile switch while no profile is held, with the report's Camera profiles row and the notes, and nothing beyond it.
-# IN-SCOPE: the six changed files are all in the step 259 Files list, and the diff is the route step 259 took, a sentence and a load button beside the Profile switch while no profile is held, with the report's Camera profiles row and the notes, and nothing beyond it.
+planhash=2fe403b2c7137347
+diffhash=fd6711165ae05c38
+verdict=IN-SCOPE: NOTES.md gains the queue lines Q-JPS-158 (rewritten) to Q-JPS-186 and the sweep paragraph that step 265 names, CLAUDE.md gains the walks bullet that step 265 names, and tools/slider-own-value-walk.mjs carries only the wait change that step 262 names, so every changed file is one the approved plan lists for steps 262 and 265.
+# IN-SCOPE: NOTES.md gains the queue lines Q-JPS-158 (rewritten) to Q-JPS-186 and the sweep paragraph that step 265 names, CLAUDE.md gains the walks bullet that step 265 names, and tools/slider-own-value-walk.mjs carries only the wait change that step 262 names, so every changed file is one the approved plan lists for steps 262 and 265.
 # 
-# The working copy has six changed paths: NOTES.md, docs/ARCHITECTURE.md, ir.html, src/camprofile.ts, src/main.ts and src/style.css. Each is in the Files list for step 259. The scope record, .plan-scope, changes only through this record, and .claude/PLAN is untracked and not listed by git.
+# Judged against the approved plan, its steps 262 and 265, and the owner's messages as the check printed them (read, not copied): those messages ask that the work go ahead without waiting on a decision, and this diff is that work.
 # 
-# In ir.html the change is one hidden block under the Profile switch's label: a sentence paragraph and a button that opens the same picker as the door below the sliders. In src/camprofile.ts it is the sentence (noProfileNotice), the button's words (loadButtonWords), the camera's name (cameraLabel), the rule order moved into profileRule, with chooseProfile returning that rule's choice unchanged, and the report's row words (profilesLine), each with its contract above it. In src/main.ts it is the new button's handles and click, the show, hide and focus hand-off in updateBalanceUI, the rule returned from balanceProfile, and the Camera profiles row of the copied report, placed between Balance and Held balance. In src/style.css the two door margin rules also match the new block. In docs/ARCHITECTURE.md only the two line counts of the module map change. In NOTES.md one entry is added at the head of the staging section, the queue lines Q-JPS-156 and Q-JPS-157 are removed, and a clause in the 2.69 entry that cited them now points at the new entry.
+# NOTES.md: one line rewritten (Q-JPS-158, the review sweep's installs made with no save) and 28 queue lines, Q-JPS-159 to Q-JPS-186, for the walk reds, the research of step 264, the findings the plan names and the findings of steps 262 and 264; and one paragraph dated 31 October 2026 at the end of the section The sweep is fifteen walks and one command now. Nothing else in NOTES.md changed.
 # 
-# Nothing beyond the route is changed. The switch's own select and its change handler are untouched, no other control of the Basic tab moves, and no file outside the six is changed. No camera profile file is written into the repository, no trailer or session link appears in any changed file, and no decision is attributed to anyone.
+# CLAUDE.md: one bullet at the end of the section Verify before claiming fixed, naming the thirty-three walks that run in the container and the twenty-one picture walks that are left to the device and to a machine with a graphics chip, with the reason in one sentence.
+# 
+# tools/slider-own-value-walk.mjs: only the settle, the counting in INIT and the removed first-answer wait, with their comments, as step 262 describes; no assertion, bar, count, frame, control or plant changed, and the one printed line added to settle is a note, not a check.
+# 
+# Two places where the queue lines depart from the step's wording are stated in the step's report and not made into changes elsewhere: Q-JPS-159 leaves open what record 104 does not settle, and no line is written for a host held after a 404, because no report of steps 262 to 264 records one. Neither adds a file or a change outside the step.
