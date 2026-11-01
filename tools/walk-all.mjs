@@ -87,7 +87,20 @@ for (const r of bad) {
     for (let j = from; j <= i; j++) console.log("  " + lines[j]);
     last = i;
   }
+  // THE VERDICT LINE, WHATEVER WORDS IT CARRIES (step 271). Only lines with FAIL, Error or error in them were kept, so a walk whose verdict reads "4 failed" or
+  // "61 control(s) to answer for" lost it from this account of its failure. A walk's last line is its verdict, so it is printed in full here unless a block above
+  // already printed it, and a walk that printed nothing says so.
+  let lastAt = lines.length - 1;
+  while (lastAt >= 0 && lines[lastAt].trim() === "") lastAt--;
+  if (lastAt < 0) console.log("  verdict: (no output)");
+  else if (lastAt > last) {
+    if (lastAt > last + 1) console.log("  ...");
+    console.log("  verdict: " + lines[lastAt].trim());
+  }
 }
 const total = (results.reduce((n, r) => n + r.ms, 0) / 1000).toFixed(0);
 console.log(bad.length ? `\n${bad.length} of ${results.length} failed (${total}s)\n` : `\nall ${results.length} walks passed (${total}s)\n`);
-process.exit(bad.length ? 1 : 0);
+// THE EXIT WAITS FOR WHAT WAS PRINTED (step 271): `process.exit` ends the process at once and a pipe is written to asynchronously, so the failure detail above could
+// be cut short for whoever read this through one. The code is set and the output says when its queue is empty before the process ends.
+process.exitCode = bad.length ? 1 : 0;
+process.stdout.write("", () => process.exit());

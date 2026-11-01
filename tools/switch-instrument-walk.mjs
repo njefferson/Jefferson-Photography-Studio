@@ -24,6 +24,11 @@
 //                                           (from outside, in the page) must land
 //                                           in the selection's wait, and nowhere in
 //                                           the switch's own parts
+//   node switch-instrument.mjs --plant-parse — check 13 is read from the look's sky
+//                                           line with the sky map part spoiled, and
+//                                           must FAIL
+//   node switch-instrument.mjs --plant-whole — check 9 reads the reported whole 200 ms
+//                                           longer than the line says, and must FAIL
 // Needs dist/ served on :8131.
 //
 // THE LOOK'S SKY IS PART OF THE LINE NOW (the open-and-strip plan, step 4). The
@@ -57,6 +62,11 @@ const unit = (txt) => (txt === null || txt === undefined ? 0 : /ms\b/.test(txt) 
 const sleep = (n) => new Promise((r) => setTimeout(r, n));
 
 const PLANT_SKY = process.argv.includes("--plant-sky");
+// --plant-parse: check 13 is handed the look's sky line with its sky map part spoiled, so it has to FAIL; it shows the parse still refuses a line whose later
+// parts do not parse, now that "none asked for" is one it accepts. Everything else in the run reads the real report.
+const PLANT_PARSE = process.argv.includes("--plant-parse");
+// --plant-whole: check 9 reads the reported whole 200 ms longer than the line says, so it has to FAIL; it shows the rounding allowance did not take the bound away.
+const PLANT_WHOLE = process.argv.includes("--plant-whole");
 // THIRTY SECONDS, because a short hold does not discriminate: in this container
 // the unplanted selection already waits five to twelve seconds (the page, three
 // decode lanes and a software rasteriser share the cores), so a hold of three
@@ -205,8 +215,15 @@ try {
   console.log(`        showing's six parts ${phSum.toFixed(0)} ms vs ${showing.toFixed(0)} ms — ${phGap.toFixed(0)} ms, ${(phDrift*100).toFixed(1)}% (allowed ${phAllow.toFixed(0)} ms)`);
   check("8 showing's own six parts add up to showing, within rounding", phGap <= phAllow, true);
 
-  console.log(`        outside the call ${outside} ms, reported ${total.toFixed(0)} ms`);
-  check("9 the reported whole fits inside the time actually spent", total <= outside + 5, true);
+  // THE REPORT PRINTS A TIME ABOVE A SECOND IN TENTHS OF A SECOND ("1.8s"), so the whole it reports can sit up to half a tenth, 50 ms, above the true one. The bound here was
+  // 5 ms, a number the printed text cannot support, and it failed whenever the rounding went up: "outside the call 2486 ms, reported 2500 ms" and "outside the call 1776 ms,
+  // reported 1800 ms" on two runs of step 271. It makes the allowance checks 11 and 15 make for the same reason (`unit`): half the printed text's last digit, 0.5 ms for a
+  // time printed in milliseconds. --plant-whole reads the whole 200 ms longer than the line says, which has to fail.
+  const totalTxt = (line.match(/MP in ([\d.]+\s*(?:ms|s))/) || [])[1] ?? null;
+  const totalRead = PLANT_WHOLE ? total + 200 : total;
+  if (PLANT_WHOLE) console.log(`\n        PLANTED RUN — check 9 reads the reported whole as ${totalRead.toFixed(0)} ms, 200 ms more than the line says`);
+  console.log(`        outside the call ${outside} ms, reported ${totalRead.toFixed(0)} ms (printed ${totalTxt}, allowed ${unit(totalTxt)} ms for its rounding)`);
+  check("9 the reported whole fits inside the time actually spent", totalRead <= outside + 5 + unit(totalTxt), true);
 
   // --- SETTLING'S TWO PARTS: the lift's first solve is inside it -------------------------------------------
   // The first visit solves the lift once, without the sky if the sky is still on its
@@ -243,7 +260,9 @@ try {
       : /^selection had not arrived/.test(txt) ? "left" : "?";
     const waitTxt = how === "worker" ? first(new RegExp(`waited ${NUM}`), txt) : how === "none" ? first(new RegExp(`after waiting ${NUM}`), txt) : null;
     const liftTxt = first(/second lift solve (none made|[\d.]+\s*(?:ms|s))/, txt);
-    const mapTxt = first(/sky map (none built yet|[\d.]+\s*(?:ms|s))/, txt);
+    // THREE WORDINGS OF THE MAP PART, as src/main.ts switchSplit prints them: a time, "none built yet" (a map was asked for and has not landed) and, since the
+    // 2026-10-19 commit that made the report name why the stage ran, "none asked for" (nothing wanted one). Anything else is not a map part and does not parse.
+    const mapTxt = first(/sky map (none built yet|none asked for|[\d.]+\s*(?:ms|s))/, txt);
     const val = (t) => (t === null || /^none/.test(t) ? null : ms(t));
     return { how, waitTxt, wait: how === "held" ? 0 : waitTxt === null ? null : ms(waitTxt), liftTxt, lift: val(liftTxt), mapTxt, map: val(mapTxt) };
   };
@@ -261,8 +280,10 @@ try {
   const settledAt = Date.now();
   const skyLine = fieldOf(rep, "Last switch");
   console.log(`\n        the look's sky, as last read: ${skyOf(skyLine)}`);
+  const sky13 = PLANT_PARSE ? skyState(skyOf(skyLine).replace("sky map ", "sky mop ")) : sky;
+  if (PLANT_PARSE) console.log(`\n        PLANTED RUN — check 13 is read from the sky line with "sky map " changed to "sky mop ": ${skyOf(skyLine).replace("sky map ", "sky mop ").slice(0, 120)}`);
   check("13 the look's sky is on the line, says how the selection arrived, and its later two parts parse",
-    ["worker", "held", "page", "none"].includes(sky.how) && sky.liftTxt !== null && sky.mapTxt !== null, true);
+    ["worker", "held", "page", "none"].includes(sky13.how) && sky13.liftTxt !== null && sky13.mapTxt !== null, true);
   check("14 the selection came from the sky worker and not from the page", sky.how === "worker" || sky.how === "held", true);
   const skySum = (sky.wait ?? 0) + (sky.lift ?? 0) + (sky.map ?? 0);
   const skyAllow = unit(sky.waitTxt) + unit(sky.liftTxt) + unit(sky.mapTxt) + 5;

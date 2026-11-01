@@ -60,6 +60,20 @@
 //
 //   --shot=PATH writes arm 8's during-the-hold screenshot there, to be OPENED.
 //
+//   --plant=wait runs arm 8b's own claim against a build that DOES wait: the
+//   practice pictures never answer and the browser offers no way to build off
+//   the page, which is the situation arm 8c measures at two seconds. Arm 8b's
+//   two checks must then fail ("every one is still lazy", and "the build does
+//   not wait for them"), which is what shows they can.
+//
+// ARM 8b READS THE FIRST LINK, NOT THE LAST (step 271). The app links two big
+// programs when the browser builds off the page: the mask-free one the editor
+// opens on, and, ten milliseconds after that one is let go, the full one with
+// the mask loops (src/main.ts, the timer that calls renderer.startMasks). The
+// fake in tools/slow-build.mjs overwrites its linkAt at every big link, so a
+// read after the release saw the second link, 3092 ms and 182 frames after the
+// words, and called the build late. `keepFirstLink` below keeps the first.
+//
 // SEEN FAILING against the build before this change (the synchronous one),
 // which is the only thing that makes a pass here mean anything.
 import { chromium } from "playwright-core";
@@ -82,6 +96,7 @@ const PHONE = { viewport: { width: 402, height: 812 }, deviceScaleFactor: 2, isM
 // Arms 8 to 8c check that it is, rather than trusting this comment.
 const PC = { viewport: { width: 1280, height: 1100 }, deviceScaleFactor: 1 };
 const SHOT = arg("shot", "");
+const PLANT = arg("plant", "");
 const TILES_WAIT_MS = 2000; // src/main.ts, decision 086
 
 let failed = 0;
@@ -99,6 +114,7 @@ async function open(ctx, cfg, record, extra) {
   // before the app's own code reads it.
   if (record) await p.addInitScript((r) => { try { localStorage.setItem("ips-graphics-built", r); } catch { /* the arm's checks say so */ } }, record);
   await p.addInitScript(slowBuild, cfg);
+  await p.addInitScript(keepFirstLink);
   if (extra) await p.addInitScript(extra);
   await p.goto(PAGE, { waitUntil: "commit" });
   await p.waitForSelector("#welcomeWhat", { state: "attached", timeout: 60000 });
@@ -182,6 +198,29 @@ function watchPictures() {
       }
     }
     return inner.call(this, prog, pname);
+  };
+}
+
+/** THE FIRST BIG LINK, KEPT (step 271). Takes nothing; returns nothing. Installed
+ *  with `addInitScript` AFTER `slowBuild`, so it wraps that fake's linkProgram:
+ *  when a call made the fake move `window.__bw.linkAt` (a program with a shader
+ *  over 20000 characters was linked) and no first link is held yet, it keeps
+ *  `window.__bw.first = { at, frame }` and never writes it again.
+ *
+ *  What callers rely on: `slowBuild` overwrites `linkAt` and `linkFrame` at every
+ *  big link, and the app links a second big program (the full one with the mask
+ *  loops) right after the first is let go, so a walk that reads `linkAt` after
+ *  the release reads that second link. `first` is the link the claims are about.
+ *  Self-contained, like `slowBuild`, since Playwright serialises it into the page. */
+function keepFirstLink() {
+  const P = WebGL2RenderingContext.prototype;
+  const inner = P.linkProgram;
+  P.linkProgram = function (prog) {
+    const bw = window.__bw;
+    const before = bw ? bw.linkAt : 0;
+    const r = inner.call(this, prog);
+    if (bw && !bw.first && bw.linkAt > 0 && bw.linkAt !== before) bw.first = { at: bw.linkAt, frame: bw.linkFrame };
+    return r;
   };
 }
 
@@ -501,7 +540,14 @@ try {
   console.log("\n8b — the same size, cold, on a browser that builds off the page");
   {
     const ctx = await browser.newContext(PC);
-    const p = await open(ctx, { delay: 3000, par: true });
+    // --plant=wait: the situation of arm 8c (pictures that never answer, no way
+    // to build off the page), so the two checks below have a build that waits to
+    // fail on. Without the flag this is the browser the arm is about.
+    if (PLANT === "wait") {
+      console.log("      PLANTED RUN — arm 8b against a build that waits: the pictures never answer and the browser offers no way to build off the page; the two checks below must fail");
+      await ctx.route("**/examples/gallery/thumbs/**", () => {});
+    }
+    const p = await open(ctx, { delay: 3000, par: PLANT !== "wait" });
     await released(p);
     await p.waitForTimeout(300);
     const s = await seen(p);
@@ -510,9 +556,13 @@ try {
     check("nothing about the practice pictures changes: every one is still lazy",
       modes.length > 0 && modes.every((m) => m === "lazy"),
       `${modes.filter((m) => m === "lazy").length} of ${modes.length} lazy`);
+    // THE FIRST LINK (`keepFirstLink`), not `linkAt`, which the app's second big
+    // link overwrites ten milliseconds after the build is let go. The bar is
+    // what it was: under 500 ms and two frames or more.
+    const first = s.first;
     check("and the build does not wait for them: two frames after the words, no more",
-      !!w && s.linkAt - w[1] < 500 && s.linkFrame - w[2] >= 2,
-      w ? `the link ${ms(s.linkAt - w[1])} and ${s.linkFrame - w[2]} frames after the words` : "the words were never written");
+      !!w && !!first && first.at - w[1] < 500 && first.frame - w[2] >= 2,
+      !w ? "the words were never written" : !first ? "no big link was recorded" : `the first link ${ms(first.at - w[1])} and ${first.frame - w[2]} frames after the words`);
     // THE OTHER HALF OF THE CONTROL: the same boxes once their pictures are in.
     await p.waitForFunction(() => {
       const c = document.getElementById("welcome").getBoundingClientRect();

@@ -69,6 +69,9 @@ const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131"
 // knows what exists. Without it, everything runs, as before.
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").split("=")[1]?.split(",").map(Number).filter((n) => !Number.isNaN(n));
 const want = (n) => !ONLY || !ONLY.length || ONLY.includes(n);
+// `--plant-temperature` (with `--only=12`) makes a Temperature press move nothing: the slider's input and change events are stopped before the app sees them. Every
+// Temperature check in section 12 has to FAIL on it, which is what shows they can.
+const PLANT_TEMPERATURE = process.argv.includes("--plant-temperature");
 const BASE = `http://127.0.0.1:${PORT}`;
 const axeSrc = readFileSync(join(repo, "node_modules/axe-core/axe.min.js"), "utf8");
 const EX = join(repo, "public/examples");
@@ -1155,10 +1158,34 @@ try {
     const exitAt = html.indexOf('<button id="balBack"');
     if (stripAt > 0 && stageAt > stripAt && panelAt > stageAt && sentenceAt > stripAt && exitAt > sentenceAt && exitAt < stageAt) ok("the standing strip is in the page as served before the stage and the panel, hidden, and holds the sentence and then the exit");
     else fail(`the standing strip in the page as served: strip at ${stripAt}, sentence at ${sentenceAt}, exit at ${exitAt}, stage at ${stageAt}, panel at ${panelAt}`);
+    /** WHAT FIVE STEPS OF THE TEMPERATURE SLIDER TO THE RIGHT HAVE TO DO, by the route the swap decides (record 104). Takes `where` (the state's label), `swapOn` (whether the
+     *  red and blue swap is on), the three gain slider positions before and after (`g0`, `g1`), and the two boxes before and after (`b0`, `b1`, each with `kelvin`). Prints one
+     *  ok or FAIL line; returns nothing.
+     *  SWAP OFF: the camera-space gains move, red goes up against blue and the sum of the three track positions (the gains' geometric mean, the picture's overall level) stays. The
+     *  gains move on whole positions of a 1300-step track and five steps of the thumb are a few mired, so the first run of this section (step 208) read red up by one, green down
+     *  by one and blue where it was (585/674/726 to 586/673/726): red minus blue is what is read, and it has to grow while the sum stays.
+     *  SWAP ON: the move goes to the screen-side gains (`params.wbScreen`), which no control holds, so it is read in two parts that only the screen-side gains can satisfy
+     *  together: the camera-space positions are EXACTLY what they were, and the white the box names (the white of both sets of gains) is five mired warmer. The thumb is one
+     *  step to a mired, and the boxes are whole kelvin, so the allowance is one mired plus what rounding each box to a kelvin can hide at that white. A press that moved nothing
+     *  fails both parts, and so does a press that moved the camera-space gains with the swap on. */
+    const judgeWarmer = (where, swapOn, g0, g1, b0, b1) => {
+      const sum = (g) => g[0] + g[1] + g[2];
+      if (swapOn) {
+        const by = 1e6 / b0.kelvin - 1e6 / b1.kelvin;
+        const tol = 1 + 0.5e6 / (b0.kelvin * b0.kelvin) + 0.5e6 / (b1.kelvin * b1.kelvin);
+        if (g1.join("/") === g0.join("/") && Math.abs(by - 5) <= tol) ok(`${where} with the swap on, Temperature +5 steps warmer left the camera gains at ${g0.join("/")} and moved the white ${by.toFixed(1)} mired warmer (${b0.kelvin} K to ${b1.kelvin} K), so the move went to the screen-side gains`);
+        else fail(`${where} with the swap on, Temperature +5 moved the camera gains ${g0.join("/")} to ${g1.join("/")} and the white ${by.toFixed(1)} mired warmer (${b0.kelvin} K to ${b1.kelvin} K); the gains should not move and the white should move 5 mired, within ${tol.toFixed(1)}`);
+      } else {
+        const r0 = g0[0] - g0[2], r1 = g1[0] - g1[2];
+        if (r1 > r0 && sum(g1) === sum(g0)) ok(`${where} with the swap off, Temperature +5 steps warmer put red up against blue (red minus blue ${r0} to ${r1}, gains ${g0.join("/")} to ${g1.join("/")}); the three positions still sum to ${sum(g1)}`);
+        else fail(`${where} with the swap off, Temperature +5 moved the gains ${g0.join("/")} to ${g1.join("/")} (red minus blue ${r0} to ${r1}, sum ${sum(g0)} to ${sum(g1)})`);
+      }
+    };
     for (const theme of THEMES) for (const size of SIZES) {
       const where = `[${theme} ${size.name}]`;
       const page = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
       page.on("dialog", (d) => d.accept());
+      if (PLANT_TEMPERATURE) await page.addInitScript(() => { for (const type of ["input", "change"]) window.addEventListener(type, (e) => { if (e.target && e.target.id === "balT") e.stopImmediatePropagation(); }, true); });
       const press = (sel) => (size.name === "phone" ? page.tap(sel) : page.click(sel));
       try {
         await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
@@ -1243,22 +1270,23 @@ try {
         else fail(`${where} the line under the sliders reads "${prof.line}" for the selected "${prof.selected}" (a note ${prof.lineIsNote}, shown ${prof.lineShown})`);
         if (prof.forgetHidden) ok(`${where} the forget button is hidden while the profile in force is not one the reader loaded`); else fail(`${where} the forget button shows for a profile the reader did not load`);
         // 3 — one state, and in kelvin (record 102): five steps of the Temperature slider to the right are a warmer white, so red goes up
-        // against blue, the sum of the three track positions (the gains' geometric mean, the picture's overall level) stays where it
-        // was, the typed Kelvin box reads a higher number, the thumb says its reading in words, and Tint keeps its reading to within the
-        // grid.
+        // against blue (swap off), or the screen-side gains move by five mired and the camera-space gains stay (swap on, record 104); the typed
+        // Kelvin box reads a higher number, the thumb says its reading in words, and Tint keeps its reading to within the grid.
         const boxesNow = () => page.evaluate(() => ({ kelvin: Number(document.getElementById("balTNum").value), tint: Number(document.getElementById("balTiNum").value), valuetext: document.getElementById("balT").getAttribute("aria-valuetext") ?? "", tintText: document.getElementById("balTi").getAttribute("aria-valuetext") ?? "" }));
+        // THE PRESS IS JUDGED BY THE ROUTE THE SWAP DECIDES (record 104, `judgeWarmer` above the loop): with the swap off it moves the camera-space
+        // gains, with the swap on, which is how a raw opens, it moves the screen-side gains and leaves the camera-space ones exactly where they were.
+        // Step 7 below takes the other route too, so both are read in every state.
+        const swapPressed = () => page.evaluate(() => document.getElementById("swapBtn")?.getAttribute("aria-pressed") === "true");
+        const warmer = async () => {
+          await page.evaluate(() => { const el = document.getElementById("balT"); el.value = String(Number(el.value) + 5); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
+          await page.waitForTimeout(300);
+        };
+        const swapOn = await swapPressed();
         const before = await boxesNow();
-        await page.evaluate(() => { const el = document.getElementById("balT"); el.value = String(Number(el.value) + 5); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
-        await page.waitForTimeout(300);
+        await warmer();
         const moved = await gains();
         const typed = await boxesNow();
-        // THE GAINS MOVE ON WHOLE POSITIONS OF A 1300-STEP TRACK. Five steps of the thumb are about six mired, which at this white is one
-        // position: the first run of this section (step 208) read red up by one, green down by one and blue where it was, 585/674/726 to
-        // 586/673/726. The claim is red against blue, so that is what is read: red minus blue has to grow and the sum has to stay.
-        const sumOpened = opened[0] + opened[1] + opened[2], sumMoved = moved[0] + moved[1] + moved[2];
-        const riseOpened = opened[0] - opened[2], riseMoved = moved[0] - moved[2];
-        if (riseMoved > riseOpened && sumMoved === sumOpened) ok(`${where} Temperature +5 steps warmer put red up against blue (red minus blue ${riseOpened} to ${riseMoved}, gains ${opened.join("/")} to ${moved.join("/")}); the three positions still sum to ${sumMoved}`);
-        else fail(`${where} Temperature +5 moved the gains ${opened.join("/")} to ${moved.join("/")} (red minus blue ${riseOpened} to ${riseMoved}, sum ${sumOpened} to ${sumMoved})`);
+        judgeWarmer(where, swapOn, opened, moved, before, typed);
         if (Number.isFinite(before.kelvin) && typed.kelvin > before.kelvin) ok(`${where} the typed Temperature box follows the gains in kelvin (${before.kelvin} to ${typed.kelvin})`); else fail(`${where} the typed Temperature box reads ${typed.kelvin} after reading ${before.kelvin}; five steps warmer should read higher`);
         if (typed.valuetext === `${typed.kelvin} kelvin` && /^tint -?\d+$/.test(typed.tintText)) ok(`${where} the thumbs say their readings in words ("${typed.valuetext}", "${typed.tintText}")`); else fail(`${where} the thumbs' spoken values are "${typed.valuetext}" and "${typed.tintText}", the boxes read ${typed.kelvin} and ${typed.tint}`);
         if (Math.abs(typed.tint - before.tint) <= 2) ok(`${where} Tint kept its reading while Temperature moved (${before.tint} to ${typed.tint})`); else fail(`${where} Temperature moved Tint from ${before.tint} to ${typed.tint}`);
@@ -1349,6 +1377,18 @@ try {
         const forget = await page.evaluate(() => { const b = document.querySelector('#balKept button.mask-del'); if (!b) return null; const name = b.getAttribute("aria-label"); b.click(); return name; });
         const listGone = await page.waitForFunction(() => document.getElementById("balKeptRow").hidden, null, { timeout: 5000 }).then(() => true).catch(() => false);
         if (forget && /^Forget /.test(forget) && listGone) ok(`${where} the kept row's forget button ("${forget}") empties the list`); else fail(`${where} forgetting the kept balance: button "${forget}", list hidden ${listGone}`);
+        // 7 — THE OTHER ROUTE (record 104). The press in step 3 took the route the page opened on. The swap button is pressed once, now that the hold is over and the gains
+        // stand at the balance the photograph opened at, so the same press is judged by the other claim too: both routes are read in every theme and shape.
+        const swapBefore = await swapPressed();
+        await page.evaluate(() => document.getElementById("swapBtn")?.click());
+        await page.waitForTimeout(300);
+        const swapNow = await swapPressed();
+        if (swapNow === swapBefore) fail(`${where} the swap button did not change its state (pressed ${swapBefore})`);
+        else {
+          const g0 = await gains(), b0 = await boxesNow();
+          await warmer();
+          judgeWarmer(`${where} (the other route)`, swapNow, g0, await gains(), b0, await boxesNow());
+        }
       } finally { await page.close(); }
     }
   }

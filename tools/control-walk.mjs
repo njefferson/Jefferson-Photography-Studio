@@ -952,4 +952,9 @@ if (allow.size) {
 // too. Read from `dist/`, not the source tree, for the same reason surfaces.mjs
 // does — a page can be generated at build time.
 console.log(failed ? `\n  ${failed} control(s) to answer for\n` : `\n  every control says what it does, in words the reader can see\n`);
-process.exit(failed ? 1 : 0);
+// THE EXIT WAITS FOR WHAT WAS PRINTED (step 271). The inventory above and the verdict on this line are one run of console.log calls with no turn of the event loop
+// between them, and `process.exit` ends the process at once. A pipe (walk-all's, a runner's) is written to asynchronously on Linux, so whatever the reader had not
+// yet taken was dropped: the output stopped inside the inventory at a different row each run, with exit code 1 and neither a verdict nor an error. The code is set,
+// the output is asked to say when its queue is empty, and only then does the process end, with the same code as before.
+process.exitCode = failed ? 1 : 0;
+process.stdout.write("", () => process.exit());
