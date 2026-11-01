@@ -1,16 +1,8 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=2fe403b2c7137347
-diffhash=82f3b0ec08b9495c
-verdict=IN-SCOPE: the diff is NOTES.md and the decision records 102, 103 and 104, which are the four files step 267 names, and every change in them is one that step lists: an Outcome section in each record, a What survives paragraph and an Audited line in each of the three roadmap bullets, which stay open, the Production paragraph of 31 October, the headings of the staging entries, and the removal of the Q-JPS-11 line.
-# IN-SCOPE: the diff is NOTES.md and the decision records 102, 103 and 104, which are the four files step 267 names, and every change in them is one that step lists: an Outcome section in each record, a What survives paragraph and an Audited line in each of the three roadmap bullets, which stay open, the Production paragraph of 31 October, the headings of the staging entries, and the removal of the Q-JPS-11 line.
+planhash=8fccb829d2a4861f
+diffhash=c0f22e42e7a14fd9
+verdict=IN-SCOPE: the diff is the notes and the three decision records of steps 270 and 272, each path named in the plan's Files list for those steps, with the walk files of step 271 left for the walks commit, and no src file or other path is in it.
+# IN-SCOPE: the diff is the notes and the three decision records of steps 270 and 272, each path named in the plan's Files list for those steps, with the walk files of step 271 left for the walks commit, and no src file or other path is in it.
 # 
-# Judged against the approved plan, its step 267, and the owner's messages as the check printed them (read, not copied): those messages ask that the plan run to its end without waiting on a decision, and this diff is the plan's last step doing its named work.
-# 
-# Records 102, 103 and 104: one section headed Outcome appended to the end of each, dated 31 October 2026, saying what was built and where by file, what was verified headless, what turned out wrong so far as the staging entries record it, and that the device pass is still owed. No other line of the three records changed.
-# 
-# NOTES.md, the roadmap: each of the three bullets gains a What survives paragraph and an Audited line and stays open. The paragraph is not named in the step text; it is added because the decisions check refuses an open item whose record has an Outcome and whose bullet does not say what survives, and because the 24 October commit gave its kept-open items the same paragraph. The check was run before the paragraphs and failed on exactly these three bullets, and after them it passes.
-# 
-# NOTES.md, the staging section: the sentence saying nothing in an entry is on production is rewritten in the entries of 31, 29 and 27 October and in the tail of the 2.67 entry, and a sentence saying the entry is on production since 31 October 2026 and which device pass it still owes is added to the headings of the entries of 28 October, 27 October and 24 October. The entry of 18 October that says it is not yet on a device is on production since 19 October and was left as it is. A Production paragraph is added after the one of 30 October, and the Q-JPS-11 line is removed, its state carried into that paragraph.
-# 
-# Nothing in src, tools, CLAUDE.md or any other record changed.
+# Judged by this agent against the plan by its path and the diff as git status lists it: NOTES.md (the step 272 sentences on the 18 October Aerochrome heading, the Q-JPS-159 to Q-JPS-197 queue lines and the 31 October 2026 paragraph of the sweep section, all the sentences the plan's stage 1 names, with one wording deviation for Q-JPS-186 recorded in the step 272 report); CLAUDE.md (the step 270 clause, already in the plan's Files); docs/decisions/105, 106 and 107 (the step 270 records, new, in the plan's Files). Nothing in src/, package.json, package-lock.json or any tools/ file is in this commit. The walk files changed in step 271 are not staged here and go in the walks commit of stage 3. The plan's approval and its go-words are the only instructions the diff serves, and it adds nothing beyond the plan's steps 270 and 272.
