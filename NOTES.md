@@ -2356,6 +2356,10 @@ Q-JPS-196: tools/switch-instrument-walk.mjs check 9 was a repeatable red on a ro
 Q-JPS-197: tools/build-wait-walk.mjs arm 2's check that the page stayed free failed once in the three unplanted runs of step 271, with a longest pause of 750 ms in a 6 s build, and did not repeat in the runs after; read as a stall of the machine during that run, and not changed (step 271).
 Q-JPS-198: 36 tool files outside the twenty-one picture walks still carry the container's paths, 77 lines in all (the browser's path, the software flags, the checkout's absolute path, a temporary folder); they take their launch lines from tools/launch.mjs only when record 083's housekeeping does the sweep, so no structural walk's launch lines changed in step 279.
 Q-JPS-199: the test page's picture checks print no time for each stage, show no progress while they run, and may decode the practice photograph or compile the picture code more than once per press, which a run on the PC made slow; folded into the next plan that touches the test page, the first look change, under record 106 (step 284). Put right by the plan of 3 November in its step 288.
+Q-JPS-200: the first run of a picture-checks press pays a one-time warm-up (23.2 s for the baseline and planted move against about 5.9 s in the later runs under software drawing) that the median hides and the run list shows; recorded under record 106 for the plan that next touches the test page (step 288).
+Q-JPS-201: the planted colour stage of a picture-checks press (1.9 s) carries the picture code's first draw, so that stage's time is not the planted colour's alone; recorded under record 106 (step 288).
+Q-JPS-202: no accessibility state samples the picture-checks progress line or its stage rows while a press is running, and the walk reaches the element without reading it in a running state; recorded under record 106 (step 289).
+Q-JPS-203: the press's drawing surface (`openDrawing` in `src/debug.ts`) repeats the calls `drawFrame` makes instead of calling it, so a later change to `drawFrame` would not reach the picture checks; recorded under record 106 (step 289).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -3059,6 +3063,21 @@ user-scalable=no.
   byte hash across devices, porting the walks and trusting a canvas read. It is the only
   instrument that reaches the iPad. See
   `docs/decisions/106-the-picture-checks-run-on-the-device-from-a-test-page.md`.
+
+- [ ] **The picture checks run on a photograph you choose** <!-- decision: 108 -->
+  **Shown as:** The test page will run its picture checks on a photograph you pick, and its report will name the file beside the figures.
+  Researched on 4 November 2026 and not built. The checks run on the bundled practice
+  photograph, which carries no camera data, so what they print says nothing of the picture the
+  owner's camera makes. Chosen: a control in the picture checks section that takes one
+  photograph the reader picks, runs the same three checks on it, and prints the file's name, its
+  camera and lens, its size and the figures; a session then fetches the same file from the
+  shared folders through `tools/owner-images.mjs` and compares the counts the page prints.
+  Kept: the editor in a frame. Rejected: pasting a picture into a chat, a stored result per
+  device, a hash across devices, and giving the practice frame a camera. A band is set only
+  from a report a device printed on a frame the owner's camera made. The doctrine says a test
+  page opens nothing of the reader's; a file the reader hands the page is read in the page and
+  goes nowhere, and whether that clause should say so is the hub's and the owner's. See
+  `docs/decisions/108-the-picture-checks-run-on-a-photograph-you-choose.md`.
 
 - [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
   **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.
