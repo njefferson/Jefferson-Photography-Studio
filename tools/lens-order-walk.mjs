@@ -2,7 +2,7 @@
 // THE BALANCE IS MEASURED ON CORRECTED DATA — asserted, not assumed (decision 021).
 // AND A MATCHED LENS OPENS CORRECTED, AT FULL STRENGTH, EVERY TIME (015, 085).
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=lens-order   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/lens-order-walk.mjs [--port=8131] [--file=A.NEF] [--second=B.NEF] [--third=C.NEF] [--chosen=0.3]
 //
 // Three raws from ONE lens that matches a shipped profile. They are the owner's
@@ -100,7 +100,9 @@
 // AND THE RE-APPLY IS EXACT. Bypass on, then off, and the canvas hash returns
 // to what it was: the ratio pass against the gains already in the buffer, no
 // second copy, no drift.
-import { chromium } from "playwright-core";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 import { requireFreshDist } from "./fresh-dist.mjs";
 import { resolve as ownerImage } from "./owner-images.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -142,7 +144,7 @@ let failed = 0; const check = (n, ok, got) => { if (!ok) failed++; console.log(`
 
 for (const f of [RAW, RAW2, RAW3]) if (!existsSync(f)) { console.log(`\nno raw at ${f} — this walk needs three real raws from one lens that matches a shipped profile\n`); process.exit(2); }
 const serving = await fetch(`http://127.0.0.1:${PORT}/ir.html`).then((r) => r.ok).catch(() => false);
-if (!serving) { console.error(`\nNothing is serving dist on :${PORT}.\n\n    python3 -m http.server ${PORT} --directory dist\n`); process.exit(2); }
+if (!serving) { console.error(`\nNothing is serving dist on :${PORT}.\n\n    node tools/launch.mjs --serve=${PORT}\n`); process.exit(2); }
 
 // The independent side: the app's own decoders, matchers, flat and gray-world, bundled from src/.
 const outDir = join(tmpdir(), "lens-order"); mkdirSync(outDir, { recursive: true });
@@ -233,7 +235,7 @@ const card = (p) => p.evaluate(() => ({ status: document.getElementById("hsStatu
 const laid = (order) => { const m = (order || "").match(/strength ([\d.]+) laid on the pixels/); return m ? Number(m[1]) : (/nothing laid on the pixels/.test(order || "") ? 0 : null); };
 const setSlider = async (p, id, v) => { await p.evaluate(([i, x]) => { const el = document.getElementById(i); el.value = String(x); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }, [id, v]); await settle(p); };
 
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await launchBrowser();
 try {
   const p = await b.newPage({ viewport: { width: 1280, height: 950 } }); p.on("dialog", (d) => d.accept());
   await p.goto(`http://127.0.0.1:${PORT}/ir.html`);

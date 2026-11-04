@@ -6,7 +6,7 @@
 // between twigs does not, so nothing measured what a hand on the Masks tab
 // sees. This does, with the reader's own two tools held against each other:
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=mask-truth   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/mask-truth-walk.mjs [--port=8131] [--frames=a.dng,b.NEF] [--reach=1] [--out=DIR]
 //
 // Per frame: open, add a Sky mask at its defaults (Reach 1, Feather 0.5, or
@@ -67,8 +67,10 @@
 // moves no number on any frame is reading nothing, and its green means
 // nothing.
 import { openMasks, setMaskValue } from "./walk-input.mjs";
-import { chromium } from "playwright-core";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
@@ -98,7 +100,7 @@ function declaredNotSky() {
 const NOT_SKY = declaredNotSky();
 const PORT = arg("port", "8131"), REACH = Number(arg("reach", "1")), OUT = arg("out", join(tmpdir(), "mask-truth"));
 const PLANT_REACHABLE = process.argv.includes("--plant-reachable");
-const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";
+const DIR = join(REPO_ROOT, "public/examples");
 // THE CORPUS, AND WHY IT GREW ON 2026-09-20. It was three frames, every one of
 // them a photograph with a large obvious sky in it, and that is the shape of
 // corpus that cannot see over-selection: on all three the mask covers roughly
@@ -341,7 +343,7 @@ const solve = (p, notSky) => p.evaluate(([SAT_FLOOR, HUE_HALF, EDGE_FRAC, PLANT_
   let coveredPx = 0; for (let i = 0; i < N; i++) if (cov[i] >= 0.5) coveredPx++;
   return { notSkyApplied, bigStats, W, H, rows: [H - 1 - rHi, H - 1 - rLo], covered: coveredPx, skyPx, edgePx: EDGE, edgeN: eN, edgeCov: eN ? eCov / eN : NaN, openN: oN, openCov: oN ? oCov / oN : NaN, softMissed: skyPx ? soft / skyPx : NaN, hardMissed: skyPx ? hard / skyPx : NaN, reachN, reachMissed: reachN ? rHard / reachN : NaN, discN, discShare: skyPx ? discN / skyPx : NaN, discCov: discN ? discCov / discN : NaN, largest, spillN: sN, spill: sN ? sCov / sN : NaN, target: { hue: ((hue0 * 180) / Math.PI + 360) % 360, sat: tsat }, png: oc.toDataURL("image/png") };
 }, [SKY_SAT_FLOOR, HUE_HALF_RAD, EDGE_FRAC, PLANT_REACHABLE, notSky]);
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await launchBrowser();
 const results = {};
 try {
   for (const file of FRAMES) {

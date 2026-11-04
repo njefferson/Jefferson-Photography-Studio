@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A SLIDER PRESSED AT THE VALUE IT ALREADY HOLDS MOVES NOTHING.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=slider-own-value   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/slider-own-value-walk.mjs [--port=8131]
 //
 // NOT in .branch-guard's `also=`: it drives a real browser against a real build and
@@ -49,6 +49,10 @@
 // given (the build before a54f622). The result is recorded in the NOTES entry of
 // the release that added this file.
 
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107). It is first, ahead of the block below.
+await declarePictureWalk(import.meta.url);
+
 console.log(`MADE TO FAIL
   Quantity 1: this walk's own pixel counter, run on two planted 4 by 2 RGBA buffers that differ in exactly two pixels (one
   red channel by 1, one blue channel by 3, an alpha difference of 9 that must be ignored), must read 2 pixels, a largest
@@ -58,7 +62,6 @@ console.log(`MADE TO FAIL
   Nothing printed below is trustworthy if either is absent or reads another number. Quantity 1 stops the walk with exit 2
   before the browser opens; quantity 2 is its last check, and the walk is red when it does not hold.`);
 
-import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
 import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 import { join } from "node:path";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
@@ -202,7 +205,7 @@ function INIT() {
   window.Worker.prototype = W.prototype;
 }
 
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const browser = await launchBrowser();
 try {
   let control = 0, controlRead = 0;
   for (const name of FRAMES) {

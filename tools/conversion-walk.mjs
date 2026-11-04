@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // WHAT THE CONVERSION LEFT IN THE FILE, ASSERTED RATHER THAN RE-DERIVED.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=conversion   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/conversion-walk.mjs [--port=8131] [--file=/path/to.NEF]
 //
 // WHY IT EXISTS. On 2026-09-16 three separate scratch probes measured this
@@ -17,7 +17,9 @@
 // only that it is one of the three and that it MOVES when the file changes — a
 // sentence that is a constant is not a measurement, which is the shape of defect
 // this repository keeps paying for.
-import { chromium } from "playwright-core";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
@@ -53,7 +55,7 @@ const check = (name, got, want) => {
 
 const serving = await fetch(`${BASE}/ir.html`).then((r) => r.ok).catch(() => false);
 if (!serving) {
-  console.error(`\nNothing is serving dist on :${PORT}.\n\n    python3 -m http.server ${PORT} --directory dist\n`);
+  console.error(`\nNothing is serving dist on :${PORT}.\n\n    node tools/launch.mjs --serve=${PORT}\n`);
   process.exit(2);
 }
 
@@ -89,7 +91,7 @@ async function readConversion(br, file) {
   }
 }
 
-const br = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const br = await launchBrowser();
 try {
   if (!existsSync(RAW)) {
     console.log(`\nno raw at ${RAW} — this walk needs a real raw and the practice DNGs are not one (IR-SCIENCE.md section 7)\n`);

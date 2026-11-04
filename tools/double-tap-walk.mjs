@@ -2,7 +2,7 @@
 // DOUBLE-TAP PUTS A CONTROL BACK WHERE THE PHOTO OPENED — every control it is
 // claimed for, including the one that is not an input.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=double-tap   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/double-tap-walk.mjs [--port=8131]
 //
 // The gesture has no visible affordance: nothing on screen moves when it is
@@ -19,21 +19,24 @@
 // curve per frame at open, so a photograph does not open on the diagonal — a
 // point that went back to TONE_DEFAULT would mean something different from the
 // same gesture on the slider beside it, and different from Reset.
-import { chromium } from "playwright-core";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
+import { join } from "node:path";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url, { software: false });
 import { openMasks, closeMasks, setMaskValue } from "./walk-input.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const BASE = `http://127.0.0.1:${PORT}`;
-const EX = "/home/user/Jefferson-Photography-Studio/public/examples";
+const EX = join(REPO_ROOT, "public/examples");
 
 let bad = 0;
 const fail = (s) => { bad++; console.log(`FAIL  ${s}`); };
 const ok = (s) => console.log(`ok    ${s}`);
 
-const br = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+const br = await launchBrowser({ software: false });
 try {
   const p = await br.newPage({ viewport: { width: 1000, height: 820 }, hasTouch: true });
   // WAIT FOR THE PHOTOGRAPH TO FINISH DRAWING BEFORE A GESTURE. Playwright

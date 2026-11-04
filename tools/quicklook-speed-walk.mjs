@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // THE TWO WAITS ON THE QUICK LOOK PATH, MEASURED ON THE APP ITSELF.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=quicklook-speed   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/quicklook-speed-walk.mjs [--port=8131] [--files=8] [--plant]
 //
 // WHY IT EXISTS (decision 033). Two delays were reported from the device — a
@@ -42,7 +42,9 @@
 // than by counting the `PLANT ?` expressions — the comment here said three and
 // the plant produced two, which is the same defect one level up: a claim about
 // an instrument that nobody ran the instrument to check.
-import { chromium } from "playwright-core";
+import { launchBrowser, declarePictureWalk, outDir } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
@@ -54,7 +56,7 @@ const arg = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--$
 const PORT = arg("port", "8131");
 const N = Number(arg("files", "8"));
 const PLANT = process.argv.includes("--plant");
-const OUT = "/tmp/quicklook-speed";
+const OUT = outDir("quicklook-speed");
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true });
 let failed = 0;
 const check = (n, ok, d = "") => { console.log(`${ok ? "ok  " : "FAIL"}  ${n}${d ? " — " + d : ""}`); if (!ok) failed++; };
@@ -140,7 +142,7 @@ const diagLine = async (p, key) => {
 const num = (s, re) => { const m = s.match(re); if (!m) return NaN; return /ms/.test(m[1]) ? parseFloat(m[1]) : parseFloat(m[1]) * 1000; };
 const t = (s, label) => num(s, new RegExp(`${label} (\\d+(?:\\.\\d+)? ?m?s)`));
 
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await launchBrowser();
 try {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 950 } });
   const p = await ctx.newPage();

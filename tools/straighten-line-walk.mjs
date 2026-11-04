@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // STRAIGHTEN TO A LINE YOU DRAW.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=straighten-line   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/straighten-line-walk.mjs [--port=8131] [--shots=DIR]
 //
 // WHY IT EXISTS (decision 038). Asked from the device: straightening should let
@@ -36,7 +36,9 @@
 // about its own sign — and no number printed here distinguishes "levelled" from
 // "tilted twice as far the other way". So it saves a before and an after
 // screenshot and they are OPENED. A number is a pointer to where to look.
-import { chromium } from "playwright-core";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
@@ -96,10 +98,7 @@ async function drawLine(p, deg, flip = false) {
   return angle(p);
 }
 
-const b = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium",
-  args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--no-sandbox"],
-});
+const b = await launchBrowser({ args: ["--no-sandbox"] });
 try {
   const ctx = await b.newContext({ viewport: { width: 1100, height: 850 } });
   const p = await ctx.newPage();

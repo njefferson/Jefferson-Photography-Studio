@@ -33,7 +33,9 @@
 // 0" failed with the frame undarkened, which is the aliasing this exists to
 // catch.
 import { openMasks, closeMasks, setMaskValue } from "./walk-input.mjs";
-import { chromium } from "playwright-core";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 import { requireFreshDist } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
@@ -90,7 +92,7 @@ async function tintOff(p) {
   check("the coverage tint is off before anything is read", pressed === "false", `Show mask reads aria-pressed=${pressed}`);
 }
 
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await launchBrowser();
 try {
   // A: the sky mask on its own — slot 0, layer 0. The reference picture.
   const p1 = await openFrame(b, PORT);

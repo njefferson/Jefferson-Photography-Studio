@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // THE HAND CORRECTION'S SIZE IS KNOWN BEFORE THE FIRST MARK, AND IT GOES SMALL.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=fix-brush   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/fix-brush-walk.mjs [--port=8131] [--plant]
 //
 // WHY IT EXISTS (decision 040). Two halves of one report: the correction brush
@@ -23,7 +23,9 @@
 //
 // --plant skips arming the mode. Three checks must go red.
 import { openMasks } from "./walk-input.mjs";
-import { chromium } from "playwright-core";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
@@ -66,7 +68,7 @@ const dab = async (p, fx, fy) => {
   await settle(p);
 };
 
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await launchBrowser();
 try {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 950 } });
   const p = await ctx.newPage(); p.on("dialog", (d) => d.accept());

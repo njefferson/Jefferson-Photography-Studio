@@ -9,7 +9,7 @@
 // shipped without it and a container going away took it with it. Four walks were
 // in this directory and roughly eighteen were not, including the export gate.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=rotation   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/rotation-walk.mjs [--port=8131] [--shots=DIR]
 //
 // --shots writes every picture checks 8-15 compare into DIR, so a number that
@@ -22,8 +22,10 @@
 // A QUARTER-TURN MUST STAY TURNED. Rotation and flip are view state and were
 // never stored, so leaving a photo and coming back put it back the way the
 // camera wrote it — and a bulk export would then disagree with what was seen.
-import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
@@ -33,7 +35,7 @@ import { join } from "node:path";
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const URL_IR = `http://127.0.0.1:${PORT}/ir.html`;
 const SHOTS = (process.argv.find((a) => a.startsWith("--shots=")) || "").split("=").slice(1).join("=");
-const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";
+const DIR = `${REPO_ROOT}/public/examples`;
 const THREE = ["canopy.dng","hillside.dng","lodge.dng"].map(f=>`${DIR}/${f}`);
 let failed=0; const check=(n,g,w)=>{const ok=JSON.stringify(g)===JSON.stringify(w);if(!ok)failed++;console.log(`${ok?"ok  ":"FAIL"}  ${n}\n        got ${JSON.stringify(g)} want ${JSON.stringify(w)}`);};
 
@@ -258,7 +260,7 @@ async function stepToName(p, name) {
   await stepTo(p, i);
   return i;
 }
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader","--enable-unsafe-swiftshader"] });
+const b = await launchBrowser();
 try {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 950 } });
   const p = await ctx.newPage();

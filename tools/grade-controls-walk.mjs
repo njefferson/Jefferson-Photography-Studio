@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // THE GRADE TAB'S CONTROLS BEHAVE LIKE THE REST OF THE APP.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=grade-controls   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/grade-controls-walk.mjs [--port=8131] [--plant]
 //
 // WHY IT EXISTS (decision 035). Three defects reported together 2026-09-20:
@@ -21,7 +21,9 @@
 // a test that passes the element in directly would never have seen it.
 //
 // --plant skips the double-tap and the centre drag. Three checks must go red.
-import { chromium } from "playwright-core";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
@@ -42,7 +44,7 @@ const setRange = async (p, id, v) => {
   await settle(p);
 };
 
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await launchBrowser();
 try {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 950 } });
   const p = await ctx.newPage(); p.on("dialog", (d) => d.accept());

@@ -60,6 +60,10 @@
 // back after `n++` in the 8-bit branch: the build before a54f622. The result is
 // recorded in the NOTES entry of the release that added this file.
 
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107). It is first, ahead of the block below.
+await declarePictureWalk(import.meta.url, { software: false });
+
 console.log(`MADE TO FAIL
   Quantity 1: this walk's own mask counter, run on a planted 8 by 6 mask of known bytes (every cell selected except a 2 by 2
   block that the selection encloses and one corner cell that touches the border), must read 43 selected cells, a largest
@@ -71,7 +75,6 @@ console.log(`MADE TO FAIL
   Nothing printed below is trustworthy if either is absent or reads another number. Quantity 1 stops the walk with exit 2
   before the browser opens; quantity 2 stops it with exit 2 before any selection is judged.`);
 
-import { chromium } from "playwright-core";
 import { build } from "esbuild";
 import { resolve as ownerImage } from "./owner-images.mjs";
 import { REPO_ROOT } from "./fresh-dist.mjs";
@@ -182,7 +185,7 @@ const check = (name, got, want) => {
 };
 const note = (s) => console.log(`        ${s}`);
 
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+const browser = await launchBrowser({ software: false });
 try {
   const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
   const p = await ctx.newPage();

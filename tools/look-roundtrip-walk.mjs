@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A LOOK PRESSED TWICE IS THE SAME PHOTOGRAPH BOTH TIMES.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=look-roundtrip   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/look-roundtrip-walk.mjs [--port=8131] [--plant]
 //
 //   npm install --no-save esbuild playwright-core
@@ -46,8 +46,10 @@
 // NOT in .branch-guard's `also=`: it drives a real browser and decodes a RAW.
 // Run it before a release, or through tools/walk-all.mjs.
 import { openMasks, closeMasks, setMaskValue } from "./walk-input.mjs";
-import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
@@ -55,7 +57,7 @@ requireFreshDist();
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const PLANT = process.argv.includes("--plant");
 const FRAME = "NIR_1644";
-const RAW = `/home/user/Jefferson-Photography-Studio/public/examples/${FRAME}.dng`;
+const RAW = `${REPO_ROOT}/public/examples/${FRAME}.dng`;
 // B&W IR is the one to pass through: it is the furthest from every other look
 // and the look the original observation used.
 const VIA = "lookMono";
@@ -69,10 +71,7 @@ const check = (name, ok, detail) => {
   if (detail) console.log(`        ${detail}`);
 };
 
-const b = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium",
-  args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"],
-});
+const b = await launchBrowser();
 try {
   /** The whole framebuffer as one FNV-1a over RGB. Takes the page; gives back a
    *  hex string. What it must satisfy: two calls on an unchanged canvas are

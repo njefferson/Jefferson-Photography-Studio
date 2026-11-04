@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 // EVERY WALK IN THIS DIRECTORY, IN ONE COMMAND.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
-//   node tools/walk-all.mjs [--only=tile-truth,journey]
+//   node tools/walk-all.mjs [--only=tile-truth,journey] [--port=8131]
+//
+// IT STARTS AND STOPS THE SERVER OVER dist ITSELF, through tools/launch.mjs, and prints
+// the machine's renderer string once. A picture walk (the twenty-one in launch.mjs's
+// PICTURE_WALKS) is SKIPPED with one printed line on a software renderer and runs where
+// the renderer is a chip; a skipped walk prints no verdict. A server already answering
+// on the port is used as it is and left running.
 //
 // WHY IT EXISTS. The pre-release sweep was a session typing ten commands from
 // memory, which means the sweep was whatever that session remembered — and the
@@ -10,7 +15,7 @@
 // EVERY `*-walk.mjs` on disk, so adding one to this directory adds it to the
 // sweep with nothing to remember.
 //
-// It refuses to start if nothing is serving dist, because ten walks each failing
+// It refuses to start if dist cannot be served, because ten walks each failing
 // to connect is ten minutes of output that says nothing about the build.
 //
 // Sequential on purpose: each drives a real browser and decodes RAW files, and
@@ -22,6 +27,7 @@ import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { requireFreshDist } from "./fresh-dist.mjs";
+import { PICTURE_WALKS, startServer, readRenderer } from "./launch.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
@@ -38,16 +44,27 @@ const walks = readdirSync(here)
   .filter((f) => !pick || pick.some((p) => f.startsWith(p)))
   .sort();
 
-const serving = await fetch(`http://127.0.0.1:${PORT}/ir.html`).then((r) => r.ok).catch(() => false);
-if (!serving) {
-  console.error(`\nNothing is serving dist on :${PORT}.\n\n    python3 -m http.server ${PORT} --directory dist\n`);
-  process.exit(2);
-}
 if (!walks.length) { console.error("no walks matched"); process.exit(2); }
 // AND THE BUILD IS THE ONE THIS TREE WOULD MAKE. Each walk refuses a stale dist
 // itself; this refuses once instead of thirty-six times, for the same reason
-// the serving check above it exists.
+// the serving check below exists.
 requireFreshDist();
+
+// THE SERVER OVER dist: started here, once, by the launch module, and stopped at the end through its own
+// child handle with the port read to confirm. One already answering on the port is used and left alone.
+const serving = await fetch(`http://127.0.0.1:${PORT}/ir.html`).then((r) => r.ok).catch(() => false);
+let server = null;
+if (!serving) {
+  try { server = await startServer(Number(PORT)); }
+  catch (e) { console.error(`\nCould not serve dist on :${PORT}: ${e.message}\n`); process.exit(2); }
+  console.log(`serving dist on :${PORT} (started by this sweep)`);
+} else console.log(`serving dist on :${PORT} (already answering, left running)`);
+
+// THE MACHINE'S RENDERER, once. A picture walk reads the drawn picture and is skipped on a software one.
+let renderer = { renderer: "unread", software: "" };
+try { renderer = await readRenderer(); }
+catch (e) { renderer = { renderer: `unread (${e.message.split("\n")[0]})`, software: "no browser" }; }
+console.log(`renderer: ${renderer.renderer}`);
 
 const run = (file) =>
   new Promise((res) => {
@@ -61,8 +78,14 @@ const run = (file) =>
 
 console.log(`\n=== ${walks.length} walks, on :${PORT} ===\n`);
 const results = [];
+const skipped = [];
 for (const w of walks) {
   process.stdout.write(`  ${basename(w, ".mjs").padEnd(26)} `);
+  if (PICTURE_WALKS.includes(w) && renderer.software) {
+    skipped.push(w);
+    console.log(`skip  ${w} reads the drawn picture and this machine draws through ${renderer.software} (${renderer.renderer.slice(0, 60)}); no verdict`);
+    continue;
+  }
   const r = await run(w);
   results.push(r);
   const last = r.out.trim().split("\n").filter(Boolean).pop() || "(no output)";
@@ -99,7 +122,10 @@ for (const r of bad) {
   }
 }
 const total = (results.reduce((n, r) => n + r.ms, 0) / 1000).toFixed(0);
-console.log(bad.length ? `\n${bad.length} of ${results.length} failed (${total}s)\n` : `\nall ${results.length} walks passed (${total}s)\n`);
+console.log(bad.length ? `\n${bad.length} of ${results.length} failed (${total}s)\n` : `\nall ${results.length} walks that ran passed (${total}s)\n`);
+if (skipped.length) console.log(`${skipped.length} picture walk(s) skipped on a software renderer, with no verdict: ${skipped.join(", ")}\n`);
+// THE SERVER THIS SWEEP STARTED IS STOPPED BY ITS OWN HANDLE, and the port is read to confirm it.
+if (server) console.log(`server on :${PORT} ${(await server.stop()) ? "stopped, port closed" : "STILL ANSWERING after the stop"}`);
 // THE EXIT WAITS FOR WHAT WAS PRINTED (step 271): `process.exit` ends the process at once and a pipe is written to asynchronously, so the failure detail above could
 // be cut short for whoever read this through one. The code is set and the output says when its queue is empty before the process ends.
 process.exitCode = bad.length ? 1 : 0;

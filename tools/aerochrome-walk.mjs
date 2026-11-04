@@ -97,19 +97,21 @@
 // books, the unconditional gray-world balance. Said out loud rather than
 // asserted weakly.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=aerochrome   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/aerochrome-walk.mjs
 //
 // Drives a real browser and decodes a RAW, so it is not in .branch-guard's
 // `also=`. Run it before a release, or through tools/walk-all.mjs.
-import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
 
 const PORT = (process.argv.find(a => a.startsWith("--port=")) || "--port=8131").split("=")[1];
-const EX = "/home/user/Jefferson-Photography-Studio/public/examples/";
+const EX = `${REPO_ROOT}/public/examples/`;
 const RAW = EX + "NIR_0063.dng";
 // TWO FRAMES FOR CHECK 9, and check 9a is the control that says they are
 // different enough for it to mean anything.
@@ -249,10 +251,7 @@ const check = (name, got, want) => {
   console.log(`        got ${JSON.stringify(got)} want ${JSON.stringify(want)}`);
 };
 
-const b = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium",
-  args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"],
-});
+const b = await launchBrowser();
 try {
   // A PAGE WITH A PHOTOGRAPH ON IT, from a clean context every time: the
   // session look is seeded out of localStorage, and a walk that inherited one

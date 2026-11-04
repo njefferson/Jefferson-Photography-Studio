@@ -46,12 +46,14 @@
 // tint off explicitly and never reads it, and check 1 is what says so if that
 // reasoning is wrong.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=aim   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/aim-walk.mjs [--port=8131] [--shots=DIR] [--only=dehaze]
 //
 // --only runs one stage's arms (and, for dehaze, the grouped arm), for proving a
 // new check fails on an old build without paying for the whole walk twice.
-import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 import { requireFreshDist } from "./fresh-dist.mjs";
 requireFreshDist();
 import { setValue, getValue, openMasks, setMaskValue } from "./walk-input.mjs";
@@ -120,7 +122,7 @@ function diff(a, b) {
   return { mean: sum / (3 * (a.px.length / 4)), moved: moved / (a.px.length / 4), same: moved === 0 };
 }
 
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const browser = await launchBrowser();
 try {
   /** One arm: open the frame, run `prep`, read the canvas once. */
   async function arm(name, prep) {

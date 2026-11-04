@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A TEMPERATURE MOVE WARMS THE PICTURE YOU SEE, WITH THE RED AND BLUE SWAP ON OR OFF (record 104).
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=temperature   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/temperature-walk.mjs [--port=8131]
 //
 // WHY THIS EXISTS. The Temperature and Tint controls were checked for what they READ (tools/join-fold-check.mjs holds the arithmetic both
@@ -34,7 +34,9 @@
 // predicates are run on planted wrong pairs and must refuse them. (b) `--plant=reverse` makes every thumb event go the opposite way while the
 // walk still asserts the direction it names, `--plant=offset` makes the ten-step event twenty-five steps, and `--plant=typed` compares the box to a
 // number five kelvin off the one typed; each must end red, with the failing checks named. `--arms=N` runs only the first N arms, which a planted run needs. (c) The run on the unplanted app must end green. A walk that passes both plants has not been shown to see anything.
-import { chromium } from "playwright-core";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 import { requireFreshDist } from "./fresh-dist.mjs";
 import { resolve as ownerImage } from "./owner-images.mjs";
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that directory to this tree. See tools/fresh-dist.mjs.
@@ -153,7 +155,7 @@ const openArm = async (br, file, swapOn) => {
 };
 
 // ----------------------------------------------------------------------------------------------------------------- made to fail, before any page of the app
-const br = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+const br = await launchBrowser();
 try {
   {
     const planted = await br.newPage();

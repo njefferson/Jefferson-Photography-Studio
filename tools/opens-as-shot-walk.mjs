@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A CAMERA-RENDERED FILE OPENS AS THE CAMERA MADE IT.
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=opens-as-shot   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/opens-as-shot-walk.mjs [--port=8131]
 //
 // Reported from the device with two screenshots: the strip of thumbnails looked
@@ -30,14 +30,16 @@
 //
 // A raw has no such comparison — it opens gray-world balanced on purpose — so it
 // is checked only for the swap state it has always had.
-import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url, { software: false });
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
 const PORT=(process.argv.find(a=>a.startsWith("--port="))||"--port=8131").split("=")[1];
 const BASE=`http://127.0.0.1:${PORT}`;
-const EX="/home/user/Jefferson-Photography-Studio/public/examples";
+const EX=`${REPO_ROOT}/public/examples`;
 import { readFileSync } from "node:fs";
 import { resolve as ownerImage } from "./owner-images.mjs";
 // THE CAMERA JPEGS ARE THE OWNER'S, TAKEN BY NAME through tools/owner-images.mjs
@@ -65,7 +67,7 @@ const hue=a=>{const[r,g,b]=a;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);if(mx-m
   return ((h*60)%360+360)%360;};
 const dHue=(a,b)=>{if(a==null||b==null)return 0;let d=Math.abs(a-b)%360;return d>180?360-d:d;};
 let bad=0;const fail=s=>{bad++;console.log("FAIL  "+s);};const ok=s=>console.log("ok    "+s);
-const br=await chromium.launch({executablePath:"/opt/pw-browsers/chromium"});
+const br=await launchBrowser({ software: false });
 try{
   const page=await br.newPage({viewport:{width:1000,height:780}});
   for(const [files,label] of SET){

@@ -2336,6 +2336,7 @@ Q-JPS-194: tools/switch-instrument-walk.mjs asks for a look whose sky stage asks
 Q-JPS-195: 52 of the 54 walk files in tools/ still end with process.exit(failed ? 1 : 0) or the like straight after their last console.log, and the control walk and walk-all no longer do; a walk whose last burst grows past what a pipe holds will be cut the same way, and none was changed in step 271 (step 271).
 Q-JPS-196: tools/switch-instrument-walk.mjs check 9 was a repeatable red on a rounding its own print could not hold, and step 271 put it right by allowing the printed time's own rounding, a loosening by exactly the print's resolution (step 271).
 Q-JPS-197: tools/build-wait-walk.mjs arm 2's check that the page stayed free failed once in the three unplanted runs of step 271, with a longest pause of 750 ms in a 6 s build, and did not repeat in the runs after; read as a stall of the machine during that run, and not changed (step 271).
+Q-JPS-198: 36 tool files outside the twenty-one picture walks still carry the container's paths, 77 lines in all (the browser's path, the software flags, the checkout's absolute path, a temporary folder); they take their launch lines from tools/launch.mjs only when record 083's housekeeping does the sweep, so no structural walk's launch lines changed in step 279.
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -2998,7 +2999,13 @@ user-scalable=no.
   Audited on 24 October against the commit log of main and the code: no commit subject on main names this item. The message body of the commit whose subject reads "Fixed: blurred foliage keeps its red, and the sky between pylons keeps its blue" (716aa67) says that pressing Export draws its progress strip at once and that a line says while the look's sky is still being refined, and `Preparing the export of` in `src/main.ts` carries the export half on main, so nothing is left to build. The notes check's window would refuse the archive on this date in any case: with this entry archived the check printed a newest archive date of 2026-10-17 against a window whose oldest entry is dated 2026-09-17, a span of 30 days against the limit of 14, so it stays open.
 - [ ] **The picture walks run on a machine with a graphics chip** <!-- decision: 107 -->
   **Shown as:** internal
-  Researched on 1 November 2026, not built. Twenty-one walks read the drawn picture and are left
+  Built on staging on 3 November 2026 and waiting on the PC run: `tools/launch.mjs` holds the
+  browser, the flags, the import and the server, the twenty-one picture walks and
+  `tools/walk-all.mjs` take them from it, and each picture walk prints the renderer first and
+  refuses a software one by name. Chromium is what it launches; the Firefox variant is not built.
+  The PC run is the owner's: open a session there, run `npx playwright install` at the module's
+  version, then `node tools/walk-all.mjs`, whose first lines name the chip. Researched on
+  1 November 2026. Twenty-one walks read the drawn picture and were left
   to the device, because the container draws in software. Every walk that opens a browser names
   the container's browser and most pass the flags for the software renderer, and Chromium's headless
   build draws in software unless a switch for the GL implementation, the ANGLE backend or the GPU
@@ -3017,7 +3024,10 @@ user-scalable=no.
 
 - [ ] **The picture checks run on the device, from a test page** <!-- decision: 106 -->
   **Shown as:** A page behind the version number will run the picture checks on this device's own graphics chip, from one button, and print a report you can copy.
-  Researched on 1 November 2026, not built. Twenty-one walks read the drawn picture and cannot run
+  Built on staging, first stage: the test page's "Picture checks" section runs three checks (a
+  look applied twice, a press at a slider's own value, the direction of Temperature) and waits
+  on the device pass; no band is set until a device prints its report. Researched on 1 November
+  2026. Twenty-one walks read the drawn picture and cannot run
   in the container, so a look is checked by a reader's eyes. Most of what they assert is relative
   inside one run (a statistic rises after a move, zero pixels move after a press, a round trip
   through a look draws the same frame), which needs no stored picture; what crosses chips is a

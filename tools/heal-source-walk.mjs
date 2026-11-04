@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // DOES THE HEAL PICK THE BEST SOURCE AVAILABLE TO IT?
 //
-//   python3 -m http.server 8131 --directory dist   (in another shell)
+//   node tools/walk-all.mjs --only=heal-source   (starts the server over dist itself; or node tools/launch.mjs --serve=8131 in another shell)
 //   node tools/heal-source-walk.mjs [--port=8131]
 //
 // NOT in .branch-guard's `also=`: it drives a real browser and decodes RAW.
@@ -35,15 +35,18 @@
 // strength of it. Both were reverted. A measurement has to ask the question the
 // code is answering, or it invents work.
 
-import { chromium } from "/home/user/Jefferson-Photography-Studio/node_modules/playwright-core/index.mjs";
-import { requireFreshDist } from "./fresh-dist.mjs";
+import { launchBrowser, declarePictureWalk } from "./launch.mjs";
+import { requireFreshDist, REPO_ROOT } from "./fresh-dist.mjs";
+import { join } from "node:path";
+// A PICTURE WALK: the launch module prints the renderer first and refuses a software one (record 107).
+await declarePictureWalk(import.meta.url);
 // BEFORE THE BROWSER: a walk measures `dist`, and nothing used to connect that
 // directory to this tree. See tools/fresh-dist.mjs.
 requireFreshDist();
 
 const PORT = (process.argv.find((a) => a.startsWith("--port=")) || "--port=8131").split("=")[1];
 const BASE = `http://127.0.0.1:${PORT}`;
-const DIR = "/home/user/Jefferson-Photography-Studio/public/examples";
+const DIR = join(REPO_ROOT, "public/examples");
 const FRAMES = ["NIR_0063.dng", "NIR_0102.dng"];
 const TAPS = [[0.25, 0.80], [0.45, 0.86], [0.62, 0.90], [0.18, 0.74], [0.60, 0.30], [0.75, 0.55]];
 
@@ -54,10 +57,7 @@ const check = (name, got, want) => {
   console.log(`${ok ? "ok  " : "FAIL"}  ${name}\n        got ${JSON.stringify(got)}  want ${JSON.stringify(want)}`);
 };
 
-const browser = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium",
-  args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"],
-});
+const browser = await launchBrowser();
 let worstGap = 0, worstPick = 0, measured = 0;
 try {
   for (const frame of FRAMES) {
