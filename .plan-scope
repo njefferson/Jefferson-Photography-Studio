@@ -1,7 +1,7 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=7f62c9111960be9c
-diffhash=074d8b6709fd6bc4
-verdict=IN-SCOPE: the remaining diff is the test page section in src/debug.ts and debug.html, record 106's Built section, and the notes entry and the raised version that step 281 names, and nothing else.
-# IN-SCOPE: the remaining diff is the test page section in src/debug.ts and debug.html, record 106's Built section, and the notes entry and the raised version that step 281 names, and nothing else.
-# Read against the plan's Files line by line: src/debug.ts, debug.html and record 106 are step 280's files, NOTES.md and VERSION are step 281's. The version's middle number is raised by one. No band is written, no structural walk file and no hub file is in the diff.
+planhash=0f936d8f753b22a4
+diffhash=37cbad118941fa53
+verdict=IN-SCOPE: the diff changes NOTES.md alone, and only the three edits step 284 names: a production sentence added to the 2.70 entry's first paragraph, the two device-pass bullets (iPad and PC) added to that entry, and one Found queue line, Q-JPS-199. The rest of NOTES.md is untouched, and no code or other file is in the diff.
+# IN-SCOPE: the diff changes NOTES.md alone, and only the three edits step 284 names: a production sentence added to the 2.70 entry's first paragraph, the two device-pass bullets (iPad and PC) added to that entry, and one Found queue line, Q-JPS-199. The rest of NOTES.md is untouched, and no code or other file is in the diff.
+# Watcher's reading: each addition is the content the step's own text specifies, copied from the device reports as printed with no name or role attached. The one thing noticed and not changed is that the 2.70 entry's first sentence still reads "main is unmoved by this release", which the new production sentence now contradicts; the step said no other line changes, so it was left in place and is recorded in the step report as a finding.
