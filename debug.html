@@ -65,6 +65,22 @@
       </section>
 
       <section class="dbg-sec">
+        <h2>Picture checks</h2>
+        <p class="dbg-note">
+          These ask whether the picture is drawn the way it should be on this device's own
+          graphics chip. Each check draws a practice photograph twice and compares the two,
+          three times over, and says first which chip is drawing. Nothing of yours is opened.
+          It takes a few minutes and the page will be busy while it runs; then copy the result
+          and paste it back.
+        </p>
+        <div class="dbg-actions">
+          <button id="dPictures" type="button" class="dbg-btn primary">Run the picture checks</button>
+          <button id="dPicCopy" type="button" class="dbg-btn">Copy the picture checks</button>
+        </div>
+        <div id="dPicResults" class="dbg-results" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="dbg-sec">
         <h2>Measure a lens</h2>
         <p class="dbg-note">
           This moved into the app itself, because a lens has nothing to do with any one

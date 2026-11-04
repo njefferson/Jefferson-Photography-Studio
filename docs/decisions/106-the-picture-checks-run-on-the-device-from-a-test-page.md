@@ -63,6 +63,22 @@ Eighth, directly under 107 and above 069, the first look change with work to bui
 
 Read from the app's own notes (NOTES.md, September 2026 sections), not run in step 270. A frame drawn from the full-resolution source took 16 to 17 ms on the 8-core iPad, 32 to 44 ms on the 4-core iPad and 10 to 13 ms on the desktop. The computed export of a two-megapixel crop took 2.7 s on the 4-core iPad, 4.3 s on the 8-core iPad and 4.1 s on the desktop, the drawn one 0.6 s, 1.1 s and 0.9 s. With the noise reduction and sharpening off, the drawn frame against the computed one read average 0.21 of 255, worst 74, 450 pixels over 8 and 134 over 24 on both a software renderer and a GTX 1650 through Direct3D 11, and average 0.19, worst 47, 152 over 8 and 31 over 24 on two different Apple chips; with the operators on, the software renderer and the GTX 1650 read 492 and 559 over 24. A byte hash over the drawn frame differed on every chip; the statistics did not. The temperature walk takes 56 to 74 minutes under software drawing.
 
+## Built
+
+First stage, built on staging: the test page `debug.html` gains a "Picture checks" section with one button and one copy button, in `src/debug.ts`. The button prints the renderer string first and names a software renderer as such, draws a planted colour through `drawFrame` and reads it back (a mismatch of even one level stops every check), tries the comparator and the patch reader on made pairs with known figures, then runs three checks three times each and prints the median with every run:
+
+- A look applied twice draws the same photograph: the same look's numbers applied from the opening baseline and drawn twice; expects zero in the largest difference and in the counts over 8 and over 24.
+- A press at a slider's own value moves nothing: exposure and gains read back through the slider's grid; expects zero pixels moved.
+- A warmer white raises the patch's red over blue, with the red and blue swap on and off, the statistic the Temperature walk reads; only the direction is asked.
+
+Each verdict is printed beside the measured numbers and what the check expects of them. The planted move (the exposure raised a quarter) is drawn in every run so each frame check is seen to read a difference when there is one.
+
+Not yet phrased, eighteen: aerochrome, aim, camera-jpeg-sky, conversion, double-tap, fix-brush, fullview-mask, grade-controls, heal-source, lens-order, mask-fix, mask-slots, mask-truth, opens-as-shot, quicklook-speed, rotation, sky-stage and straighten-line. Each needs a pointer, the editor's own controls, a mask the drawn path does not cover, a shared owner photograph or a timing, so none is two renders read back in one run. They wait for the second stage, the editor in a frame.
+
+Every band is unset: the checks expect zero or a direction and write no tolerance, and an absolute band is set only from a report a device has printed.
+
+The device pass: the owner opens the test page behind the version number on the iPad and on the PC, presses the button, and pastes the copied report back.
+
 ## Depends
 
 - touches 083 — its housekeeping keeps the walks' own upkeep and the agreement walk's set, and this takes its practice photograph the way the page already does, adding no walk.

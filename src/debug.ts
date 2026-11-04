@@ -38,9 +38,11 @@ import { measureHoldWatch, holdWatchLine } from "./startup";
 import { onAdoptAnswer, wireUpdateStrip } from "./swupdate";
 import { decode } from "./decode";
 import { decodeOffThread, decodeLanes } from "./decodeClient";
-import { sniff } from "./import";
+import { sniff, type ImportedFile } from "./import";
+import { srgbDisplayToP3Display } from "./icc";
+import { snapExposure, snapGain } from "./tile";
 import { workerCount } from "./exportparallel";
-import { linearAt } from "./decode";
+import { linearAt, type DecodedImage } from "./decode";
 import { makeRowDenoiser } from "./raw/denoise";
 import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, type EditParams, type MaskLayer } from "./pipeline";
 import { exportImage } from "./export";
@@ -52,6 +54,10 @@ declare const __APP_VERSION__: string;
 const $ = (id: string) => document.getElementById(id)!;
 const results = $("dResults");
 const out: string[] = [];
+// Where `row` and `note` write while the picture checks run: their own list and
+// their own copy block, so the speed rows above are neither moved nor cleared.
+let rowsInto: HTMLElement = results;
+let outInto: string[] = out;
 
 /** A value that says its row produced no number: did not build, did not draw,
  *  not run, failed, refused, not available, WebGL2 unavailable. */
@@ -87,11 +93,11 @@ function row(name: string, value: string, meaning: string, samples?: string, bui
   (d.querySelector(".dbg-k") as HTMLElement).textContent = name;
   (d.querySelector(".dbg-v") as HTMLElement).textContent = value;
   (d.querySelector(".dbg-m") as HTMLElement).textContent = (samples ? `${meaning} Runs: ${samples}.` : meaning) + (build ? ` ${build}` : "");
-  results.appendChild(d);
+  rowsInto.appendChild(d);
   // Folded here, where the copy is built, so every source of a reason is one
   // line with no control characters, the editor's own build error included.
   const fold = (s: string) => s.replace(/[\u0000-\u001f\s]+/g, " ").trim();
-  out.push(`${name}: ${value}` + (samples ? `   [${samples}]` : "")
+  outInto.push(`${name}: ${value}` + (samples ? `   [${samples}]` : "")
     + (NOT_MEASURED.test(value) ? `\n    ${fold(meaning)}` : "")
     + (build ? `\n    ${fold(build)}` : ""));
 }
@@ -99,7 +105,7 @@ function note(text: string) {
   const p = document.createElement("p");
   p.className = "dbg-progress";
   p.textContent = text;
-  results.appendChild(p);
+  rowsInto.appendChild(p);
   return p;
 }
 
@@ -2333,6 +2339,302 @@ async function fullResolutionPreview(): Promise<void> {
     row("Could the live view run at full resolution", "not run", `${(e as Error).message}.`);
   }
 }
+
+// --- the picture checks (record 106, first stage) ----------------------------
+// THREE CHECKS THAT ASK WHETHER THE PICTURE IS RIGHT, ON THIS DEVICE'S OWN CHIP.
+// Each is a relative statement made inside one run: two draws of the same photograph
+// by the same chip are compared with each other, so a chip that rounds differently
+// from another changes both sides alike and no stored picture is needed. Every check
+// carries its PLANTED PAIR first, a pair known to differ whose known figure is
+// printed and must be read back, so a check that cannot fail is seen not failing.
+// A planted colour is drawn and read back before any check, and must read exactly:
+// a browser that adds noise to what a page reads back would otherwise turn into
+// false verdicts. NO BAND IS WRITTEN HERE. Each verdict is the measured numbers beside
+// what the check expects of them, and a band is set only from a report a device has
+// printed (decision 106, Rejected). The section opens nothing of the reader's,
+// changes no setting and writes nothing that outlives the run.
+
+/** The names a software renderer goes by in the unmasked renderer string. */
+const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|\bwarp\b|basic render|software/i;
+
+/** The planted colour, red then green then blue, in 255ths. */
+const PLANT_COLOUR: [number, number, number] = [200, 100, 50];
+
+const MEDIAN_OF = (v: number[]): number => [...v].sort((x, y) => x - y)[Math.floor(v.length / 2)];
+
+/** Which chip is drawing. Takes nothing. Returns the unmasked renderer string of a throwaway
+ *  WebGL2 canvas, or a short phrase saying why there is none. The context is given back. */
+function chipName(): string {
+  try {
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl2");
+    if (!gl) return "WebGL2 unavailable";
+    const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+    const s = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : "renderer not disclosed";
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    c.width = 1; c.height = 1;
+    return s;
+  } catch { return "renderer not read"; }
+}
+
+interface FrameDiff { worst: number; over8: number; over24: number; moved: number; px: number }
+
+/** How far two frames of one size are apart. Takes two RGBA byte frames. Returns the largest
+ *  per-channel difference, the count of pixels with a channel more than 8 of 255 apart, the count
+ *  more than 24 apart, and the count that differ at all, with the pixel count. Throws when the
+ *  two are not the same size. What it must satisfy: two equal frames read zero in all four, and
+ *  the planted pair below reads its known figures, which `pictureChecks` requires before any check. */
+function diffFrames(a: Uint8ClampedArray, b: Uint8ClampedArray): FrameDiff {
+  if (a.length !== b.length) throw new Error(`the two frames came out different sizes (${a.length / 4} and ${b.length / 4} pixels)`);
+  const px = a.length / 4;
+  let worst = 0, over8 = 0, over24 = 0, moved = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    let m = 0;
+    for (let k = 0; k < 3; k++) { const d = Math.abs(a[i + k] - b[i + k]); if (d > m) m = d; }
+    if (m > worst) worst = m;
+    if (m > 0) moved++;
+    if (m > 8) over8++;
+    if (m > 24) over24++;
+  }
+  return { worst, over8, over24, moved, px };
+}
+
+/** The near-neutral patch of a frame, the walk's own choice. Takes an RGBA byte frame. Returns the
+ *  pixel indexes of its least-spread three percent among the pixels neither dark nor bright (at
+ *  least fifty), which the caller keeps so a second frame is read at the same pixels. */
+function pickPatch(d: Uint8ClampedArray): number[] {
+  const n = d.length / 4;
+  const hist = new Array(256).fill(0);
+  const spread = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = d[4 * i], g = d[4 * i + 1], b = d[4 * i + 2];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+    if (d[4 * i + 3] === 0 || l < 40 || l > 215) { spread[i] = -1; continue; }
+    spread[i] = mx - mn; hist[mx - mn]++;
+  }
+  let eligible = 0;
+  for (let s = 0; s < 256; s++) eligible += hist[s];
+  const want = Math.max(50, Math.floor(eligible * 0.03));
+  let cut = 0, acc = 0;
+  for (; cut < 256; cut++) { acc += hist[cut]; if (acc >= want) break; }
+  const idx: number[] = [];
+  for (let i = 0; i < n; i++) if (spread[i] >= 0 && spread[i] <= cut) idx.push(i);
+  return idx;
+}
+
+/** The red over the blue of a patch. Takes an RGBA byte frame and the indexes of its patch.
+ *  Returns the sum of the patch's red over the sum of its blue, or 0 for an empty patch. It is
+ *  the statistic the Temperature walk reads: a warmer picture raises it. */
+function patchRedOverBlue(d: Uint8ClampedArray, idx: number[]): number {
+  let sr = 0, sb = 0;
+  for (const i of idx) { sr += d[4 * i]; sb += d[4 * i + 2]; }
+  return sb > 0 ? sr / sb : 0;
+}
+
+/** A complete edit with every control at its neutral value, then `over` on top. Takes the fields
+ *  to change. Returns a fresh edit sharing no array with any other, so one draw's edit can never
+ *  be altered by another's. Consumers: the three picture checks and the planted colour. */
+function pictureParams(over: Partial<EditParams>): EditParams {
+  const p: EditParams = {
+    wb: [1, 1, 1], exposure: 1, recover: 0, swapRB: false, hue: 0, sat: 1, contrast: 1, denoise: 0,
+    tint: [1, 1, 1], glow: 0, sky: [0, 1, 1], foliage: [0, 1, 1],
+    tone: [...TONE_DEFAULT], toneR: [...TONE_DEFAULT], toneG: [...TONE_DEFAULT], toneB: [...TONE_DEFAULT],
+    lum: 1, masks: [], hotspot: 0, hotspotSize: 0.5, hotspotColor: 0, lensFix: 1, lensBypass: false, forceBalance: false,
+    hsFix: 1, hsBypass: false, vignette: 0, clarity: 0, dehaze: 0, sharpen: 0, texture: 0,
+    hsl: hslDefault(), bwOn: false, bwMix: [1, 1, 1], grade: [...GRADE_DEFAULT], grainAmt: 0, grainSize: 1.5,
+    vigAmt: 0, vigMid: 0.5, mix3: [...MIX3_DEFAULT], spots: [], crop: { ...CROP_DEFAULT }, straighten: 0,
+  };
+  return { ...p, ...JSON.parse(JSON.stringify(over)) };
+}
+
+/** Draws a colour the page chose and reads it back, through the same `drawFrame` the export uses.
+ *  Takes nothing. Returns whether every pixel read back exactly the colour the picture code is
+ *  expected to give (the planted colour through the same conversion to the wide-gamut space
+ *  `drawFrame` ends with), with the figures and a sentence for the row. What it must satisfy:
+ *  `exact` is true only when no pixel and no channel is off by even one, which is what lets the
+ *  checks after it trust a read; a throw is the caller's "could not draw". */
+async function plantedColour(): Promise<{ exact: boolean; value: string; meaning: string }> {
+  const W = 32, H = 32;
+  const pixels = new Uint8ClampedArray(W * H * 4);
+  for (let i = 0; i < W * H; i++) { pixels[4 * i] = PLANT_COLOUR[0]; pixels[4 * i + 1] = PLANT_COLOUR[1]; pixels[4 * i + 2] = PLANT_COLOUR[2]; pixels[4 * i + 3] = 255; }
+  const img = { width: W, height: H, pixels, isRaw: false } as DecodedImage;
+  const file: ImportedFile = { name: "planted.png", kind: "png", bytes: new Uint8Array(0), looksTranscoded: false };
+  const frame = await drawFrame(file, img, pictureParams({}), null);
+  const p3 = new Float32Array(3);
+  srgbDisplayToP3Display(PLANT_COLOUR[0] / 255, PLANT_COLOUR[1] / 255, PLANT_COLOUR[2] / 255, p3);
+  const want = new Uint8ClampedArray(3);
+  for (let k = 0; k < 3; k++) want[k] = p3[k] * 255;
+  let off = 0, worst = 0;
+  const px = frame.data.length / 4;
+  for (let i = 0; i < px; i++) {
+    let bad = false;
+    for (let k = 0; k < 3; k++) { const d = Math.abs(frame.data[4 * i + k] - want[k]); if (d > worst) worst = d; if (d > 0) bad = true; }
+    if (bad) off++;
+  }
+  const exact = off === 0;
+  return {
+    exact,
+    value: `${exact ? "read exactly" : "did not read exactly"} · drew ${PLANT_COLOUR.join(", ")} and read ${frame.data[0]}, ${frame.data[1]}, ${frame.data[2]} for the expected ${want[0]}, ${want[1]}, ${want[2]} · ${off} of ${px} pixels off, worst ${worst} of 255`,
+    meaning: exact
+      ? "A colour the page chose was drawn through the picture code and read back, and every pixel came back as it should. So a read made here is not being changed on its way out, and the checks below can be trusted."
+      : "A colour the page chose came back changed. Either this browser alters what a page reads back from a drawing, or the chip does not hold a plain colour; no check below is run, because its figures would not be the picture's.",
+  };
+}
+
+/** The three checks' own instruments, tried on pictures made here with known answers. Takes
+ *  nothing. Returns whether the frame comparator read the known figures of a made pair and the
+ *  patch reader read a known rise and a known fall, with the sentence for the row. What it must
+ *  satisfy: false when either instrument reads any known figure wrongly, which stops every check. */
+function plantedPairs(): { ok: boolean; value: string; meaning: string } {
+  const n = 1000;
+  const a = new Uint8ClampedArray(n * 4), b = new Uint8ClampedArray(n * 4);
+  for (let i = 0; i < n; i++) { a[4 * i] = 100; a[4 * i + 1] = 100; a[4 * i + 2] = 100; a[4 * i + 3] = 255; b[4 * i] = 100; b[4 * i + 1] = 100; b[4 * i + 2] = 100; b[4 * i + 3] = 255; }
+  for (let i = 0; i < 100; i++) b[4 * i] = 140;
+  const d = diffFrames(a, b);
+  const same = diffFrames(a, a);
+  const cmpOk = d.worst === 40 && d.over8 === 100 && d.over24 === 100 && d.moved === 100 && same.moved === 0 && same.worst === 0;
+  const one = new Uint8ClampedArray(n * 4), two = new Uint8ClampedArray(n * 4);
+  for (let i = 0; i < n; i++) { one[4 * i] = 200; one[4 * i + 1] = 150; one[4 * i + 2] = 100; one[4 * i + 3] = 255; two[4 * i] = 255; two[4 * i + 1] = 150; two[4 * i + 2] = 100; two[4 * i + 3] = 255; }
+  const idx = pickPatch(one);
+  const lo = patchRedOverBlue(one, idx), hi = patchRedOverBlue(two, idx), back = patchRedOverBlue(one, idx);
+  const patchOk = idx.length === n && Math.abs(lo - 2) < 1e-9 && Math.abs(hi - 2.55) < 1e-9 && hi > lo && !(back > hi);
+  const ok = cmpOk && patchOk;
+  return {
+    ok,
+    value: `${ok ? "read as known" : "did not read as known"} · frames: worst ${d.worst}, ${d.over8} over 8, ${d.over24} over 24, ${d.moved} moved (known 40, 100, 100, 100); patch: red over blue ${lo.toFixed(2)} then ${hi.toFixed(2)} (known 2.00 then 2.55), a rise`,
+    meaning: "The comparator and the patch reader, tried first on pictures made here whose answers are known: a frame with a hundred pixels forty apart, an equal frame read as no difference, and a patch whose red was raised read as a rise and its return as no rise. A check that cannot fail would pass anything; this is the page seeing each instrument fail before it is trusted.",
+  };
+}
+
+/** The three picture checks, three times over. Takes nothing; writes its rows into the picture
+ *  checks' own list. Returns when the rows are written. What it must satisfy: nothing of the
+ *  reader's is opened, no check runs unless the planted colour read exactly and the planted pairs
+ *  read as known, and every verdict is printed beside the numbers it rests on. */
+async function pictureChecks(): Promise<void> {
+  const chip = chipName();
+  const soft = SOFTWARE_RENDERER.test(chip);
+  row("The graphics chip drawing these checks", chip,
+    soft ? "THIS IS A SOFTWARE RENDERER, not a graphics chip: it is neither the chip nor the browser a reader uses, so the figures below describe this renderer and say nothing of the picture on a device."
+         : "The renderer string the browser gives for this page's drawing. The figures below are of this chip.");
+  const p = note("Drawing a planted colour…");
+  try {
+    const plant = await plantedColour();
+    row("A planted colour, drawn and read back", plant.value, plant.meaning);
+    if (!plant.exact) { p.remove(); row("The three picture checks", "not run", "The planted colour did not read back exactly, so a picture read on this page cannot be trusted."); return; }
+    const pairs = plantedPairs();
+    row("The checks' own pairs, planted first", pairs.value, pairs.meaning);
+    if (!pairs.ok) { p.remove(); row("The three picture checks", "not run", "An instrument did not read its planted pair as known, so nothing it says is trustworthy."); return; }
+
+    p.textContent = "Opening the practice photograph…";
+    const res = await fetch("./examples/NIR_0063.dng");
+    if (!res.ok) throw new Error("practice photo not available offline");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const file: ImportedFile = { name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false };
+    const img = await decodeOffThread({ ...file, bytes: bytes.slice() });
+    const frac = Math.min(1, Math.sqrt(2e5 / (img.width * img.height)));
+    // THE OPENING BASELINE, on the slider grid: the exposure and the gains are written the way the
+    // sliders will read them back, as a look writes them (`snapExposure`, `snapGain`).
+    const baseline = pictureParams({
+      wb: [1.6, 1, 0.7].map(snapGain) as [number, number, number], exposure: snapExposure(1.2), swapRB: true,
+      sat: 1.1, contrast: 1.05, denoise: 0.47, sharpen: 0.4,
+      crop: { x: (1 - frac) / 2, y: (1 - frac) / 2, w: frac, h: frac },
+    });
+    if (!canDrawFrame(baseline)) throw new Error("this edit is outside what the drawn path covers yet");
+    const draw = async (pr: EditParams): Promise<Uint8ClampedArray> => { const f = await drawFrame(file, img, pr, null); await tick(); return f.data; };
+    const LOOK = { hue: 4, sat: 1.25, contrast: 1.08, texture: 0.25 };
+    const WARM = 1.1;
+
+    type Run = { roundTrip: FrameDiff; own: FrameDiff; planted: FrameDiff; on: [number, number]; off: [number, number]; px: number };
+    const runs: Run[] = [];
+    let patchProblem = "";
+    for (let r = 1; r <= 3; r++) {
+      p.textContent = `Run ${r} of 3: drawing eight frames…`;
+      const B = await draw(baseline);
+      // THE PLANTED MOVE: the same photograph with its exposure raised a quarter, a pair known to differ.
+      const M = await draw({ ...baseline, exposure: baseline.exposure * 1.25 });
+      // 1. THE LOOK ROUND TRIP: one look's numbers applied from the opening baseline, drawn, applied again from the same baseline, drawn again.
+      const A1 = await draw({ ...pictureParams(baseline), ...LOOK });
+      const A2 = await draw({ ...pictureParams(baseline), ...LOOK });
+      // 2. A PRESS AT A SLIDER'S OWN VALUE: the exposure and the gains read back through the slider's grid, which moves nothing already on it.
+      const B2 = await draw({ ...pictureParams(baseline), exposure: snapExposure(baseline.exposure), wb: baseline.wb.map(snapGain) as [number, number, number] });
+      // 3. THE DIRECTION OF TEMPERATURE: a warmer white, set where the control sets it, with the swap on (the screen-side gains) and off (the camera gains).
+      const onWarm = await draw({ ...pictureParams(baseline), wbScreen: [WARM, 1, 1 / WARM] });
+      const offBase = await draw({ ...pictureParams(baseline), swapRB: false });
+      const offWarm = await draw({ ...pictureParams(baseline), swapRB: false, wb: [baseline.wb[0] * WARM, baseline.wb[1], baseline.wb[2] / WARM] });
+      const idxOn = pickPatch(B), idxOff = pickPatch(offBase);
+      if (idxOn.length < 50 || idxOff.length < 50) { patchProblem = `the picture has no near-neutral patch to read (${Math.min(idxOn.length, idxOff.length)} pixels)`; }
+      runs.push({
+        roundTrip: diffFrames(A1, A2), own: diffFrames(B, B2), planted: diffFrames(B, M),
+        on: [patchRedOverBlue(B, idxOn), patchRedOverBlue(onWarm, idxOn)],
+        off: [patchRedOverBlue(offBase, idxOff), patchRedOverBlue(offWarm, idxOff)],
+        px: B.length / 4,
+      });
+    }
+    p.remove();
+    const px = runs[0].px;
+    const figs = (d: FrameDiff) => `worst ${d.worst}, ${d.over8} over 8, ${d.over24} over 24, ${d.moved} moved`;
+    const plantedLine = (d: FrameDiff) => `${d.moved} pixels moved, worst ${d.worst}`;
+    const frameCheck = (name: string, pick: (r: Run) => FrameDiff, expects: string, plantedWhat: string) => {
+      const ds = runs.map(pick);
+      // The planted move (exposure raised a quarter) reads worst 24 here, so it is trusted when it moves pixels past 8, not past 24.
+      const trusted = runs.every((r) => r.planted.over8 > 0 && r.planted.moved > 0);
+      const zero = ds.every((d) => d.worst === 0 && d.over8 === 0 && d.over24 === 0 && d.moved === 0);
+      const verdict = !trusted ? "not trusted, the planted pair did not read as differing" : zero ? "as expected" : "NOT as expected";
+      row(name,
+        `${verdict} · largest difference ${MEDIAN_OF(ds.map((d) => d.worst))} of 255, ${MEDIAN_OF(ds.map((d) => d.over8))} over 8, ${MEDIAN_OF(ds.map((d) => d.over24))} over 24, ${MEDIAN_OF(ds.map((d) => d.moved))} of ${px} pixels moved (median of 3)`,
+        `Expects: ${expects} No band is set; a figure above zero is printed, not forgiven. Planted pair first: ${plantedWhat} read ${runs.map((r) => plantedLine(r.planted)).join("; ")}, so the check sees a difference when there is one.`,
+        runs.map((r, i) => `run ${i + 1}: ${figs(pick(r))}`).join(" · "));
+    };
+    frameCheck("Picture check: a look applied twice draws the same photograph", (r) => r.roundTrip,
+      "zero in all four figures, since both draws are of the same numbers applied from the same baseline, by one chip, in one run.",
+      "the baseline against itself with the exposure raised a quarter,");
+    frameCheck("Picture check: a press at a slider's own value moves nothing", (r) => r.own,
+      "zero pixels moved, since the exposure and the gains read back through the slider's grid are the values they already held.",
+      "the same pair of draws,");
+    const rise = (a: [number, number]) => a[1] > a[0];
+    const pct = (a: [number, number]) => ((a[1] / a[0] - 1) * 100).toFixed(2);
+    const risen = !patchProblem && runs.every((r) => rise(r.on) && rise(r.off));
+    const mid = (f: (r: Run) => number) => MEDIAN_OF(runs.map(f));
+    row("Picture check: a warmer white raises the patch's red over blue",
+      patchProblem ? `not run · ${patchProblem}`
+        : `${risen ? "as expected" : "NOT as expected"} · swap on: red over blue ${mid((r) => r.on[0]).toFixed(4)} to ${mid((r) => r.on[1]).toFixed(4)} (${mid((r) => (r.on[1] / r.on[0] - 1) * 100).toFixed(2)} percent); swap off: ${mid((r) => r.off[0]).toFixed(4)} to ${mid((r) => r.off[1]).toFixed(4)} (${mid((r) => (r.off[1] / r.off[0] - 1) * 100).toFixed(2)} percent) (median of 3)`,
+      "Expects: the red over the blue of a near-neutral patch rises when the white is moved warmer, with the red and blue swap on and with it off, which is the statistic the Temperature walk reads. Only the direction is asked, never a size. The white is moved by a tenth in red and the inverse in blue, set on the screen-side gains with the swap on and on the camera gains with it off, which is where the control sets it. Planted pair first: a patch whose red was raised read 2.00 then 2.55, a rise (known), in the line above.",
+      runs.map((r, i) => `run ${i + 1}: on ${r.on[0].toFixed(4)} to ${r.on[1].toFixed(4)} (${pct(r.on)} percent), off ${r.off[0].toFixed(4)} to ${r.off[1].toFixed(4)} (${pct(r.off)} percent)`).join(" · "));
+  } catch (e) {
+    p.remove();
+    row("The three picture checks", "not run", `${(e as Error).message}.`);
+  }
+}
+
+const picOut: string[] = [];
+($("dPictures") as HTMLButtonElement).addEventListener("click", async (e) => {
+  const btn = e.currentTarget as HTMLButtonElement;
+  const list = $("dPicResults");
+  if (running) { list.replaceChildren(); const m = document.createElement("p"); m.className = "dbg-progress"; m.textContent = "Another test on this page is still running. Press this again when it has finished."; list.appendChild(m); return; }
+  const others = ["dRun", "dBigRead", "dSlowBuild"].map((id) => $(id) as HTMLButtonElement);
+  btn.disabled = true;
+  others.forEach((b) => { b.disabled = true; });
+  const was = btn.textContent;
+  btn.textContent = "Running…";
+  running++;
+  list.replaceChildren();
+  picOut.length = 0;
+  rowsInto = list; outInto = picOut;
+  try {
+    await refreshReport();
+    await pictureChecks();
+  } catch (err) {
+    row("The picture checks", "not run", `${(err as Error).message}.`);
+  } finally {
+    rowsInto = results; outInto = out;
+    running--;
+    btn.textContent = was;
+    btn.disabled = false;
+    others.forEach((b) => { b.disabled = false; });
+  }
+});
+const picCopy = $("dPicCopy") as HTMLButtonElement;
+picCopy.addEventListener("click", () => copy(textArea.value + "\nPicture checks\n" + (picOut.length ? picOut.join("\n") : "not run yet: the picture checks have not been run on this page since it opened") + "\n", picCopy, "Copy the picture checks"));
 
 ($("dBigRead") as HTMLButtonElement).addEventListener("click", async (e) => {
   const btn = e.currentTarget as HTMLButtonElement;
