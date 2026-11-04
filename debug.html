@@ -71,12 +71,15 @@
           graphics chip. Each check draws a practice photograph twice and compares the two,
           three times over, and says first which chip is drawing. Nothing of yours is opened.
           It takes a few minutes and the page will be busy while it runs; then copy the result
-          and paste it back.
+          and paste it back. The line below the buttons says which check and which run it is
+          on, what it is doing and how long it has been going, and the copied result says how
+          long each stage took.
         </p>
         <div class="dbg-actions">
           <button id="dPictures" type="button" class="dbg-btn primary">Run the picture checks</button>
           <button id="dPicCopy" type="button" class="dbg-btn">Copy the picture checks</button>
         </div>
+        <p id="dPicProgress" class="dbg-progress" role="status" aria-live="polite" aria-label="Picture checks progress">Not running. Press the button and this line says where the checks have got to.</p>
         <div id="dPicResults" class="dbg-results" role="status" aria-live="polite"></div>
       </section>
 
