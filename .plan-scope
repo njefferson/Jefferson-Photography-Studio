@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=1d6516cce4ea2767
-diffhash=0df0356d9c715455
-verdict=IN-SCOPE: the working copy changes exactly NOTES.md, record 106 and the new record 108, all docs; NOTES.md gains only the 108 bullet between 106 and 069 and the Q-JPS-200 to Q-JPS-203 queue lines; record 106 gains only the band sentence at the end of its Built paragraph; nothing under src, tools or public changes, and the commit is docs-only against the plan's Files and Steps.
-# IN-SCOPE: the working copy changes exactly NOTES.md, record 106 and the new record 108, all docs; NOTES.md gains only the 108 bullet between 106 and 069 and the Q-JPS-200 to Q-JPS-203 queue lines; record 106 gains only the band sentence at the end of its Built paragraph; nothing under src, tools or public changes, and the commit is docs-only against the plan's Files and Steps.
+planhash=8552a5496c3468ae
+diffhash=91ac4f542aba4ecb
+verdict=IN-SCOPE: the change touches only the two decision records and NOTES.md, and within them only what step 294 names: one sentence added to record 108's Context, one phrase of its Context renamed, one sentence of record 106's Measured section renamed, two device-pass bullets and one queue line in NOTES.md. Each file is in the plan's Files list for this step, and nothing outside those edits is in the diff.
+# IN-SCOPE: the change touches only the two decision records and NOTES.md, and within them only what step 294 names: one sentence added to record 108's Context, one phrase of its Context renamed, one sentence of record 106's Measured section renamed, two device-pass bullets and one queue line in NOTES.md. Each file is in the plan's Files list for this step, and nothing outside those edits is in the diff.
