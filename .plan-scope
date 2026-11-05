@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=8552a5496c3468ae
-diffhash=91ac4f542aba4ecb
-verdict=IN-SCOPE: the change touches only the two decision records and NOTES.md, and within them only what step 294 names: one sentence added to record 108's Context, one phrase of its Context renamed, one sentence of record 106's Measured section renamed, two device-pass bullets and one queue line in NOTES.md. Each file is in the plan's Files list for this step, and nothing outside those edits is in the diff.
-# IN-SCOPE: the change touches only the two decision records and NOTES.md, and within them only what step 294 names: one sentence added to record 108's Context, one phrase of its Context renamed, one sentence of record 106's Measured section renamed, two device-pass bullets and one queue line in NOTES.md. Each file is in the plan's Files list for this step, and nothing outside those edits is in the diff.
+planhash=1eb9b215dafa0944
+diffhash=26c29ed7347691eb
+verdict=IN-SCOPE: the working change is the single sentence the step names, added at the end of the first paragraph of the 2.71 entry in NOTES.md; the diff touches no other line and no other path, and the working copy held no other change before the step.
+# IN-SCOPE: the working change is the single sentence the step names, added at the end of the first paragraph of the 2.71 entry in NOTES.md; the diff touches no other line and no other path, and the working copy held no other change before the step.
