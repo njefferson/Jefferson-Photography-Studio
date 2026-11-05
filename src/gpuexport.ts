@@ -272,16 +272,101 @@ export function buildLinearSource(file: ImportedFile, current: DecodedImage, hal
   return { image, ms: performance.now() - t0, bytes };
 }
 
+/** The drawing surface every drawn frame goes through: one `Renderer` on a canvas of its
+ *  own, given a photograph once and drawn from as many times as asked. `drawFrame` below
+ *  opens one, gives it a photograph, draws once and closes it; the test page's picture
+ *  checks open one and draw every frame of a press through it, so a change here reaches
+ *  both. */
+export interface Drawing {
+  /** Gives the surface a photograph to draw from. Takes the picked file, its decode, the lens
+   *  curve (or null) and the view's rotation and flip. Builds the pixel source, uploads it,
+   *  and sets the tap scale, the lens curve, the rotation and the flip. Returns the
+   *  milliseconds the pixel build took and the milliseconds the upload and those settings took. */
+  use(file: ImportedFile, current: DecodedImage, lens: LensCurve | null, rotate: number, flip: number): { source: number; upload: number };
+  /** Draws one frame. Takes an edit. Returns the frame's pixels (top row first, in the
+   *  wide-gamut space the computed export gives), the canvas's size, and the milliseconds the
+   *  tone curve, the render, the read-back and the conversion took. */
+  draw(params: EditParams): { data: Uint8ClampedArray; width: number; height: number; ms: { tone: number; render: number; read: number; p3: number } };
+  /** Gives the graphics context and the canvas back. Takes nothing; returns nothing. */
+  close(): void;
+}
+
+/** Opens a drawing surface. Takes nothing. Returns a promise of the surface once the picture
+ *  code has built, and rejects when it does not build here (decision 071: a new Renderer's
+ *  program is still building when the constructor returns, and a draw before it is ready draws
+ *  nothing); the context is given back before it rejects. What it must satisfy: this is the one
+ *  place that makes a `Renderer` for a drawn frame, so `drawFrame` and the test page's picture
+ *  checks draw through the same calls, and a frame drawn through a surface equals the frame
+ *  `drawFrame` gives for the same photograph and edit, which the agreement walk and the test
+ *  page's drawn-against-computed row hold. The caller closes the surface in a `finally`. */
+export async function openDrawing(): Promise<Drawing> {
+  // A CANVAS OF ITS OWN, never in the document: `setImage` sizes it to the
+  // image (times the crop), which is why a drawn export needs no tiling on any
+  // device measured — all three report a 16384-pixel limit.
+  const canvas = document.createElement("canvas");
+  const r = new Renderer(canvas);
+  // A WebGL context is not garbage: browsers cap how many a page may hold, so
+  // one that is not released costs the next one (Renderer.dispose).
+  const close = () => { r.dispose(); canvas.width = 1; canvas.height = 1; };
+  try { await r.ready; } catch (e) { close(); throw e; }
+  return {
+    use(file, current, lens, rotate, flip) {
+      // ONE PASS, EVERY PIXEL. The computed export does this per output pixel inside
+      // its sampler chain, which is more work in total — but it never holds a whole
+      // frame, and this does: four bytes a channel, 334 MB on a 21-megapixel raw.
+      // That is the trade this file exists to measure.
+      const built = buildLinearSource(file, current);
+      const src = getSource(file, current);
+      const t = performance.now();
+      r.setImage(built.image);
+      // THE FOOTPRINT THE READER PREVIEWED, not the one a full-resolution texture
+      // would give. Read from the same function the computed export uses, so the
+      // two cannot disagree about it.
+      r.setTapScale(proxyFactorFor(src, built.image.width, built.image.height));
+      // The halves this source may take (lensflat.ts lensCurveForSource): a
+      // camera-rendered picture takes the brightness half alone. A raw here is a
+      // fresh demosaic without the decode's flat, so it takes the whole curve.
+      r.setLensCurve(lensCurveForSource(lens, { isRaw: current.isRaw, turn: file.kind === "jpeg" ? turnOfOrientation(readExifSubset(file.bytes)?.orientation) : 0 }));
+      r.setRotation(rotate);
+      r.setFlip(flip);
+      return { source: built.ms, upload: performance.now() - t };
+    },
+    draw(params) {
+      let t = performance.now();
+      r.setToneCurve(params.tone, params.toneR, params.toneG, params.toneB);
+      const tone = performance.now() - t;
+      t = performance.now();
+      r.render(params);
+      const render = performance.now() - t;
+      t = performance.now();
+      const data = r.readFrame();
+      const read = performance.now() - t;
+      // DISPLAY P3, LIKE THE COMPUTED EXPORT. A JPEG this app saves is P3 and
+      // carries the matching profile; the renderer draws sRGB to its canvas.
+      // Without this the two paths differ by the gamut conversion and the
+      // comparison would be measuring that rather than the pipeline.
+      t = performance.now();
+      const p3 = new Float32Array(3);
+      for (let i = 0; i < data.length; i += 4) {
+        srgbDisplayToP3Display(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255, p3);
+        data[i] = p3[0] * 255; data[i + 1] = p3[1] * 255; data[i + 2] = p3[2] * 255;
+      }
+      return { data, width: canvas.width, height: canvas.height, ms: { tone, render, read, p3: performance.now() - t } };
+    },
+    close,
+  };
+}
+
 /** Draw one frame of an export through the app's own renderer and hand back its
  *  pixels, top row first, in the same RGBA layout the computed path produces.
  *  Takes the picked `file` and its decode `current`, the edit `params`, the
  *  lens curve `lens` (or null), and the view's `rotate` and `flip`. Returns a
  *  promise of the frame and where its time went; it resolves once drawn, and
- *  rejects if the editor's picture code does not build here (decision 071: a
- *  new Renderer's program is still building when the constructor returns, and
- *  a draw before it is ready draws nothing). Consumer: the test page's drawn
- *  export row, which compares `data` pixel for pixel with the computed export,
- *  so it must be the same size and layout as that path's output. */
+ *  rejects if the editor's picture code does not build here. It opens a drawing
+ *  surface (`openDrawing`), gives it the photograph, draws once and closes it.
+ *  Consumer: the test page's drawn export row, which compares `data` pixel for
+ *  pixel with the computed export, so it must be the same size and layout as
+ *  that path's output. */
 export async function drawFrame(
   file: ImportedFile,
   current: DecodedImage,
@@ -290,58 +375,12 @@ export async function drawFrame(
   rotate = 0,
   flip = 0,
 ): Promise<DrawnFrame> {
-  // ONE PASS, EVERY PIXEL. The computed export does this per output pixel inside
-  // its sampler chain, which is more work in total — but it never holds a whole
-  // frame, and this does: four bytes a channel, 334 MB on a 21-megapixel raw.
-  // That is the trade this file exists to measure.
-  const built = buildLinearSource(file, current);
-  const image = built.image;
-  const source = built.ms;
-  const src = getSource(file, current);
-
-  // A CANVAS OF ITS OWN, never in the document: `setImage` sizes it to the
-  // image (times the crop), which is why a drawn export needs no tiling on any
-  // device measured — all three report a 16384-pixel limit.
-  const canvas = document.createElement("canvas");
-  const r = new Renderer(canvas);
+  const surface = await openDrawing();
   try {
-    await r.ready;
-    let t = performance.now();
-    r.setImage(image);
-    // THE FOOTPRINT THE READER PREVIEWED, not the one a full-resolution texture
-    // would give. Read from the same function the computed export uses, so the
-    // two cannot disagree about it.
-    r.setTapScale(proxyFactorFor(src, image.width, image.height));
-    // The halves this source may take (lensflat.ts lensCurveForSource): a
-    // camera-rendered picture takes the brightness half alone. A raw here is a
-    // fresh demosaic without the decode's flat, so it takes the whole curve.
-    r.setLensCurve(lensCurveForSource(lens, { isRaw: current.isRaw, turn: file.kind === "jpeg" ? turnOfOrientation(readExifSubset(file.bytes)?.orientation) : 0 }));
-    r.setToneCurve(params.tone, params.toneR, params.toneG, params.toneB);
-    r.setRotation(rotate);
-    r.setFlip(flip);
-    const upload = performance.now() - t;
-    t = performance.now();
-    r.render(params);
-    const draw = performance.now() - t;
-    t = performance.now();
-    const data = r.readFrame();
-    const read = performance.now() - t;
-    // DISPLAY P3, LIKE THE COMPUTED EXPORT. A JPEG this app saves is P3 and
-    // carries the matching profile; the renderer draws sRGB to its canvas.
-    // Without this the two paths differ by the gamut conversion and the
-    // comparison would be measuring that rather than the pipeline.
-    t = performance.now();
-    const p3 = new Float32Array(3);
-    for (let i = 0; i < data.length; i += 4) {
-      srgbDisplayToP3Display(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255, p3);
-      data[i] = p3[0] * 255; data[i + 1] = p3[1] * 255; data[i + 2] = p3[2] * 255;
-    }
-    const p3ms = performance.now() - t;
-    return { data, width: canvas.width, height: canvas.height, ms: { source, upload, draw, read, p3: p3ms } };
+    const used = surface.use(file, current, lens, rotate, flip);
+    const f = surface.draw(params);
+    return { data: f.data, width: f.width, height: f.height, ms: { source: used.source, upload: used.upload + f.ms.tone, draw: f.ms.render, read: f.ms.read, p3: f.ms.p3 } };
   } finally {
-    // A WebGL context is not garbage: browsers cap how many a page may hold, so
-    // one that is not released costs the next one.
-    canvas.width = 1;
-    canvas.height = 1;
+    surface.close();
   }
 }

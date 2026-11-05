@@ -45,6 +45,7 @@
 //  10  the session strip offering to skip a later file of a set
 //  11  the line that says the look's sky is still being refined
 //  12  Temperature and Tint, the hold, the standing line and the way out of it
+//  13  the test page with a press running: the progress line, the pressed button, the targets and axe
 //
 // Feature-specific a11y probes stay in the scratchpad, per release. What makes
 // this one repo-worthy is the coverage assertion: it is the only thing here
@@ -1389,6 +1390,67 @@ try {
           await warmer();
           judgeWarmer(`${where} (the other route)`, swapNow, g0, await gains(), b0, await boxesNow());
         }
+      } finally { await page.close(); }
+    }
+  }
+  // ── 13 ─────────────────────────────────────────────────
+  // THE TEST PAGE WITH A PRESS RUNNING (record 106). Every other section measures the test page at rest, where its
+  // progress line still holds the words it had at parse and its rows are empty. The press changes that line at each
+  // check, run and frame and fills the rows, and nothing here had read the page in that state. The walk presses the
+  // Picture checks button, waits until the progress line's words differ from the parse-time ones (no longer than 60 s),
+  // and measures the page there in both themes and both shapes: the line is still a polite status region in view, in
+  // words, at the text floor and the contrast floor, the pressed button says it is running, every control is 44 or
+  // more, and axe finds nothing serious. A second change of the words is waited for too, so it is a press that is
+  // moving and not one that said its first words and stopped. The page is then closed without waiting for the press
+  // to end: the press is about two minutes under the container's software drawing, and its figures are the probe's.
+  if (want(13)) console.log("\n13 — the test page with a press running: the progress line, the pressed button, the targets and axe");
+  if (want(13)) {
+    for (const theme of THEMES) for (const size of SIZES) {
+      const where = `[${theme} ${size.name}]`;
+      const page = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
+      page.on("dialog", (d) => d.accept());
+      try {
+        await page.goto(`${BASE}/debug.html`, { waitUntil: "load" });
+        const rest = await page.evaluate(() => document.getElementById("dPicProgress")?.textContent ?? null);
+        if (rest === null) { fail(`${where} debug.html has no #dPicProgress, so the running press is unmeasured`); continue; }
+        await page.evaluate(() => document.getElementById("dPictures")?.click());
+        const moved = await page.waitForFunction((was) => (document.getElementById("dPicProgress")?.textContent ?? "") !== was, rest, { timeout: 60000, polling: 100 }).then(() => true).catch(() => false);
+        if (!moved) { fail(`${where} the progress line still read its parse-time words 60 s after the button was pressed, so no running state was reached`); continue; }
+        const first = await page.evaluate(() => document.getElementById("dPicProgress").textContent);
+        ok(`${where} the progress line changed from "${rest.slice(0, 30)}..." to "${first}" after the press`);
+        await page.evaluate(COMPOSITE);
+        const m = await page.evaluate(() => {
+          const el = document.getElementById("dPicProgress");
+          const btn = document.getElementById("dPictures");
+          const cs = getComputedStyle(el);
+          const parse = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+          const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+          const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+          const fg = parse(cs.color), bg = window.__composited(el);
+          const L1 = lum(fg), L2 = lum(bg);
+          const r = el.getBoundingClientRect();
+          return {
+            words: el.textContent, role: el.getAttribute("role"), live: el.getAttribute("aria-live"), label: el.getAttribute("aria-label") || "",
+            fontPx: parseFloat(cs.fontSize), ratio: Math.round(((Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05)) * 100) / 100,
+            shown: cs.display !== "none" && cs.visibility !== "hidden", hiddenAncestor: !!el.closest("[hidden]"),
+            inView: r.left >= -0.5 && r.right <= innerWidth + 0.5, scroll: document.documentElement.scrollWidth > innerWidth,
+            btnText: btn.textContent, btnDisabled: btn.disabled,
+          };
+        });
+        note(`${where} the line says: "${m.words}" (${m.fontPx}px, ${m.ratio}:1)`);
+        if (m.role === "status" && m.live === "polite" && m.label.length >= 12 && m.shown && !m.hiddenAncestor) ok(`${where} the line is still a polite status region with the label "${m.label}", rendered and not inside anything hidden`);
+        else fail(`${where} the line while running: role ${m.role}, aria-live ${m.live}, label "${m.label}", rendered ${m.shown}, inside something hidden ${m.hiddenAncestor}`);
+        if (m.words.trim().length >= 12) ok(`${where} the running state is in words`); else fail(`${where} the line's words are too short to say anything: "${m.words}"`);
+        if (m.fontPx >= 11) ok(`${where} text is ${m.fontPx}px, at or over the 11px floor`); else fail(`${where} text is ${m.fontPx}px, under the 11px floor`);
+        if (m.ratio >= 4.5) ok(`${where} text reads ${m.ratio}:1 against what is behind it`); else fail(`${where} text reads ${m.ratio}:1 against what is behind it, under 4.5`);
+        if (m.inView && !m.scroll) ok(`${where} the line is inside the window width and the page has no sideways scroll`); else fail(`${where} line inside the width ${m.inView}, sideways scroll ${m.scroll}`);
+        if (/Running/.test(m.btnText) && m.btnDisabled) ok(`${where} the pressed button says "${m.btnText}" and is disabled while the press runs`); else fail(`${where} the pressed button reads "${m.btnText}", disabled ${m.btnDisabled}`);
+        const inside = await page.evaluate(HIT);
+        if (inside.small.length) fail(`${where} press running, under 44: ${inside.small.join(" · ")}`); else ok(`${where} press running: every button is 44 or more`);
+        // A SECOND CHANGE: the words move on again, so the press is going and not stopped on its first line.
+        const again = await page.waitForFunction((was) => (document.getElementById("dPicProgress")?.textContent ?? "") !== was, first, { timeout: 60000, polling: 100 }).then(() => true).catch(() => false);
+        if (again) ok(`${where} the words moved on again while the press ran`); else fail(`${where} the words did not move for 60 s after the first change, so the press is not running`);
+        await axeLine(page, `debug.html ${where} with a press running`);
       } finally { await page.close(); }
     }
   }

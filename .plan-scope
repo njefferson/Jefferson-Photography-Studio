@@ -1,6 +1,6 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=1eb9b215dafa0944
-diffhash=26c29ed7347691eb
-verdict=IN-SCOPE: the working change is the single sentence the step names, added at the end of the first paragraph of the 2.71 entry in NOTES.md; the diff touches no other line and no other path, and the working copy held no other change before the step.
-# IN-SCOPE: the working change is the single sentence the step names, added at the end of the first paragraph of the 2.71 entry in NOTES.md; the diff touches no other line and no other path, and the working copy held no other change before the step.
+planhash=8ca757486d05071a
+diffhash=981d90a44c9585af
+verdict=IN-SCOPE: the six changed files of the app's working copy are each named in the plan's Files line for step 298, debug.html and tools/surfaces.mjs are named there and unchanged, and nothing outside that list is changed, staged or committed; the plan's steps 298 and 299 as read are the ceiling this diff stays under.
+# IN-SCOPE: the six changed files of the app's working copy are each named in the plan's Files line for step 298, debug.html and tools/surfaces.mjs are named there and unchanged, and nothing outside that list is changed, staged or committed; the plan's steps 298 and 299 as read are the ceiling this diff stays under.

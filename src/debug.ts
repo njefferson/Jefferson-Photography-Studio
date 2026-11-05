@@ -45,9 +45,8 @@ import { workerCount } from "./exportparallel";
 import { linearAt, type DecodedImage } from "./decode";
 import { makeRowDenoiser } from "./raw/denoise";
 import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, type EditParams, type MaskLayer } from "./pipeline";
-import { exportImage, getSource, proxyFactorFor } from "./export";
-import { lensCurveForSource } from "./lensflat";
-import { drawFrame, canDrawFrame, buildLinearSource, type DrawnFrame } from "./gpuexport";
+import { exportImage } from "./export";
+import { drawFrame, canDrawFrame, buildLinearSource, openDrawing, type Drawing, type DrawnFrame } from "./gpuexport";
 import { Renderer, VERT, FRAG, MASK_LOOP, dropMaskLoops } from "./gl";
 
 declare const __APP_VERSION__: string;
@@ -2357,21 +2356,38 @@ async function fullResolutionPreview(): Promise<void> {
 //
 // ONE DECODE AND ONE BUILD PER PRESS, WHERE EACH DRAW USED TO MAKE ITS OWN. `drawFrame` builds
 // the pixel source and a new picture code (a `Renderer`) on every call, which is right for an
-// export and was about two dozen of each here. The press now opens ONE drawing surface (`openDrawing`),
+// export and was about two dozen of each here. The press now opens ONE drawing surface (`openDrawing`,
+// in `gpuexport.ts` beside `drawFrame`, which opens, draws once and closes through the same code),
 // gives it the photograph once and draws every frame of every run through it, and the report prints
 // how many times the photograph was decoded and the picture code built, so "once each" is read
 // from the page's own counts and not assumed. Every stage is timed with the page's own clock and
 // the time is printed beside it, and one line says where the press has got to.
+//
+// EVERY SECOND OF A PRESS LIES IN A NAMED ROW. The press keeps one mark on the page's clock, and
+// every stretch is the time from that mark to the next, put under a name and the mark moved on, so
+// the rows add up to the whole press by construction and the one line that adds them says how far
+// it is from the whole and calls the difference "in no row". The stretch the press spends waiting
+// for the screen to draw is one row of its own with a count. While the page is hidden a browser
+// stops animation frames and throttles timers to seconds (MDN, Page Visibility), so the press then
+// makes no such wait and goes straight on, and the report says how many it skipped.
 
 /** What one press did, and how long each stage took. `decodes` and `builds` count the practice
  *  photograph's decode and the picture code's build at the places they happen; `uses` counts how
  *  many times each named picture was turned into the chip's source; `stages` holds every time
- *  made under a stage's name, in the order the press made them. */
+ *  made under a stage's name, in the order the press made them; `mark` is the moment on the page's
+ *  clock up to which the press's time is already under a name; `waits` and `waitMs` count and sum
+ *  the waits for the screen to draw, `hidden` counts the ones skipped with the page hidden, and
+ *  `books` sums the stretches outside the runs that are only the press writing its rows and words. */
 interface PressTally {
   decodes: number;
   builds: number;
   uses: Record<string, number>;
   stages: Map<string, number[]>;
+  mark: number;
+  waits: number;
+  waitMs: number;
+  hidden: number;
+  books: number;
 }
 
 /** Puts one time under a stage's name. Takes the tally, the name and the milliseconds. Returns
@@ -2380,6 +2396,61 @@ interface PressTally {
 function timeStage(tally: PressTally, name: string, ms: number): void {
   const l = tally.stages.get(name);
   if (l) l.push(ms); else tally.stages.set(name, [ms]);
+}
+
+/** Takes the time since the press's mark. Takes the tally. Returns the milliseconds from the mark to
+ *  now and moves the mark to now. What it must satisfy: every millisecond of a press is returned by
+ *  exactly one call, so whatever the callers put under names adds up to the press. */
+function lapMs(tally: PressTally): number {
+  const now = performance.now();
+  const d = now - tally.mark;
+  tally.mark = now;
+  return d;
+}
+
+/** Puts the time since the mark under a stage's name. Takes the tally and the name. Returns nothing. */
+function lap(tally: PressTally, name: string): void {
+  timeStage(tally, name, lapMs(tally));
+}
+
+/** Puts the time since the mark under "the press writing its rows and words". Takes the tally.
+ *  Returns nothing. Called before a timed stage begins, so what came before it (a row written, a
+ *  progress line set, an edit made) is in a row and not in the stage. */
+function books(tally: PressTally): void {
+  tally.books += lapMs(tally);
+}
+
+/** The name of the last stretch of the press: its time rows written and its drawing surface given back. */
+const TAIL_STAGE = "writing the time rows and giving the drawing surface back";
+/** The name of the planted colour's first draw, which is also the picture code's first draw. */
+const FIRST_DRAW = "the picture code's first draw";
+
+/** Gives the screen a moment to draw the progress line. Takes the tally. Returns a promise that
+ *  resolves after a zero-delay timer, with the stretch put under the waiting row and counted; while
+ *  the document reads hidden it makes no wait, counts the skip, and resolves at once. What it must
+ *  satisfy: a hidden page never waits on a timer a browser throttles to seconds, and every wait
+ *  made is in `waitMs`. */
+async function pause(tally: PressTally): Promise<void> {
+  if (document.visibilityState === "hidden") { tally.hidden++; return; }
+  const before = lapMs(tally);
+  tally.books += before;
+  await tick();
+  tally.waits++;
+  tally.waitMs += lapMs(tally);
+}
+
+/** Starts a press's tally. Takes the moment the press began on the page's clock. Returns an empty
+ *  tally whose mark is that moment. */
+function newTally(start: number): PressTally {
+  return { decodes: 0, builds: 0, uses: {}, stages: new Map(), mark: start, waits: 0, waitMs: 0, hidden: 0, books: 0 };
+}
+
+/** Every millisecond the press has put under a name. Takes the tally. Returns the sum of every
+ *  stage, the waits and the books. */
+function pressTotal(tally: PressTally): number {
+  let s = tally.waitMs + tally.books;
+  for (const l of tally.stages.values()) for (const v of l) s += v;
+  return s;
 }
 
 /** The progress line of the picture checks, present in `debug.html` from parse in a polite live
@@ -2401,61 +2472,18 @@ function progress(text: string, last = false): void {
  *  in seconds above, with one decimal. */
 const dur = (n: number): string => (n < 10000 ? ms(n) : `${(n / 1000).toFixed(1)} s`);
 
-/** The surface every frame of a press is drawn through. */
-interface Drawing {
-  /** Gives the surface a picture to draw from. Takes the file, its decode and a name for the
-   *  tally; builds the pixel source once and uploads it. Returns nothing. */
-  use(file: ImportedFile, current: DecodedImage, label: string): void;
-  /** Draws one frame. Takes an edit. Returns the frame's pixels as `drawFrame` does (top row
-   *  first, in the wide-gamut space) and the milliseconds the render, read-back and conversion took. */
-  draw(params: EditParams): { data: Uint8ClampedArray; ms: number };
-  /** Gives the graphics context back. Takes nothing; returns nothing. */
-  dispose(): void;
-}
-
-/** Opens the press's one drawing surface. Takes the press's tally, which gains the build's time
- *  and a count of one. Returns a promise of the surface once the picture code has built, and
- *  rejects when it does not build here. What it must satisfy: `draw` gives the frame
- *  `drawFrame` gives for the same edit of the same photograph, since it makes the same
- *  calls on the same renderer in the same order, and a call to this function is the only place
- *  in the section that makes a `Renderer`. */
-async function openDrawing(tally: PressTally): Promise<Drawing> {
-  const canvas = document.createElement("canvas");
-  const t0 = performance.now();
-  tally.builds++;
-  const r = new Renderer(canvas);
-  const give = () => { r.dispose(); canvas.width = 1; canvas.height = 1; };
-  try { await r.ready; } catch (e) { give(); throw e; }
-  timeStage(tally, "the picture code's build", performance.now() - t0);
-  r.setRotation(0);
-  r.setFlip(0);
-  return {
-    use(file, current, label) {
-      const src = getSource(file, current);
-      const t1 = performance.now();
-      tally.uses[label] = (tally.uses[label] ?? 0) + 1;
-      const built = buildLinearSource(file, current);
-      timeStage(tally, `the ${label}'s pixel build`, performance.now() - t1);
-      const t2 = performance.now();
-      r.setImage(built.image);
-      r.setTapScale(proxyFactorFor(src, built.image.width, built.image.height));
-      r.setLensCurve(lensCurveForSource(null, { isRaw: current.isRaw, turn: 0 }));
-      timeStage(tally, `the ${label}'s upload to the chip`, performance.now() - t2);
-    },
-    draw(params) {
-      const t1 = performance.now();
-      r.setToneCurve(params.tone, params.toneR, params.toneG, params.toneB);
-      r.render(params);
-      const data = r.readFrame();
-      const p3 = new Float32Array(3);
-      for (let i = 0; i < data.length; i += 4) {
-        srgbDisplayToP3Display(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255, p3);
-        data[i] = p3[0] * 255; data[i + 1] = p3[1] * 255; data[i + 2] = p3[2] * 255;
-      }
-      return { data, ms: performance.now() - t1 };
-    },
-    dispose: give,
-  };
+/** Gives the press's drawing surface a picture and puts the two times under names. Takes the surface,
+ *  the tally, the file, its decode and a name for the picture. Returns nothing; the tally counts one
+ *  more use of the name, and the stretch since the mark goes under "the <name>'s pixel build" (the
+ *  time the surface says the build took) and "the <name>'s upload to the chip" (the rest). What it
+ *  must satisfy: the surface is given no lens curve, no rotation and no flip, which is what the press
+ *  draws, so a frame drawn after it is the frame `drawFrame` gives for the same photograph and edit. */
+function useOn(drawing: Drawing, tally: PressTally, file: ImportedFile, current: DecodedImage, label: string): void {
+  tally.uses[label] = (tally.uses[label] ?? 0) + 1;
+  const u = drawing.use(file, current, null, 0, 0);
+  const whole = lapMs(tally);
+  timeStage(tally, `the ${label}'s pixel build`, u.source);
+  timeStage(tally, `the ${label}'s upload to the chip`, Math.max(0, whole - u.source));
 }
 
 /** The names a software renderer goes by in the unmasked renderer string. */
@@ -2553,22 +2581,28 @@ function pictureParams(over: Partial<EditParams>): EditParams {
 
 /** Draws a colour the page chose and reads it back, through the press's one drawing surface, which
  *  does what `drawFrame` does (the same picture code, the same conversion to the wide-gamut space).
- *  Takes that surface and the press's tally, which gains the stage's time. Returns whether every
- *  pixel read back exactly the colour the picture code is expected to give, with the figures and a
- *  sentence for the row. What it must satisfy: `exact` is true only when no pixel and no channel is
- *  off by even one, which is what lets the checks after it trust a read; a throw is the caller's
- *  "could not draw". The surface is left holding the planted picture, so the caller gives it the
- *  photograph with `use` before it draws that. */
+ *  Takes that surface and the press's tally, which gains the stages' times: the colour's source made
+ *  and sent, the picture code's first draw (a draw of the same colour, made and thrown away so the
+ *  chip's one-time warm-up is in a row of its own), and the colour drawn, read back and compared.
+ *  Returns whether every pixel read back exactly the colour the picture code is expected to give,
+ *  with the figures and a sentence for the row. What it must satisfy: `exact` is true only when no
+ *  pixel and no channel is off by even one, which is what lets the checks after it trust a read; the
+ *  planted colour's own row is the second draw's alone; a throw is the caller's "could not draw". The
+ *  surface is left holding the planted picture, so the caller gives it the photograph with `useOn`
+ *  before it draws that. */
 async function plantedColour(drawing: Drawing, tally: PressTally): Promise<{ exact: boolean; value: string; meaning: string }> {
   const W = 32, H = 32;
   const pixels = new Uint8ClampedArray(W * H * 4);
   for (let i = 0; i < W * H; i++) { pixels[4 * i] = PLANT_COLOUR[0]; pixels[4 * i + 1] = PLANT_COLOUR[1]; pixels[4 * i + 2] = PLANT_COLOUR[2]; pixels[4 * i + 3] = 255; }
   const img = { width: W, height: H, pixels, isRaw: false } as DecodedImage;
   const file: ImportedFile = { name: "planted.png", kind: "png", bytes: new Uint8Array(0), looksTranscoded: false };
-  const t0 = performance.now();
-  drawing.use(file, img, "planted colour");
-  const frame = drawing.draw(pictureParams({}));
-  timeStage(tally, "the planted colour, drawn and read back", performance.now() - t0);
+  books(tally);
+  useOn(drawing, tally, file, img, "planted colour");
+  const edit = pictureParams({});
+  books(tally);
+  drawing.draw(edit);
+  lap(tally, FIRST_DRAW);
+  const frame = drawing.draw(edit);
   const p3 = new Float32Array(3);
   srgbDisplayToP3Display(PLANT_COLOUR[0] / 255, PLANT_COLOUR[1] / 255, PLANT_COLOUR[2] / 255, p3);
   const want = new Uint8ClampedArray(3);
@@ -2581,6 +2615,7 @@ async function plantedColour(drawing: Drawing, tally: PressTally): Promise<{ exa
     if (bad) off++;
   }
   const exact = off === 0;
+  lap(tally, "the planted colour, drawn and read back");
   return {
     exact,
     value: `${exact ? "read exactly" : "did not read exactly"} · drew ${PLANT_COLOUR.join(", ")} and read ${frame.data[0]}, ${frame.data[1]}, ${frame.data[2]} for the expected ${want[0]}, ${want[1]}, ${want[2]} · ${off} of ${px} pixels off, worst ${worst} of 255`,
@@ -2622,45 +2657,52 @@ function plantedPairs(): { ok: boolean; value: string; meaning: string } {
  *  reader's is opened, no check runs unless the planted colour read exactly and the planted pairs
  *  read as known, every verdict is printed beside the numbers it rests on, the practice photograph
  *  is decoded once and the picture code built once however many frames are drawn, the counts of
- *  both are printed, and the drawing surface is given back whatever happens. */
-async function pictureChecks(): Promise<boolean> {
-  const tally: PressTally = { decodes: 0, builds: 0, uses: {}, stages: new Map() };
+ *  both are printed, and the drawing surface is given back whatever happens. It takes the press's
+ *  tally, begun by the caller at the press of the button, and puts every stretch under a name in it. */
+async function pictureChecks(tally: PressTally): Promise<boolean> {
   const chip = chipName();
   const soft = SOFTWARE_RENDERER.test(chip);
+  lap(tally, "reading the chip's name");
   row("The graphics chip drawing these checks", chip,
     soft ? "THIS IS A SOFTWARE RENDERER, not a graphics chip: it is neither the chip nor the browser a reader uses, so the figures below describe this renderer and say nothing of the picture on a device."
          : "The renderer string the browser gives for this page's drawing. The figures below are of this chip.");
   let drawing: Drawing | null = null;
   try {
     progress("Building the picture code, once for the whole press");
-    const dr = await openDrawing(tally);
+    books(tally);
+    tally.builds++;
+    const dr = await openDrawing();
     drawing = dr;
-    await tick();
+    lap(tally, "the picture code's build");
+    await pause(tally);
     progress("Drawing a planted colour");
     const plant = await plantedColour(dr, tally);
     row("A planted colour, drawn and read back", plant.value, plant.meaning);
     if (!plant.exact) { row("The three picture checks", "not run", "The planted colour did not read back exactly, so a picture read on this page cannot be trusted."); return false; }
     progress("Trying the checks' own planted pairs");
+    books(tally);
     const pairs = plantedPairs();
+    lap(tally, "the checks' own planted pairs, tried");
     row("The checks' own pairs, planted first", pairs.value, pairs.meaning);
     if (!pairs.ok) { row("The three picture checks", "not run", "An instrument did not read its planted pair as known, so nothing it says is trustworthy."); return false; }
 
     progress("Reading the practice photograph's file");
-    const tFile = performance.now();
+    books(tally);
     const res = await fetch("./examples/NIR_0063.dng");
     if (!res.ok) throw new Error("practice photo not available offline");
     const bytes = new Uint8Array(await res.arrayBuffer());
-    timeStage(tally, "reading the practice photograph's file", performance.now() - tFile);
+    lap(tally, "reading the practice photograph's file");
     const file: ImportedFile = { name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false };
     progress("Decoding the practice photograph, once for the whole press");
-    const tDecode = performance.now();
+    books(tally);
     tally.decodes++;
     const img = await decodeOffThread({ ...file, bytes: bytes.slice() });
-    timeStage(tally, "the practice photograph's decode", performance.now() - tDecode);
+    lap(tally, "the practice photograph's decode");
     progress("Building the practice photograph's pixels and sending them to the chip, once");
-    await tick();
-    dr.use(file, img, "practice photograph");
-    await tick();
+    await pause(tally);
+    books(tally);
+    useOn(dr, tally, file, img, "practice photograph");
+    await pause(tally);
     const frac = Math.min(1, Math.sqrt(2e5 / (img.width * img.height)));
     // THE OPENING BASELINE, on the slider grid: the exposure and the gains are written the way the
     // sliders will read them back, as a look writes them (`snapExposure`, `snapGain`).
@@ -2678,20 +2720,26 @@ async function pictureChecks(): Promise<boolean> {
     let patchProblem = "";
     // The time each part of the press took, one figure per run: the draws and the readings of the
     // shared baseline and planted move, and of each check, summed over the run's frames.
-    const PARTS = ["shared draws", "shared reading", "check 1 draws", "check 1 reading", "check 2 draws", "check 2 reading", "check 3 draws", "check 3 reading"];
+    // THE EIGHTH PART is everything in a run that is neither a draw nor a reading: making each frame's
+    // edit, setting the progress words and keeping the books. Each part takes the stretch since the press's
+    // mark, so the eight and the waits add up to the run.
+    const PARTS = ["shared draws", "shared reading", "check 1 draws", "check 1 reading", "check 2 draws", "check 2 reading", "check 3 draws", "check 3 reading", "making each frame's edit and keeping the books"];
+    const EDITS = PARTS[8];
+    books(tally);
     for (let r = 1; r <= 3; r++) {
       const acc: Record<string, number> = {};
       let frameNo = 0;
       const draw = async (part: string, what: string, pr: EditParams): Promise<Uint8ClampedArray> => {
         frameNo++;
         progress(`Run ${r} of 3, frame ${frameNo} of 8: ${what}`);
-        await tick();
+        acc[EDITS] = (acc[EDITS] ?? 0) + lapMs(tally);
+        await pause(tally);
         const f = dr.draw(pr);
-        acc[part] = (acc[part] ?? 0) + f.ms;
-        await tick();
+        acc[part] = (acc[part] ?? 0) + lapMs(tally);
+        await pause(tally);
         return f.data;
       };
-      const read = <V,>(part: string, f: () => V): V => { const t1 = performance.now(); const v = f(); acc[part] = (acc[part] ?? 0) + (performance.now() - t1); return v; };
+      const read = <V,>(part: string, f: () => V): V => { const v = f(); acc[part] = (acc[part] ?? 0) + lapMs(tally); return v; };
       const B = await draw("shared draws", "the baseline", baseline);
       // THE PLANTED MOVE: the same photograph with its exposure raised a quarter, a pair known to differ.
       const M = await draw("shared draws", "the planted move, the exposure raised a quarter", { ...baseline, exposure: baseline.exposure * 1.25 });
@@ -2705,7 +2753,7 @@ async function pictureChecks(): Promise<boolean> {
       const offBase = await draw("check 3 draws", "check 3 of 3, the swap off, before the warmer white", { ...pictureParams(baseline), swapRB: false });
       const offWarm = await draw("check 3 draws", "check 3 of 3, a warmer white with the swap off", { ...pictureParams(baseline), swapRB: false, wb: [baseline.wb[0] * WARM, baseline.wb[1], baseline.wb[2] / WARM] });
       progress(`Run ${r} of 3: reading the eight frames`);
-      await tick();
+      await pause(tally);
       const idxOn = read("check 3 reading", () => pickPatch(B)), idxOff = read("check 3 reading", () => pickPatch(offBase));
       if (idxOn.length < 50 || idxOff.length < 50) { patchProblem = `the picture has no near-neutral patch to read (${Math.min(idxOn.length, idxOff.length)} pixels)`; }
       runs.push({
@@ -2714,10 +2762,11 @@ async function pictureChecks(): Promise<boolean> {
         off: read("check 3 reading", () => [patchRedOverBlue(offBase, idxOff), patchRedOverBlue(offWarm, idxOff)] as [number, number]),
         px: B.length / 4,
       });
+      acc[EDITS] = (acc[EDITS] ?? 0) + lapMs(tally);
       for (const part of PARTS) timeStage(tally, part, acc[part] ?? 0);
     }
     progress("Writing the results");
-    await tick();
+    await pause(tally);
     const px = runs[0].px;
     const figs = (d: FrameDiff) => `worst ${d.worst}, ${d.over8} over 8, ${d.over24} over 24, ${d.moved} moved`;
     const plantedLine = (d: FrameDiff) => `${d.moved} pixels moved, worst ${d.worst}`;
@@ -2750,28 +2799,57 @@ async function pictureChecks(): Promise<boolean> {
 
     // HOW LONG EACH STAGE TOOK, beside the figures, and how many times the photograph was decoded and
     // the picture code built, which the press is asked to do once each.
+    books(tally);
     const st = (k: string): number[] => tally.stages.get(k) ?? [];
-    const once = (name: string, key: string, meaning: string) => {
-      const l = st(key);
-      row(`Time: ${name}`, l.length ? `${dur(l[0])} (once)` : "not measured", meaning);
+    const printed = new Set<string>();
+    const once = (name: string, keys: string[], meaning: string) => {
+      keys.forEach((k) => printed.add(k));
+      const l = keys.map((k) => st(k)[0]);
+      row(`Time: ${name}`, l.every((v) => v !== undefined) ? `${dur(l.reduce((s, v) => s + v, 0))} (once)` : "not measured", meaning);
     };
-    once("reading the practice photograph's file", "reading the practice photograph's file", "The practice photograph's file read into memory, before its decode.");
-    once("the practice photograph's decode", "the practice photograph's decode", "The decode of the practice photograph off the page's own thread, done once for the whole press and handed to every draw.");
-    once("the picture code's build", "the picture code's build", "The picture code built on this chip, once for the whole press; every frame of every run is drawn through it.");
-    once("the planted colour, drawn and read back", "the planted colour, drawn and read back", "The planted colour's source, one draw and its read-back and conversion, before any check.");
-    once("the photograph's pixels built", "the practice photograph's pixel build", "The photograph's pixels made from its decode, once, which every draw of the press then reads.");
-    once("the photograph sent to the chip", "the practice photograph's upload to the chip", "The photograph's pixels uploaded to the chip, once.");
+    once("reading the practice photograph's file", ["reading the practice photograph's file"], "The practice photograph's file read into memory, before its decode.");
+    once("the practice photograph's decode", ["the practice photograph's decode"], "The decode of the practice photograph off the page's own thread, done once for the whole press and handed to every draw.");
+    once("the picture code's build", ["the picture code's build"], "The picture code built on this chip, once for the whole press; every frame of every run is drawn through it.");
+    once("the planted colour's source made and sent", ["the planted colour's pixel build", "the planted colour's upload to the chip"], "The planted colour's own small source made and uploaded to the chip, before its draws.");
+    once("the picture code's first draw", [FIRST_DRAW], "One draw of the planted colour, made and thrown away before the one that is read, so whatever the chip pays the first time it draws is in this row and not in the planted colour's.");
+    once("the planted colour, drawn and read back", ["the planted colour, drawn and read back"], "The planted colour's second draw, its read-back and conversion and the comparison of every pixel with what the picture code should give, before any check.");
+    once("the checks' own planted pairs, tried", ["the checks' own planted pairs, tried"], "The comparator and the patch reader tried on pictures made here whose answers are known.");
+    once("the photograph's pixels built", ["the practice photograph's pixel build"], "The photograph's pixels made from its decode, once, which every draw of the press then reads.");
+    once("the photograph sent to the chip", ["the practice photograph's upload to the chip"], "The photograph's pixels uploaded to the chip, once, with the lens curve, rotation and flip set.");
+    once("reading the chip's name", ["reading the chip's name"], "The throwaway canvas that names the graphics chip, before the first row.");
+    once("taking the device report again", ["taking the device report again"], "The report of the device and the browser taken again at the press of the button, before the checks begin.");
     const wholeOf = (names: string[]): number[] => [0, 1, 2].map((i) => names.reduce((s, n) => s + (st(n)[i] ?? 0), 0));
     const timed = (name: string, drawKey: string, readKey: string, meaning: string) => {
       const draws = st(drawKey), reads = st(readKey), whole = wholeOf([drawKey, readKey]);
+      printed.add(drawKey); printed.add(readKey);
       row(`Time: ${name}`,
-        `whole ${dur(MEDIAN_OF(whole))}, of which renders and read-backs ${dur(MEDIAN_OF(draws))} and reading the figures ${dur(MEDIAN_OF(reads))} (median of 3)`,
+        `whole ${dur(MEDIAN_OF(whole))}, first run ${dur(whole[0])}, of which renders and read-backs ${dur(MEDIAN_OF(draws))} and reading the figures ${dur(MEDIAN_OF(reads))} (median of 3)`,
         meaning, whole.map((w, i) => `run ${i + 1}: ${dur(w)}`).join(", "));
     };
     timed("the baseline and the planted move", "shared draws", "shared reading", "The two frames every check leans on: the baseline and the planted move, with their comparison.");
     timed("check 1, a look applied twice", "check 1 draws", "check 1 reading", "The two renders and read-backs of the check and the comparison of the two.");
     timed("check 2, a press at a slider's own value", "check 2 draws", "check 2 reading", "The one render and read-back of the check and its comparison with the baseline.");
     timed("check 3, a warmer white", "check 3 draws", "check 3 reading", "The three renders and read-backs of the check and its two patch readings.");
+    {
+      printed.add(EDITS);
+      const whole = st(EDITS);
+      row("Time: making each frame's edit and keeping the books",
+        `whole ${dur(MEDIAN_OF(whole))}, first run ${dur(whole[0] ?? 0)} (median of 3)`,
+        "Everything in a run that is neither a draw nor a reading: the edit made for each of the eight frames, the progress words set and the run's figures put away.",
+        whole.map((w, i) => `run ${i + 1}: ${dur(w)}`).join(", "));
+    }
+    row("Time: waiting for the screen to draw",
+      `${dur(tally.waitMs)} in all, over ${tally.waits} ${tally.waits === 1 ? "wait" : "waits"}`,
+      "The zero-delay waits the press makes so the progress line can draw, between its stages and its frames, all in this one row.");
+    row("Time: writing rows and words outside the runs", `${dur(tally.books)} (in all)`,
+      "The press writing its own rows and progress words between stages, outside the three runs: the stretches that are only bookkeeping.");
+    row("Done in this press: waits skipped with the page hidden",
+      `${tally.hidden} ${tally.hidden === 1 ? "wait" : "waits"} skipped with the page hidden`,
+      "While the page is hidden a browser stops animation frames and throttles timers to seconds, so the press makes no wait then and goes straight on. Zero here means the page was in front for the whole press.");
+    for (const k of tally.stages.keys()) {
+      if (printed.has(k) || k === TAIL_STAGE) continue;
+      row(`Time: ${k}`, `${dur(st(k).reduce((s, v) => s + v, 0))} (in all)`, "A stretch of the press that has no row of its own above.");
+    }
     const photographUses = tally.uses["practice photograph"] ?? 0;
     const onceEach = tally.decodes === 1 && tally.builds === 1 && photographUses === 1;
     row("Done in this press: the photograph decoded, the picture code built",
@@ -2782,7 +2860,8 @@ async function pictureChecks(): Promise<boolean> {
     row("The three picture checks", "not run", `${(e as Error).message}.`);
     return false;
   } finally {
-    drawing?.dispose();
+    drawing?.close();
+    lap(tally, TAIL_STAGE);
   }
 }
 
@@ -2801,12 +2880,19 @@ const picOut: string[] = [];
   picOut.length = 0;
   rowsInto = list; outInto = picOut;
   pressStart = performance.now();
+  const tally = newTally(pressStart);
   progress("Starting the picture checks");
   try {
     await refreshReport();
-    const finished = await pictureChecks();
+    lap(tally, "taking the device report again");
+    const finished = await pictureChecks(tally);
     const whole = performance.now() - pressStart;
     row("Time: the whole press", dur(whole), "From the press of the button to the last row, the report's own build, the drawing and the reading together.");
+    const sum = pressTotal(tally);
+    const tail = tally.stages.get(TAIL_STAGE)?.[0] ?? 0;
+    row("Time: every row added together",
+      `${dur(sum)} against the whole press ${dur(whole)}, ${dur(Math.max(0, whole - sum))} in no row; the last stretch, writing the time rows and giving the drawing surface back, ${dur(tail)}, is in this sum and in no row above it`,
+      "Every stretch of the press from the button to this line is in one named row above, and this line adds them: the rows' times, the waiting and bookkeeping rows and the last stretch. The difference from the whole press is what lay in no row.");
     progress(finished ? `Done. All three checks ran and the whole press took ${dur(whole)}.` : `Stopped before the checks finished, as the rows say. The press took ${dur(whole)}.`, true);
   } catch (err) {
     row("The picture checks", "not run", `${(err as Error).message}.`);
