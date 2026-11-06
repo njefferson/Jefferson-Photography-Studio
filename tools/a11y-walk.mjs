@@ -1497,6 +1497,23 @@ try {
         hit = await page.evaluate(HIT);
         if (hit.small.length) fail(`${where} after step 1, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after step 1: every button is 44 or more`);
         await axeLine(page, `debug.html ${where} after step 1`);
+        // (b2) TAP FEEDBACK: a typed spot reads at once. The points line is a live region present from parse; after the pair is typed it says
+        // in words whether the spot is usable, blown out or too dark, and the first picture's label names the spot with its letter and state
+        // (the mark is a letter in a square with words beside it, which the label repeats). Only the words are read: no picture is judged.
+        const live = await page.evaluate(() => { const el = document.getElementById("dSepHint"); return { role: el?.getAttribute("role"), live: el?.getAttribute("aria-live") }; });
+        if (live.role === "status" && live.live === "polite") ok(`${where} the points line is a polite live region present from parse`); else fail(`${where} the points line is not a polite status region: ${JSON.stringify(live)}`);
+        const hint0 = await page.evaluate(() => document.getElementById("dSepHint")?.textContent ?? "");
+        await page.fill("#dSepNX", "30");
+        await page.fill("#dSepNY", "30");
+        await page.dispatchEvent("#dSepNY", "change");
+        const spoke = await page.waitForFunction((was) => { const t = document.getElementById("dSepHint")?.textContent ?? ""; return t !== was && /^The neutral spot at/.test(t) && /(is usable|is blown out|too dark)/.test(t); }, hint0, { timeout: 900000, polling: 200 }).then(() => true).catch(() => false);
+        const spokenWords = await page.evaluate(() => document.getElementById("dSepHint")?.textContent ?? "");
+        if (spoke) ok(`${where} a typed neutral spot is answered in words: "${spokenWords.slice(0, 70)}..."`); else fail(`${where} a typed neutral spot was not answered in words: "${spokenWords}"`);
+        const marked = await page.evaluate(() => { const cv = document.querySelector("#dSepPics canvas"); const fig = cv && cv.closest("figure"); return { label: cv ? cv.getAttribute("aria-label") || "" : "", cap: fig && fig.querySelector("figcaption") ? fig.querySelector("figcaption").textContent : "" }; });
+        if (/Marked: N, the neutral spot, (usable|blown out|too dark)/.test(marked.label) && marked.cap === marked.label) ok(`${where} the picture's label and caption name the spot by its letter and its state`); else fail(`${where} the picture's label does not name the typed spot and its state: "${marked.label.slice(-120)}"`);
+        hit = await page.evaluate(HIT);
+        if (hit.small.length) fail(`${where} after a typed spot, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after a typed spot: every button is 44 or more`);
+        await axeLine(page, `debug.html ${where} after a typed spot`);
         // (c) step 3, two points typed
         for (const [id, v] of [["dSepNX", "30"], ["dSepNY", "30"], ["dSepFX", "60"], ["dSepFY", "60"]]) await page.fill(`#${id}`, v);
         await page.evaluate(() => document.getElementById("dSepGo")?.click());

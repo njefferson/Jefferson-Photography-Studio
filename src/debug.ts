@@ -38,7 +38,7 @@ import { measureHoldWatch, holdWatchLine } from "./startup";
 import { onAdoptAnswer, wireUpdateStrip } from "./swupdate";
 import { decode } from "./decode";
 import { decodeOffThread, decodeLanes } from "./decodeClient";
-import { sniff, type ImportedFile } from "./import";
+import { sniff, importFile, type ImportedFile } from "./import";
 import { srgbDisplayToP3Display } from "./icc";
 import { snapExposure, snapGain, freshBaseline, EXPOSURE_LO, EXPOSURE_HI } from "./tile";
 import { workerCount } from "./exportparallel";
@@ -2680,6 +2680,21 @@ function exifWords(bytes: Uint8Array): string {
   return parts.join(", ");
 }
 
+/** Says in words which route opened a photograph. Takes the file and its decode. Returns one sentence naming the route (the raw's sensor
+ *  data, a raw's embedded preview, or a camera-rendered file as the camera made it), the decoder's own name for the format, the camera and
+ *  the lens. What it must satisfy: it reads `img.isRaw` and `img.previewNotice` as the decoder set them, so the route it names is the one
+ *  the editor's open takes for the same file, and it names no figure the file does not carry. */
+function routeWords(file: ImportedFile, img: DecodedImage): string {
+  const decoder = file.kind === "nef" ? "the Nikon NEF decoder"
+    : file.kind === "dng" || file.kind === "tiff" ? "the DNG and TIFF decoder"
+    : "the browser's own image decoder";
+  const route = img.isRaw ? "the raw's sensor data, developed as the editor opens it, with its camera matrix"
+    : img.previewNotice ? `a raw's embedded JPEG preview and not its sensor data (${img.previewNotice})`
+    : file.kind === "jpeg" || file.kind === "png" ? "a camera-rendered file, as the camera made it"
+    : "an 8-bit picture read out of the file, not its sensor data";
+  return `${route} · format ${file.kind}${file.rawBrand ? ` (${file.rawBrand})` : ""}, read by ${decoder} · ${exifWords(file.bytes)}`;
+}
+
 /** Reads the photograph a press runs on. Takes the press's tally. Returns the subject: the picked file decoded
  *  when one was picked and it decodes, else the practice photograph fetched and decoded. A picked file the page
  *  cannot decode gets a row in the not-measured words saying why and the practice photograph is used. Writes the
@@ -2721,6 +2736,8 @@ async function loadSubject(tally: PressTally): Promise<Subject> {
   }
   row("The photograph these checks run on", `${file.name} · ${file.kind} · ${img.width} by ${img.height} pixels`,
     `${label === "picked photograph" ? "The photograph you picked." : "The bundled practice photograph, which carries no camera data."} Its EXIF: ${exifWords(file.bytes)}. The file is read on this page only.`);
+  row("How the photograph was opened", routeWords(file, img),
+    "The route the decode took, read from the decoder's own answer: a raw is developed from its sensor data and then opens at a balance found from the data; a raw whose sensor data the decoder did not take is shown by its embedded preview, an 8-bit picture that opens at no balance; a camera-rendered file stays as the camera made it. The camera and lens are what the file's EXIF holds, read once the way the editor reads it. This page draws with no lens curve, so the lens is named and not applied to the pictures below.");
   return { file, img, label, name: file.name };
 }
 
@@ -2731,8 +2748,11 @@ async function loadSubject(tally: PressTally): Promise<Subject> {
   pickedFile = null;
   if (!f) { note.textContent = "No photograph picked, so the practice photograph is used."; return; }
   try {
-    const bytes = new Uint8Array(await f.arrayBuffer());
-    pickedFile = { name: f.name, kind: sniff(bytes), bytes, looksTranscoded: false };
+    // THE EDITOR'S OWN DOOR (`importFile`): a NEF and a DNG carry the same magic number, so `sniff` alone calls a NEF a "dng" and the
+    // decoder then opens the raw's embedded preview, as an 8-bit picture at no balance. `importFile` tells them apart by name (`refineKind`),
+    // names a third-party raw's brand and unpacks a zip, which is how the editor opens every file.
+    pickedFile = await importFile(f);
+    const bytes = pickedFile.bytes;
     note.textContent = `Picked ${f.name}: ${(bytes.length / (1024 * 1024)).toFixed(1)} MB, read as ${pickedFile.kind}. Both buttons below now run on it. It goes nowhere: nothing is uploaded or saved. The copied result carries its file name, its camera and its lens.`;
   } catch (err) {
     note.textContent = `The page could not read ${f.name} (${(err as Error).message}), so the practice photograph is used. Pick it again, or pick another.`;
@@ -3180,7 +3200,17 @@ function sepFigure(parent: HTMLElement, words: string, data: Uint8ClampedArray, 
 interface SepState {
   drawing: Drawing; subject: Subject; wb0: [number, number, number]; exp0: number;
   t: ReturnType<typeof thin>; cv0: HTMLCanvasElement; spec: Parameters<typeof readBalance>[1] | null;
+  /** The picture on show: the opening balance's at first, then the balance of the last usable spot. */
+  shown: ReturnType<typeof thin>;
+  /** Which balance `shown` is drawn at, in words. */
+  shownWhat: string;
+  /** The words the picture's label and caption start from, before the spots' state is added. */
+  baseWords: string;
+  /** What each spot's last reading said. Null until the spot has been read. */
+  spots: { n: SpotRead | null; f: SpotRead | null };
 }
+/** One spot's reading by the editor's tap rule: where it is, whether it is usable, the balance it sets and, when usable, the picture drawn at it. */
+interface SpotRead { px: number; py: number; verdict: "ok" | "blown" | "dark"; wb: [number, number, number] | null; exposure: number; t: ReturnType<typeof thin> | null }
 let sep: SepState | null = null;
 const sepGo = $("dSepGo") as HTMLButtonElement;
 
@@ -3208,32 +3238,119 @@ function sepPoints(): { n: [number, number]; f: [number, number] } | null {
   return { n: [v[0] / 100, v[1] / 100], f: [v[2] / 100, v[3] / 100] };
 }
 
-/** Redraws the first picture with the two points marked: a circle with N for the neutral spot, a square with F for the foliage spot. Takes
- *  nothing; returns nothing. The marks are shapes and letters, never colour alone. */
+/** The image pixel a spot lies at. Takes the decoded photograph and the spot as fractions of its width and height. Returns the column and
+ *  the row, the rounding the editor's tap and step 3 both use, so a spot read here is the spot step 3 reads. */
+const spotPixel = (img: DecodedImage, f: [number, number]): [number, number] => [Math.round(f[0] * (img.width - 1)), Math.round(f[1] * (img.height - 1))];
+
+/** The balance the editor's own tap sets from a spot (main.ts, the canvas tap), reused and not re-derived: the 5 by 5 patch read by
+ *  `sampleForWb`, which refuses a blown-out or an almost black spot, the gains `unitMinGains` of the patch's own ratios, and the exposure
+ *  that keeps the spot at the brightness it had (`exposureHoldingNeutral`), held between the slider's two ends. Takes the state and the
+ *  pixel. Returns the verdict and, on "ok", the gains and exposure; on a refusal the gains are null. What it must satisfy: the same
+ *  numbers the editor's tap gives for this photograph, so a spot means the same thing on this page and in the editor. */
+function tapBalance(s: SepState, px: number, py: number): { verdict: SpotRead["verdict"]; wb: [number, number, number] | null; exposure: number } {
+  const sample = sampleForWb(s.subject.img, px, py);
+  if (sample.verdict !== "ok") return { verdict: sample.verdict, wb: null, exposure: 0 };
+  const [r, g, b] = sample.lin;
+  const mean = (r + g + b) / 3;
+  const next = unitMinGains([mean / r, mean / g, mean / b]);
+  const exposure = Math.min(EXPOSURE_HI, Math.max(EXPOSURE_LO, exposureHoldingNeutral(s.subject.img, sample.lin, s.wb0, s.exp0, next)));
+  return { verdict: "ok", wb: next, exposure };
+}
+
+const SPOT_NAME = { n: "neutral spot", f: "foliage spot" } as const;
+const SPOT_LETTER = { n: "N", f: "F" } as const;
+/** A spot's state in words. Takes its last reading or null. Returns "usable", "blown out", "too dark" or "not read yet". */
+const stateWords = (r: SpotRead | null): string => (!r ? "not read yet" : r.verdict === "ok" ? "usable" : r.verdict === "blown" ? "blown out" : "too dark");
+
+/** Redraws the first picture: the photograph on show, with each typed spot marked by its letter in a square (N for the neutral spot, F for
+ *  the foliage spot) and the spot's state in words beside it, and puts the same words in the picture's label and caption. A spot that is
+ *  blown out or too dark has a dashed square. Takes nothing; returns nothing. What it must satisfy: the marks are a letter, a square and
+ *  words, never colour alone, and a spot whose boxes moved since it was read is marked "not read yet" and never with a stale state. */
 function sepMarks(): void {
   if (!sep) return;
-  const cv = sep.cv0, ctx = cv.getContext("2d")!;
-  const id = ctx.createImageData(sep.t.w, sep.t.h);
-  id.data.set(sep.t.data);
+  const s = sep;
+  const cv = s.cv0, ctx = cv.getContext("2d")!;
+  const id = ctx.createImageData(s.shown.w, s.shown.h);
+  id.data.set(s.shown.data);
   ctx.putImageData(id, 0, 0);
-  const mark = (fx: number, fy: number, letter: string, square: boolean) => {
-    const x = fx * (sep!.t.w - 1), y = fy * (sep!.t.h - 1), r = Math.max(8, sep!.t.h / 30);
-    ctx.lineWidth = 4; ctx.strokeStyle = "black"; ctx.fillStyle = "white"; ctx.font = `bold ${Math.round(r * 1.6)}px sans-serif`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const scale = cv.clientWidth > 0 ? s.shown.w / cv.clientWidth : 1; // canvas pixels to a displayed pixel, so the marks read at a size on the screen
+  const said: string[] = [];
+  const mark = (kind: "n" | "f", fx: number, fy: number) => {
+    const [px, py] = spotPixel(s.subject.img, [fx, fy]);
+    const last = s.spots[kind];
+    const read = last && last.px === px && last.py === py ? last : null;
+    const letter = SPOT_LETTER[kind], state = stateWords(read), refused = !!read && read.verdict !== "ok";
+    const r = 13 * scale;
+    const x = Math.min(s.shown.w - r, Math.max(r, fx * (s.shown.w - 1))), y = Math.min(s.shown.h - r, Math.max(r, fy * (s.shown.h - 1)));
     for (const pass of [0, 1]) {
-      if (pass) { ctx.lineWidth = 2; ctx.strokeStyle = "white"; }
-      ctx.beginPath();
-      if (square) ctx.rect(x - r, y - r, 2 * r, 2 * r); else ctx.arc(x, y, r, 0, 2 * Math.PI);
-      ctx.stroke();
+      ctx.lineWidth = (pass ? 2 : 5) * scale; ctx.strokeStyle = pass ? "white" : "black";
+      ctx.setLineDash(refused ? [4 * scale, 3 * scale] : []);
+      ctx.beginPath(); ctx.rect(x - r, y - r, 2 * r, 2 * r); ctx.stroke();
     }
-    ctx.lineWidth = 3; ctx.strokeStyle = "black"; ctx.strokeText(letter, x, y); ctx.fillText(letter, x, y);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = `bold ${Math.round(17 * scale)}px sans-serif`;
+    ctx.lineWidth = 3 * scale; ctx.strokeStyle = "black";
+    ctx.strokeText(letter, x, y); ctx.fillText(letter, x, y);
+    const text = `${SPOT_NAME[kind]}: ${state}`;
+    ctx.font = `bold ${Math.round(13 * scale)}px sans-serif`;
+    const onRight = x + r + 6 * scale + ctx.measureText(text).width <= s.shown.w;
+    ctx.textAlign = onRight ? "left" : "right";
+    const tx = onRight ? x + r + 6 * scale : x - r - 6 * scale;
+    ctx.lineWidth = 4 * scale;
+    ctx.strokeText(text, tx, y); ctx.fillText(text, tx, y);
+    said.push(`${letter}, the ${SPOT_NAME[kind]}, ${state}`);
   };
-  const ok = (a: number, b: number) => Number.isFinite(a) && Number.isFinite(b);
-  const nx = Number(sepBox("dSepNX").value), ny = Number(sepBox("dSepNY").value), fx = Number(sepBox("dSepFX").value), fy = Number(sepBox("dSepFY").value);
-  if (sepBox("dSepNX").value !== "" && sepBox("dSepNY").value !== "" && ok(nx, ny)) mark(nx / 100, ny / 100, "N", false);
-  if (sepBox("dSepFX").value !== "" && sepBox("dSepFY").value !== "" && ok(fx, fy)) mark(fx / 100, fy / 100, "F", true);
+  const ids = ["dSepNX", "dSepNY", "dSepFX", "dSepFY"];
+  const v = ids.map((i) => (sepBox(i).value.trim() === "" ? NaN : Number(sepBox(i).value)));
+  if (Number.isFinite(v[0]) && Number.isFinite(v[1])) mark("n", v[0] / 100, v[1] / 100);
+  if (Number.isFinite(v[2]) && Number.isFinite(v[3])) mark("f", v[2] / 100, v[3] / 100);
+  const label = `${s.baseWords} It is drawn at ${s.shownWhat}.${said.length ? ` Marked: ${said.join("; ")}.` : ""}`;
+  cv.setAttribute("aria-label", label);
+  const cap = cv.nextElementSibling;
+  if (cap) cap.textContent = label;
 }
 for (const id of ["dSepNX", "dSepNY", "dSepFX", "dSepFY"]) sepBox(id).addEventListener("input", sepMarks);
+
+/** Reads one spot at once, as a tap or a pair of typed numbers sets it. Takes which spot, "n" or "f", and reads its two boxes. Returns
+ *  nothing; it says in the live region (the points line, present from parse) one sentence naming the spot and saying whether it is
+ *  usable, blown out or too dark; where it is usable it redraws the picture at the balance the editor's tap sets from it, and where it is
+ *  not the picture stays at the last usable balance and the sentence says so; either way the marks are redrawn. What it must satisfy: the
+ *  reading is kept in `sep.spots` so step 3 reads the same spot the same way and reuses the picture drawn here rather than drawing it
+ *  twice; one empty box says nothing, because the pair is not yet typed. */
+function sepSpot(kind: "n" | "f"): void {
+  const hint = $("dSepHint");
+  const s = sep;
+  if (!s) { hint.textContent = "Press step 1 first: the picture has to be drawn before a spot can be read."; return; }
+  if (running) { hint.textContent = "A test is still running on this page. Set the spot again when it has finished."; return; }
+  const raw = (kind === "n" ? ["dSepNX", "dSepNY"] : ["dSepFX", "dSepFY"]).map((i) => sepBox(i).value.trim());
+  if (raw.some((x) => x === "")) return;
+  const v = raw.map(Number);
+  const name = SPOT_NAME[kind];
+  if (v.some((x) => !Number.isFinite(x) || x < 0 || x > 100)) { hint.textContent = `The ${name}'s two numbers must each be from 0 to 100, so it was not read.`; return; }
+  const [px, py] = spotPixel(s.subject.img, [v[0] / 100, v[1] / 100]);
+  const where = `${v[0].toFixed(1)} percent across and ${v[1].toFixed(1)} percent down`;
+  const bal = tapBalance(s, px, py);
+  let t: ReturnType<typeof thin> | null = null;
+  if (bal.verdict === "ok" && bal.wb) {
+    try { t = thin(s.drawing.draw(sepEdit(bal.wb, bal.exposure))); } catch (err) {
+      hint.textContent = `The ${name} at ${where} could not be drawn (${(err as Error).message}), so the picture stays at ${s.shownWhat}.`;
+      return;
+    }
+  }
+  s.spots[kind] = { px, py, verdict: bal.verdict, wb: bal.wb, exposure: bal.exposure, t };
+  if (t && bal.wb) {
+    s.shown = t;
+    s.shownWhat = `the balance set from the ${name}`;
+    const rd = s.spec ? readBalance(bal.wb, s.spec) : null;
+    hint.textContent = `The ${name} at ${where} is usable: it sets gains ${bal.wb.map((g) => g.toFixed(4)).join(", ")} at exposure ${bal.exposure.toFixed(3)}${rd ? `, reading ${Math.round(rd.kelvin)} K and tint ${Math.round(rd.tint)}` : ""}, and the picture above is drawn at that balance.`;
+  } else {
+    hint.textContent = `The ${name} at ${where} is ${bal.verdict === "blown" ? "blown out, so its colour was never recorded" : "too dark to set a balance from"}, so it is not used and the picture stays at ${s.shownWhat}. Tap another spot.`;
+  }
+  sepMarks();
+}
+for (const id of ["dSepNX", "dSepNY"]) sepBox(id).addEventListener("change", () => sepSpot("n"));
+for (const id of ["dSepFX", "dSepFY"]) sepBox(id).addEventListener("change", () => sepSpot("f"));
 
 /** Writes the stage rows and the two sum rows of a press. Takes the press's tally and its whole time. Returns nothing. */
 function sepTimeRows(tally: PressTally, whole: number): void {
@@ -3320,7 +3437,8 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       const box = document.createElement("div");
       box.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px";
       host.appendChild(box);
-      const cv0 = sepFigure(box, `The photograph drawn with red and blue swapped and no look, at the balance the editor opens at. Tap it to set the point chosen above, or type the two points in the boxes. A circle marked N is the neutral spot and a square marked F the foliage spot. It is shown at ${t.w} by ${t.h} pixels, every ${t.k === 1 ? "pixel" : `${t.k}th pixel`} of the ${t.fromW} by ${t.fromH} drawn frame.`, t.data, t.w, t.h);
+      const baseWords = `The photograph drawn with red and blue swapped and no look. Tap it to set the point chosen above, or type the two points in the boxes, and it is redrawn at once at the balance that spot sets, with the spot marked by its letter in a square, N for the neutral spot and F for the foliage spot, and its state in words. It is shown at ${t.w} by ${t.h} pixels, every ${t.k === 1 ? "pixel" : `${t.k}th pixel`} of the ${t.fromW} by ${t.fromH} drawn frame.`;
+      const cv0 = sepFigure(box, `${baseWords} It is drawn at the balance the editor opens at.`, t.data, t.w, t.h);
       cv0.style.cursor = "crosshair";
       cv0.addEventListener("click", (ev) => {
         const r = cv0.getBoundingClientRect();
@@ -3328,16 +3446,15 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
         const neutral = ($("dSepTapNeutral") as HTMLInputElement).checked;
         sepBox(neutral ? "dSepNX" : "dSepFX").value = fx.toFixed(1);
         sepBox(neutral ? "dSepNY" : "dSepFY").value = fy.toFixed(1);
-        $("dSepHint").textContent = `The ${neutral ? "neutral" : "foliage"} spot is now ${fx.toFixed(1)} percent across and ${fy.toFixed(1)} percent down.`;
-        sepMarks();
+        sepSpot(neutral ? "n" : "f");
       });
-      sep = { drawing, subject, wb0: base.wb, exp0: base.exposure, t, cv0, spec };
+      sep = { drawing, subject, wb0: base.wb, exp0: base.exposure, t, cv0, spec, shown: t, shownWhat: "the balance the editor opens at", baseWords, spots: { n: null, f: null } };
       drawing = null;
       const rd = spec ? readBalance(base.wb, spec) : null;
       row("The opening balance, the first white point", `gains ${base.wb.map((g) => g.toFixed(4)).join(", ")} · exposure ${base.exposure.toFixed(4)} · ${rd ? `reads as ${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read: the file has no matrix to read it through"}`,
-        `What the editor opens this photograph at, from the gray-world rule (freshBaseline). The drawn picture has the red and blue swap on and no look, every control at its neutral${subject.img.isRaw ? "" : "; this file is camera-rendered, so it opens with no balance, and the swap is switched on here all the same for the check"}.`);
+        `What the editor opens this photograph at, by the app's one copy of the at-open ruling (freshBaseline): for a raw opened from its sensor data, the balance found from the data (gray-world) and the automatic exposure. The drawn picture has the red and blue swap on and no look, every control at its neutral${subject.img.isRaw ? "" : "; this file opened as an 8-bit picture (a camera-rendered file, or a raw shown by its embedded preview, as the row above says), so it opens with no balance and exposure 1, and the swap is switched on here all the same for the check"}.`);
       progress("The photograph is drawn. Now tap a neutral spot and a sunlit leaf, or type their points, then press step 3.", true);
-      $("dSepHint").textContent = "The picture is drawn above. Choose what a tap sets, then tap the picture or type the four numbers, then press step 3.";
+      $("dSepHint").textContent = "The picture is drawn above. Choose what a tap sets, then tap the picture or type the two numbers of a spot: the picture is redrawn at that spot's balance and this line says whether the spot is usable. Set both spots, then press step 3.";
       sepMarks();
       sepGo.disabled = false;
     } finally {
@@ -3356,21 +3473,18 @@ sepGo.addEventListener("click", (e) => {
   void sepPress(e.currentTarget as HTMLButtonElement, false, async (tally) => {
     try {
       const img = s.subject.img;
-      const px = (f: [number, number]): [number, number] => [Math.round(f[0] * (img.width - 1)), Math.round(f[1] * (img.height - 1))];
-      type Point = { name: string; wb: [number, number, number]; exposure: number; why: string };
-      const points: Point[] = [{ name: "the balance the app opens at", wb: s.wb0, exposure: s.exp0, why: "freshBaseline's opening gains" }];
-      for (const [name, f, what] of [["a balance set from your neutral spot", pts.n, "neutral spot"], ["a balance set from your foliage spot", pts.f, "foliage spot"]] as const) {
-        const [cx, cy] = px(f);
-        const sample = sampleForWb(img, cx, cy);
-        if (sample.verdict !== "ok") {
-          row(`White point: ${name}`, "not run", `The ${what} at pixel ${cx}, ${cy} is ${sample.verdict === "blown" ? "blown out, so its colour was never recorded" : "almost black, so there is not enough colour in it"}; the editor refuses the same tap. Choose another spot and press step 3 again.`);
+      type Point = { name: string; wb: [number, number, number]; exposure: number; why: string; drawn: ReturnType<typeof thin> | null };
+      const points: Point[] = [{ name: "the balance the app opens at", wb: s.wb0, exposure: s.exp0, why: "freshBaseline's opening gains", drawn: null }];
+      for (const [name, f, what, kind] of [["a balance set from your neutral spot", pts.n, "neutral spot", "n"], ["a balance set from your foliage spot", pts.f, "foliage spot", "f"]] as const) {
+        const [cx, cy] = spotPixel(img, f);
+        // A spot already read at this pixel (a tap or typed pair) is read again by nobody: its balance and its drawn picture are reused.
+        const last = s.spots[kind];
+        const read = last && last.px === cx && last.py === cy ? last : { px: cx, py: cy, ...tapBalance(s, cx, cy), t: null };
+        if (read.verdict !== "ok" || !read.wb) {
+          row(`White point: ${name}`, "not run", `The ${what} at pixel ${cx}, ${cy} is ${read.verdict === "blown" ? "blown out, so its colour was never recorded" : "almost black, so there is not enough colour in it"}; the editor refuses the same tap. Choose another spot and press step 3 again.`);
           continue;
         }
-        const [r, g, b] = sample.lin;
-        const mean = (r + g + b) / 3;
-        const next = unitMinGains([mean / r, mean / g, mean / b]);
-        const exposure = Math.min(EXPOSURE_HI, Math.max(EXPOSURE_LO, exposureHoldingNeutral(img, sample.lin, s.wb0, s.exp0, next)));
-        points.push({ name, wb: next, exposure, why: `the ${what} at pixel ${cx}, ${cy}, set the way the editor's tap sets a balance` });
+        points.push({ name, wb: read.wb, exposure: read.exposure, why: `the ${what} at pixel ${cx}, ${cy}, set the way the editor's tap sets a balance`, drawn: read.t });
       }
       row("The Separation check's own settings", `floor ${SAT_GUARD_LO} · ${SEP_BINS} bins of ${SEP_BIN_DEG} degrees · targets ${SEP_TARGET_FOLIAGE} and ${SEP_TARGET_SKY} · soft edge ${SEP_SOFT_EDGE} · minimum ${SEP_MIN_SHARE * 100} percent`,
         "The floor is the band stage's own saturation floor (SAT_GUARD_LO), applied here to the saturation of the drawn pixel, which is what the reader sees. A cluster is a run of hue bins between two valleys (a valley is a bin under one tenth of the smaller of its two nearest peaks); a run under one percent of the pixels above the floor is no cluster. The foliage cluster is the one holding the foliage spot; the sky cluster is the largest other. Turn A moves the foliage cluster's middle hue to 335 degrees and the sky cluster's to 215, each as one rotation with a ten-degree soft edge. Turn B moves every other cluster by plus 60 degrees and holds those two. Pixels below the floor are held in both. Nothing here is a setting of the editor. The check runs once.");
@@ -3385,6 +3499,7 @@ sepGo.addEventListener("click", (e) => {
         books(tally);
         let t: ReturnType<typeof thin>;
         if (P.wb === s.wb0) t = s.t;
+        else if (P.drawn) t = P.drawn;
         else {
           const frame = s.drawing.draw(sepEdit(P.wb, P.exposure));
           lap(tally, `separation: white point ${N}, the draw and read-back`);
@@ -3434,8 +3549,12 @@ sepGo.addEventListener("click", (e) => {
         sepFigure(r2, `White point ${N}, turn B: every cluster but the foliage and sky ones turned by plus 60 degrees, those two and everything below the floor held.`, turnB, t.w, t.h);
         row(`White point ${N}: ${P.name}`, `gains ${P.wb.map((g) => g.toFixed(4)).join(", ")} · exposure ${P.exposure.toFixed(4)} · ${rd ? `reads as ${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read"}`, `From ${P.why}. Drawn once, with the swap on and no look.`);
         row(`White point ${N}: the floor`, `${SAT_GUARD_LO} · ${((1 - (hp.above / (t.w * t.h))) * 100).toFixed(1)} percent of pixels below it`, "Saturation of the drawn pixel below which a pixel is in no cluster.");
-        row(`White point ${N}: the clusters`, `${an.clusters.length} ${an.clusters.length === 1 ? "cluster" : "clusters"} · neutral spot in ${nIdx >= 0 ? an.clusters[nIdx].letter : "no cluster"} · foliage spot in ${fIdx >= 0 ? an.clusters[fIdx].letter : "no cluster"} · sky cluster ${sIdx >= 0 ? an.clusters[sIdx].letter : "none"}`,
-          "Found by the rule in the settings row. A spot in no cluster means its patch fell below the floor or between clusters.");
+        // ONE CLUSTER OVER THE WHOLE WHEEL cannot be told from a rule that missed the valleys without the counts, so the counts follow and the words say it.
+        const wide = an.clusters.find((c) => c.spanDeg >= 340);
+        row(`White point ${N}: the clusters`, `${an.clusters.length} ${an.clusters.length === 1 ? "cluster" : "clusters"} · neutral spot in ${nIdx >= 0 ? an.clusters[nIdx].letter : "no cluster"} · foliage spot in ${fIdx >= 0 ? an.clusters[fIdx].letter : "no cluster"} · sky cluster ${sIdx >= 0 ? an.clusters[sIdx].letter : "none"}${wide ? ` · ONE CLUSTER SPANS THE WHOLE WHEEL: cluster ${wide.letter} covers ${Math.round(wide.spanDeg)} of 360 degrees and holds ${(wide.share * 100).toFixed(1)} percent, so no valley separates the hues at this white point` : ""}`,
+          "Found by the rule in the settings row. A spot in no cluster means its patch fell below the floor or between clusters. A cluster covering nearly the whole wheel means the rule found no valley between the hues of the pixels above the floor; the counts row beside it holds the shape the rule was given.");
+        row(`White point ${N}: the hue counts`, an.hist.join(" "),
+          `The ${an.above} pixels above the floor counted in each of the ${SEP_BINS} hue bins of ${SEP_BIN_DEG} degrees, in order from the bin of 0 to ${SEP_BIN_DEG} degrees, as whole numbers; the sum is ${an.hist.reduce((x, y) => x + y, 0)}. These are the counts the clustering rule reads, so a valley, or the lack of one, can be seen in them.`);
         for (const c of an.clusters) {
           row(`White point ${N}, cluster ${c.letter} (${c.colour})`, `hue ${Math.round(c.startDeg) > Math.round((c.startDeg + c.spanDeg) % 360) ? `${Math.round(c.startDeg)} to 360 and 0 to ${Math.round((c.startDeg + c.spanDeg) % 360)}, an arc through 0` : `${Math.round(c.startDeg)} to ${Math.round((c.startDeg + c.spanDeg) % 360)}`} degrees, middle${Math.round(c.medHue)} · ${(c.share * 100).toFixed(1)} percent · median saturation ${c.medSat.toFixed(2)}, median value ${c.medVal.toFixed(2)}`, "Range, share of the pixels above the floor, and the medians of the pixels in it.");
         }
