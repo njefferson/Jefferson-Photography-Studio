@@ -1,6 +1,7 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=8ca757486d05071a
-diffhash=981d90a44c9585af
-verdict=IN-SCOPE: the six changed files of the app's working copy are each named in the plan's Files line for step 298, debug.html and tools/surfaces.mjs are named there and unchanged, and nothing outside that list is changed, staged or committed; the plan's steps 298 and 299 as read are the ceiling this diff stays under.
-# IN-SCOPE: the six changed files of the app's working copy are each named in the plan's Files line for step 298, debug.html and tools/surfaces.mjs are named there and unchanged, and nothing outside that list is changed, staged or committed; the plan's steps 298 and 299 as read are the ceiling this diff stays under.
+planhash=2afa380e39840d9b
+diffhash=9481eccf9ab092a9
+verdict=IN-SCOPE: the four changed files, CLAUDE.md, NOTES.md, record 069 and ir.html, are files step 304 names; the other nine files the step puts back read as committed text, and the changes are the two corrected notes, record 069's retitled section and option head, the removed 2.72 entry with the replaced 069 line, and the new CLAUDE.md section of five requirements.
+# IN-SCOPE: the four changed files, CLAUDE.md, NOTES.md, record 069 and ir.html, are files step 304 names; the other nine files the step puts back read as committed text, and the changes are the two corrected notes, record 069's retitled section and option head, the removed 2.72 entry with the replaced 069 line, and the new CLAUDE.md section of five requirements.
+# Read against the plan by its path: step 304's Files and Do, its stages 4 to 7. The owner's messages printed by the check were not copied into this file.

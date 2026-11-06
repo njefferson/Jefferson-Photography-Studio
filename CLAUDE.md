@@ -466,6 +466,17 @@ options at session start; `tools/decisions-check.mjs` prints them again on
 every commit. The sentence arrives unasked, twice, in the two places a session
 cannot avoid looking. (Hub LESSONS §329.)
 
+## BEFORE A PLAN GOES UP (5 and 6 November 2026)
+**A plan on this app answers five requirements before it is written, and states its answer to each in its own first section.** They are here, in the file every session loads, and not behind a gate, because no parser can tell a requirement answered from a sentence shaped like an answer.
+
+- **A picture to be judged is made on the test page, on the device.** The test page (`debug.html`, behind the version number) draws through the device's own graphics chip in seconds. The container draws through a software renderer at about a minute and a half a render. A plan rendered fifteen variants in the container to describe pictures back in words, where the page draws them in seconds on the device and shows them.
+- **Nothing is done twice, and what can run beside runs beside.** A frame is rendered once and its pixels kept. A second step rendered every frame again because the first had kept none, and a hue map per white point duplicated the class map beside it.
+- **Research is read whole, never from a summary.** A page is fetched to disk by the step's own fetcher and read there. A search finds addresses and is never a reading. A plan allowed a search's summary as a reading and had to be corrected.
+- **The gates are read before the files a step may touch are drawn.** `.branch-guard` names every check a commit runs, and each file a gate writes or judges belongs in the step's files. A plan drew its files without reading it and its step ejected at the preview-version gate.
+- **Every file, name and fact in a plan comes from a read, and where one cannot be read the plan says so.** A plan named a function in the wrong file from a note and not from a read.
+
+These are answered in the plan before it is written and are put in front of the session here because the hub's lesson 329 says exposure where the task is, and not a gate, is what holds a requirement a parser cannot judge.
+
 ## THIS IS A VISUAL APP, NOT A MATH APP (owner, 2026-09-19)
 **OPEN WHAT YOU RENDERED. A number is a pointer to where to look; it is never a
 substitute for looking and never evidence about appearance.**

@@ -2,6 +2,8 @@
 
 ## Context
 
+**The goal.** A cloud is white and stays white through the channel swap and the sky sliders. It is exempt from what the sky masks' adjustments do. A channel swap cannot tint a neutral pixel, so a cloud that changes colour was changed by a stage of the look, and no stage of the look may change a cloud's colour from white. The invariant is not written into each stage as a setting of its own; each of the three sky stages is guarded by one weight. Stated 5 November 2026.
+
 Found 2026-09-26, while a learned sky selection was built, exported beside
 today's and taken out, and recorded in 052 as one of three facts not fixed.
 **The look's three sky stages have no guard against white.** Read off the
@@ -748,7 +750,7 @@ What exists that this item will use, so a second one does not get written
       map's estimate over a lattice, which the render does not separate). The coarse
       map's halo at NIR_1651's crown is what 088 measures.
 
-13. **RESEARCHED 24 October 2026 (IR-SCIENCE 9x-ii), written, open and not built: the
+13. **FIRST FORM BUILT 5 November 2026 by the plan of that day, step 301, measured on two frames and dropped the same day; its code is out of the working copy ("Built and dropped, 5 November 2026", below).** **RESEARCHED 24 October 2026 (IR-SCIENCE 9x-ii), written, then built: the
     white guard under the three sliders is a range the reader fixes on the picture,
     with a transition and the selection shown.** Since 2026-10-17 the look carries none
     of the three stages, so the record answers now for the reader who raises Sky colour
@@ -805,7 +807,8 @@ What exists that this item will use, so a second one does not get written
       says the stages can tint and darken a cloud. That is a found defect with a known
       fix, not an option: the two notes are to say what the stages do. It is reported as
       found in the 24 October research, for the plan that next builds in this area, and
-      no wording is chosen here.
+      no wording is chosen here. Put right 6 November 2026: the two notes say that a cloud
+      inside the sky selection takes the slider with the sky around it.
     - **What would decide it, when it is built:** the cloud checks this record still owes
       on the turned frames, NIR_1651 and NIR_1644, rendered with the guard on and off
       while the sliders are moved, whole frame and at 1:1, and opened.
@@ -1340,6 +1343,10 @@ band at 0.64. So the bars tell this option from Rejected 9.
   the manual's latest version, for Siril 1.5.0; the stable manual, for 1.4.4,
   does not have it (read 2026-09-30).
 
+## Built and dropped, 5 November 2026
+
+Option 13's first form was built on 5 November 2026 and taken out of the working copy the same day, and its whole diff is kept in the session's record. What was built: a button, Keep a cloud white, under the three sky sliders on the Basic tab arms one tap on the photograph. The tap reads a 24 by 24 patch of the working copy as the three stages receive it and writes one field on the photograph's edits, `skyKeep`: the tap's place, the patch's median colour, its spread (the median absolute deviation of the distance from that median) and the feather. A feather slider sets how wide the fall from full keep to none is, a Clear empties the field, and Show what is kept dims what the guard does not hold. The weight is one number, 1 minus a trapezoid on the distance of the pixel's colour from the median: full keep inside the spread, falling across the feather to none. The shader and `compileEdit` compute it from the same numbers by the same arithmetic, and each of Sky colour smoothing, Sky depth and Sky saturation multiplies its own amount by 1 minus the keep. No gate or constant of the three stages moved. The field is per photograph and corrective like white balance: it is left out of a saved look and of the preview stamp, a saved edit without it renders as before, and `.scope-allow` declares it as acting on a selection. What the renders showed, on the two frames: the cloud opens pale cyan or teal before any sky slider, because the balance the app opens at leaves it off neutral and the look multiplies that (IR-SCIENCE 4c-xxiv); the guard kept only the colour tapped, the pale parts of NIR_1651's cloud and the wisps and a band of clear sky of the same colour on NIR_1661; and the kept cloud returned to the colour it opened at and not to white. Why: a colour range is a colour and not a place, and the white point the cloud arrives at is not neutral. The route was dropped on 5 November 2026 and its code, the field and the picture-code version raised for it were taken out of the working copy, so the preview version stays where it was. The two notes under Sky depth and Sky saturation were corrected on 6 November 2026 to say that a cloud inside the sky selection takes the slider with the sky around it.
+
 ## Rank
 
 **After 015 (2026-09-26)**, which it now needs (Depends): turning the lens correction on at open changes what reaches these stages. 075 and 076 sit between (2026-09-27): they are the open path's two silent waits, share no ground with these stages, and were built beside 015. Below that, the order argued here stands.
@@ -1460,3 +1467,6 @@ because of this, so the rank does not move.
 - NIR_3461.NEF, 2026-10-13: the same two builds, whole frame and crops of the wires, the pylons and the right pylon's foot. Head: pink discs beside the pylons, a blue disc at the foot. Build: none of them.
 - NIR_1651.NEF, 2026-10-13: the same two builds, whole frame and crops of the cloud, the treetop and the cyan band. The cloud and the band read the same to within 0.3 levels.
 - NIR_1703.NEF, 2026-10-13: the same two builds, whole frame and crown crops. The cloud regions read the same to within 0.3 levels; the crowns' red halo gone, which of option 12 and 087's route removed it was not split.
+- NIR_1651.NEF, 2026-11-05: option 13's first form, the Aerochrome chip with Sky colour smoothing, Sky depth and Sky saturation each at 0.5, whole frame and a 300 px crop at 1:1 of the canvas on the cloud at the upper right, as opened, raised without the guard, raised with the guard tapped on that cloud at the feather's default of 0.2, with the feather at 0.4, and with the overlay shown (the overlay's crop was not opened). As opened the cloud is pale cyan-grey, not white (the mean colour at the tap 112, 155, 154). Raised without the guard it goes dark grey-teal (57, 77, 77). With the guard the parts of the cloud inside the tapped colour come back to nearly the opened colour (116, 143, 142 at the default feather, 121, 148, 148 at 0.4) as pale islands with ragged edges, and the denser, darker parts of the same cloud stay dark; the clear sky and the tree read as they did without the guard. The wider feather joins the islands and softens their edges and does not reach the dark parts. The overlay holds exactly the pale islands bright and dims the rest.
+- NIR_1661.NEF, 2026-11-05: the same renders on the thin wisps at the middle of the frame (the overlay's crop was not opened). As opened the wisps and the pale sky under them are pale teal (75, 140, 140); raised without the guard they go dark teal (24, 74, 73). With the guard the wisps and the whole band of pale sky of the same colour come back to the opened colour (74, 140, 139) with a hard lower edge, so the guard takes the clear sky of that colour with the wisps, as this record's cost paragraph says a range does; the feather at 0.4 changes it little. The overlay shows the pale band and the wisps bright, with the rest dim.
+- Result against the goal, 2026-11-05: on both frames the guard returns what it holds to the colour it had before the sliders and not to white, because the cloud is already pale cyan or teal as the look opens it, and on NIR_1651 it holds only part of the cloud. Whether the goal asks for a cloud pulled to white, which no stage does today, or only a cloud kept as opened, is not settled by these renders.

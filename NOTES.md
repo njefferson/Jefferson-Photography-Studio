@@ -2372,6 +2372,7 @@ Q-JPS-201: the planted colour stage of a picture-checks press (1.9 s) carries th
 Q-JPS-202: no accessibility state samples the picture-checks progress line or its stage rows while a press is running, and the walk reaches the element without reading it in a running state; recorded under record 106 (step 289). Put right by the plan of 5 November in its step 298.
 Q-JPS-203: the press's drawing surface (`openDrawing` in `src/debug.ts`) repeats the calls `drawFrame` makes instead of calling it, so a later change to `drawFrame` would not reach the picture checks; recorded under record 106 (step 289). Put right by the plan of 5 November in its step 298.
 Q-JPS-204: the test page's whole-press time on the PC, 510.1 s on 2.71, is about 457 s more than the sum of every time its report printed, about 53 s, while on the iPad that sum leaves about 0.6 s of a press of 8.0 s, so a stretch of the press is in no row on the PC alone; the next plan that touches the test page finds which stage it is and gives it a row, under record 106 (the two reports of 4 November). Put right by the plan of 5 November in its step 298.
+Q-JPS-205: the test page's probe of 5 November did not print the page's own drawn-against-computed row, so the move of the drawing surface rests on the agreement walk and the press; the next plan that touches the test page reads that row, under record 106.
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -3093,6 +3094,7 @@ user-scalable=no.
 
 - [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
   **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.
+  **Built, measured and dropped 5 November 2026:** the white guard of option 13 was built, kept only the colour tapped and returned the cloud to the colour it opened at, pale cyan or teal, because the balance the app opens at leaves it off neutral (IR-SCIENCE 4c-xxiv); its code left the working copy and the record keeps what the renders found.
   Sky colour smoothing pulls a white or grey pixel inside the sky toward the
   sky's colour, Sky saturation then reads the tint, and Sky depth darkens
   whatever the selection holds. Under the learned selection taken out on
