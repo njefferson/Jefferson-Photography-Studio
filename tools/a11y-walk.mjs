@@ -1454,6 +1454,65 @@ try {
       } finally { await page.close(); }
     }
   }
+  // ── 14 ─────────────────────────────────────────────────
+  // THE TEST PAGE'S DOOR AND ITS SEPARATION CHECK (records 108 and 084). Three states beyond section 13's: (a) at rest, the file
+  // input and the Separation controls (a labelled file input, two radios for what a tap sets, four labelled number boxes, two
+  // buttons, the second disabled until the picture is drawn); (b) after step 1, with the first picture on the page and its words;
+  // (c) after step 3 has run on the practice photograph with two typed points, with every picture of the three white points on the
+  // page. In each: every control is named and 44 or more, every canvas is an image with words as its label and a caption, text
+  // meets the floors, the page has no sideways scroll, and axe finds nothing serious. Only structure is read: under the container's
+  // software drawing nothing is judged about the pictures themselves.
+  if (want(14)) console.log("\n14 — the test page's door and Separation check: at rest, after step 1, after step 3");
+  if (want(14)) {
+    const PIC = `() => { const out = []; for (const cv of document.querySelectorAll("#dSepPics canvas")) { const fig = cv.closest("figure"); out.push({ role: cv.getAttribute("role"), label: cv.getAttribute("aria-label") || "", cap: (fig && fig.querySelector("figcaption") ? fig.querySelector("figcaption").textContent : "").length }); } return out; }`;
+    for (const theme of THEMES) for (const size of SIZES) {
+      const where = `[${theme} ${size.name}]`;
+      const page = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
+      page.on("dialog", (d) => d.accept());
+      try {
+        await page.goto(`${BASE}/debug.html`, { waitUntil: "load" });
+        const controls = await page.evaluate(() => {
+          const names = (id) => { const el = document.getElementById(id); if (!el) return null; const l = document.querySelector(`label[for="${id}"]`) || el.closest("label"); return { name: (el.getAttribute("aria-label") || (l ? l.textContent : "") || el.textContent || "").trim(), h: el.getBoundingClientRect().height, disabled: !!el.disabled }; };
+          const ids = ["dPicFile", "dSepStart", "dSepGo", "dSepTapNeutral", "dSepTapFoliage", "dSepNX", "dSepNY", "dSepFX", "dSepFY"];
+          return Object.fromEntries(ids.map((i) => [i, names(i)]));
+        });
+        for (const [id, c] of Object.entries(controls)) {
+          if (!c) fail(`${where} #${id} is missing from debug.html`);
+          else if (c.name.length < 8) fail(`${where} #${id} has no name of at least 8 characters ("${c.name}")`);
+          else ok(`${where} #${id} is named: "${c.name.slice(0, 50)}"`);
+        }
+        if (controls.dSepGo && controls.dSepGo.disabled) ok(`${where} step 3 is disabled until the picture is drawn`); else fail(`${where} step 3 is not disabled at rest`);
+        let hit = await page.evaluate(HIT);
+        if (hit.small.length) fail(`${where} at rest, under 44: ${hit.small.join(" · ")}`); else ok(`${where} at rest: every button is 44 or more`);
+        await axeLine(page, `debug.html ${where} with the Separation controls at rest`);
+        // (b) step 1
+        await page.evaluate(() => document.getElementById("dSepStart")?.click());
+        const drawn = await page.waitForFunction(() => /^The photograph is drawn|^Stopped/.test(document.getElementById("dPicProgress")?.textContent ?? ""), null, { timeout: 900000, polling: 200 }).then(() => true).catch(() => false);
+        const said = await page.evaluate(() => document.getElementById("dPicProgress")?.textContent ?? "");
+        if (!drawn || /^Stopped/.test(said)) { fail(`${where} step 1 did not reach the drawn picture: "${said}"`); continue; }
+        ok(`${where} step 1 reached "${said.slice(0, 40)}..."`);
+        let pics = await page.evaluate(`(${PIC})()`);
+        if (pics.length >= 1 && pics.every((p) => p.role === "img" && p.label.length >= 40 && p.cap >= 40)) ok(`${where} after step 1: ${pics.length} picture(s), each an image with words as its label and a caption`); else fail(`${where} after step 1: pictures ${JSON.stringify(pics)}`);
+        if (await page.evaluate(() => !document.getElementById("dSepGo").disabled)) ok(`${where} step 3 is enabled once the picture is drawn`); else fail(`${where} step 3 is still disabled after step 1`);
+        hit = await page.evaluate(HIT);
+        if (hit.small.length) fail(`${where} after step 1, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after step 1: every button is 44 or more`);
+        await axeLine(page, `debug.html ${where} after step 1`);
+        // (c) step 3, two points typed
+        for (const [id, v] of [["dSepNX", "30"], ["dSepNY", "30"], ["dSepFX", "60"], ["dSepFY", "60"]]) await page.fill(`#${id}`, v);
+        await page.evaluate(() => document.getElementById("dSepGo")?.click());
+        const done = await page.waitForFunction(() => /^Done\.|^Stopped/.test(document.getElementById("dPicProgress")?.textContent ?? ""), null, { timeout: 1800000, polling: 500 }).then(() => true).catch(() => false);
+        const fin = await page.evaluate(() => document.getElementById("dPicProgress")?.textContent ?? "");
+        if (!done || /^Stopped/.test(fin)) { fail(`${where} step 3 did not finish: "${fin}"`); continue; }
+        pics = await page.evaluate(`(${PIC})()`);
+        if (pics.length >= 4 && pics.every((p) => p.role === "img" && p.label.length >= 40 && p.cap >= 40)) ok(`${where} after step 3: ${pics.length} pictures, each an image with words as its label and a caption`); else fail(`${where} after step 3: pictures ${JSON.stringify(pics.slice(0, 3))}`);
+        const scroll = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+        if (!scroll) ok(`${where} after step 3: no sideways scroll`); else fail(`${where} after step 3: the page scrolls sideways`);
+        hit = await page.evaluate(HIT);
+        if (hit.small.length) fail(`${where} after step 3, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after step 3: every button is 44 or more`);
+        await axeLine(page, `debug.html ${where} after step 3`);
+      } finally { await page.close(); }
+    }
+  }
 } finally {
   await browser.close();
 }

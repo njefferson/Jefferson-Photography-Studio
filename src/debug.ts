@@ -40,11 +40,14 @@ import { decode } from "./decode";
 import { decodeOffThread, decodeLanes } from "./decodeClient";
 import { sniff, type ImportedFile } from "./import";
 import { srgbDisplayToP3Display } from "./icc";
-import { snapExposure, snapGain } from "./tile";
+import { snapExposure, snapGain, freshBaseline, EXPOSURE_LO, EXPOSURE_HI } from "./tile";
 import { workerCount } from "./exportparallel";
-import { linearAt, type DecodedImage } from "./decode";
+import { linearAt, sampleForWb, unitMinGains, exposureHoldingNeutral, type DecodedImage } from "./decode";
+import { readExifSubset } from "./exif";
+import { photoCamera as cameraOf, choicesFor, loadedFor, profileRule } from "./camprofile";
+import { readBalance } from "./balancestore";
 import { makeRowDenoiser } from "./raw/denoise";
-import { compileEdit, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, type EditParams, type MaskLayer } from "./pipeline";
+import { compileEdit, SAT_GUARD_LO, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, type EditParams, type MaskLayer } from "./pipeline";
 import { exportImage } from "./export";
 import { drawFrame, canDrawFrame, buildLinearSource, openDrawing, type Drawing, type DrawnFrame } from "./gpuexport";
 import { Renderer, VERT, FRAG, MASK_LOOP, dropMaskLoops } from "./gl";
@@ -2650,6 +2653,92 @@ function plantedPairs(): { ok: boolean; value: string; meaning: string } {
   };
 }
 
+// --- THE DOOR (record 108): A PHOTOGRAPH THE READER PICKS ----------------------------------------------------------------
+// One file input in the Picture checks section. A picked file is read into memory here, built into an `ImportedFile`
+// and given to the same path the practice file's fetch feeds, so the three checks and the Separation check run on it in
+// place of the practice file. Nothing of the file leaves the page and nothing is written back.
+
+/** The photograph the reader picked, or null. Set by the file input below; read by both presses. */
+let pickedFile: ImportedFile | null = null;
+
+/** The photograph a press runs on: the file, its decode, the word the press's rows call it and its name. */
+interface Subject { file: ImportedFile; img: DecodedImage; label: "practice photograph" | "picked photograph"; name: string }
+
+/** Says in words what a file's EXIF holds. Takes the file's bytes. Returns the camera, the lens and the other
+ *  figures as one sentence, or says no camera was read where the file carries none. What it must satisfy: only
+ *  fields of the honest EXIF subset (`readExifSubset`) appear, so no location and no maker note is named. */
+function exifWords(bytes: Uint8Array): string {
+  let s = null;
+  try { s = readExifSubset(bytes); } catch { s = null; }
+  if (!s || (!s.make && !s.model && !s.lens)) return "no camera was read: the file carries no camera data this page can read";
+  const cam = [s.make, s.model].filter(Boolean).join(" ") || "no camera name";
+  const parts = [`camera ${cam}`, `lens ${s.lens ?? "not recorded"}`];
+  if (s.focalLength) parts.push(`${(s.focalLength[0] / s.focalLength[1]).toFixed(0)} mm`);
+  if (s.fNumber) parts.push(`f/${(s.fNumber[0] / s.fNumber[1]).toFixed(1)}`);
+  if (s.exposureTime) parts.push(`${s.exposureTime[0]}/${s.exposureTime[1]} s`);
+  if (s.iso) parts.push(`ISO ${s.iso}`);
+  return parts.join(", ");
+}
+
+/** Reads the photograph a press runs on. Takes the press's tally. Returns the subject: the picked file decoded
+ *  when one was picked and it decodes, else the practice photograph fetched and decoded. A picked file the page
+ *  cannot decode gets a row in the not-measured words saying why and the practice photograph is used. Writes the
+ *  row that names the file, its kind, its pixel size, its camera and its lens. What it must satisfy: the decode
+ *  is made once per call and counted in `tally.decodes`; the file's bytes are never sent anywhere. */
+async function loadSubject(tally: PressTally): Promise<Subject> {
+  let file: ImportedFile | null = null;
+  let img: DecodedImage | null = null;
+  let label: Subject["label"] = "practice photograph";
+  if (pickedFile) {
+    try {
+      progress(`Decoding ${pickedFile.name}, once for the whole press`);
+      books(tally);
+      tally.decodes++;
+      img = await decodeOffThread({ ...pickedFile, bytes: pickedFile.bytes.slice() });
+      file = pickedFile;
+      label = "picked photograph";
+      lap(tally, `the ${label}'s file read and decode`);
+    } catch (e) {
+      img = null;
+      tally.decodes--;
+      row("The picked photograph", "failed", `The page could not decode ${pickedFile.name} (${(e as Error).message}), so the practice photograph is used instead. A raw from the Nikon Z 50, a DNG, a TIFF, a JPEG or a PNG decodes here; a format this app does not open does not.`);
+      books(tally);
+    }
+  }
+  if (!file || !img) {
+    progress("Reading the practice photograph's file");
+    books(tally);
+    const res = await fetch("./examples/NIR_0063.dng");
+    if (!res.ok) throw new Error("practice photo not available offline");
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    lap(tally, `reading the ${label}'s file`);
+    file = { name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false };
+    progress("Decoding the practice photograph, once for the whole press");
+    books(tally);
+    tally.decodes++;
+    img = await decodeOffThread({ ...file, bytes: bytes.slice() });
+    lap(tally, `the ${label}'s decode`);
+  }
+  row("The photograph these checks run on", `${file.name} · ${file.kind} · ${img.width} by ${img.height} pixels`,
+    `${label === "picked photograph" ? "The photograph you picked." : "The bundled practice photograph, which carries no camera data."} Its EXIF: ${exifWords(file.bytes)}. The file is read on this page only.`);
+  return { file, img, label, name: file.name };
+}
+
+($("dPicFile") as HTMLInputElement).addEventListener("change", async (e) => {
+  const input = e.currentTarget as HTMLInputElement;
+  const note = $("dPicFileNote");
+  const f = input.files?.[0];
+  pickedFile = null;
+  if (!f) { note.textContent = "No photograph picked, so the practice photograph is used."; return; }
+  try {
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    pickedFile = { name: f.name, kind: sniff(bytes), bytes, looksTranscoded: false };
+    note.textContent = `Picked ${f.name}: ${(bytes.length / (1024 * 1024)).toFixed(1)} MB, read as ${pickedFile.kind}. Both buttons below now run on it. It goes nowhere: nothing is uploaded or saved. The copied result carries its file name, its camera and its lens.`;
+  } catch (err) {
+    note.textContent = `The page could not read ${f.name} (${(err as Error).message}), so the practice photograph is used. Pick it again, or pick another.`;
+  }
+});
+
 /** The three picture checks, three times over. Takes nothing; writes its rows into the picture
  *  checks' own list and says where it has got to in the progress line. Returns a promise of
  *  whether all three checks ran (false when the planted colour or a planted pair did not read as
@@ -2686,22 +2775,13 @@ async function pictureChecks(tally: PressTally): Promise<boolean> {
     row("The checks' own pairs, planted first", pairs.value, pairs.meaning);
     if (!pairs.ok) { row("The three picture checks", "not run", "An instrument did not read its planted pair as known, so nothing it says is trustworthy."); return false; }
 
-    progress("Reading the practice photograph's file");
-    books(tally);
-    const res = await fetch("./examples/NIR_0063.dng");
-    if (!res.ok) throw new Error("practice photo not available offline");
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    lap(tally, "reading the practice photograph's file");
-    const file: ImportedFile = { name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false };
-    progress("Decoding the practice photograph, once for the whole press");
-    books(tally);
-    tally.decodes++;
-    const img = await decodeOffThread({ ...file, bytes: bytes.slice() });
-    lap(tally, "the practice photograph's decode");
-    progress("Building the practice photograph's pixels and sending them to the chip, once");
+    const subject = await loadSubject(tally);
+    const { file, img } = subject;
+    const S = subject.label;
+    progress(`Building the ${S}'s pixels and sending them to the chip, once`);
     await pause(tally);
     books(tally);
-    useOn(dr, tally, file, img, "practice photograph");
+    useOn(dr, tally, file, img, S);
     await pause(tally);
     const frac = Math.min(1, Math.sqrt(2e5 / (img.width * img.height)));
     // THE OPENING BASELINE, on the slider grid: the exposure and the gains are written the way the
@@ -2807,15 +2887,19 @@ async function pictureChecks(tally: PressTally): Promise<boolean> {
       const l = keys.map((k) => st(k)[0]);
       row(`Time: ${name}`, l.every((v) => v !== undefined) ? `${dur(l.reduce((s, v) => s + v, 0))} (once)` : "not measured", meaning);
     };
-    once("reading the practice photograph's file", ["reading the practice photograph's file"], "The practice photograph's file read into memory, before its decode.");
-    once("the practice photograph's decode", ["the practice photograph's decode"], "The decode of the practice photograph off the page's own thread, done once for the whole press and handed to every draw.");
+    if (S === "picked photograph") {
+      once("the picked photograph's decode", [`the ${S}'s file read and decode`], "The decode of the photograph you picked off the page's own thread, done once for the whole press and handed to every draw. The file was already in memory from the file input, so it has no read of its own.");
+    } else {
+      once("reading the practice photograph's file", ["reading the practice photograph's file"], "The practice photograph's file read into memory, before its decode.");
+      once("the practice photograph's decode", ["the practice photograph's decode"], "The decode of the practice photograph off the page's own thread, done once for the whole press and handed to every draw.");
+    }
     once("the picture code's build", ["the picture code's build"], "The picture code built on this chip, once for the whole press; every frame of every run is drawn through it.");
     once("the planted colour's source made and sent", ["the planted colour's pixel build", "the planted colour's upload to the chip"], "The planted colour's own small source made and uploaded to the chip, before its draws.");
     once("the picture code's first draw", [FIRST_DRAW], "One draw of the planted colour, made and thrown away before the one that is read, so whatever the chip pays the first time it draws is in this row and not in the planted colour's.");
     once("the planted colour, drawn and read back", ["the planted colour, drawn and read back"], "The planted colour's second draw, its read-back and conversion and the comparison of every pixel with what the picture code should give, before any check.");
     once("the checks' own planted pairs, tried", ["the checks' own planted pairs, tried"], "The comparator and the patch reader tried on pictures made here whose answers are known.");
-    once("the photograph's pixels built", ["the practice photograph's pixel build"], "The photograph's pixels made from its decode, once, which every draw of the press then reads.");
-    once("the photograph sent to the chip", ["the practice photograph's upload to the chip"], "The photograph's pixels uploaded to the chip, once, with the lens curve, rotation and flip set.");
+    once("the photograph's pixels built", [`the ${S}'s pixel build`], "The photograph's pixels made from its decode, once, which every draw of the press then reads.");
+    once("the photograph sent to the chip", [`the ${S}'s upload to the chip`], "The photograph's pixels uploaded to the chip, once, with the lens curve, rotation and flip set.");
     once("reading the chip's name", ["reading the chip's name"], "The throwaway canvas that names the graphics chip, before the first row.");
     once("taking the device report again", ["taking the device report again"], "The report of the device and the browser taken again at the press of the button, before the checks begin.");
     const wholeOf = (names: string[]): number[] => [0, 1, 2].map((i) => names.reduce((s, n) => s + (st(n)[i] ?? 0), 0));
@@ -2850,10 +2934,10 @@ async function pictureChecks(tally: PressTally): Promise<boolean> {
       if (printed.has(k) || k === TAIL_STAGE) continue;
       row(`Time: ${k}`, `${dur(st(k).reduce((s, v) => s + v, 0))} (in all)`, "A stretch of the press that has no row of its own above.");
     }
-    const photographUses = tally.uses["practice photograph"] ?? 0;
+    const photographUses = tally.uses[S] ?? 0;
     const onceEach = tally.decodes === 1 && tally.builds === 1 && photographUses === 1;
     row("Done in this press: the photograph decoded, the picture code built",
-      `${onceEach ? "once each, as asked" : "NOT once each"} · the practice photograph decoded ${tally.decodes} ${tally.decodes === 1 ? "time" : "times"}, the picture code built ${tally.builds} ${tally.builds === 1 ? "time" : "times"}, the photograph's pixels built ${photographUses} ${photographUses === 1 ? "time" : "times"}`,
+      `${onceEach ? "once each, as asked" : "NOT once each"} · the ${S} decoded ${tally.decodes} ${tally.decodes === 1 ? "time" : "times"}, the picture code built ${tally.builds} ${tally.builds === 1 ? "time" : "times"}, the photograph's pixels built ${photographUses} ${photographUses === 1 ? "time" : "times"}`,
       "Counted where each happens in this section, over every frame of the three runs, so once each is read here and not assumed. The planted colour's own small source is not the photograph and is not counted with it.");
     return true;
   } catch (e) {
@@ -2863,6 +2947,515 @@ async function pictureChecks(tally: PressTally): Promise<boolean> {
     drawing?.close();
     lap(tally, TAIL_STAGE);
   }
+}
+
+// --- THE SEPARATION CHECK (records 084 and 106) -----------------------------------------------------------------------------
+// The premise it measures: after the red and blue swap, the populations of a scene (sky, foliage, built things, water) fall
+// into hue ranges of their own, and each range can be turned alone with no mask. The page draws the picked photograph with
+// the swap on and no look at three white points, finds the hue ranges the DRAWN pixels fall into by a stated rule, paints a
+// map of them, turns each range in place, and prints every range's figures. It sets nothing: the three white points, the
+// floor, the rule and the turns' targets are the ones named below and each is printed. It runs once; nothing here is timed
+// against a band. The pixels it reads are the drawn display pixels (what the reader sees), thinned to about a million.
+
+/** The hue bins: 72 of five degrees. */
+const SEP_BINS = 72;
+const SEP_BIN_DEG = 5;
+/** The hue the foliage's cluster is turned to, and the sky's, as the record states the film's two hues. */
+const SEP_TARGET_FOLIAGE = 335;
+const SEP_TARGET_SKY = 215;
+/** The soft edge at each end of a turned cluster, in degrees, and the share of the pixels above the floor under which a run is no cluster. */
+const SEP_SOFT_EDGE = 10;
+const SEP_MIN_SHARE = 0.01;
+/** The most pixels the analysis reads: a frame larger than this is thinned by taking every k-th pixel of every k-th row. */
+const SEP_PIXELS_MAX = 1.2e6;
+/** The colours of the class map, which differ in lightness as well as hue, with their names for the legend. */
+const SEP_COLOURS: { name: string; rgb: [number, number, number] }[] = [
+  { name: "orange", rgb: [230, 159, 0] }, { name: "sky blue", rgb: [86, 180, 233] }, { name: "green", rgb: [0, 158, 115] },
+  { name: "yellow", rgb: [240, 228, 66] }, { name: "dark blue", rgb: [0, 114, 178] }, { name: "red-orange", rgb: [213, 94, 0] },
+  { name: "pink", rgb: [204, 121, 167] }, { name: "white", rgb: [255, 255, 255] },
+];
+
+interface SepCluster { letter: string; colour: string; startDeg: number; spanDeg: number; count: number; share: number; medHue: number; medSat: number; medVal: number }
+interface SepHues { w: number; h: number; hue: Float32Array; sat: Float32Array; val: Float32Array; hist: number[]; above: number }
+interface SepAnalysis extends SepHues { clusters: SepCluster[]; binCluster: Int8Array; clusterOf: Int8Array }
+
+/** Takes a frame's RGBA bytes and its size. Returns each pixel's HSV hue (degrees), saturation and value, the 72-bin hue count of
+ *  the pixels whose saturation is at or above the floor `SAT_GUARD_LO`, and how many those are. What it must satisfy: a pixel
+ *  below the floor is in no bin. */
+function huePass(data: Uint8ClampedArray, w: number, h: number): SepHues {
+  const n = w * h;
+  const hue = new Float32Array(n), sat = new Float32Array(n), val = new Float32Array(n);
+  const hist: number[] = new Array(SEP_BINS).fill(0);
+  let above = 0;
+  for (let i = 0; i < n; i++) {
+    const r = data[4 * i], g = data[4 * i + 1], b = data[4 * i + 2];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let hh = 0;
+    if (d > 0) {
+      hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      hh *= 60;
+      if (hh < 0) hh += 360;
+    }
+    const s = mx > 0 ? d / mx : 0;
+    hue[i] = hh; sat[i] = s; val[i] = mx / 255;
+    if (s >= SAT_GUARD_LO) { above++; hist[Math.min(SEP_BINS - 1, Math.floor(hh / SEP_BIN_DEG))]++; }
+  }
+  return { w, h, hue, sat, val, hist, above };
+}
+
+/** The clustering rule of the check. Takes the 72-bin hue count and the number of pixels above the floor. Returns the clusters as runs
+ *  of bins, largest first, at most eight. The rule: a bin is a peak when it holds pixels and at least as many as both neighbours (the
+ *  circle wraps); a bin is a valley when it is no peak and holds under one tenth of the smaller of the two nearest peaks, one found
+ *  going each way round; a cluster is the run of bins between two valleys; a run holding under one percent of the pixels above the
+ *  floor is not a cluster. What it must satisfy: runs share no bin. */
+function findClusters(hist: number[], above: number): { start: number; len: number; count: number }[] {
+  const n = SEP_BINS;
+  const peak = hist.map((c, i) => c > 0 && c >= hist[(i + n - 1) % n] && c >= hist[(i + 1) % n]);
+  if (!peak.some(Boolean)) return [];
+  const nearest = (i: number, dir: number): number => {
+    for (let d = 1; d <= n; d++) { const j = (((i + dir * d) % n) + n) % n; if (peak[j]) return hist[j]; }
+    return 0;
+  };
+  const valley = hist.map((c, i) => !peak[i] && c < 0.1 * Math.min(nearest(i, -1), nearest(i, 1)));
+  const first = valley.indexOf(true);
+  const runs: { start: number; len: number; count: number }[] = [];
+  if (first < 0) runs.push({ start: 0, len: n, count: above });
+  else {
+    let cur: { start: number; len: number; count: number } | null = null;
+    for (let d = 1; d <= n; d++) {
+      const i = (first + d) % n;
+      if (valley[i]) { if (cur) { runs.push(cur); cur = null; } }
+      else { if (!cur) cur = { start: i, len: 0, count: 0 }; cur.len++; cur.count += hist[i]; }
+    }
+    if (cur) runs.push(cur);
+  }
+  return runs.filter((r) => r.count >= SEP_MIN_SHARE * above).sort((a, b) => b.count - a.count).slice(0, SEP_COLOURS.length);
+}
+
+/** The place in a histogram where the running count first reaches half of `total`. Takes the histogram and the total. Returns the bin. */
+function histMedian(hist: ArrayLike<number>, total: number): number {
+  let acc = 0;
+  for (let i = 0; i < hist.length; i++) { acc += hist[i]; if (acc * 2 >= total) return i; }
+  return Math.max(0, hist.length - 1);
+}
+
+/** Takes the hue pass. Returns it with its clusters (each with its hue range, share, median hue, median saturation and median value) and
+ *  the class of every pixel: minus one below the floor, minus two above it and in no cluster, otherwise the cluster's index. */
+function clusterPass(p: SepHues): SepAnalysis {
+  const runs = findClusters(p.hist, p.above);
+  const binCluster = new Int8Array(SEP_BINS).fill(-1);
+  runs.forEach((r, k) => { for (let j = 0; j < r.len; j++) binCluster[(r.start + j) % SEP_BINS] = k; });
+  const n = p.w * p.h;
+  const clusterOf = new Int8Array(n);
+  const fine = runs.map(() => new Uint32Array(360)), sH = runs.map(() => new Uint32Array(100)), vH = runs.map(() => new Uint32Array(100));
+  const count = runs.map(() => 0);
+  for (let i = 0; i < n; i++) {
+    if (p.sat[i] < SAT_GUARD_LO) { clusterOf[i] = -1; continue; }
+    const k = binCluster[Math.min(SEP_BINS - 1, Math.floor(p.hue[i] / SEP_BIN_DEG))];
+    if (k < 0) { clusterOf[i] = -2; continue; }
+    clusterOf[i] = k;
+    count[k]++;
+    fine[k][Math.min(359, Math.floor((p.hue[i] - runs[k].start * SEP_BIN_DEG + 360) % 360))]++;
+    sH[k][Math.min(99, Math.floor(p.sat[i] * 100))]++;
+    vH[k][Math.min(99, Math.floor(p.val[i] * 100))]++;
+  }
+  const clusters: SepCluster[] = runs.map((r, k) => {
+    const startDeg = r.start * SEP_BIN_DEG;
+    return {
+      letter: String.fromCharCode(65 + k), colour: SEP_COLOURS[k].name, startDeg, spanDeg: r.len * SEP_BIN_DEG, count: count[k],
+      share: p.above ? count[k] / p.above : 0,
+      medHue: (startDeg + histMedian(fine[k], count[k]) + 0.5) % 360,
+      medSat: (histMedian(sH[k], count[k]) + 0.5) / 100, medVal: (histMedian(vH[k], count[k]) + 0.5) / 100,
+    };
+  });
+  return { ...p, clusters, binCluster, clusterOf };
+}
+
+/** The cluster a point lies in. Takes the analysis and a point as fractions of the width and the height. Returns the index of the cluster
+ *  most common among the clustered pixels of the five by five patch round it, or minus one when none of them is clustered. */
+function clusterAt(a: SepAnalysis, fx: number, fy: number): number {
+  const cx = Math.round(fx * (a.w - 1)), cy = Math.round(fy * (a.h - 1));
+  const tally = new Map<number, number>();
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    const x = Math.min(a.w - 1, Math.max(0, cx + dx)), y = Math.min(a.h - 1, Math.max(0, cy + dy));
+    const k = a.clusterOf[y * a.w + x];
+    if (k >= 0) tally.set(k, (tally.get(k) ?? 0) + 1);
+  }
+  let best = -1, bestN = 0;
+  for (const [k, c] of tally) if (c > bestN) { best = k; bestN = c; }
+  return best;
+}
+
+/** The class map. Takes the analysis. Returns RGBA bytes of its size: grey below the floor, a dotted pattern for pixels above it in no
+ *  cluster, each cluster's colour otherwise, and for each cluster the middle of its pixels, where its letter is drawn. */
+function classMap(a: SepAnalysis): { data: Uint8ClampedArray; labels: { letter: string; x: number; y: number }[] } {
+  const out = new Uint8ClampedArray(a.w * a.h * 4);
+  const sx = a.clusters.map(() => 0), sy = a.clusters.map(() => 0), sn = a.clusters.map(() => 0);
+  for (let y = 0; y < a.h; y++) for (let x = 0; x < a.w; x++) {
+    const i = y * a.w + x, o = 4 * i, k = a.clusterOf[i];
+    let c: [number, number, number];
+    if (k === -1) c = [128, 128, 128];
+    else if (k === -2) c = (x + y) % 8 < 3 ? [40, 40, 40] : [215, 215, 215];
+    else { c = SEP_COLOURS[k].rgb; sx[k] += x; sy[k] += y; sn[k]++; }
+    out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = 255;
+  }
+  return { data: out, labels: a.clusters.map((c, k) => ({ letter: c.letter, x: sn[k] ? sx[k] / sn[k] : 0, y: sn[k] ? sy[k] / sn[k] : 0 })) };
+}
+
+/** Writes a colour given as hue, saturation and value into RGBA bytes. Takes the bytes, the offset and the three. Returns nothing. */
+function putHsv(out: Uint8ClampedArray, o: number, h: number, s: number, v: number): void {
+  const c = v * s, hh = (((h % 360) + 360) % 360) / 60, x = c * (1 - Math.abs((hh % 2) - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if (hh < 1) { r = c; g = x; } else if (hh < 2) { r = x; g = c; } else if (hh < 3) { g = c; b = x; }
+  else if (hh < 4) { g = x; b = c; } else if (hh < 5) { r = x; b = c; } else { r = c; b = x; }
+  out[o] = (r + m) * 255; out[o + 1] = (g + m) * 255; out[o + 2] = (b + m) * 255; out[o + 3] = 255;
+}
+
+/** Turns clusters in place. Takes the frame's bytes, its analysis and `shiftOf`, which gives the degrees a cluster turns by or null to
+ *  hold it. Returns new bytes in which each turned cluster's pixels carry their hue plus the shift, scaled to nothing over the first and
+ *  last ten degrees of the cluster (the soft edge, held to half the cluster's span when it is narrower), with saturation and value as
+ *  they were; every other pixel, and every pixel below the floor, is copied unchanged. What it must satisfy: a cluster held gives back
+ *  its pixels byte for byte. */
+function turnClusters(src: Uint8ClampedArray, a: SepAnalysis, shiftOf: (k: number) => number | null): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(src);
+  for (let i = 0; i < a.w * a.h; i++) {
+    const k = a.clusterOf[i];
+    if (k < 0) continue;
+    const d = shiftOf(k);
+    if (d === null) continue;
+    const c = a.clusters[k];
+    const rel = (a.hue[i] - c.startDeg + 360) % 360;
+    const edge = Math.min(SEP_SOFT_EDGE, c.spanDeg / 2);
+    const wgt = edge > 0 ? Math.min(1, Math.max(0, Math.min(rel, c.spanDeg - rel) / edge)) : 1;
+    if (wgt > 0) putHsv(out, 4 * i, a.hue[i] + wgt * d, a.sat[i], a.val[i]);
+  }
+  return out;
+}
+
+/** The degrees from one hue to another by the short way round. Takes the two hues. Returns a number in minus 180 to 180. */
+const shortWay = (from: number, to: number): number => ((((to - from) % 360) + 540) % 360) - 180;
+
+/** Takes a drawn frame. Returns it thinned to at most `SEP_PIXELS_MAX` pixels by taking every k-th pixel of every k-th row, with k and the
+ *  size it came from. */
+function thin(f: { data: Uint8ClampedArray; width: number; height: number }): { data: Uint8ClampedArray; w: number; h: number; k: number; fromW: number; fromH: number } {
+  const k = Math.max(1, Math.ceil(Math.sqrt((f.width * f.height) / SEP_PIXELS_MAX)));
+  const w = Math.floor(f.width / k), h = Math.floor(f.height / k);
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const s = (y * k * f.width + x * k) * 4, o = (y * w + x) * 4;
+    data[o] = f.data[s]; data[o + 1] = f.data[s + 1]; data[o + 2] = f.data[s + 2]; data[o + 3] = 255;
+  }
+  return { data, w, h, k, fromW: f.width, fromH: f.height };
+}
+
+/** Puts a picture on the page with its words. Takes the parent, the words (the picture's name and what it shows), the RGBA bytes, the size
+ *  and optionally letters to draw at points. Returns the canvas, which is a real image for a screen reader (role img with the words as its
+ *  label) and carries the same words in a caption under it, so no picture stands without them. */
+function sepFigure(parent: HTMLElement, words: string, data: Uint8ClampedArray, w: number, h: number, labels?: { letter: string; x: number; y: number }[]): HTMLCanvasElement {
+  const fig = document.createElement("figure");
+  fig.style.cssText = "margin:0;flex:1 1 15rem;min-width:0;max-width:30rem";
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  cv.setAttribute("role", "img");
+  cv.setAttribute("aria-label", words);
+  cv.style.cssText = "display:block;width:100%;height:auto;border:1px solid var(--line-2);border-radius:6px";
+  const ctx = cv.getContext("2d")!;
+  const id = ctx.createImageData(w, h);
+  id.data.set(data);
+  ctx.putImageData(id, 0, 0);
+  if (labels) {
+    ctx.font = `bold ${Math.max(14, Math.round(h / 16))}px sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineWidth = 4; ctx.strokeStyle = "black"; ctx.fillStyle = "white";
+    for (const l of labels) { ctx.strokeText(l.letter, l.x, l.y); ctx.fillText(l.letter, l.x, l.y); }
+  }
+  const cap = document.createElement("figcaption");
+  cap.style.cssText = "font-size:0.8125rem;line-height:1.4;color:var(--txt-2);margin-top:4px";
+  cap.textContent = words;
+  fig.append(cv, cap);
+  parent.appendChild(fig);
+  return cv;
+}
+
+/** What the first press leaves for the second: the open drawing surface, the subject, the opening balance, and the first picture. */
+interface SepState {
+  drawing: Drawing; subject: Subject; wb0: [number, number, number]; exp0: number;
+  t: ReturnType<typeof thin>; cv0: HTMLCanvasElement; spec: Parameters<typeof readBalance>[1] | null;
+}
+let sep: SepState | null = null;
+const sepGo = $("dSepGo") as HTMLButtonElement;
+
+/** Gives the first press's drawing surface back and disables the second button. Takes nothing; returns nothing. */
+function closeSep(): void {
+  sep?.drawing.close();
+  sep = null;
+  sepGo.disabled = true;
+}
+window.addEventListener("pagehide", closeSep);
+
+/** The edit of a white point: the swap on, no look, every control at its neutral, the balance and exposure given. Takes the gains and the
+ *  exposure. Returns the edit, and throws when the drawn path does not cover it. */
+function sepEdit(wb: [number, number, number], exposure: number): EditParams {
+  const p = pictureParams({ wb, exposure, swapRB: true });
+  if (!canDrawFrame(p)) throw new Error("this edit is outside what the drawn path covers yet");
+  return p;
+}
+
+const sepBox = (id: string): HTMLInputElement => $(id) as HTMLInputElement;
+/** The two typed points. Returns each as fractions of the width and the height, or null when a box is empty or outside zero to one hundred. */
+function sepPoints(): { n: [number, number]; f: [number, number] } | null {
+  const v = ["dSepNX", "dSepNY", "dSepFX", "dSepFY"].map((id) => (sepBox(id).value.trim() === "" ? NaN : Number(sepBox(id).value)));
+  if (v.some((x) => !Number.isFinite(x) || x < 0 || x > 100)) return null;
+  return { n: [v[0] / 100, v[1] / 100], f: [v[2] / 100, v[3] / 100] };
+}
+
+/** Redraws the first picture with the two points marked: a circle with N for the neutral spot, a square with F for the foliage spot. Takes
+ *  nothing; returns nothing. The marks are shapes and letters, never colour alone. */
+function sepMarks(): void {
+  if (!sep) return;
+  const cv = sep.cv0, ctx = cv.getContext("2d")!;
+  const id = ctx.createImageData(sep.t.w, sep.t.h);
+  id.data.set(sep.t.data);
+  ctx.putImageData(id, 0, 0);
+  const mark = (fx: number, fy: number, letter: string, square: boolean) => {
+    const x = fx * (sep!.t.w - 1), y = fy * (sep!.t.h - 1), r = Math.max(8, sep!.t.h / 30);
+    ctx.lineWidth = 4; ctx.strokeStyle = "black"; ctx.fillStyle = "white"; ctx.font = `bold ${Math.round(r * 1.6)}px sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const pass of [0, 1]) {
+      if (pass) { ctx.lineWidth = 2; ctx.strokeStyle = "white"; }
+      ctx.beginPath();
+      if (square) ctx.rect(x - r, y - r, 2 * r, 2 * r); else ctx.arc(x, y, r, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+    ctx.lineWidth = 3; ctx.strokeStyle = "black"; ctx.strokeText(letter, x, y); ctx.fillText(letter, x, y);
+  };
+  const ok = (a: number, b: number) => Number.isFinite(a) && Number.isFinite(b);
+  const nx = Number(sepBox("dSepNX").value), ny = Number(sepBox("dSepNY").value), fx = Number(sepBox("dSepFX").value), fy = Number(sepBox("dSepFY").value);
+  if (sepBox("dSepNX").value !== "" && sepBox("dSepNY").value !== "" && ok(nx, ny)) mark(nx / 100, ny / 100, "N", false);
+  if (sepBox("dSepFX").value !== "" && sepBox("dSepFY").value !== "" && ok(fx, fy)) mark(fx / 100, fy / 100, "F", true);
+}
+for (const id of ["dSepNX", "dSepNY", "dSepFX", "dSepFY"]) sepBox(id).addEventListener("input", sepMarks);
+
+/** Writes the stage rows and the two sum rows of a press. Takes the press's tally and its whole time. Returns nothing. */
+function sepTimeRows(tally: PressTally, whole: number): void {
+  books(tally);
+  for (const [k, l] of tally.stages) row(`Time: ${k}`, `${dur(l.reduce((s, v) => s + v, 0))} (${l.length === 1 ? "once" : `in all, ${l.length} times`})`, "A stage of this press, timed on this page's own clock.");
+  row("Time: waiting for the screen to draw", `${dur(tally.waitMs)} in all, over ${tally.waits} ${tally.waits === 1 ? "wait" : "waits"}`, "The zero-delay waits the press makes so the progress line can draw.");
+  row("Time: the whole press", dur(whole), "From the press of the button to the last row.");
+  const sum = pressTotal(tally);
+  row("Time: every row added together", `${dur(sum)} against the whole press ${dur(whole)}, ${dur(Math.max(0, whole - sum))} in no row`, "Every stretch of the press is under a name above, and this line adds them. The difference from the whole press is what lay in no row.");
+}
+
+/** Takes the two buttons' common wrapper: runs `body` as a press of the Separation check with the page's other tests held off, the rows
+ *  written into the picture checks' own list and copy block, and the press counted in `running` until `body` ends. Returns nothing. */
+async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: PressTally) => Promise<void>): Promise<void> {
+  const list = $("dPicResults");
+  if (running) { $("dSepHint").textContent = "Another test on this page is still running. Press this again when it has finished."; return; }
+  const others = ["dRun", "dBigRead", "dSlowBuild", "dPictures", "dSepStart", "dSepGo"].map((id) => $(id) as HTMLButtonElement);
+  const was = others.map((b) => b.disabled);
+  others.forEach((b) => { b.disabled = true; });
+  const label = btn.textContent;
+  btn.textContent = "Running…";
+  running++;
+  if (clear) { list.replaceChildren(); picOut.length = 0; }
+  rowsInto = list; outInto = picOut;
+  pressStart = performance.now();
+  const tally = newTally(pressStart);
+  try {
+    await body(tally);
+  } catch (err) {
+    row("The Separation check", "not run", `${(err as Error).message}.`);
+    progress(`Stopped: ${(err as Error).message}.`, true);
+  } finally {
+    rowsInto = results; outInto = out;
+    running--;
+    btn.textContent = label;
+    others.forEach((b, i) => { b.disabled = was[i]; });
+    sepGo.disabled = !sep;
+  }
+}
+
+($("dSepStart") as HTMLButtonElement).addEventListener("click", (e) => {
+  void sepPress(e.currentTarget as HTMLButtonElement, true, async (tally) => {
+    closeSep();
+    $("dSepPics").replaceChildren();
+    await refreshReport();
+    lap(tally, "taking the device report again");
+    const chip = chipName();
+    lap(tally, "reading the chip's name");
+    row("The graphics chip drawing the Separation check", chip, SOFTWARE_RENDERER.test(chip)
+      ? "THIS IS A SOFTWARE RENDERER, not a graphics chip: the figures describe this renderer and say nothing of the picture on a device."
+      : "The renderer string the browser gives for this page's drawing. The figures are of this chip.");
+    let drawing: Drawing | null = null;
+    try {
+      progress("Building the picture code, once");
+      books(tally);
+      tally.builds++;
+      drawing = await openDrawing();
+      lap(tally, "the picture code's build");
+      await pause(tally);
+      const plant = await plantedColour(drawing, tally);
+      row("A planted colour, drawn and read back", plant.value, plant.meaning);
+      if (!plant.exact) { row("The Separation check", "not run", "The planted colour did not read back exactly, so a picture read on this page cannot be trusted."); progress("Stopped: the planted colour did not read back exactly.", true); return; }
+      books(tally);
+      const pairs = plantedPairs();
+      lap(tally, "the checks' own planted pairs, tried");
+      row("The checks' own pairs, planted first", pairs.value, pairs.meaning);
+      if (!pairs.ok) { row("The Separation check", "not run", "An instrument did not read its planted pair as known, so nothing it says is trustworthy."); progress("Stopped: a planted pair did not read as known.", true); return; }
+      const subject = await loadSubject(tally);
+      progress(`Sending the ${subject.label} to the chip`);
+      await pause(tally);
+      books(tally);
+      useOn(drawing, tally, subject.file, subject.img, subject.label);
+      const base = freshBaseline(subject.img);
+      const cam = cameraOf(subject.img.isRaw, subject.file.bytes);
+      const spec = profileRule(choicesFor(cam, loadedFor(cam.keys)), undefined, undefined, undefined).choice?.spec ?? null;
+      progress("Drawing the photograph with the swap on at the balance the app opens at");
+      await pause(tally);
+      books(tally);
+      const frame = drawing.draw(sepEdit(base.wb, base.exposure));
+      lap(tally, "separation: the first draw and read-back, at the opening balance");
+      const t = thin(frame);
+      lap(tally, "separation: the first picture thinned");
+      const host = $("dSepPics");
+      const box = document.createElement("div");
+      box.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px";
+      host.appendChild(box);
+      const cv0 = sepFigure(box, `The photograph drawn with red and blue swapped and no look, at the balance the editor opens at. Tap it to set the point chosen above, or type the two points in the boxes. A circle marked N is the neutral spot and a square marked F the foliage spot. It is shown at ${t.w} by ${t.h} pixels, every ${t.k === 1 ? "pixel" : `${t.k}th pixel`} of the ${t.fromW} by ${t.fromH} drawn frame.`, t.data, t.w, t.h);
+      cv0.style.cursor = "crosshair";
+      cv0.addEventListener("click", (ev) => {
+        const r = cv0.getBoundingClientRect();
+        const fx = Math.min(100, Math.max(0, ((ev.clientX - r.left) / r.width) * 100)), fy = Math.min(100, Math.max(0, ((ev.clientY - r.top) / r.height) * 100));
+        const neutral = ($("dSepTapNeutral") as HTMLInputElement).checked;
+        sepBox(neutral ? "dSepNX" : "dSepFX").value = fx.toFixed(1);
+        sepBox(neutral ? "dSepNY" : "dSepFY").value = fy.toFixed(1);
+        $("dSepHint").textContent = `The ${neutral ? "neutral" : "foliage"} spot is now ${fx.toFixed(1)} percent across and ${fy.toFixed(1)} percent down.`;
+        sepMarks();
+      });
+      sep = { drawing, subject, wb0: base.wb, exp0: base.exposure, t, cv0, spec };
+      drawing = null;
+      const rd = spec ? readBalance(base.wb, spec) : null;
+      row("The opening balance, the first white point", `gains ${base.wb.map((g) => g.toFixed(4)).join(", ")} · exposure ${base.exposure.toFixed(4)} · ${rd ? `reads as ${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read: the file has no matrix to read it through"}`,
+        `What the editor opens this photograph at, from the gray-world rule (freshBaseline). The drawn picture has the red and blue swap on and no look, every control at its neutral${subject.img.isRaw ? "" : "; this file is camera-rendered, so it opens with no balance, and the swap is switched on here all the same for the check"}.`);
+      progress("The photograph is drawn. Now tap a neutral spot and a sunlit leaf, or type their points, then press step 3.", true);
+      $("dSepHint").textContent = "The picture is drawn above. Choose what a tap sets, then tap the picture or type the four numbers, then press step 3.";
+      sepMarks();
+      sepGo.disabled = false;
+    } finally {
+      if (drawing) drawing.close();
+      lap(tally, TAIL_STAGE);
+      sepTimeRows(tally, performance.now() - pressStart);
+    }
+  });
+});
+
+sepGo.addEventListener("click", (e) => {
+  const s = sep;
+  if (!s) { $("dSepHint").textContent = "Press step 1 first: the picture has to be drawn before the two spots can be set."; return; }
+  const pts = sepPoints();
+  if (!pts) { $("dSepHint").textContent = "All four boxes need a number from 0 to 100. Tap the picture for each spot or type them, then press step 3 again."; return; }
+  void sepPress(e.currentTarget as HTMLButtonElement, false, async (tally) => {
+    try {
+      const img = s.subject.img;
+      const px = (f: [number, number]): [number, number] => [Math.round(f[0] * (img.width - 1)), Math.round(f[1] * (img.height - 1))];
+      type Point = { name: string; wb: [number, number, number]; exposure: number; why: string };
+      const points: Point[] = [{ name: "the balance the app opens at", wb: s.wb0, exposure: s.exp0, why: "freshBaseline's opening gains" }];
+      for (const [name, f, what] of [["a balance set from your neutral spot", pts.n, "neutral spot"], ["a balance set from your foliage spot", pts.f, "foliage spot"]] as const) {
+        const [cx, cy] = px(f);
+        const sample = sampleForWb(img, cx, cy);
+        if (sample.verdict !== "ok") {
+          row(`White point: ${name}`, "not run", `The ${what} at pixel ${cx}, ${cy} is ${sample.verdict === "blown" ? "blown out, so its colour was never recorded" : "almost black, so there is not enough colour in it"}; the editor refuses the same tap. Choose another spot and press step 3 again.`);
+          continue;
+        }
+        const [r, g, b] = sample.lin;
+        const mean = (r + g + b) / 3;
+        const next = unitMinGains([mean / r, mean / g, mean / b]);
+        const exposure = Math.min(EXPOSURE_HI, Math.max(EXPOSURE_LO, exposureHoldingNeutral(img, sample.lin, s.wb0, s.exp0, next)));
+        points.push({ name, wb: next, exposure, why: `the ${what} at pixel ${cx}, ${cy}, set the way the editor's tap sets a balance` });
+      }
+      row("The Separation check's own settings", `floor ${SAT_GUARD_LO} · ${SEP_BINS} bins of ${SEP_BIN_DEG} degrees · targets ${SEP_TARGET_FOLIAGE} and ${SEP_TARGET_SKY} · soft edge ${SEP_SOFT_EDGE} · minimum ${SEP_MIN_SHARE * 100} percent`,
+        "The floor is the band stage's own saturation floor (SAT_GUARD_LO), applied here to the saturation of the drawn pixel, which is what the reader sees. A cluster is a run of hue bins between two valleys (a valley is a bin under one tenth of the smaller of its two nearest peaks); a run under one percent of the pixels above the floor is no cluster. The foliage cluster is the one holding the foliage spot; the sky cluster is the largest other. Turn A moves the foliage cluster's middle hue to 335 degrees and the sky cluster's to 215, each as one rotation with a ten-degree soft edge. Turn B moves every other cluster by plus 60 degrees and holds those two. Pixels below the floor are held in both. Nothing here is a setting of the editor. The check runs once.");
+      row("The two spots", `neutral ${(pts.n[0] * 100).toFixed(1)} across, ${(pts.n[1] * 100).toFixed(1)} down · foliage ${(pts.f[0] * 100).toFixed(1)} across, ${(pts.f[1] * 100).toFixed(1)} down (percent of width and height)`,
+        `As tapped or typed. The patch read at each is the one the editor's tap reads. The analysis reads every ${s.t.k === 1 ? "pixel" : `${s.t.k}th pixel`} of the drawn frame.`);
+      const host = $("dSepPics");
+      for (let k = 0; k < points.length; k++) {
+        const P = points[k];
+        const N = k + 1;
+        progress(`White point ${N}: drawing`);
+        await pause(tally);
+        books(tally);
+        let t: ReturnType<typeof thin>;
+        if (P.wb === s.wb0) t = s.t;
+        else {
+          const frame = s.drawing.draw(sepEdit(P.wb, P.exposure));
+          lap(tally, `separation: white point ${N}, the draw and read-back`);
+          t = thin(frame);
+          lap(tally, `separation: white point ${N}, the picture thinned`);
+        }
+        progress(`White point ${N}: the hue pass`);
+        await pause(tally);
+        books(tally);
+        const hp = huePass(t.data, t.w, t.h);
+        lap(tally, `separation: white point ${N}, the hue pass`);
+        const an = clusterPass(hp);
+        lap(tally, `separation: white point ${N}, the clustering`);
+        const map = classMap(an);
+        lap(tally, `separation: white point ${N}, painting the class map`);
+        const fIdx = clusterAt(an, pts.f[0], pts.f[1]), nIdx = clusterAt(an, pts.n[0], pts.n[1]);
+        const sIdx = an.clusters.findIndex((_, i) => i !== fIdx);
+        const shiftA = (c: number): number | null => c === fIdx ? shortWay(an.clusters[c].medHue, SEP_TARGET_FOLIAGE) : c === sIdx ? shortWay(an.clusters[c].medHue, SEP_TARGET_SKY) : null;
+        const shiftB = (c: number): number | null => c === fIdx || c === sIdx ? null : 60;
+        const turnA = turnClusters(t.data, an, shiftA);
+        const turnB = turnClusters(t.data, an, shiftB);
+        lap(tally, `separation: white point ${N}, the two turns`);
+        progress(`White point ${N}: showing the pictures`);
+        const rd = s.spec ? readBalance(P.wb, s.spec) : null;
+        const sec = document.createElement("section");
+        sec.style.cssText = "margin:18px 0";
+        const hd = document.createElement("h4");
+        hd.style.cssText = "font-size:0.9375rem;margin:0 0 6px";
+        hd.textContent = `White point ${N} of 3: ${P.name}`;
+        sec.appendChild(hd);
+        host.appendChild(sec);
+        const r1 = document.createElement("div");
+        r1.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;margin:0 0 8px";
+        sec.appendChild(r1);
+        sepFigure(r1, `White point ${N}, ${P.name}: the photograph drawn with red and blue swapped and no look.`, t.data, t.w, t.h);
+        sepFigure(r1, `White point ${N}, class map: each hue cluster has its own colour and its letter; grey is below the floor; the dotted pattern is above the floor and in no cluster.`, map.data, t.w, t.h, map.labels);
+        const ul = document.createElement("ul");
+        ul.style.cssText = "margin:0 0 8px;padding-left:1.2rem;font-size:0.8125rem;line-height:1.5;color:var(--txt-2)";
+        const li = (text: string) => { const e2 = document.createElement("li"); e2.textContent = text; ul.appendChild(e2); };
+        for (const c of an.clusters) li(`${c.letter}, ${c.colour}: hue ${Math.round(c.startDeg) > Math.round((c.startDeg + c.spanDeg) % 360) ? `${Math.round(c.startDeg)} to 360 and 0 to ${Math.round((c.startDeg + c.spanDeg) % 360)}, an arc through 0` : `${Math.round(c.startDeg)} to ${Math.round((c.startDeg + c.spanDeg) % 360)}`} degrees,${(c.share * 100).toFixed(1)} percent of the pixels above the floor${an.clusters.indexOf(c) === fIdx ? ", holds the foliage spot" : ""}${an.clusters.indexOf(c) === nIdx ? ", holds the neutral spot" : ""}.`);
+        li("Grey: below the floor. Dotted pattern: above the floor and in no cluster.");
+        sec.appendChild(ul);
+        const r2 = document.createElement("div");
+        r2.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;margin:0 0 8px";
+        sec.appendChild(r2);
+        sepFigure(r2, `White point ${N}, turn A: the foliage cluster turned so its middle lands on ${SEP_TARGET_FOLIAGE} degrees and the sky cluster on ${SEP_TARGET_SKY}, every other pixel held.`, turnA, t.w, t.h);
+        sepFigure(r2, `White point ${N}, turn B: every cluster but the foliage and sky ones turned by plus 60 degrees, those two and everything below the floor held.`, turnB, t.w, t.h);
+        row(`White point ${N}: ${P.name}`, `gains ${P.wb.map((g) => g.toFixed(4)).join(", ")} · exposure ${P.exposure.toFixed(4)} · ${rd ? `reads as ${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read"}`, `From ${P.why}. Drawn once, with the swap on and no look.`);
+        row(`White point ${N}: the floor`, `${SAT_GUARD_LO} · ${((1 - (hp.above / (t.w * t.h))) * 100).toFixed(1)} percent of pixels below it`, "Saturation of the drawn pixel below which a pixel is in no cluster.");
+        row(`White point ${N}: the clusters`, `${an.clusters.length} ${an.clusters.length === 1 ? "cluster" : "clusters"} · neutral spot in ${nIdx >= 0 ? an.clusters[nIdx].letter : "no cluster"} · foliage spot in ${fIdx >= 0 ? an.clusters[fIdx].letter : "no cluster"} · sky cluster ${sIdx >= 0 ? an.clusters[sIdx].letter : "none"}`,
+          "Found by the rule in the settings row. A spot in no cluster means its patch fell below the floor or between clusters.");
+        for (const c of an.clusters) {
+          row(`White point ${N}, cluster ${c.letter} (${c.colour})`, `hue ${Math.round(c.startDeg) > Math.round((c.startDeg + c.spanDeg) % 360) ? `${Math.round(c.startDeg)} to 360 and 0 to ${Math.round((c.startDeg + c.spanDeg) % 360)}, an arc through 0` : `${Math.round(c.startDeg)} to ${Math.round((c.startDeg + c.spanDeg) % 360)}`} degrees, middle${Math.round(c.medHue)} · ${(c.share * 100).toFixed(1)} percent · median saturation ${c.medSat.toFixed(2)}, median value ${c.medVal.toFixed(2)}`, "Range, share of the pixels above the floor, and the medians of the pixels in it.");
+        }
+        row(`White point ${N}: the turns`, `A: foliage ${fIdx >= 0 ? `${Math.round(an.clusters[fIdx].medHue)} to ${SEP_TARGET_FOLIAGE}` : "no cluster, not turned"}, sky ${sIdx >= 0 ? `${Math.round(an.clusters[sIdx].medHue)} to ${SEP_TARGET_SKY}` : "no cluster, not turned"} · B: ${an.clusters.filter((_, i) => i !== fIdx && i !== sIdx).map((c) => c.letter).join(", ") || "no other cluster"} by plus 60`,
+          "The middle hue of the cluster, and where turn A takes it; the clusters turn B moves.");
+        await pause(tally);
+      }
+      sepTimeRowsFor(tally);
+      progress("Done. The three white points are drawn and turned; copy the picture checks to send the numbers.", true);
+      $("dSepHint").textContent = "Done. The pictures are above and the numbers are in the picture checks' list, ready to copy.";
+    } finally {
+      closeSep();
+    }
+  });
+});
+
+/** The second press's time rows, written after its stages. Takes its tally. Returns nothing. */
+function sepTimeRowsFor(tally: PressTally): void {
+  lap(tally, TAIL_STAGE);
+  sepTimeRows(tally, performance.now() - pressStart);
 }
 
 const picOut: string[] = [];

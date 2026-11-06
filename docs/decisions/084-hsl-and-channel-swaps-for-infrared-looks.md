@@ -37,6 +37,8 @@ photograph opens with the swap on and no look, the box named Sky acts on the
 foliage and the box named Foliage on the sky (NOTES.md, "The per-colour boxes
 are named for subjects and keyed on hue, 2026-09-16"; renders below).
 
+**The instrument of the premise (the plan of 6 November 2026, on staging as 2.72).** The premise this record rests on, that after a careful balance and the swap the populations of a scene fall into hue ranges that can each be turned alone, is measured by the Separation check on the test page (record 106's fourth check), on a photograph the reader picks (record 108): the drawn pixels at three white points, the hue clusters found by a stated rule and painted beside the picture, each cluster turned in place, and every range, share and median in the copied report. Nothing of this record's panel is built; the check is what the panel's build waits on.
+
 ## Looked up
 
 The first version's research stands where it bears on this question, and a
@@ -124,6 +126,10 @@ their sources; they are not infrared science, so they are not in IR-SCIENCE.
   so it comes first.
 - touches 003 — 003 moves where the drawer's controls live; this adds to them,
   so it comes after.
+- touches 106 — the Separation check that measures this record's premise is a
+  fourth check on that record's test page.
+- touches 108 — the check runs on a photograph the reader picks through that
+  record's door.
 
 ## Built already
 

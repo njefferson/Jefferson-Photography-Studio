@@ -54,6 +54,14 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**Version 2.72: the test page runs its picture checks on a photograph you pick, and a Separation check shows the hue clusters of your photograph at three white points with each cluster turned: built on staging by the plan of 6 November and verified headless there, not yet on a device (records 108, 084 and 106).** On staging at staging.jefferson-photo-studio.pages.dev.
+- **New: the test page's Picture checks section takes a photograph you pick.** A file input with a label sits above the buttons; the three checks run on the picked photograph in place of the practice photograph, and the first row of the report names the file, its pixel size and its camera and lens. A file the page cannot decode gets a row saying why and the practice photograph is used. Nothing is uploaded or saved, and a line beside the copy button says the file's name and camera are in the copy.
+- **New: a Separation check beside the three, with two buttons.** Step 1 draws the photograph with the red and blue swap on, no look, at the balance the editor opens at. Step 2 is two spots, a neutral one and a sunlit leaf, set by tapping the picture or by typing percentages into four labelled boxes. Step 3 draws the photograph at three white points (the opening balance, a balance set from the neutral spot, a balance set from the foliage spot), finds the hue ranges the drawn colours fall into, paints a map of them beside each picture with a letter and a legend in words, and turns each range in place twice, once to two target hues and once by sixty degrees for the rest. The copy carries every range, share and median, the taps and the stage times. It runs once and sets no look and no control.
+- **Internal, nothing a reader sees:** records 108, 106 and 084 gain what was built; the accessibility walk gains a section of three states of the test page (at rest, after step 1, after step 3); the module map is made again; `VERSION` reads 2.72.
+- **Verified headless, and what needs the device.** The build, the typecheck and every commit gate run here, and a probe of the built page on the practice photograph read the Separation report's rows. Nothing is judged about any picture under the container's software drawing. Not run: any device, and any of the owner's raws on the page.
+- **What is still wrong.** Nothing has run on a device. The practice photograph, which the walks use, carries no camera data. How the iPad's picker hands a raw to the page is not read. The check reads every k-th pixel of a large frame, which the report states.
+- **For the device pass on staging.** One press on the iPad and one on the PC with a raw from the camera picked: step 1, tap a neutral spot and a sunlit leaf, step 3, read the pictures, copy the picture checks and paste the report back.
+
 **Fixed: the test page's picture checks account for every second of a press, name the first run's time and the picture code's first draw, and keep going with the page out of sight: built on staging by the plan of 5 November and verified headless there, not yet on a device (record 106).** On staging at staging.jefferson-photo-studio.pages.dev.
 - **Fixed: every stretch of a press from the button to the done line now lies inside one named timed row, and one line adds them.** The line "every row added together" prints the sum of every time the report printed against the whole press and names the difference as in no row. The press's waits for the screen to draw are one row with a count, the making of each frame's edit and the keeping of the books are a row, the writing of the rows outside the runs is a row, and the last stretch, writing the time rows and giving the drawing surface back, is named in the line itself.
 - **Fixed: the picture code's first draw has a row of its own, and each row made of three runs prints its first run's time beside the median.** The planted colour is drawn twice, the first draw timed as the picture code's first draw and the second read back and timed as the planted colour, so that row is the planted colour's alone. "First run" is printed after each three-run median, so a warm-up the median hides is on the line.
@@ -2304,7 +2312,7 @@ Q-JPS-131: tools/sky-stage-walk.mjs imports playwright-core by an absolute path 
 Q-JPS-132: macro.html's frame thumbnails carry their instruction (tap to view, tap again to turn off) in the title only until the first tap raises the status line; the control walk declares them by number, so a third frame in its state would need a third line, and the instruction is not on screen before a tap (declared, not changed: a label or wording change is a copy choice) (step 194).
 Q-JPS-133: the control walk's key for a control with no id is the first 24 characters of its text, so a declared line for a row whose text carries a name the reader chose, a count or a clock cannot be kept without the walk choosing the name; the kept-balance row is the one case so far (step 194).
 Q-JPS-134: record 034's NIR_3406, NIR_3394 and NIR_3429 are not in tools/owner-images.json, so none can be measured or rendered under the rule that only the shared photographs are used, and 034's candidate 1 test names the carport frame; a stand-in has to come from the shared set and none was searched for (step 195).
-Q-JPS-135: ir.html's note under Sky depth says a cloud is left exactly as it was and the note under Sky saturation says a cloud stays as grey as it is, while record 069 records that Sky depth can darken a cloud inside a blue texel and that the stages tinted cloud when they were built under the look, so the labels describe a guard the record says does not exist; not changed, because no step chose a wording (step 195).
+Q-JPS-135: ir.html's note under Sky depth says a cloud is left exactly as it was and the note under Sky saturation says a cloud stays as grey as it is, while record 069 records that Sky depth can darken a cloud inside a blue texel and that the stages tinted cloud when they were built under the look, so the labels describe a guard the record says does not exist; not changed, because no step chose a wording (step 195). Put right on 6 November 2026 by the commit whose subject opens "Fixed: the notes under Sky depth and Sky saturation", since step 304 left it as written.
 Q-JPS-136: record 073's pointer, that a noisier frame raises the border search's thresholds, is not a mechanism yet: a noise ceiling near the sky's own scale lies far below the thresholds the record measured (0.187 and 0.334), so it would move the good frame's threshold as well; the node measurement of 26 October 2026 did not reproduce the record's figures at the head (the refined selection reads 49.4 and 36.0 percent where the record has 45.7 and 20.5), so nothing about noise was read from it and the question is open (steps 195 and 201).
 Q-JPS-137: the first send of step 195 recorded the unresolved hosts without the document each was tried for, so the list of what each held is by what the host is and not by what was asked of it; goobi.tib.eu, www.eecis.udel.edu and ntrs.nasa.gov are tied to no document (step 195).
 Q-JPS-138: the replay worktrees jps-196b and jps-196c and the first-pass jps-196 are left in place (no worktree is removed), the folder dist-plant is left untracked in jps-196c, and the disk had 7 gigabytes free before step 196's last builds and renders (step 196).
@@ -2373,6 +2381,12 @@ Q-JPS-202: no accessibility state samples the picture-checks progress line or it
 Q-JPS-203: the press's drawing surface (`openDrawing` in `src/debug.ts`) repeats the calls `drawFrame` makes instead of calling it, so a later change to `drawFrame` would not reach the picture checks; recorded under record 106 (step 289). Put right by the plan of 5 November in its step 298.
 Q-JPS-204: the test page's whole-press time on the PC, 510.1 s on 2.71, is about 457 s more than the sum of every time its report printed, about 53 s, while on the iPad that sum leaves about 0.6 s of a press of 8.0 s, so a stretch of the press is in no row on the PC alone; the next plan that touches the test page finds which stage it is and gives it a row, under record 106 (the two reports of 4 November). Put right by the plan of 5 November in its step 298.
 Q-JPS-205: the test page's probe of 5 November did not print the page's own drawn-against-computed row, so the move of the drawing surface rests on the agreement walk and the press; the next plan that touches the test page reads that row, under record 106.
+Q-JPS-206: nikonimglib.com refused the proxy with a tunnel status of 403 when the Z 50 II colour-blender help page was wanted; a question for the owner, under record 101, not a fact about the camera (step 307, 6 November 2026).
+Q-JPS-207: www.nikonusa.com refused the proxy with a tunnel status of 403 when a Picture Control how-to page was wanted; a question for the owner, under record 101 (step 307, 6 November 2026).
+Q-JPS-208: www.nikon.nl refused the proxy with a tunnel status of 403 when a Z 50 II Picture Control magazine page was wanted; a question for the owner, under record 101 (step 307, 6 November 2026).
+Q-JPS-209: www.ultravioletphotography.com refused the proxy with a tunnel status of 403 when a conversion thread was wanted; a question for the owner, under record 101 (step 307, 6 November 2026).
+Q-JPS-210: www.uniquephoto.com refused the proxy with a tunnel status of 403 when an infrared balance question and answer was wanted; a question for the owner, under record 101 (step 307, 6 November 2026).
+Q-JPS-211: markus-hagner-photography.com answered with its own 403 when one of its pages was wanted, so the site refused and not the proxy; a question for the owner, under record 101 (step 307, 6 November 2026).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -3089,7 +3103,9 @@ user-scalable=no.
   device, a hash across devices, and giving the practice frame a camera. A band is set only
   from a report a device printed on a frame the owner's camera made. The doctrine says a test
   page opens nothing of the reader's; a file the reader hands the page is read in the page and
-  goes nowhere, and whether that clause should say so is the hub's and the owner's. See
+  goes nowhere, and whether that clause should say so is the hub's and the owner's. Built on
+  staging as 2.72 by the plan of 6 November: the door, a file input in the Picture checks
+  section, and a report that names the file and its camera; it waits on the device pass. See
   `docs/decisions/108-the-picture-checks-run-on-a-photograph-you-choose.md`.
 
 - [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
@@ -4157,7 +4173,9 @@ user-scalable=no.
   panel gathers them: swap chips written onto the existing swap and mixer, the
   eight bands entered from the photo, the Sky and Foliage boxes keyed on where
   the subjects sit after the swap, one Strength, and Save as a look. After Big
-  image, before the screens are assessed.
+  image, before the screens are assessed. Its premise is measured by the Separation check on
+  the test page, built on staging as 2.72 and waiting on the device pass; nothing of the
+  panel is built.
 
 - [ ] **Housekeeping: walks that cannot see what they claim, and paths into dead sessions** <!-- decision: 083 -->
   **Shown as:** internal
