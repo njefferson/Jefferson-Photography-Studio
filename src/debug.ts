@@ -42,10 +42,10 @@ import { sniff, importFile, type ImportedFile } from "./import";
 import { srgbDisplayToP3Display } from "./icc";
 import { snapExposure, snapGain, freshBaseline, EXPOSURE_LO, EXPOSURE_HI } from "./tile";
 import { workerCount } from "./exportparallel";
-import { linearAt, sampleForWb, unitMinGains, exposureHoldingNeutral, type DecodedImage } from "./decode";
+import { linearAt, sampleForWb, unitMinGains, exposureHoldingNeutral, WB_GAIN_LO, WB_GAIN_HI, type DecodedImage } from "./decode";
 import { readExifSubset } from "./exif";
 import { photoCamera as cameraOf, choicesFor, loadedFor, profileRule } from "./camprofile";
-import { readBalance } from "./balancestore";
+import { readBalance, readShown, exactBalance, screenForWhite, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR } from "./balancestore";
 import { makeRowDenoiser } from "./raw/denoise";
 import { compileEdit, SAT_GUARD_LO, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, type EditParams, type MaskLayer } from "./pipeline";
 import { exportImage } from "./export";
@@ -3213,12 +3213,14 @@ interface SepState {
 interface SpotRead { px: number; py: number; verdict: "ok" | "blown" | "dark"; wb: [number, number, number] | null; exposure: number; t: ReturnType<typeof thin> | null }
 let sep: SepState | null = null;
 const sepGo = $("dSepGo") as HTMLButtonElement;
+const sepSweepBtn = $("dSepSweep") as HTMLButtonElement;
 
-/** Gives the first press's drawing surface back and disables the second button. Takes nothing; returns nothing. */
+/** Gives the first press's drawing surface back and disables the second button and the sweep's. Takes nothing; returns nothing. */
 function closeSep(): void {
   sep?.drawing.close();
   sep = null;
   sepGo.disabled = true;
+  sepSweepBtn.disabled = true;
 }
 window.addEventListener("pagehide", closeSep);
 
@@ -3367,7 +3369,7 @@ function sepTimeRows(tally: PressTally, whole: number): void {
 async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: PressTally) => Promise<void>): Promise<void> {
   const list = $("dPicResults");
   if (running) { $("dSepHint").textContent = "Another test on this page is still running. Press this again when it has finished."; return; }
-  const others = ["dRun", "dBigRead", "dSlowBuild", "dPictures", "dSepStart", "dSepGo"].map((id) => $(id) as HTMLButtonElement);
+  const others = ["dRun", "dBigRead", "dSlowBuild", "dPictures", "dSepStart", "dSepGo", "dSepSweep"].map((id) => $(id) as HTMLButtonElement);
   const was = others.map((b) => b.disabled);
   others.forEach((b) => { b.disabled = true; });
   const label = btn.textContent;
@@ -3388,6 +3390,7 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
     btn.textContent = label;
     others.forEach((b, i) => { b.disabled = was[i]; });
     sepGo.disabled = !sep;
+    sepSweepBtn.disabled = !sep;
   }
 }
 
@@ -3457,6 +3460,7 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       $("dSepHint").textContent = "The picture is drawn above. Choose what a tap sets, then tap the picture or type the two numbers of a spot: the picture is redrawn at that spot's balance and this line says whether the spot is usable. Set both spots, then press step 3.";
       sepMarks();
       sepGo.disabled = false;
+      sepSweepBtn.disabled = false;
     } finally {
       if (drawing) drawing.close();
       lap(tally, TAIL_STAGE);
@@ -3539,7 +3543,7 @@ sepGo.addEventListener("click", (e) => {
         const ul = document.createElement("ul");
         ul.style.cssText = "margin:0 0 8px;padding-left:1.2rem;font-size:0.8125rem;line-height:1.5;color:var(--txt-2)";
         const li = (text: string) => { const e2 = document.createElement("li"); e2.textContent = text; ul.appendChild(e2); };
-        for (const c of an.clusters) li(`${c.letter}, ${c.colour}: hue ${Math.round(c.startDeg) > Math.round((c.startDeg + c.spanDeg) % 360) ? `${Math.round(c.startDeg)} to 360 and 0 to ${Math.round((c.startDeg + c.spanDeg) % 360)}, an arc through 0` : `${Math.round(c.startDeg)} to ${Math.round((c.startDeg + c.spanDeg) % 360)}`} degrees,${(c.share * 100).toFixed(1)} percent of the pixels above the floor${an.clusters.indexOf(c) === fIdx ? ", holds the foliage spot" : ""}${an.clusters.indexOf(c) === nIdx ? ", holds the neutral spot" : ""}.`);
+        for (const c of an.clusters) li(`${c.letter}, ${c.colour}: hue ${Math.round(c.startDeg) > Math.round((c.startDeg + c.spanDeg) % 360) ? `${Math.round(c.startDeg)} to 360 and 0 to ${Math.round((c.startDeg + c.spanDeg) % 360)}, an arc through 0` : `${Math.round(c.startDeg)} to ${Math.round((c.startDeg + c.spanDeg) % 360)}`} degrees, ${(c.share * 100).toFixed(1)} percent of the pixels above the floor${an.clusters.indexOf(c) === fIdx ? ", holds the foliage spot" : ""}${an.clusters.indexOf(c) === nIdx ? ", holds the neutral spot" : ""}.`);
         li("Grey: below the floor. Dotted pattern: above the floor and in no cluster.");
         sec.appendChild(ul);
         const r2 = document.createElement("div");
@@ -3556,7 +3560,7 @@ sepGo.addEventListener("click", (e) => {
         row(`White point ${N}: the hue counts`, an.hist.join(" "),
           `The ${an.above} pixels above the floor counted in each of the ${SEP_BINS} hue bins of ${SEP_BIN_DEG} degrees, in order from the bin of 0 to ${SEP_BIN_DEG} degrees, as whole numbers; the sum is ${an.hist.reduce((x, y) => x + y, 0)}. These are the counts the clustering rule reads, so a valley, or the lack of one, can be seen in them.`);
         for (const c of an.clusters) {
-          row(`White point ${N}, cluster ${c.letter} (${c.colour})`, `hue ${Math.round(c.startDeg) > Math.round((c.startDeg + c.spanDeg) % 360) ? `${Math.round(c.startDeg)} to 360 and 0 to ${Math.round((c.startDeg + c.spanDeg) % 360)}, an arc through 0` : `${Math.round(c.startDeg)} to ${Math.round((c.startDeg + c.spanDeg) % 360)}`} degrees, middle${Math.round(c.medHue)} · ${(c.share * 100).toFixed(1)} percent · median saturation ${c.medSat.toFixed(2)}, median value ${c.medVal.toFixed(2)}`, "Range, share of the pixels above the floor, and the medians of the pixels in it.");
+          row(`White point ${N}, cluster ${c.letter} (${c.colour})`, `hue ${Math.round(c.startDeg) > Math.round((c.startDeg + c.spanDeg) % 360) ? `${Math.round(c.startDeg)} to 360 and 0 to ${Math.round((c.startDeg + c.spanDeg) % 360)}, an arc through 0` : `${Math.round(c.startDeg)} to ${Math.round((c.startDeg + c.spanDeg) % 360)}`} degrees, middle ${Math.round(c.medHue)} · ${(c.share * 100).toFixed(1)} percent · median saturation ${c.medSat.toFixed(2)}, median value ${c.medVal.toFixed(2)}`, "Range, share of the pixels above the floor, and the medians of the pixels in it.");
         }
         row(`White point ${N}: the turns`, `A: foliage ${fIdx >= 0 ? `${Math.round(an.clusters[fIdx].medHue)} to ${SEP_TARGET_FOLIAGE}` : "no cluster, not turned"}, sky ${sIdx >= 0 ? `${Math.round(an.clusters[sIdx].medHue)} to ${SEP_TARGET_SKY}` : "no cluster, not turned"} · B: ${an.clusters.filter((_, i) => i !== fIdx && i !== sIdx).map((c) => c.letter).join(", ") || "no other cluster"} by plus 60`,
           "The middle hue of the cluster, and where turn A takes it; the clusters turn B moves.");
@@ -3576,6 +3580,138 @@ function sepTimeRowsFor(tally: PressTally): void {
   lap(tally, TAIL_STAGE);
   sepTimeRows(tally, performance.now() - pressStart);
 }
+
+// --- THE SWEEP (records 106 and 084) ---------------------------------------------------------------------------------------
+// The Separation check's instrument for the device: the picked photograph drawn at a grid of balances over the camera's reach and
+// under the channel remaps the editor has, each setting counted in the check's own bins. It sets no band, no balance and no look; the
+// rule, the floor, the bins, the targets, the soft edge and the minimum above are the ones the check uses and are not read or changed here.
+
+/** The five mixer presets of the editor (src/main.ts, `MIX3_PRESETS`, which is private to that module and so copied here), in its order, each
+ *  a 3 by 3 matrix of nine numbers, row by row. What it must satisfy: the same nine numbers as main.ts for the same label. */
+const SWEEP_PRESETS: { label: string; m: number[] }[] = [
+  { label: "Identity", m: [1, 0, 0, 0, 1, 0, 0, 0, 1] },
+  { label: "R⇄B swap", m: [0, 0, 1, 0, 1, 0, 1, 0, 0] },
+  { label: "Channel cycle", m: [0, 1, 0, 0, 0, 1, 1, 0, 0] },
+  { label: "Copper", m: [1.1, 0.3, 0, 0.2, 0.7, 0.1, 0, 0.2, 0.8] },
+  { label: "Film rotation", m: [0, 0, 1, 1, 0, 0, 0, 1, 0] },
+];
+/** The grid: five Temperatures from the scale's far end to its near end, in mired, and five Tints from the scale's lowest to its highest. */
+const SWEEP_STEPS = 5;
+const SWEEP_TINTS = [-150, -75, 0, 75, 150];
+
+/** One setting of the sweep: how it is drawn, and what to call it. `skip` is set when the setting cannot be drawn, with the reason in words. */
+interface SweepSetting {
+  route: string; what: string; wb: [number, number, number]; screen: [number, number, number] | null; swap: boolean; mix3: number[] | null;
+  exposure: number; mixer: string; reading: { kelvin: number; tint: number } | null; reuse: ReturnType<typeof thin> | null; skip: string | null;
+  /** True when `skip` is set because the balance's gains leave the gain sliders' track or no gains can give it, so the summary counts it apart from a setting that failed to draw. */
+  notExpressible?: boolean;
+}
+
+/** Takes one drawn, thinned frame. Returns the 72 hue counts of the pixels at or above the floor, a ten-band saturation count of every pixel
+ *  (band 0 holds 0 to 10 percent), how many pixels are above the floor and the share under it. What it must satisfy: the hue counts and the
+ *  number above the floor are `huePass`'s own, so the sweep counts exactly as the check does. */
+function sweepCounts(t: ReturnType<typeof thin>): { hue: number[]; sat: number[]; above: number; under: number } {
+  const hp = huePass(t.data, t.w, t.h);
+  const sat: number[] = new Array(10).fill(0);
+  for (let i = 0; i < hp.sat.length; i++) sat[Math.min(9, Math.floor(hp.sat[i] * 10))]++;
+  const n = t.w * t.h;
+  return { hue: hp.hist, sat, above: hp.above, under: n ? 1 - hp.above / n : 0 };
+}
+
+/** Takes a sweep setting. Returns the edit that draws it: the swap as the setting says, the mixer if it has one, the screen-side gains if it
+ *  has them, no look and every other control at its neutral. Throws when the drawn path does not cover it. */
+function sweepEdit(st: SweepSetting): EditParams {
+  const over: Partial<EditParams> = { wb: st.wb, exposure: st.exposure, swapRB: st.swap };
+  if (st.screen) over.wbScreen = st.screen;
+  if (st.mix3) over.mix3 = st.mix3;
+  const p = pictureParams(over);
+  if (!canDrawFrame(p)) throw new Error("this edit is outside what the drawn path covers yet");
+  return p;
+}
+
+/** Takes the open state of the Separation check. Returns the settings in the order the sweep draws them: the opening balance with the swap on
+ *  (the first picture, reused) and off; the grid by three routes, which are the camera-side gains with the swap on and off and the screen-side
+ *  gains with the swap on; then the five mixer presets at the opening balance with the swap on (the identity preset reuses the first picture).
+ *  A balance whose gains leave the track, or that no gains can give, is a setting with `skip` set. */
+function sweepSettings(s: SepState): SweepSetting[] {
+  const list: SweepSetting[] = [];
+  const open = s.spec ? readBalance(s.wb0, s.spec) : null;
+  const base = (over: Partial<SweepSetting>): SweepSetting => ({ route: "", what: "", wb: s.wb0, screen: null, swap: true, mix3: null, exposure: s.exp0, mixer: "none", reading: open, reuse: null, skip: null, ...over });
+  list.push(base({ route: "camera-side gains, swap on", what: "the opening balance", reuse: s.t }));
+  list.push(base({ route: "camera-side gains, swap off", what: "the opening balance", swap: false }));
+  if (!s.spec) {
+    list.push(base({ route: "grid", what: "every Temperature and Tint", skip: "the file has no matrix to read a temperature through, so no balance on the grid can be made" }));
+  } else {
+    for (let i = 0; i < SWEEP_STEPS; i++) {
+      const mired = Math.round(TEMPERATURE_MIRED_FAR + ((TEMPERATURE_MIRED_NEAR - TEMPERATURE_MIRED_FAR) * i) / (SWEEP_STEPS - 1));
+      for (const tint of SWEEP_TINTS) {
+        const want = { mired, tint };
+        const at = `${mired} mired, tint ${tint}`;
+        const cam = exactBalance(want, s.wb0, s.spec);
+        const scr = screenForWhite(want, s.wb0, s.spec);
+        const kelvin = 1e6 / mired;
+        const outside = cam ? cam.some((g) => !(g >= WB_GAIN_LO && g <= WB_GAIN_HI)) : false;
+        const camWhy = !cam
+          ? `Temperature ${Math.round(kelvin)} K (${mired} mired), tint ${tint}: this balance is not expressible, because no camera-side gains can give it`
+          : outside ? `Temperature ${Math.round(kelvin)} K (${mired} mired), tint ${tint}, gains ${cam.map((g) => g.toFixed(4)).join(", ")}: this balance is not expressible, because its gains leave the gain sliders' track of ${WB_GAIN_LO} to ${WB_GAIN_HI.toFixed(4)}`
+          : null;
+        for (const swap of [true, false]) {
+          list.push(base({ route: `camera-side gains, swap ${swap ? "on" : "off"}`, what: at, wb: cam ?? s.wb0, swap, reading: { kelvin, tint }, skip: camWhy, notExpressible: camWhy !== null }));
+        }
+        list.push(base({ route: "screen-side gains, swap on", what: at, screen: scr, reading: { kelvin, tint }, skip: scr ? null : `Temperature ${Math.round(kelvin)} K (${mired} mired), tint ${tint}: this balance is not expressible, because no screen-side gains can give it`, notExpressible: !scr }));
+      }
+    }
+  }
+  SWEEP_PRESETS.forEach((p, i) => list.push(base({ route: `mixer preset ${p.label}, swap on`, what: "the opening balance", mix3: i === 0 ? null : p.m, mixer: p.label, reuse: i === 0 ? s.t : null })));
+  return list;
+}
+
+sepSweepBtn.addEventListener("click", (e) => {
+  const s = sep;
+  if (!s) { $("dSepHint").textContent = "Press step 1 first: the picture has to be drawn before the sweep can run."; return; }
+  void sepPress(e.currentTarget as HTMLButtonElement, false, async (tally) => {
+    const list = sweepSettings(s);
+    const t0 = performance.now();
+    let ran = 0, reused = 0, skipped = 0, notExpr = 0;
+    row("The sweep's own settings", `${list.length} settings · grid ${SWEEP_STEPS} Temperatures by ${SWEEP_TINTS.length} Tints over ${TEMPERATURE_MIRED_FAR} to ${TEMPERATURE_MIRED_NEAR} mired and tints ${SWEEP_TINTS.join(", ")} · floor ${SAT_GUARD_LO} · ${SEP_BINS} bins of ${SEP_BIN_DEG} degrees`,
+      "Three routes at each grid point: the camera-side gains the check writes, with the swap on and off, and the screen-side gains the editor writes for Temperature and Tint while the swap is on, over the opening balance. Then the opening balance under each of the editor's five mixer presets. The sweep sets no look, no band and no control; the rule, the floor and the bins are the Separation check's own. A balance that cannot be made is a row that says so and is not drawn.");
+    for (let k = 0; k < list.length; k++) {
+      const st = list[k];
+      const N = k + 1;
+      const name = `Sweep ${N} of ${list.length}: ${st.route}, ${st.what}`;
+      if (st.skip) { row(name, `not run · ${st.skip}`, `Not drawn. Route: ${st.route}. ${st.skip}.`); if (st.notExpressible) notExpr++; else skipped++; continue; }
+      progress(`Sweep ${N} of ${list.length}: ${st.route}, ${st.what}`);
+      await pause(tally);
+      books(tally);
+      let t = st.reuse;
+      if (t) reused++;
+      else {
+        try {
+          const frame = s.drawing.draw(sweepEdit(st));
+          lap(tally, "sweep: a draw and read-back");
+          t = thin(frame);
+          lap(tally, "sweep: the picture thinned");
+        } catch (err) {
+          row(name, "not run", `The setting could not be drawn (${(err as Error).message}).`);
+          skipped++;
+          continue;
+        }
+      }
+      const c = sweepCounts(t);
+      lap(tally, "sweep: the hue and saturation counts");
+      const rd = st.screen && s.spec ? readShown(st.wb, st.screen, s.spec) : st.reading;
+      const px = t.w * t.h;
+      row(name,
+        `${rd ? `${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read"} · gains ${st.wb.map((g) => g.toFixed(4)).join(", ")} · screen-side gains ${st.screen ? st.screen.map((g) => g.toFixed(4)).join(", ") : "none"} · exposure ${st.exposure.toFixed(4)} · swap ${st.swap ? "on" : "off"} · mixer ${st.mixer} · ${c.above} of ${px} pixels at or above the floor, ${(c.under * 100).toFixed(1)} percent under it · saturation bands of every pixel, 0 to 10 percent first: ${c.sat.join(" ")} · hue counts: ${c.hue.join(" ")}`,
+        `${st.reuse ? "The first picture, counted again, not drawn again. " : ""}The ${SEP_BINS} hue counts are the pixels at or above the floor in bins of ${SEP_BIN_DEG} degrees from 0; the ten saturation counts are every pixel; the share under the floor is the pixels below ${SAT_GUARD_LO} saturation. Counts only, of the drawn pixels, thinned to every ${t.k === 1 ? "pixel" : `${t.k}th pixel`}.`);
+      ran++;
+    }
+    row("The sweep", `${ran} of ${list.length} settings counted (${reused} from the first picture, ${notExpr} not expressible, ${skipped} not run for another reason) in ${dur(performance.now() - t0)}`, "How many settings the sweep counted and how long the whole sweep took, from the first setting to the last row.");
+    sepTimeRowsFor(tally);
+    progress(`Sweep done. ${ran} of ${list.length} settings counted, ${notExpr} not expressible, ${skipped} not run for another reason; the rows are in the picture checks' list, ready to copy.`, true);
+    $("dSepHint").textContent = "The sweep is done. Its rows are in the picture checks' list, ready to copy. You can press it again, or press step 3.";
+  });
+});
 
 const picOut: string[] = [];
 ($("dPictures") as HTMLButtonElement).addEventListener("click", async (e) => {

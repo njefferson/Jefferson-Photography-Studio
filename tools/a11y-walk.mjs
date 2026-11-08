@@ -1473,7 +1473,7 @@ try {
         await page.goto(`${BASE}/debug.html`, { waitUntil: "load" });
         const controls = await page.evaluate(() => {
           const names = (id) => { const el = document.getElementById(id); if (!el) return null; const l = document.querySelector(`label[for="${id}"]`) || el.closest("label"); return { name: (el.getAttribute("aria-label") || (l ? l.textContent : "") || el.textContent || "").trim(), h: el.getBoundingClientRect().height, disabled: !!el.disabled }; };
-          const ids = ["dPicFile", "dSepStart", "dSepGo", "dSepTapNeutral", "dSepTapFoliage", "dSepNX", "dSepNY", "dSepFX", "dSepFY"];
+          const ids = ["dPicFile", "dSepStart", "dSepGo", "dSepSweep", "dSepTapNeutral", "dSepTapFoliage", "dSepNX", "dSepNY", "dSepFX", "dSepFY"];
           return Object.fromEntries(ids.map((i) => [i, names(i)]));
         });
         for (const [id, c] of Object.entries(controls)) {
@@ -1482,6 +1482,8 @@ try {
           else ok(`${where} #${id} is named: "${c.name.slice(0, 50)}"`);
         }
         if (controls.dSepGo && controls.dSepGo.disabled) ok(`${where} step 3 is disabled until the picture is drawn`); else fail(`${where} step 3 is not disabled at rest`);
+        if (controls.dSepSweep && controls.dSepSweep.disabled) ok(`${where} the sweep is disabled until the picture is drawn`); else fail(`${where} the sweep is not disabled at rest`);
+        if (controls.dSepSweep && controls.dSepSweep.h >= 44) ok(`${where} the sweep button is 44 or more high`); else fail(`${where} the sweep button is under 44 high`);
         let hit = await page.evaluate(HIT);
         if (hit.small.length) fail(`${where} at rest, under 44: ${hit.small.join(" · ")}`); else ok(`${where} at rest: every button is 44 or more`);
         await axeLine(page, `debug.html ${where} with the Separation controls at rest`);
@@ -1494,6 +1496,7 @@ try {
         let pics = await page.evaluate(`(${PIC})()`);
         if (pics.length >= 1 && pics.every((p) => p.role === "img" && p.label.length >= 40 && p.cap >= 40)) ok(`${where} after step 1: ${pics.length} picture(s), each an image with words as its label and a caption`); else fail(`${where} after step 1: pictures ${JSON.stringify(pics)}`);
         if (await page.evaluate(() => !document.getElementById("dSepGo").disabled)) ok(`${where} step 3 is enabled once the picture is drawn`); else fail(`${where} step 3 is still disabled after step 1`);
+        if (await page.evaluate(() => !document.getElementById("dSepSweep").disabled)) ok(`${where} the sweep is enabled once the picture is drawn`); else fail(`${where} the sweep is still disabled after step 1`);
         hit = await page.evaluate(HIT);
         if (hit.small.length) fail(`${where} after step 1, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after step 1: every button is 44 or more`);
         await axeLine(page, `debug.html ${where} after step 1`);
@@ -1514,6 +1517,30 @@ try {
         hit = await page.evaluate(HIT);
         if (hit.small.length) fail(`${where} after a typed spot, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after a typed spot: every button is 44 or more`);
         await axeLine(page, `debug.html ${where} after a typed spot`);
+        // (b3) THE SWEEP: pressed on the practice photograph. Its progress line is the polite live region present from parse and moves on while it
+        // runs; when it ends the progress line says it is done, the list holds a row per setting, each drawn row carries the 72 hue counts and the
+        // ten saturation bands in words, and one row names how many settings were counted and how long it took. Only structure is read.
+        await page.evaluate(() => document.getElementById("dSepSweep")?.click());
+        const sweepStarted = await page.waitForFunction(() => /^Sweep \d+ of \d+/.test(document.getElementById("dPicProgress")?.textContent ?? ""), null, { timeout: 900000, polling: 200 }).then(() => true).catch(() => false);
+        if (sweepStarted) ok(`${where} the sweep's progress line names the setting and the count`); else fail(`${where} the sweep's progress line never named a setting`);
+        const sweepBusy = await page.evaluate(() => { const b = document.getElementById("dSepSweep"); return { text: b?.textContent ?? "", disabled: !!b?.disabled }; });
+        if (/Running/.test(sweepBusy.text) && sweepBusy.disabled) ok(`${where} the sweep button says "Running…" and is disabled while it runs`); else fail(`${where} the sweep button reads "${sweepBusy.text.slice(0, 40)}", disabled ${sweepBusy.disabled}, while it runs`);
+        const swept = await page.waitForFunction(() => /^Sweep done\.|^Stopped/.test(document.getElementById("dPicProgress")?.textContent ?? ""), null, { timeout: 3600000, polling: 500 }).then(() => true).catch(() => false);
+        const sweptSaid = await page.evaluate(() => document.getElementById("dPicProgress")?.textContent ?? "");
+        if (!swept || /^Stopped/.test(sweptSaid)) { fail(`${where} the sweep did not finish: "${sweptSaid}"`); continue; }
+        ok(`${where} the sweep finished: "${sweptSaid.slice(0, 60)}..."`);
+        const sweepRows = await page.evaluate(() => {
+          const rows = [...document.querySelectorAll("#dPicResults .dbg-row")].map((r) => ({ k: r.querySelector(".dbg-k")?.textContent ?? "", v: r.querySelector(".dbg-v")?.textContent ?? "" }));
+          const sw = rows.filter((r) => /^Sweep \d+ of \d+/.test(r.k));
+          const drawn = sw.filter((r) => r.v !== "not run");
+          const counts = drawn.filter((r) => { const m = /hue counts: ([\d ]+)$/.exec(r.v); const s = /saturation bands of every pixel, 0 to 10 percent first: ([\d ]+) · hue counts/.exec(r.v); return m && s && m[1].trim().split(/\s+/).length === 72 && s[1].trim().split(/\s+/).length === 10; });
+          return { sweep: sw.length, drawn: drawn.length, counted: counts.length, summary: rows.some((r) => r.k === "The sweep" && /settings counted/.test(r.v) && /in [\d.]+ (ms|s)/.test(r.v)) };
+        });
+        if (sweepRows.drawn >= 1 && sweepRows.counted === sweepRows.drawn) ok(`${where} the sweep wrote ${sweepRows.sweep} rows, ${sweepRows.drawn} drawn, each with 72 hue counts and 10 saturation bands`); else fail(`${where} the sweep's rows: ${JSON.stringify(sweepRows)}`);
+        if (sweepRows.summary) ok(`${where} one row names how many settings were counted and how long the sweep took`); else fail(`${where} no summary row for the sweep`);
+        hit = await page.evaluate(HIT);
+        if (hit.small.length) fail(`${where} after the sweep, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after the sweep: every button is 44 or more`);
+        await axeLine(page, `debug.html ${where} after the sweep`);
         // (c) step 3, two points typed
         for (const [id, v] of [["dSepNX", "30"], ["dSepNY", "30"], ["dSepFX", "60"], ["dSepFY", "60"]]) await page.fill(`#${id}`, v);
         await page.evaluate(() => document.getElementById("dSepGo")?.click());

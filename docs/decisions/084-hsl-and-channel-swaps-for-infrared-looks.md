@@ -157,6 +157,17 @@ What building this will use, so a second one does not get written
   candidates made only of controls a reader has, and refuses two different
   recipes that render the same picture.
 
+On 7 November 2026 the separation research was gathered in the session's
+scratchpad, in five lanes that choose nothing: what the infrared photographer
+whose method the record read has published, tied to the body and conversion
+each source concerns; the multispectral field's measures of how far apart two
+classes sit and its operations for parting them; the app's own levers, read from
+the code; and a headless count of each population's hue, saturation and
+lightness across balances and remaps. The judgement of which measure and which
+operations goes into the build plan, not into this record. The test page's sweep
+(record 106) is the same count made on the reader's device, on their own
+photographs, at each balance and remap, and is this premise's instrument there.
+
 ## Options
 
 1. **One infrared colour panel: a row of swap chips, the colour bands under it,

@@ -1,6 +1,16 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=b3258862046b1ad4
-diffhash=5a3bbd533bbdb77d
-verdict=IN-SCOPE: the uncommitted diff touches only the seven files step 309 names (src/debug.ts, debug.html, tools/a11y-walk.mjs, NOTES.md, docs/ARCHITECTURE.md, and the records 106 and 108). Inside src/debug.ts it adds only the four fixes of the plan: the picked file read through the editor's own importFile, a route row, the opening balance from the one at-open ruling, the tap feedback through the editor's tap rule, and the hue count rows. The clustering rule, the floor, the targets, the soft edge, the minimum share and VERSION are unchanged, and no editor module, look table or pipeline module is touched.
-# IN-SCOPE: the uncommitted diff touches only the seven files step 309 names (src/debug.ts, debug.html, tools/a11y-walk.mjs, NOTES.md, docs/ARCHITECTURE.md, and the records 106 and 108). Inside src/debug.ts it adds only the four fixes of the plan: the picked file read through the editor's own importFile, a route row, the opening balance from the one at-open ruling, the tap feedback through the editor's tap rule, and the hue count rows. The clustering rule, the floor, the targets, the soft edge, the minimum share and VERSION are unchanged, and no editor module, look table or pipeline module is touched.
+planhash=65dabbe81c32f89b
+diffhash=4e6f23b7f27c2ec0
+verdict=IN-SCOPE: every changed file is named by step 317's Files line and every change in the diff is covered by a line of step 317's Do.
+# IN-SCOPE: every changed file is named by step 317's Files line and every change in the diff is covered by a line of step 317's Do.
+# NOTES.md: covered by step 317 stage 6 (the new entry at the top of the device-pass section, the Q-JPS-212 and Q-JPS-213 lines at the end of the Found queue); the stage 9 bullet brought to the new probe's counts.
+# VERSION: covered by step 317 stage 6 (VERSION reads 2.73, from 2.72).
+# debug.html: covered by step 317 stage 3 (the sweep button, disabled at rest, and its help paragraph).
+# docs/ARCHITECTURE.md: covered by step 317 stage 7 (the module map written by architecture-check, src/debug.ts line count only).
+# docs/decisions/084: covered by step 317 stage 6 (one paragraph dated 7 November, naming no photograph file).
+# docs/decisions/106: covered by step 317 stage 6 (one sentence on the sweep rows, after the Separation check paragraph).
+# docs/decisions/108: covered by step 317 stage 6 (one sentence that the sweep runs on the picked photograph).
+# src/debug.ts: covered by step 317 stage 3 (the sweep, its settings and rows, its button and its enabling), stage 4 (the two report strings gain a space, the cluster middle and the legend share), and stage 9 (the gain-track check through WB_GAIN_LO and WB_GAIN_HI imported from src/decode.ts, unchanged, and the not-expressible rows); the balancestore imports are reads of functions the sweep calls, and the module itself is unchanged.
+# tools/a11y-walk.mjs: covered by step 317 stage 5 (section 14 gains the sweep state: disabled at rest, enabled after step 1, pressed on the practice photograph with its progress line and rows).
+# No file outside step 317's Files is changed. No change sets a band, a balance, a look or a control. The Separation check's rule, floor, bins, targets, soft edge and minimum are unchanged.

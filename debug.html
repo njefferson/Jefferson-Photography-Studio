@@ -99,10 +99,15 @@
           neutral spot, a balance set from your foliage spot), finds the hue ranges the drawn colours fall into, paints a map of them beside each
           picture, and turns each range in place. It runs once, not three times; it sets no look and no control, and the figures it prints are of the
           drawn pixels. Nothing is saved.
+          The sweep button, once step 1 has drawn the photograph, draws it again at a grid of white balances over the camera's whole reach
+          and under each of the editor's five channel remaps, and prints for each setting the hue counts, the saturation spread and the share
+          under the floor. It draws many times, so it takes a few minutes on a device; its progress line says where it has got to. It sets no
+          look, no band and no control, and it needs no spots.
         </p>
         <div class="dbg-actions">
           <button id="dSepStart" type="button" class="dbg-btn primary">Separation check, step 1: draw the photograph</button>
           <button id="dSepGo" type="button" class="dbg-btn" disabled>Separation check, step 3: make the three white points and the clusters</button>
+          <button id="dSepSweep" type="button" class="dbg-btn" disabled>Separation check, sweep: count the photograph across white balances and channel remaps</button>
         </div>
         <fieldset id="dSepTargets" style="border:1px solid var(--line-2);border-radius:9px;margin:0 0 10px;padding:8px 12px">
           <legend>Step 2: what a tap on the picture sets</legend>
