@@ -766,7 +766,7 @@ cannot describe something the code does not say about itself.
 - **`src/color.ts`** (244 lines) — Camera color science.
 - **`src/cubeimport.ts`** (181 lines) — .cube (Adobe/Resolve 3D LUT) IMPORT parser.
 - **`src/dcp.ts`** (543 lines) — DNG Camera Profile (.dcp) export for Lightroom / Camera Raw.
-- **`src/debug.ts`** (3819 lines) — The test page behind the version number.
+- **`src/debug.ts`** (4034 lines) — The test page behind the version number.
 - **`src/decode.ts`** (832 lines) — Image decoding. Real paths, no big WASM dependency: - JPEG/PNG: native bitmap decode.
 - **`src/decode.worker.ts`** (147 lines) — Decoding, off the main thread.
 - **`src/decodeClient.ts`** (426 lines) — Main-thread side of the decode workers.
@@ -776,11 +776,11 @@ cannot describe something the code does not say about itself.
 - **`src/export.worker.ts`** (78 lines) — ONE BAND OF AN EXPORT, ON ANOTHER CORE.
 - **`src/exportparallel.ts`** (429 lines) — AN EXPORT, SPLIT ACROSS CORES.
 - **`src/framecache.ts`** (139 lines) — What the lens rig has already measured, so an interrupted run is not thrown away.
-- **`src/gl.ts`** (3910 lines) — WebGL2 edit pipeline.
+- **`src/gl.ts`** (3927 lines) — WebGL2 edit pipeline.
 - **`src/glow.ts`** (110 lines) — HIE-style halation glow.
 - **`src/glprobe.worker.ts`** (39 lines) — CAN A WORKER DRAW? Asked from inside one, because that is the only place the answer is true or false rather than a specification.
 - **`src/gps.ts`** (245 lines) — Location-data guard: find and remove GPS location from a photo FILE's own bytes — the original the user loaded, not the app's exports (exports are re-encoded and carry no EXIF at all today).
-- **`src/gpuexport.ts`** (387 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
+- **`src/gpuexport.ts`** (491 lines) — AN EXPORT DRAWN RATHER THAN COMPUTED — the measurement, not yet the product.
 - **`src/half.ts`** (109 lines) — IEEE half-precision, both directions, in one place.
 - **`src/heal.ts`** (1203 lines) — Dust & spot healing: a per-photo list of feathered clone spots that REWRITES
 - **`src/histogram.ts`** (114 lines) — Lightroom-style floating histogram.

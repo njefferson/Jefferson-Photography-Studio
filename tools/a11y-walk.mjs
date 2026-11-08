@@ -1465,8 +1465,15 @@ try {
   if (want(14)) console.log("\n14 — the test page's door and Separation check: at rest, after step 1, after step 3");
   if (want(14)) {
     const PIC = `() => { const out = []; for (const cv of document.querySelectorAll("#dSepPics canvas")) { const fig = cv.closest("figure"); out.push({ role: cv.getAttribute("role"), label: cv.getAttribute("aria-label") || "", cap: (fig && fig.querySelector("figcaption") ? fig.querySelector("figcaption").textContent : "").length }); } return out; }`;
+    // THE REPORT'S ROWS, as name and value, read off the page. Used by the rows the 8 November diagnostics added (record 106).
+    const READ_ROWS = () => [...document.querySelectorAll("#dPicResults .dbg-row")].map((r) => ({ k: r.querySelector(".dbg-k")?.textContent ?? "", v: r.querySelector(".dbg-v")?.textContent ?? "" }));
+    // THE SWEEP IS PRESSED ONCE, in the first theme and shape this section visits. Its counts do not change with theme or shape and a press is
+    // about ten minutes in the container, so the other pairs check the button, the progress region and the rows of that one press, and press nothing.
+    const SWEEP_PAIR = { theme: THEMES[0], size: SIZES[0] };
+    let sweepRowsSeen = null;
     for (const theme of THEMES) for (const size of SIZES) {
       const where = `[${theme} ${size.name}]`;
+      const first = theme === SWEEP_PAIR.theme && size === SWEEP_PAIR.size;
       const page = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
       page.on("dialog", (d) => d.accept());
       try {
@@ -1500,6 +1507,32 @@ try {
         hit = await page.evaluate(HIT);
         if (hit.small.length) fail(`${where} after step 1, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after step 1: every button is 44 or more`);
         await axeLine(page, `debug.html ${where} after step 1`);
+        // (b1) WHAT THE DRAWING SURFACE GAVE BACK AND THE PLANTED COLOURED PICTURE (record 106, 8 November 2026). The planted coloured picture
+        // goes through the photograph's own path and must read as known; each diagnostic row must be present and name a format or a type.
+        // Only the words are read: no picture is judged.
+        const afterStep1 = await page.evaluate(READ_ROWS);
+        const plantedRow = afterStep1.find((r) => r.k === "A planted coloured picture, through the photograph's path");
+        if (plantedRow && /^read as known/.test(plantedRow.v)) ok(`${where} the planted coloured picture reads as known: "${plantedRow.v.slice(0, 60)}..."`); else fail(`${where} the planted coloured picture does not read as known: "${plantedRow ? plantedRow.v.slice(0, 160) : "no row"}"`);
+        const WHEN = "after the photograph's first draw";
+        const needRows = [`Drawing surface, ${WHEN}: the upload`, `Drawing surface, ${WHEN}: the draw and the read-back`, `Drawing surface, ${WHEN}: what the context supports`, `Drawn frame, ${WHEN}: each channel's mean and top`, `Drawing surface, ${WHEN}: the read-back's bytes before the display-P3 conversion`, `Drawn frame, ${WHEN}: values at nine places after the conversion`, "A float texture upload and read-back on a context of its own"];
+        const missingRows = needRows.filter((n) => !afterStep1.some((r) => r.k === n));
+        if (!missingRows.length) ok(`${where} all ${needRows.length} diagnostic rows are present after step 1`); else fail(`${where} diagnostic rows missing after step 1: ${missingRows.join(" | ")}`);
+        const uploadRow = afterStep1.find((r) => r.k === `Drawing surface, ${WHEN}: the upload`);
+        if (uploadRow && /internal format (RGBA32F|RGBA16F|RGBA8)/.test(uploadRow.v) && /type (FLOAT|HALF_FLOAT|UNSIGNED_BYTE)/.test(uploadRow.v)) ok(`${where} the upload row names an internal format and a type`); else fail(`${where} the upload row names no format: "${uploadRow ? uploadRow.v.slice(0, 120) : "no row"}"`);
+        const readRow = afterStep1.find((r) => r.k === `Drawing surface, ${WHEN}: the draw and the read-back`);
+        if (readRow && /read-back asks for RGBA and UNSIGNED_BYTE/.test(readRow.v) && /first error after the draw/.test(readRow.v)) ok(`${where} the read-back row names the format, the type and the errors`); else fail(`${where} the read-back row is incomplete: "${readRow ? readRow.v.slice(0, 120) : "no row"}"`);
+        if (first) {
+          // THE PLANTED PICTURE SEEN FAILING, ONCE: the page flag exchanges two of its colours, so the check must read as not known.
+          const swapPage = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
+          try {
+            await swapPage.goto(`${BASE}/debug.html?plantswap=1`, { waitUntil: "load" });
+            await swapPage.evaluate(() => document.getElementById("dSepStart")?.click());
+            const swapDrawn = await swapPage.waitForFunction(() => /^The photograph is drawn|^Stopped/.test(document.getElementById("dPicProgress")?.textContent ?? ""), null, { timeout: 900000, polling: 200 }).then(() => true).catch(() => false);
+            const swapRows = swapDrawn ? await swapPage.evaluate(READ_ROWS) : [];
+            const swapRow = swapRows.find((r) => r.k === "A planted coloured picture, through the photograph's path");
+            if (swapRow && /^did not read as known/.test(swapRow.v) && /plantswap/.test(swapRow.v)) ok(`${where} with the page flag the planted coloured picture reads as NOT known (the walk's own made-to-fail)`); else fail(`${where} with the page flag the planted coloured picture did not read as not known: "${swapRow ? swapRow.v.slice(0, 160) : "no row"}"`);
+          } finally { await swapPage.close(); }
+        }
         // (b2) TAP FEEDBACK: a typed spot reads at once. The points line is a live region present from parse; after the pair is typed it says
         // in words whether the spot is usable, blown out or too dark, and the first picture's label names the spot with its letter and state
         // (the mark is a letter in a square with words beside it, which the label repeats). Only the words are read: no picture is judged.
@@ -1520,6 +1553,12 @@ try {
         // (b3) THE SWEEP: pressed on the practice photograph. Its progress line is the polite live region present from parse and moves on while it
         // runs; when it ends the progress line says it is done, the list holds a row per setting, each drawn row carries the 72 hue counts and the
         // ten saturation bands in words, and one row names how many settings were counted and how long it took. Only structure is read.
+        if (!first) {
+          // The other three pairs press nothing: the button, the progress region and the planted picture's row are read as they stand.
+          const regions = await page.evaluate(() => { const el = document.getElementById("dPicProgress"); const b = document.getElementById("dSepSweep"); return { role: el?.getAttribute("role"), live: el?.getAttribute("aria-live"), label: el?.getAttribute("aria-label") || "", enabled: !!b && !b.disabled, h: b ? b.getBoundingClientRect().height : 0 }; });
+          if (regions.role === "status" && regions.live === "polite" && regions.label.length >= 8) ok(`${where} the progress region is a polite status region with a label, present from parse`); else fail(`${where} the progress region is not a labelled polite status region: ${JSON.stringify(regions)}`);
+          if (regions.enabled && regions.h >= 44) ok(`${where} the sweep button is enabled and 44 or more high once the picture is drawn (not pressed here: the sweep was pressed once, in ${SWEEP_PAIR.theme} ${SWEEP_PAIR.size.name})`); else fail(`${where} the sweep button is not enabled and 44 high: ${JSON.stringify(regions)}`);
+        } else {
         await page.evaluate(() => document.getElementById("dSepSweep")?.click());
         const sweepStarted = await page.waitForFunction(() => /^Sweep \d+ of \d+/.test(document.getElementById("dPicProgress")?.textContent ?? ""), null, { timeout: 900000, polling: 200 }).then(() => true).catch(() => false);
         if (sweepStarted) ok(`${where} the sweep's progress line names the setting and the count`); else fail(`${where} the sweep's progress line never named a setting`);
@@ -1541,6 +1580,31 @@ try {
         hit = await page.evaluate(HIT);
         if (hit.small.length) fail(`${where} after the sweep, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after the sweep: every button is 44 or more`);
         await axeLine(page, `debug.html ${where} after the sweep`);
+        // THE SWEEP'S ROWS MUST CARRY COLOUR AND THE DIAGNOSTICS: a row of the sweep with no pixel at or above the floor is a failure (a sweep
+        // that reads nothing is not a sweep that passed), and the rows of the sweep's first draw are present. Read from the one press.
+        const afterSweep = await page.evaluate(READ_ROWS);
+        sweepRowsSeen = afterSweep;
+        const zeroRows = afterSweep.filter((r) => /^Sweep \d+ of \d+/.test(r.k) && r.v !== "not run" && !/^not run/.test(r.v) && (/ (\d+) of \d+ pixels at or above the floor/.exec(r.v) || [])[1] === "0");
+        if (zeroRows.length === 0) ok(`${where} no sweep row reads 0 pixels at or above the floor`); else fail(`${where} ${zeroRows.length} sweep row(s) read 0 pixels at or above the floor, the first: "${zeroRows[0].k}"`);
+        const sweepNeed = ["Drawing surface, after the sweep's first draw: the upload", "Drawing surface, after the sweep's first draw: the draw and the read-back", "Drawing surface, after the sweep's first draw: what the context supports", "Drawn frame, after the sweep's first draw: each channel's mean and top", "Drawing surface, after the sweep's first draw: the read-back's bytes before the display-P3 conversion", "Drawn frame, after the sweep's first draw: values at nine places after the conversion"];
+        const sweepMissing = sweepNeed.filter((n) => !afterSweep.some((r) => r.k === n));
+        if (!sweepMissing.length) ok(`${where} the diagnostic rows of the sweep's first draw are present`); else fail(`${where} diagnostic rows missing after the sweep: ${sweepMissing.join(" | ")}`);
+        // The same rows under every other theme and shape, from that one press, with nothing pressed again.
+        for (const t2 of THEMES) for (const s2 of SIZES) {
+          if (t2 === theme && s2 === size) continue;
+          await page.emulateMedia({ colorScheme: t2 });
+          await page.setViewportSize(s2.opts.viewport);
+          const w2 = `[${t2} ${s2.name}, rows of the one sweep press]`;
+          const have = await page.evaluate(READ_ROWS);
+          if (have.filter((r) => /^Sweep \d+ of \d+/.test(r.k)).length === sweepRows.sweep) ok(`${w2} the sweep's ${sweepRows.sweep} rows are still on the page`); else fail(`${w2} the sweep's rows changed with the theme or shape`);
+          const h2 = await page.evaluate(HIT);
+          if (h2.small.length) fail(`${w2} under 44: ${h2.small.join(" · ")}`); else ok(`${w2} every button is 44 or more`);
+          if (!(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))) ok(`${w2} no sideways scroll`); else fail(`${w2} the page scrolls sideways`);
+          await axeLine(page, `debug.html ${w2}`);
+        }
+        await page.emulateMedia({ colorScheme: theme });
+        await page.setViewportSize(size.opts.viewport);
+        }
         // (c) step 3, two points typed
         for (const [id, v] of [["dSepNX", "30"], ["dSepNY", "30"], ["dSepFX", "60"], ["dSepFY", "60"]]) await page.fill(`#${id}`, v);
         await page.evaluate(() => document.getElementById("dSepGo")?.click());

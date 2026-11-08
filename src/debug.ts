@@ -49,7 +49,7 @@ import { readBalance, readShown, exactBalance, screenForWhite, TEMPERATURE_MIRED
 import { makeRowDenoiser } from "./raw/denoise";
 import { compileEdit, SAT_GUARD_LO, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, type EditParams, type MaskLayer } from "./pipeline";
 import { exportImage } from "./export";
-import { drawFrame, canDrawFrame, buildLinearSource, openDrawing, type Drawing, type DrawnFrame } from "./gpuexport";
+import { drawFrame, canDrawFrame, buildLinearSource, openDrawing, type Drawing, type DrawnFrame, type DrawProbe } from "./gpuexport";
 import { Renderer, VERT, FRAG, MASK_LOOP, dropMaskLoops } from "./gl";
 
 declare const __APP_VERSION__: string;
@@ -3168,6 +3168,203 @@ function thin(f: { data: Uint8ClampedArray; width: number; height: number }): { 
   return { data, w, h, k, fromW: f.width, fromH: f.height };
 }
 
+// --- WHAT THE DRAWING SURFACE GAVE BACK, AND A PLANTED COLOURED PICTURE THROUGH THE PHOTOGRAPH'S OWN PATH (record 106) -----------
+// An iPad with 8 cores under Safari 26.6.3 read every pixel of a photograph as colourless in all 82 sweep rows while the planted
+// colour (an 8-bit picture) read back exactly. The two differ in the source: the colour is uploaded as 8-bit bytes and the photograph
+// as a linear float source. These rows print what the drawing surface and its context gave back for the photograph, and the planted
+// coloured picture goes through the photograph's own path (a linear float source, the same upload call, the same draw, the same
+// read-back, the same thinning and counting), so a device that reads the photograph as colourless says in numbers where the colour went.
+
+/** A GL error code in words. Takes the code (0 for none, -1 when the context could not be reached). Returns its name and number. */
+function glErrWords(e: number): string {
+  if (e === 0) return "none";
+  if (e === -1) return "the context could not be reached";
+  const names: Record<number, string> = { 1280: "INVALID_ENUM", 1281: "INVALID_VALUE", 1282: "INVALID_OPERATION", 1285: "OUT_OF_MEMORY", 1286: "INVALID_FRAMEBUFFER_OPERATION", 37442: "CONTEXT_LOST_WEBGL" };
+  return `${names[e] ?? "an unnamed code"} (${e})`;
+}
+const FB_STATUS_WORDS: Record<number, string> = { 36053: "complete", 36054: "incomplete attachment", 36055: "missing attachment", 36057: "incomplete dimensions", 36061: "unsupported" };
+const GL_FORMAT_WORDS: Record<number, string> = { 6408: "RGBA", 6407: "RGB", 6403: "RED" };
+const GL_TYPE_WORDS: Record<number, string> = { 5121: "UNSIGNED_BYTE", 5126: "FLOAT", 5131: "HALF_FLOAT", 5123: "UNSIGNED_SHORT" };
+const yesNo = (b: boolean): string => (b ? "yes" : "no");
+
+/** Writes four rows saying what the drawing surface's context gave back. Takes the words for when it was read ("after the
+ *  photograph's first draw") and the surface's `DrawProbe`. Returns nothing. What it must satisfy: every row names a format, a type or
+ *  an error, so a report that reads colourless says what the chip was given and what it gave back. */
+function probeRows(when: string, d: DrawProbe): void {
+  row(`Drawing surface, ${when}: the upload`,
+    `${d.source} · texture internal format ${d.internal}, format ${d.format}, type ${d.type} · first error after the upload: ${glErrWords(d.errUpload)}`,
+    "What the drawing surface sent the chip for its source. The format and type are the ones the renderer's setImage named in the upload call it made, recorded on the line before the call and read back from the renderer; they are not inferred from an extension.");
+  row(`Drawing surface, ${when}: the draw and the read-back`,
+    `drawn into the canvas's own framebuffer, ${d.drawingBuffer[0]} by ${d.drawingBuffer[1]}, status ${FB_STATUS_WORDS[d.fbStatus] ?? d.fbStatus} · the read-back asks for RGBA and UNSIGNED_BYTE and the context offers ${GL_FORMAT_WORDS[d.readFormat] ?? d.readFormat} and ${GL_TYPE_WORDS[d.readType] ?? d.readType} · first error after the draw: ${glErrWords(d.errDraw)} · after the read-back: ${glErrWords(d.errRead)} · the context is ${d.lost ? "LOST" : "alive"}`,
+    "The framebuffer the frame is drawn into, the format and type of the read-back and the first error the context raised after each step.");
+  row(`Drawing surface, ${when}: what the context supports`,
+    `float colour buffer offered ${yesNo(d.colorBufferFloat)} · float texture linear filtering granted to the renderer ${yesNo(d.floatLinear)} · largest texture ${d.maxTexture} pixels`,
+    "Whether the context offers the float colour buffer extension, whether the renderer was granted float texture linear filtering at its start, and the largest texture the chip accepts.");
+  row(`Drawing surface, ${when}: the read-back's bytes before the display-P3 conversion`,
+    d.rawGrid.length ? d.rawGrid.map((c) => `(${c[0]}, ${c[1]}) ${c[2]}, ${c[3]}, ${c[4]}`).join(" · ") : "no frame has been read back yet",
+    "The red, green and blue bytes the read-back returned at a three by three grid of fixed fractional positions of the full frame, kept inside the drawing surface before its conversion to the wide-gamut space, each as (column, row) then the three bytes. Compare with the row below, which is read after the conversion.");
+}
+
+/** Writes two rows about a drawn frame's raw values. Takes the words for when, the frame as read back (top row first) and its thinned copy.
+ *  Returns nothing. What it must satisfy: the means and tops are of the thinned copy's red, green and blue as the sweep counts them, and the
+ *  grid is read from the full frame at the fractions 0.1, 0.5 and 0.9 across and down, so a frame that is all one value shows it in nine places. */
+function channelRows(when: string, frame: { data: Uint8ClampedArray; width: number; height: number }, t: ReturnType<typeof thin>): void {
+  const sum = [0, 0, 0], top = [0, 0, 0];
+  const n = t.w * t.h;
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { const v = t.data[4 * i + k]; sum[k] += v; if (v > top[k]) top[k] = v; }
+  row(`Drawn frame, ${when}: each channel's mean and top`,
+    `red mean ${(n ? sum[0] / n : 0).toFixed(2)}, top ${top[0]} · green mean ${(n ? sum[1] / n : 0).toFixed(2)}, top ${top[1]} · blue mean ${(n ? sum[2] / n : 0).toFixed(2)}, top ${top[2]} · of 255, over the ${n} thinned pixels`,
+    "The mean and the largest value of each channel over the pixels the check counts. A frame that is one grey has the three means equal and the three tops equal.");
+  const fr = [0.1, 0.5, 0.9];
+  const cells: string[] = [];
+  for (const fy of fr) for (const fx of fr) {
+    const x = Math.floor(fx * (frame.width - 1)), y = Math.floor(fy * (frame.height - 1));
+    const o = (y * frame.width + x) * 4;
+    cells.push(`(${x}, ${y}) ${frame.data[o]}, ${frame.data[o + 1]}, ${frame.data[o + 2]}`);
+  }
+  row(`Drawn frame, ${when}: values at nine places after the conversion`, cells.join(" · "),
+    "The red, green and blue bytes of the frame after the conversion to the wide-gamut space, at a three by three grid of fixed fractional positions of the full frame, each as (column, row) then the three bytes.");
+}
+
+/** Uploads a float texture on a context of the page's own and reads it back, so the browser's float upload is tested apart from the
+ *  picture code. Takes the size to try. Returns one sentence per variant: a 4 by 4 texture and one of that size, each as RGBA32F and as
+ *  RGBA16F from float data, saying whether the framebuffer was complete, the first error, and how many of five points came back as written.
+ *  What it must satisfy: it makes its own throwaway context and gives it back, so the drawing surface's state is not touched. */
+function floatUploadProbe(w: number, h: number): string {
+  let gl: WebGL2RenderingContext | null = null;
+  const c = document.createElement("canvas");
+  try {
+    c.width = 1; c.height = 1;
+    gl = c.getContext("webgl2");
+    if (!gl) return "WebGL2 unavailable";
+    const colour = !!gl.getExtension("EXT_color_buffer_float");
+    const lim = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+    const out: string[] = [];
+    const sizes: [number, number][] = [[4, 4], [Math.min(w, lim), Math.min(h, lim)]];
+    for (const [tw, th] of sizes) {
+      for (const [name, internal] of [["RGBA32F", gl.RGBA32F], ["RGBA16F", gl.RGBA16F]] as [string, number][]) {
+        gl.getError();
+        const data = new Float32Array(tw * th * 4);
+        for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) { const o = (y * tw + x) * 4; data[o] = x / tw; data[o + 1] = y / th; data[o + 2] = 0.25; data[o + 3] = 1; }
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texImage2D(gl.TEXTURE_2D, 0, internal, tw, th, 0, gl.RGBA, gl.FLOAT, data);
+        const eUp = gl.getError();
+        const fb = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        let good = 0;
+        const px = new Float32Array(4);
+        if (st === gl.FRAMEBUFFER_COMPLETE) {
+          for (const [fx, fy] of [[0.1, 0.1], [0.5, 0.5], [0.9, 0.9], [0.1, 0.9], [0.9, 0.1]]) {
+            const x = Math.floor(fx * (tw - 1)), y = Math.floor(fy * (th - 1));
+            gl.readPixels(x, y, 1, 1, gl.RGBA, gl.FLOAT, px);
+            if (Math.abs(px[0] - x / tw) < 0.002 && Math.abs(px[1] - y / th) < 0.002 && Math.abs(px[2] - 0.25) < 0.002) good++;
+          }
+        }
+        const eRead = gl.getError();
+        out.push(`${name} from FLOAT data at ${tw} by ${th}: framebuffer ${FB_STATUS_WORDS[st] ?? st}, error after the upload ${glErrWords(eUp)}, after the read ${glErrWords(eRead)}, ${good} of 5 points read as written`);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.deleteFramebuffer(fb);
+        gl.deleteTexture(tex);
+      }
+    }
+    return `${colour ? "float colour buffer granted" : "float colour buffer not granted, so no read could be made"} · ${out.join(" · ")}`;
+  } catch (e) {
+    return `could not be run (${(e as Error).message})`;
+  } finally {
+    try { gl?.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* nothing to give back */ }
+    c.width = 1; c.height = 1;
+  }
+}
+
+/** The planted coloured picture's four quadrants, in the order top left, top right, bottom left, bottom right: three of known hue and one grey,
+ *  each as a linear colour. */
+const PLANT_QUADS: { name: string; lin: [number, number, number]; grey: boolean }[] = [
+  { name: "top left (red source)", lin: [0.6, 0.05, 0.05], grey: false },
+  { name: "top right (green source)", lin: [0.05, 0.6, 0.05], grey: false },
+  { name: "bottom left (blue source)", lin: [0.05, 0.05, 0.6], grey: false },
+  { name: "bottom right (grey source)", lin: [0.2, 0.2, 0.2], grey: true },
+];
+
+/** The hue of a colour in degrees. Takes red, green and blue on any one scale. Returns the HSV hue from 0 up to 360, 0 for a grey. */
+function hueDeg(r: number, g: number, b: number): number {
+  const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+  if (d <= 0) return 0;
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60;
+  return h < 0 ? h + 360 : h;
+}
+
+/** The hue bin a planted linear colour should land in after the check's edit. Takes the colour. Returns the hue in degrees and the bin. What
+ *  it must satisfy: the check's edit has the red and blue swap on, so red and blue are exchanged, then the sRGB curve, then the wide-gamut
+ *  conversion the drawing surface applies to its read-back, the steps `plantedColour` verified on 8-bit bytes. */
+function plantedExpect(lin: [number, number, number]): { hue: number; bin: number } {
+  const enc = (c: number): number => (c <= 0.003131 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+  const p3 = new Float32Array(3);
+  srgbDisplayToP3Display(enc(lin[2]), enc(lin[1]), enc(lin[0]), p3);
+  const hue = hueDeg(p3[0], p3[1], p3[2]);
+  return { hue, bin: Math.min(SEP_BINS - 1, Math.floor(hue / SEP_BIN_DEG)) };
+}
+
+/** Draws a planted coloured picture through the photograph's own path and reads it. Takes the press's one drawing surface and the tally.
+ *  Returns whether each coloured quadrant's pixels fell in its expected hue bins (within three bins either side) and the grey quadrant's fell
+ *  under the floor, with the figures and the sentence for the row. What it must satisfy: the source is a linear float source with a camera
+ *  matrix, uploaded by `useLinear` (the call a raw's source takes), drawn by `draw` at the check's neutral edit, thinned by `thin` and counted
+ *  by `huePass`; `known` is true only when at least nine in ten of each quadrant's interior pixels are in the expected place. The page flag
+ *  `plantswap` in the address exchanges the green and blue quadrants' source colours and is read here and nowhere else, so the check can be
+ *  seen reading as not known. The surface is left holding the planted picture. */
+function plantedPicture(drawing: Drawing, tally: PressTally): { known: boolean; value: string; meaning: string } {
+  const W = 64, H = 64;
+  const flagged = new URLSearchParams(location.search).has("plantswap");
+  const source = PLANT_QUADS.map((q, i) => (flagged && (i === 1 || i === 2) ? PLANT_QUADS[3 - i].lin : q.lin));
+  const linear = new Float32Array(W * H * 4);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const lin = source[(y < H / 2 ? 0 : 2) + (x < W / 2 ? 0 : 1)];
+    const o = (y * W + x) * 4;
+    linear[o] = lin[0]; linear[o + 1] = lin[1]; linear[o + 2] = lin[2]; linear[o + 3] = 1;
+  }
+  books(tally);
+  drawing.useLinear({ width: W, height: H, linear, camMatrix: [1, 0, 0, 0, 1, 0, 0, 0, 1] }, 0, 0);
+  const frame = drawing.draw(sepEdit([1, 1, 1], 1));
+  const t = thin(frame);
+  const hp = huePass(t.data, t.w, t.h);
+  const parts: string[] = [];
+  let known = true;
+  PLANT_QUADS.forEach((q, i) => {
+    const x0 = Math.floor((i % 2) * t.w / 2 + t.w / 8), x1 = Math.floor((i % 2) * t.w / 2 + (3 * t.w) / 8);
+    const y0 = Math.floor((i >> 1) * t.h / 2 + t.h / 8), y1 = Math.floor((i >> 1) * t.h / 2 + (3 * t.h) / 8);
+    let n = 0, hit = 0;
+    const seen = new Array(SEP_BINS).fill(0);
+    const want = q.grey ? null : plantedExpect(q.lin);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const p = y * t.w + x;
+      n++;
+      if (hp.sat[p] >= SAT_GUARD_LO) {
+        const b = Math.min(SEP_BINS - 1, Math.floor(hp.hue[p] / SEP_BIN_DEG));
+        seen[b]++;
+        if (want) { const dist = Math.min((b - want.bin + SEP_BINS) % SEP_BINS, (want.bin - b + SEP_BINS) % SEP_BINS); if (dist <= 3) hit++; }
+      } else if (!want) hit++;
+    }
+    let top = 0;
+    for (let b = 1; b < SEP_BINS; b++) if (seen[b] > seen[top]) top = b;
+    const ok = n > 0 && hit / n >= 0.9;
+    if (!ok) known = false;
+    parts.push(q.grey
+      ? `${q.name}: expected under the floor, ${hit} of ${n} pixels under it`
+      : `${q.name}: expected hue bin ${want!.bin} (${want!.hue.toFixed(0)} degrees), most pixels in bin ${top}, ${hit} of ${n} in the expected bins`);
+  });
+  lap(tally, "separation: the planted coloured picture, drawn and read back");
+  return {
+    known,
+    value: `${known ? "read as known" : "did not read as known"} · ${parts.join(" · ")}${flagged ? " · the page flag plantswap is on: the green and blue quadrants' source colours were exchanged on purpose" : ""}`,
+    meaning: "A picture made here whose colours are known, in the photograph's own shape (a linear float source with a camera matrix), uploaded by the call the photograph's source takes, drawn at the check's neutral edit, read back, thinned and counted by the code the check uses. Read as known means each coloured quadrant fell in its expected hue bins and the grey one under the floor: this device keeps colour through the photograph's path. Read as not known means this device loses the colour on that path whatever the photograph holds, and the rows beside it say where.",
+  };
+}
+
 /** Puts a picture on the page with its words. Takes the parent, the words (the picture's name and what it shows), the RGBA bytes, the size
  *  and optionally letters to draw at points. Returns the canvas, which is a real image for a screen reader (role img with the words as its
  *  label) and carries the same words in a caption under it, so no picture stands without them. */
@@ -3421,6 +3618,11 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       lap(tally, "the checks' own planted pairs, tried");
       row("The checks' own pairs, planted first", pairs.value, pairs.meaning);
       if (!pairs.ok) { row("The Separation check", "not run", "An instrument did not read its planted pair as known, so nothing it says is trustworthy."); progress("Stopped: a planted pair did not read as known.", true); return; }
+      progress("Drawing a planted coloured picture through the photograph's path");
+      await pause(tally);
+      const picture = plantedPicture(drawing, tally);
+      row("A planted coloured picture, through the photograph's path", picture.value, picture.meaning);
+      books(tally);
       const subject = await loadSubject(tally);
       progress(`Sending the ${subject.label} to the chip`);
       await pause(tally);
@@ -3436,6 +3638,12 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       lap(tally, "separation: the first draw and read-back, at the opening balance");
       const t = thin(frame);
       lap(tally, "separation: the first picture thinned");
+      probeRows("after the photograph's first draw", drawing.probe());
+      channelRows("after the photograph's first draw", frame, t);
+      lap(tally, "separation: the drawing surface's report and the frame's raw values");
+      row("A float texture upload and read-back on a context of its own", floatUploadProbe(frame.width, frame.height),
+        "The browser's own float upload tested apart from the picture code: a texture of float data is uploaded as RGBA32F and as RGBA16F, first at 4 by 4 and then at the size of the drawn frame (the photograph's full size), attached to a framebuffer and read back at five places, and each place is compared with what was written. It runs on a throwaway context given back at once.");
+      lap(tally, "separation: the float upload test");
       const host = $("dSepPics");
       const box = document.createElement("div");
       box.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px";
@@ -3673,6 +3881,7 @@ sepSweepBtn.addEventListener("click", (e) => {
     const list = sweepSettings(s);
     const t0 = performance.now();
     let ran = 0, reused = 0, skipped = 0, notExpr = 0;
+    let diagnosed = false;
     row("The sweep's own settings", `${list.length} settings · grid ${SWEEP_STEPS} Temperatures by ${SWEEP_TINTS.length} Tints over ${TEMPERATURE_MIRED_FAR} to ${TEMPERATURE_MIRED_NEAR} mired and tints ${SWEEP_TINTS.join(", ")} · floor ${SAT_GUARD_LO} · ${SEP_BINS} bins of ${SEP_BIN_DEG} degrees`,
       "Three routes at each grid point: the camera-side gains the check writes, with the swap on and off, and the screen-side gains the editor writes for Temperature and Tint while the swap is on, over the opening balance. Then the opening balance under each of the editor's five mixer presets. The sweep sets no look, no band and no control; the rule, the floor and the bins are the Separation check's own. A balance that cannot be made is a row that says so and is not drawn.");
     for (let k = 0; k < list.length; k++) {
@@ -3691,6 +3900,12 @@ sepSweepBtn.addEventListener("click", (e) => {
           lap(tally, "sweep: a draw and read-back");
           t = thin(frame);
           lap(tally, "sweep: the picture thinned");
+          if (!diagnosed) {
+            diagnosed = true;
+            probeRows("after the sweep's first draw", s.drawing.probe());
+            channelRows("after the sweep's first draw", frame, t);
+            lap(tally, "sweep: the drawing surface's report and the frame's raw values");
+          }
         } catch (err) {
           row(name, "not run", `The setting could not be drawn (${(err as Error).message}).`);
           skipped++;

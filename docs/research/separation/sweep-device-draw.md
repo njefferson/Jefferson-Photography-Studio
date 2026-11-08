@@ -1,0 +1,71 @@
+# Why every photograph pixel read colourless on one iPad, and what the test page now prints to say
+
+Written on 8 November 2026 for record 106 (the picture checks on the device) and record 084 (the sweep as its instrument). This file reads the drawing surface's code and the pages named below, ranks the candidate causes, and ties each diagnostic row the test page now prints to the candidate it confirms or rules out. It chooses no look, no method and no band, and it judges no picture. No cause is settled by the code and the facts together; the file says so below and names the rows that settle it on the device.
+
+## The device facts, as the plan of 8 November states them
+
+An iPad reporting 8 cores, Safari 26.6.3, a 768 by 1024 screen at 2x, an Apple graphics chip with a 16384 pixel texture limit and float buffers, app 2.73 on staging. The photograph NIR_3742.NEF, 2800 by 1864, opened by the raw route with its camera matrix at gains 1.0000, 1.8674, 3.0228, exposure 2.35, reading 1701 K and tint -83. The planted colour drew 200, 100, 50 and read 187, 105, 62 as expected, 0 of 1024 pixels off. The photograph's upload took 1321 ms and its first draw and read-back 1095 ms. Every one of the 82 sweep rows, the two from the first picture included, read 0 of 834400 pixels at or above the saturation floor, every pixel in the lowest saturation band and every hue count zero; the 80 draws took 42.5 s.
+
+A second iPad with 4 cores and Safari 27.0.1, on 2.72.1, read real counts from the same Separation check: 89.8 percent under the floor at the opening balance with two hue groups, and 2189 ms for the first draw and read-back.
+
+The container on 7 November, on the practice photograph, read 139255 of 579393 pixels above the floor at the opening balance and every pixel above it at 537 K, so the counting after the read-back is sound where the read-back carries colour. A probe of the 8 November build in the container (step 322) printed the new rows below on the practice photograph and the planted coloured picture read as known there, and read as not known with the page flag on.
+
+## What the code does at each stage
+
+The Separation check's step 1 (src/debug.ts, the click handler of dSepStart) opens one drawing surface with openDrawing (src/gpuexport.ts), draws the planted colour, then gives the surface the photograph with useOn, which calls the surface's use, then draws with sepEdit and reads the frame back.
+
+The planted colour is an 8-bit picture. use calls buildLinearSource, which for a picture with pixels returns the bytes, and Renderer.setImage (src/gl.ts, setImage, the branch after the linear branch) uploads them as RGBA8 or SRGB8_ALPHA8 with type UNSIGNED_BYTE and filtering LINEAR. No camera matrix is set.
+
+The photograph is a raw. buildLinearSource with half false returns a Float32Array of width times height times 4 values and the camera matrix. setImage uploads it (src/gl.ts, setImage, the linear branch): with OES_texture_float_linear granted as RGBA32F from FLOAT, otherwise as RGBA16F from FLOAT, with NEAREST filtering, and the shader applies the camera matrix when the useCam uniform is set (src/gl.ts, the line that multiplies the colour by the matrix, and the two lines that set the uniforms from the camera matrix). A 2800 by 1864 source is about 83 megabytes as RGBA32F.
+
+The draw goes to the canvas's own framebuffer, which the context creates as 8-bit RGBA with preserveDrawingBuffer on (src/gl.ts, the getContext call in the constructor). Renderer.readFrame reads it with readPixels in RGBA and UNSIGNED_BYTE (src/gl.ts, readFrame) and flips the rows. The extension EXT_color_buffer_float and OES_texture_float_linear are asked for once in the constructor and their results are not reported anywhere; EXT_color_buffer_float matters only to float framebuffers, and the main draw goes to an 8-bit one.
+
+Where a failure would be silent: the texImage2D calls in setImage are never followed by a getError, so an out-of-memory or invalid-operation error on the large float upload leaves a texture that samples as black without any message; a lost context is reported only by a callback and not by the page's rows; the read-back is checked only through the planted colour, which uses a different source; the sweep counted pixels and never checked that any pixel carried colour. The drawing surface did not expose its context, so none of this could be read from the page before 2.74.
+
+## What was read outside the repository, and what it said
+
+Pages fetched whole to disk and read there, with the Read and Grep tools, on 8 November 2026.
+
+The WebKit feature posts for Safari 27.0, 27.1 and 27.2 and for Safari 26.0 to 26.6 (webkit.org/blog). The 27.0 post lists four WebGL fixes: a regression where a WebGL canvas was filled with opaque content that hid stacked canvases beneath it, compressedTexImage not validating whether the compressed texture format extension was enabled, some texImage functions reporting errors with incorrect function names, and some WebGL context state properties not being reset on context loss. None concerns float textures, float upload or read-back. The 26.5 post lists one WebGL fix: shader compilation now handles NaN and infinity values properly; Safari 26.6.3 is later than 26.5, so the fix is in the device's version. The 26.0 post says WebGPU supersedes WebGL on macOS, iOS, iPadOS and visionOS and is preferred for new sites. The 26.1 to 26.4 and 26.6 posts hold no WebGL item that the search found.
+
+The WebKit bug list searches for float texture, RGBA16F, readPixels float and OES_texture_float_linear (bugs.webkit.org, comma-separated lists). They return test-suite failures (conformance tests for float textures that are flaky or failing on some platforms), and bug 329926, titled that the WebGPU backend of ANGLE does not enable GL extensions or formats from the device's features, assigned and changed on 3 November 2026, whose page holds only a link to a pull request and no description. Bug 273074, a demo that does not work on an iPhone 15, was fetched and holds nothing about floats. No bug page read describes the symptom of a float upload reading as black on an iPad.
+
+MDN pages for EXT_color_buffer_float (available across browsers since September 2021; it makes RGBA32F, RGBA16F and other sized formats colour-renderable), OES_texture_float_linear (available since July 2015; it allows linear filtering of floating-point textures and without it a float texture cannot be sampled LINEAR), readPixels (INVALID_OPERATION is raised for an unsupported format and type combination), and the WebGL best-practices page.
+
+Not read: the Khronos registry pages for the three float extensions and the WebGL 2 specification (registry.khronos.org answered with a Cloudflare challenge page, status 403, for every address tried; the proxy did not refuse it), and Apple's Safari release-notes pages at developer.apple.com (they answer 200 but carry a script shell and the sentence asking for JavaScript, with no release text). The MDN page for WebGL2RenderingContext.texImage2D answered 404 at the address tried.
+
+## The candidate causes, ranked
+
+First, the large float source is uploaded and sampled wrongly on this chip and browser, so the shader samples black or one grey. For: it is the one thing the photograph has that the planted colour does not; every setting reading zero, with the swap on and off and under all five mixers, is what a source that carries no colour gives whatever the edit does; the second iPad ran the same code on a different Safari and read colour. Against: the container runs the same upload and reads colour; no page read names such a fault in Safari 26.6.3. Confirmed or ruled out by: the upload row (the internal format, format and type and the first error after the upload), the float upload round trip row (whether this browser reads back at five places what it was given, as RGBA32F and as RGBA16F, at 4 by 4 and at the drawn frame's size), and the planted coloured picture row.
+
+Second, the upload fails for size or memory and no error was ever read, leaving an incomplete texture that samples as black. For: the source is about 83 megabytes as RGBA32F; the first iPad has 8 cores and the second 4, which says nothing about memory; the code never calls getError after texImage2D. Against: the upload took 1321 ms and the draw 1095 ms, which are the times of work done, and a refused upload usually returns at once. Confirmed or ruled out by: the first error after the upload (OUT_OF_MEMORY or INVALID_OPERATION), and the round trip row at the drawn frame's size.
+
+Third, the camera matrix path. The photograph sets the camera matrix and the useCam uniform and the planted colour does not, so a fault in setting a mat3 uniform, or a matrix of zeros, draws black or grey for the photograph alone. For: it is the other difference in what the two draw. Against: the matrix is the editor's own and the editor draws raws on the same device (the 8-core iPad opens raws in the editor; whether it did so under Safari 26.6.3 is not stated in the facts). Confirmed or ruled out by: the planted coloured picture, which now sets an identity camera matrix and the useCam uniform; if it reads as not known the matrix path is implicated, and the raw values at nine places show whether the photograph is black or grey.
+
+Fourth, the context supports less than the code assumes: the float colour buffer, the half-float colour buffer or float linear filtering absent or different on the chip, so the code takes the RGBA16F branch from FLOAT data (src/gl.ts, setImage, the last branch), whose conversion is done by the browser. For: Safari 26 states that WebGPU supersedes WebGL on Apple platforms, and bug 329926 concerns formats and extensions in ANGLE's WebGPU backend, though nothing read ties either to this device. Against: the device report states float buffers. Confirmed or ruled out by: the supports row (the float colour buffer offered, float linear filtering granted to the renderer, and the largest texture) and the upload row, which names RGBA32F or RGBA16F as the renderer's own record of the call it made.
+
+Fifth, the browser alters what a page reads back from a canvas. Against: the planted colour read exactly on the same device in the same press, on the same read-back call. Ruled out for 8-bit content by that row; the new read-back row names the format and type the context offers.
+
+Sixth, the context is lost between the planted colour and the photograph. Against: the photograph's draw took time and the sweep ran 80 draws. Confirmed or ruled out by: the context state in the read-back row.
+
+## Which cause the code and the facts settle
+
+None. The code leaves the first three open together and the device facts cannot separate them: all three give a frame of one grey or black for the photograph and a good frame for the planted colour. The fix is therefore not made in step 322; no line of src/gpuexport.ts or src/gl.ts that draws or reads a frame was changed, and the changes only read: src/gpuexport.ts reads the context (getError, the supported-extension list and the limit queries), keeps nine bytes of the read-back before its conversion and adds a way to give the surface a prepared source, and src/gl.ts records the formats of its last upload and reports them. The test page's rows now separate the candidates on the device in one press of step 1 and the sweep.
+
+## The diagnostic rows, each tied to what it settles
+
+The planted coloured picture row. A linear float source of four quadrants (three of known hue and one grey) with an identity camera matrix, uploaded by the call the photograph's source takes, drawn at the check's neutral edit, read back, thinned and counted by the check's own code. Read as known means the float upload, the camera-matrix path, the draw and the read-back carry colour on this device, and the photograph's colourless reading then lies in the photograph's own values (its real matrix, its size or its gains). Read as not known rules in the first, second or third candidate according to the next rows.
+
+The drawing surface rows after the photograph's first draw. The upload row names the source, the internal format, format and type, and the first error after the upload (candidates one, two and four). The draw and read-back row names the framebuffer's status and size, the read-back format and type the context offers, the first error after the draw and after the read-back, and whether the context is alive (candidates five and six). The supports row names whether the float colour buffer is offered, whether float linear filtering was granted to the renderer, and the largest texture (candidate four). The read-back's bytes row gives the nine bytes before the conversion to the wide-gamut space (candidates one to three).
+
+The drawn frame rows. Each channel's mean and top over the thinned pixels separate a black frame (all zero), a grey frame (means and tops equal) and a frame with colour; the nine values at fixed fractions, after the conversion, show the same in nine places and are set beside the nine bytes before it (candidates one to three).
+
+The float upload round trip row. On a context of its own, a float texture is uploaded as RGBA32F and as RGBA16F, at 4 by 4 and at the drawn frame's size, attached to a framebuffer and read back at five places against what was written. It tests the browser's float upload apart from the picture code (candidates one, two and four).
+
+The same drawing surface and frame rows are printed again after the sweep's first draw, so a change between the press of step 1 and the sweep shows.
+
+## Uncertain
+
+The internal format of the photograph's texture cannot be asked of a WebGL 2 context, so it is the renderer's own record of the format its upload call was given, which says what was sent and not what the chip stored. The additions to the drawing surface and the renderer are the additive ones the plan's rules of 8 November allow; they change no drawn pixel.
+
+The accessibility walk was not run over this build. Its section 14 edit, which presses the sweep once, refuses an all-zero row and checks the planted picture and the diagnostic rows, lands as code with this release and runs at the promotion of 2.74; the rows above were read from a probe of the built page on the practice photograph.

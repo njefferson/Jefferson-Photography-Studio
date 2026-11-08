@@ -1707,6 +1707,9 @@ export class Renderer {
    *  LINEAR. RGBA16F needs nothing — it is texture-filterable in core GLES 3.0
    *  (table 3.13), so WebGL2 filters it everywhere. */
   private floatLinear = false;
+  /** What `setImage` last uploaded, set on the line before each upload call and read by `uploadReport`
+   *  alone. It changes nothing that is drawn. */
+  private lastUpload = { internal: "none yet", format: "none yet", type: "none yet", floatLinear: false };
   /** The 8-bit source is uploaded SRGB8_ALPHA8, so the sampler hands the
    *  shader linear values and `u_linear` is set for it (setImage). */
   private srgbSource = false;
@@ -2877,9 +2880,11 @@ export class Renderer {
         // reports no memory figure at all, so the app cannot ask. Half-float
         // holds ~11 bits of relative precision, which is what every HDR image
         // pipeline uses for linear data, and the shader samples it identically.
+        this.lastUpload = { internal: "RGBA16F", format: "RGBA", type: "HALF_FLOAT", floatLinear: this.floatLinear };
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, width, height, 0, gl.RGBA, gl.HALF_FLOAT, img.linear16);
       } else if (this.floatLinear) {
         // A raw's half-size working copy, as float32, where the device filters it.
+        this.lastUpload = { internal: "RGBA32F", format: "RGBA", type: "FLOAT", floatLinear: this.floatLinear };
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, img.linear!);
       } else {
         // AND AS HALF-FLOAT WHERE IT DOES NOT (2026-10-02). RGBA32F filters only
@@ -2892,6 +2897,7 @@ export class Renderer {
         // checks, the worst preview value moves by up to 0.4 of a level, on
         // dark channels after a hue turn. Where the extension is granted
         // nothing changes.
+        this.lastUpload = { internal: "RGBA16F", format: "RGBA", type: "FLOAT", floatLinear: this.floatLinear };
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, width, height, 0, gl.RGBA, gl.FLOAT, img.linear!);
       }
     } else {
@@ -2911,11 +2917,22 @@ export class Renderer {
       gl.bindTexture(gl.TEXTURE_2D, this.tex);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      this.lastUpload = { internal: this.srgbSource ? "SRGB8_ALPHA8" : "RGBA8", format: "RGBA", type: "UNSIGNED_BYTE", floatLinear: this.floatLinear };
       gl.texImage2D(
         gl.TEXTURE_2D, 0, this.srgbSource ? gl.SRGB8_ALPHA8 : gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE,
         new Uint8Array(img.pixels!.buffer),
       );
     }
+  }
+
+  /** Says what `setImage` last uploaded. Takes nothing. Returns the texture's internal format, format
+   *  and type as the upload call named them, and whether OES_texture_float_linear was granted, all
+   *  as words and a flag ("none yet" before any upload). What it must satisfy: it only reads what
+   *  `setImage` recorded on the line before its upload call, so it is never inferred from an
+   *  extension's presence and calling it moves no pixel. Consumer: `openDrawing`'s probe, which the
+   *  test page prints as the upload's formats. */
+  uploadReport(): { internal: string; format: string; type: string; floatLinear: boolean } {
+    return { ...this.lastUpload };
   }
 
   /** DOES THIS DEVICE DECODE AN sRGB TEXTURE BEFORE IT FILTERS IT? GLES 3.0

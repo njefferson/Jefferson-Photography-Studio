@@ -287,8 +287,47 @@ export interface Drawing {
    *  wide-gamut space the computed export gives), the canvas's size, and the milliseconds the
    *  tone curve, the render, the read-back and the conversion took. */
   draw(params: EditParams): { data: Uint8ClampedArray; width: number; height: number; ms: { tone: number; render: number; read: number; p3: number } };
+  /** Gives the surface a prepared linear source in place of a photograph. Takes the source (its size,
+   *  its float32 RGBA pixels and its camera matrix, nine numbers row by row, or none), the view's
+   *  rotation and its flip. Uploads it by the same call a raw's source goes through, with no lens
+   *  curve and a tap scale of one. Returns the milliseconds the upload and those settings took. What
+   *  it must satisfy: the source goes through `Renderer.setImage` exactly as `use` sends a raw's
+   *  source, so a picture drawn from it is drawn by the path the photograph is drawn by. Consumer:
+   *  the test page's planted coloured picture. */
+  useLinear(image: { width: number; height: number; linear: Float32Array; camMatrix?: number[] }, rotate: number, flip: number): { upload: number };
+  /** Says what the context gave back for the last upload, draw and read-back. Takes nothing. Returns
+   *  a `DrawProbe`, read from the context at the moment of the call. What it must satisfy: it only
+   *  reads, so a frame drawn after it equals the frame drawn without it. Consumer: the test page's
+   *  diagnostic rows. */
+  probe(): DrawProbe;
   /** Gives the graphics context and the canvas back. Takes nothing; returns nothing. */
   close(): void;
+}
+
+/** What a drawing surface's context reported, as numbers and words. `errUpload`, `errDraw` and
+ *  `errRead` are the first GL error the context raised since the step before (0 for none, -1 when
+ *  the context could not be reached); `internal`, `format` and `type` are what the renderer's
+ *  `setImage` named in its last upload call (`Renderer.uploadReport`), never inferred from an
+ *  extension; the framebuffer fields are read with `checkFramebufferStatus`, the drawing buffer's size
+ *  and the read-back format and type the context offers; `rawGrid` is the read-back's own bytes
+ *  at nine fixed places before the display-P3 conversion, each as column, row, red, green, blue. */
+export interface DrawProbe {
+  lost: boolean;
+  source: string;
+  internal: string;
+  format: string;
+  type: string;
+  errUpload: number;
+  errDraw: number;
+  errRead: number;
+  fbStatus: number;
+  drawingBuffer: [number, number];
+  readFormat: number;
+  readType: number;
+  floatLinear: boolean;
+  colorBufferFloat: boolean;
+  maxTexture: number;
+  rawGrid: [number, number, number, number, number][];
 }
 
 /** Opens a drawing surface. Takes nothing. Returns a promise of the surface once the picture
@@ -309,7 +348,58 @@ export async function openDrawing(): Promise<Drawing> {
   // one that is not released costs the next one (Renderer.dispose).
   const close = () => { r.dispose(); canvas.width = 1; canvas.height = 1; };
   try { await r.ready; } catch (e) { close(); throw e; }
+  // THE CONTEXT THE RENDERER MADE, ASKED FOR AGAIN. A second `getContext("webgl2")` on a canvas that
+  // already has one returns that one, so the surface can read its errors and limits without the
+  // renderer exposing anything. It only reads: `getError` is drained at three points so the first
+  // error since the step before is named, and nothing else on the context is touched.
+  const gl = canvas.getContext("webgl2") as WebGL2RenderingContext | null;
+  const drain = (): number => {
+    if (!gl) return -1;
+    let first = 0;
+    for (let i = 0; i < 16; i++) { const e = gl.getError(); if (e === 0) break; if (first === 0) first = e; }
+    return first;
+  };
+  const seen = { up: 0, draw: 0, read: 0, linear: false, raw: [] as [number, number, number, number, number][] };
+  const finishUse = (t: number): number => performance.now() - t;
+  // The extensions the context offers, read as a list and never asked for by name, so the probe enables nothing.
+  const offered = (name: string): boolean => !!gl && (gl.getSupportedExtensions() ?? []).includes(name);
   return {
+    useLinear(image, rotate, flip) {
+      const t = performance.now();
+      drain();
+      r.setImage(image);
+      seen.up = drain();
+      seen.linear = true;
+      r.setTapScale(1);
+      r.setLensCurve(lensCurveForSource(null, { isRaw: true, turn: 0 }));
+      r.setRotation(rotate);
+      r.setFlip(flip);
+      return { upload: finishUse(t) };
+    },
+    probe() {
+      const none: DrawProbe = {
+        lost: true, source: "no context", internal: "unknown", format: "unknown", type: "unknown",
+        errUpload: -1, errDraw: -1, errRead: -1, fbStatus: -1, drawingBuffer: [canvas.width, canvas.height],
+        readFormat: -1, readType: -1, floatLinear: false, colorBufferFloat: false, maxTexture: -1, rawGrid: [],
+      };
+      if (!gl) return none;
+      // THE UPLOAD'S FORMATS ARE THE RENDERER'S OWN RECORD of the call it made, not a reading of an extension.
+      const up = r.uploadReport();
+      return {
+        lost: gl.isContextLost(),
+        source: seen.linear ? "a linear float source, one RGBA float32 value per pixel" : "an 8-bit picture",
+        internal: up.internal, format: up.format, type: up.type,
+        errUpload: seen.up, errDraw: seen.draw, errRead: seen.read,
+        fbStatus: gl.checkFramebufferStatus(gl.FRAMEBUFFER),
+        drawingBuffer: [gl.drawingBufferWidth, gl.drawingBufferHeight],
+        readFormat: gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT) as number,
+        readType: gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE) as number,
+        floatLinear: up.floatLinear,
+        colorBufferFloat: offered("EXT_color_buffer_float"),
+        maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
+        rawGrid: seen.raw.slice(),
+      };
+    },
     use(file, current, lens, rotate, flip) {
       // ONE PASS, EVERY PIXEL. The computed export does this per output pixel inside
       // its sampler chain, which is more work in total — but it never holds a whole
@@ -318,7 +408,10 @@ export async function openDrawing(): Promise<Drawing> {
       const built = buildLinearSource(file, current);
       const src = getSource(file, current);
       const t = performance.now();
+      drain();
       r.setImage(built.image);
+      seen.up = drain();
+      seen.linear = !!(built.image.linear || built.image.linear16);
       // THE FOOTPRINT THE READER PREVIEWED, not the one a full-resolution texture
       // would give. Read from the same function the computed export uses, so the
       // two cannot disagree about it.
@@ -336,11 +429,22 @@ export async function openDrawing(): Promise<Drawing> {
       r.setToneCurve(params.tone, params.toneR, params.toneG, params.toneB);
       const tone = performance.now() - t;
       t = performance.now();
+      drain();
       r.render(params);
+      seen.draw = drain();
       const render = performance.now() - t;
       t = performance.now();
       const data = r.readFrame();
+      seen.read = drain();
       const read = performance.now() - t;
+      // THE READ-BACK'S OWN BYTES at nine fixed places, kept before the conversion below changes them (top row first,
+      // fractions 0.1, 0.5 and 0.9 across and down). Read-only: nothing here changes `data`.
+      seen.raw = [];
+      for (const fy of [0.1, 0.5, 0.9]) for (const fx of [0.1, 0.5, 0.9]) {
+        const x = Math.floor(fx * (canvas.width - 1)), y = Math.floor(fy * (canvas.height - 1));
+        const o = (y * canvas.width + x) * 4;
+        seen.raw.push([x, y, data[o], data[o + 1], data[o + 2]]);
+      }
       // DISPLAY P3, LIKE THE COMPUTED EXPORT. A JPEG this app saves is P3 and
       // carries the matching profile; the renderer draws sRGB to its canvas.
       // Without this the two paths differ by the gamut conversion and the

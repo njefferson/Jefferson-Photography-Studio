@@ -53,6 +53,8 @@ Put right on 6 November 2026 (the plan of that date, step 309), because the firs
 
 Added on 7 November 2026 (step 317, on staging as 2.73): the Separation check's sweep runs on the picked photograph, the one step 1 drew through this door, and on the practice photograph when none was picked.
 
+Added on 8 November 2026 (step 322, on staging as 2.74): the planted coloured picture goes through the picked photograph's path, a linear float source uploaded by the call a raw's source takes, so a device that reads the picked photograph as colourless can be told apart from one that loses colour on that path whatever the photograph holds (record 106 holds the paragraph).
+
 ## Depends
 
 - needs 106 — it grows 106's picture checks section and cannot be built before that section exists on the device.

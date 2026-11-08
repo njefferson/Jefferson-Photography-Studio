@@ -1,16 +1,18 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=65dabbe81c32f89b
-diffhash=4e6f23b7f27c2ec0
-verdict=IN-SCOPE: every changed file is named by step 317's Files line and every change in the diff is covered by a line of step 317's Do.
-# IN-SCOPE: every changed file is named by step 317's Files line and every change in the diff is covered by a line of step 317's Do.
-# NOTES.md: covered by step 317 stage 6 (the new entry at the top of the device-pass section, the Q-JPS-212 and Q-JPS-213 lines at the end of the Found queue); the stage 9 bullet brought to the new probe's counts.
-# VERSION: covered by step 317 stage 6 (VERSION reads 2.73, from 2.72).
-# debug.html: covered by step 317 stage 3 (the sweep button, disabled at rest, and its help paragraph).
-# docs/ARCHITECTURE.md: covered by step 317 stage 7 (the module map written by architecture-check, src/debug.ts line count only).
-# docs/decisions/084: covered by step 317 stage 6 (one paragraph dated 7 November, naming no photograph file).
-# docs/decisions/106: covered by step 317 stage 6 (one sentence on the sweep rows, after the Separation check paragraph).
-# docs/decisions/108: covered by step 317 stage 6 (one sentence that the sweep runs on the picked photograph).
-# src/debug.ts: covered by step 317 stage 3 (the sweep, its settings and rows, its button and its enabling), stage 4 (the two report strings gain a space, the cluster middle and the legend share), and stage 9 (the gain-track check through WB_GAIN_LO and WB_GAIN_HI imported from src/decode.ts, unchanged, and the not-expressible rows); the balancestore imports are reads of functions the sweep calls, and the module itself is unchanged.
-# tools/a11y-walk.mjs: covered by step 317 stage 5 (section 14 gains the sweep state: disabled at rest, enabled after step 1, pressed on the practice photograph with its progress line and rows).
-# No file outside step 317's Files is changed. No change sets a band, a balance, a look or a control. The Separation check's rule, floor, bins, targets, soft edge and minimum are unchanged.
+planhash=49d8d10ab3045943
+diffhash=59571b976837cc54
+verdict=IN-SCOPE: every changed or new file is named by the Files line of step 322 and each change matches that step's Do; the drawing surface and renderer changes are additions only, as the Rules of this plan allow.
+# IN-SCOPE: every changed or new file is named by the Files line of step 322 and each change matches that step's Do; the drawing surface and renderer changes are additions only, as the Rules of this plan allow.
+# src/gpuexport.ts: Files line of step 322 and the Rules entry on the additive probe; adds the DrawProbe type, the useLinear entry and the probe member, plus error draining and the kept raw read-back grid, with use, draw and close keeping their signatures and results.
+# src/gl.ts: Files line of step 322 (only the read-only report of what setImage uploaded); adds a private lastUpload record set on the line before each upload call and the uploadReport method, moving no pixel.
+# src/debug.ts: Files line of step 322 and its Do stages 4 and 5; adds the diagnostic rows after the photograph's first draw and the sweep's first draw, the float upload test on a context of its own, and the planted coloured picture with the plantswap page flag.
+# tools/a11y-walk.mjs: Files line of step 322 and its Do stage 7; section 14 presses the sweep once, refuses an all-zero sweep row, checks the planted picture, its flagged failure and the diagnostic rows; it lands as code and runs at the promotion by the owner ruling recorded in the plan's Asked.
+# docs/research/separation/sweep-device-draw.md (new): Files line of step 322 and its Do stage 3; the diagnosis file.
+# docs/ARCHITECTURE.md: Files line of step 322 and its Do stage 9; the module map rewritten by the architecture check, three line counts moved.
+# docs/decisions/106-the-picture-checks-run-on-the-device-from-a-test-page.md: Files line of step 322 and its Do stage 8; one paragraph dated 8 November under its Built section.
+# docs/decisions/108-the-picture-checks-run-on-a-photograph-you-choose.md: Files line of step 322 and its Do stage 8; one sentence-length paragraph under its Built section.
+# NOTES.md: Files line of step 322 and its Do stage 8 and fourth-send text; the staging entry at the top of the device-pass section and Found queue lines Q-JPS-214 to Q-JPS-225.
+# VERSION: Files line of step 322; 2.73 to 2.74 for a capability release.
+# .githooks/pre-commit: not covered by any step of this plan; step 323 Facts leave it as it stands, stage none of it and keep it out of the commit; the close files it as a finding.
+# .plan-scope: Files line of step 323; written by the scope record after this verdict.
