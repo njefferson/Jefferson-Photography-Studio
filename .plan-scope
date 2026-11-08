@@ -1,18 +1,56 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=49d8d10ab3045943
-diffhash=59571b976837cc54
-verdict=IN-SCOPE: every changed or new file is named by the Files line of step 322 and each change matches that step's Do; the drawing surface and renderer changes are additions only, as the Rules of this plan allow.
-# IN-SCOPE: every changed or new file is named by the Files line of step 322 and each change matches that step's Do; the drawing surface and renderer changes are additions only, as the Rules of this plan allow.
-# src/gpuexport.ts: Files line of step 322 and the Rules entry on the additive probe; adds the DrawProbe type, the useLinear entry and the probe member, plus error draining and the kept raw read-back grid, with use, draw and close keeping their signatures and results.
-# src/gl.ts: Files line of step 322 (only the read-only report of what setImage uploaded); adds a private lastUpload record set on the line before each upload call and the uploadReport method, moving no pixel.
-# src/debug.ts: Files line of step 322 and its Do stages 4 and 5; adds the diagnostic rows after the photograph's first draw and the sweep's first draw, the float upload test on a context of its own, and the planted coloured picture with the plantswap page flag.
-# tools/a11y-walk.mjs: Files line of step 322 and its Do stage 7; section 14 presses the sweep once, refuses an all-zero sweep row, checks the planted picture, its flagged failure and the diagnostic rows; it lands as code and runs at the promotion by the owner ruling recorded in the plan's Asked.
-# docs/research/separation/sweep-device-draw.md (new): Files line of step 322 and its Do stage 3; the diagnosis file.
-# docs/ARCHITECTURE.md: Files line of step 322 and its Do stage 9; the module map rewritten by the architecture check, three line counts moved.
-# docs/decisions/106-the-picture-checks-run-on-the-device-from-a-test-page.md: Files line of step 322 and its Do stage 8; one paragraph dated 8 November under its Built section.
-# docs/decisions/108-the-picture-checks-run-on-a-photograph-you-choose.md: Files line of step 322 and its Do stage 8; one sentence-length paragraph under its Built section.
-# NOTES.md: Files line of step 322 and its Do stage 8 and fourth-send text; the staging entry at the top of the device-pass section and Found queue lines Q-JPS-214 to Q-JPS-225.
-# VERSION: Files line of step 322; 2.73 to 2.74 for a capability release.
-# .githooks/pre-commit: not covered by any step of this plan; step 323 Facts leave it as it stands, stage none of it and keep it out of the commit; the close files it as a finding.
-# .plan-scope: Files line of step 323; written by the scope record after this verdict.
+diffhash=cf43e724e3a3154c
+verdict=IN-SCOPE: every staged file is a copy of step 324, 325 or 326's research output or one of step 327's two named edits, and .githooks/pre-commit is left out of the commit.
+# IN-SCOPE: every staged file is a copy of step 324, 325 or 326's research output or one of step 327's two named edits, and .githooks/pre-commit is left out of the commit.
+# .third-person-allow: covered by the plan's Files, step 327 entry (".third-person-allow"), and step 327's Do stage 2 (one declaration line for the Shea digest by file).
+# NOTES.md: covered by step 327's Do stage 2 (the Found queue lines of the reports not yet queued, under the next free key, no owner named), and by the Files line listing NOTES.md.
+# docs/research/separation/field.md: covered by the Files line for step 327 (field.md, new) and step 327's Do stage 2 (the research folder copied whole).
+# docs/research/separation/shea.md: covered by the Files line for step 327 (shea.md, new) and step 327's Do stage 2.
+# docs/research/separation/levers.md: covered by the Files line for step 327 (levers.md, new) and step 327's Do stage 2.
+# docs/research/separation/gather-frames.json: not named by the Files line; covered by step 327's Do stage 2 (the research folder copied whole) and by step 326's Do stage 3 (the frame list the gather works from); sizes masked by the plan's hash rule.
+# docs/research/separation/gather/summary.md: covered by the Files line for step 327 (gather/ with one JSON per frame and its summary).
+# docs/research/separation/gather/NIR_1376.json: covered by the Files line for step 327 (gather/, one JSON per frame).
+# docs/research/separation/gather/NIR_1638.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1642.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1649.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1651.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1661.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1667.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1679.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1688.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1703.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1707.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1712.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1716.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1737.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1739.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1748.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1749.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1763.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1824.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1827.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1830.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1835.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1851.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_1873.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_2922.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_2927.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3430.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3460.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3461.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3462.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3463.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3466.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3467.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3471.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3472.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3473.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3474.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3698.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3700.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3703.json: covered by the same Files line.
+# docs/research/separation/gather/NIR_3716.json: covered by the same Files line.
+# .githooks/pre-commit: not in any step's Files; left unstaged and out of the commit by step 327's Do stage 1 and stage 3.
+# .plan-scope: the record this verdict mints, covered by the Files line for step 327 (".plan-scope").

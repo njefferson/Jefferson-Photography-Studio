@@ -38,3 +38,9 @@ docs/decisions/018-one-sky-selection-for-every-sky-aware-tool.md | cited author'
 src/localmap.ts | cited author's surname, He, Sun and Tang (dark-channel dehaze) | He
 src/pipeline.ts | cited author's surname, He, Sun and Tang (dark-channel dehaze) | He
 src/gl.ts | cited author's surname, He, Sun and Tang (dark-channel dehaze) | He
+
+# The digest of a published infrared photographer's own pages and videos. The
+# pronouns are that author, cited, and he is not a person in this project; the
+# digest is of public pages and a reference to the owner is not declared here.
+docs/research/separation/shea.md | pronoun for the cited author of the pages the digest summarises, not a person in this project | he
+docs/research/separation/shea.md | possessive for the cited author of the pages the digest summarises, not a person in this project | his

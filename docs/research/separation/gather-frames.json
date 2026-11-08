@@ -1,0 +1,738 @@
+[
+ {
+  "frame": "NIR_0063",
+  "records": [
+   "018",
+   "019",
+   "023",
+   "028",
+   "029",
+   "058",
+   "061"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_0172",
+  "records": [
+   "029",
+   "031"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_0627",
+  "records": [
+   "019",
+   "029",
+   "031",
+   "052",
+   "068",
+   "069",
+   "070"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_1376",
+  "records": [
+   "015",
+   "019",
+   "034",
+   "084",
+   "085"
+  ],
+  "raw": "NIR_1376.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1376.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1638",
+  "records": [
+   "029",
+   "031"
+  ],
+  "raw": "NIR_1638.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1638.JPG",
+   "NIR_1638.NEF",
+   "NIR_1638.zip"
+  ]
+ },
+ {
+  "frame": "NIR_1642",
+  "records": [
+   "034"
+  ],
+  "raw": "NIR_1642.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1642.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1644",
+  "records": [
+   "018",
+   "019",
+   "023",
+   "026",
+   "028",
+   "029",
+   "052",
+   "068",
+   "069",
+   "070"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_1649",
+  "records": [
+   "087"
+  ],
+  "raw": "NIR_1649.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1649.JPG",
+   "NIR_1649.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1651",
+  "records": [
+   "018",
+   "019",
+   "023",
+   "028",
+   "029",
+   "030",
+   "031",
+   "044",
+   "052",
+   "068",
+   "069",
+   "070",
+   "073",
+   "078",
+   "085",
+   "087",
+   "088",
+   "089"
+  ],
+  "raw": "NIR_1651.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1651.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1661",
+  "records": [
+   "069",
+   "078",
+   "083",
+   "085"
+  ],
+  "raw": "NIR_1661.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1661.JPG",
+   "NIR_1661.NEF",
+   "NIR_1661.zip"
+  ]
+ },
+ {
+  "frame": "NIR_1667",
+  "records": [
+   "087"
+  ],
+  "raw": "NIR_1667.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1667.JPG",
+   "NIR_1667.NEF",
+   "NIR_1667.zip"
+  ]
+ },
+ {
+  "frame": "NIR_1679",
+  "records": [
+   "034"
+  ],
+  "raw": "NIR_1679.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1679.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1688",
+  "records": [
+   "029"
+  ],
+  "raw": "NIR_1688.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1688.JPG",
+   "NIR_1688.NEF",
+   "NIR_1688.zip"
+  ]
+ },
+ {
+  "frame": "NIR_1703",
+  "records": [
+   "061",
+   "069",
+   "073",
+   "078",
+   "085",
+   "087"
+  ],
+  "raw": "NIR_1703.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1703.JPG",
+   "NIR_1703.NEF",
+   "NIR_1703.zip"
+  ]
+ },
+ {
+  "frame": "NIR_1707",
+  "records": [
+   "087"
+  ],
+  "raw": "NIR_1707.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1707.JPG",
+   "NIR_1707.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1712",
+  "records": [
+   "087"
+  ],
+  "raw": "NIR_1712.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1712.JPG",
+   "NIR_1712.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1716",
+  "records": [
+   "019",
+   "087"
+  ],
+  "raw": "NIR_1716.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1716.JPG",
+   "NIR_1716.NEF",
+   "NIR_1716.zip"
+  ]
+ },
+ {
+  "frame": "NIR_1737",
+  "records": [
+   "034"
+  ],
+  "raw": "NIR_1737.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1737.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1739",
+  "records": [
+   "087"
+  ],
+  "raw": "NIR_1739.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1739.JPG",
+   "NIR_1739.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1748",
+  "records": [
+   "034"
+  ],
+  "raw": "NIR_1748.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1748.JPG",
+   "NIR_1748.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1749",
+  "records": [
+   "087"
+  ],
+  "raw": "NIR_1749.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1749.JPG",
+   "NIR_1749.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1763",
+  "records": [
+   "087"
+  ],
+  "raw": "NIR_1763.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1763.JPG",
+   "NIR_1763.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1805",
+  "records": [
+   "087"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": [
+   "NIR_1805.JPG"
+  ]
+ },
+ {
+  "frame": "NIR_1824",
+  "records": [
+   "087"
+  ],
+  "raw": "NIR_1824.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1824.JPG",
+   "NIR_1824.NEF",
+   "NIR_1824.zip"
+  ]
+ },
+ {
+  "frame": "NIR_1827",
+  "records": [
+   "052",
+   "068",
+   "069",
+   "078"
+  ],
+  "raw": "NIR_1827.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1827.JPG",
+   "NIR_1827.NEF",
+   "NIR_1827.zip"
+  ]
+ },
+ {
+  "frame": "NIR_1830",
+  "records": [
+   "029"
+  ],
+  "raw": "NIR_1830.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1830.JPG",
+   "NIR_1830.NEF",
+   "NIR_1830.zip"
+  ]
+ },
+ {
+  "frame": "NIR_1835",
+  "records": [
+   "034"
+  ],
+  "raw": "NIR_1835.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1835.JPG",
+   "NIR_1835.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1851",
+  "records": [
+   "034"
+  ],
+  "raw": "NIR_1851.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1851.JPG",
+   "NIR_1851.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1873",
+  "records": [
+   "029"
+  ],
+  "raw": "NIR_1873.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_1873.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_1877",
+  "records": [
+   "029"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_2082",
+  "records": [
+   "019"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_2922",
+  "records": [
+   "034"
+  ],
+  "raw": "NIR_2922.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_2922.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_2927",
+  "records": [
+   "034"
+  ],
+  "raw": "NIR_2927.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_2927.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3394",
+  "records": [
+   "034"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_3406",
+  "records": [
+   "019",
+   "034",
+   "069"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_3429",
+  "records": [
+   "034"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_3430",
+  "records": [
+   "034",
+   "061"
+  ],
+  "raw": "NIR_3430.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3430.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3460",
+  "records": [
+   "019",
+   "069",
+   "087"
+  ],
+  "raw": "NIR_3460.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3460.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3461",
+  "records": [
+   "013",
+   "019",
+   "042",
+   "052",
+   "061",
+   "065",
+   "066",
+   "068",
+   "069",
+   "073",
+   "078",
+   "087",
+   "088",
+   "089"
+  ],
+  "raw": "NIR_3461.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3461.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3462",
+  "records": [
+   "087"
+  ],
+  "raw": "NIR_3462.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3462.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3463",
+  "records": [
+   "042",
+   "061",
+   "069",
+   "073",
+   "087"
+  ],
+  "raw": "NIR_3463.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3463.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3466",
+  "records": [
+   "052",
+   "066",
+   "068",
+   "069",
+   "078",
+   "087"
+  ],
+  "raw": "NIR_3466.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3466.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3467",
+  "records": [
+   "019",
+   "042",
+   "073",
+   "087"
+  ],
+  "raw": "NIR_3467.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3467.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3471",
+  "records": [
+   "019",
+   "072",
+   "073",
+   "087"
+  ],
+  "raw": "NIR_3471.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3471.JPG",
+   "NIR_3471.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3472",
+  "records": [
+   "072",
+   "073",
+   "087"
+  ],
+  "raw": "NIR_3472.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3472.JPG",
+   "NIR_3472.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3473",
+  "records": [
+   "072",
+   "087"
+  ],
+  "raw": "NIR_3473.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3473.JPG",
+   "NIR_3473.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3474",
+  "records": [
+   "072",
+   "087"
+  ],
+  "raw": "NIR_3474.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3474.JPG",
+   "NIR_3474.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3698",
+  "records": [
+   "069",
+   "078"
+  ],
+  "raw": "NIR_3698.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3698.NEF",
+   "NIR_3698.jpg"
+  ]
+ },
+ {
+  "frame": "NIR_3700",
+  "records": [
+   "015",
+   "085"
+  ],
+  "raw": "NIR_3700.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3700.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3703",
+  "records": [
+   "015"
+  ],
+  "raw": "NIR_3703.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3703.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3716",
+  "records": [
+   "015",
+   "072",
+   "084",
+   "085"
+  ],
+  "raw": "NIR_3716.NEF",
+  "size": masked,
+  "inIndexAs": [
+   "NIR_3716.NEF"
+  ]
+ },
+ {
+  "frame": "NIR_3735",
+  "records": [
+   "101"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_3736",
+  "records": [
+   "101"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_3738",
+  "records": [
+   "101"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_3762",
+  "records": [
+   "101"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_4027",
+  "records": [
+   "101"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_4078",
+  "records": [
+   "plan"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ },
+ {
+  "frame": "NIR_4094",
+  "records": [
+   "plan"
+  ],
+  "raw": null,
+  "size": null,
+  "inIndexAs": []
+ }
+]
