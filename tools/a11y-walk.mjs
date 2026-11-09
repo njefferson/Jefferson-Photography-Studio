@@ -1517,6 +1517,23 @@ try {
         const needRows = [`Drawing surface, ${WHEN}: the upload`, `Drawing surface, ${WHEN}: the draw and the read-back`, `Drawing surface, ${WHEN}: what the context supports`, `Drawn frame, ${WHEN}: each channel's mean and top`, `Drawing surface, ${WHEN}: the read-back's bytes before the display-P3 conversion`, `Drawn frame, ${WHEN}: values at nine places after the conversion`, "A float texture upload and read-back on a context of its own"];
         const missingRows = needRows.filter((n) => !afterStep1.some((r) => r.k === n));
         if (!missingRows.length) ok(`${where} all ${needRows.length} diagnostic rows are present after step 1`); else fail(`${where} diagnostic rows missing after step 1: ${missingRows.join(" | ")}`);
+        // (b1a) THE SEPARATION MEASURE'S ROWS (records 084 and 106, plan of 9 November 2026): the measure read its own planted counts as known, the
+        // pixels were labelled once and the labels row names the four shares and whether a sky was found, the first picture carries the split and
+        // the distance (or says it is undefined and why), and the labelling has its two time rows. Only the words are read: no picture is judged.
+        await page.waitForFunction(() => [...document.querySelectorAll("#dPicResults .dbg-k")].some((k) => k.textContent === "Time: every row added together"), null, { timeout: 120000, polling: 200 }).catch(() => null);
+        const afterStep1Measure = await page.evaluate(READ_ROWS);
+        const measureNeed = [
+          ["The separation measure, planted first", /^read as known/, "reads its planted counts as known"],
+          ["The photograph's drawn size", /\d+ by \d+ pixels/, "names the drawn size"],
+          ["The photograph's pixels, labelled", /sky \d+ · neutral \d+ · foliage \d+ · other \d+ of \d+ thinned pixels .*(sky selection|the sky selection).* sky weight 0\.5/, "names the four labels, whether a sky was found and the figures"],
+          ["The first picture: the four labels and the separation measure", /sky: .*foliage: .*other: .*the control, neutral: .*whole frame: .*sky to foliage (Hellinger distance \d\.\d{4}|distance undefined \(.+\))/, "carries the split, the control and the distance or why it is undefined"],
+          ["Time: separation: the sky selection's build", /ms|s \(/, "has its time row"],
+          ["Time: separation: the label pass", /ms|s \(/, "has its time row"],
+        ];
+        for (const [k, re, what] of measureNeed) {
+          const r = afterStep1Measure.find((x) => x.k === k);
+          if (r && re.test(r.v)) ok(`${where} after step 1, the row "${k}" ${what}`); else fail(`${where} after step 1, the row "${k}" ${r ? `does not match: "${r.v.slice(0, 200)}"` : "is missing"}`);
+        }
         const uploadRow = afterStep1.find((r) => r.k === `Drawing surface, ${WHEN}: the upload`);
         if (uploadRow && /internal format (RGBA32F|RGBA16F|RGBA8)/.test(uploadRow.v) && /type (FLOAT|HALF_FLOAT|UNSIGNED_BYTE)/.test(uploadRow.v)) ok(`${where} the upload row names an internal format and a type`); else fail(`${where} the upload row names no format: "${uploadRow ? uploadRow.v.slice(0, 120) : "no row"}"`);
         const readRow = afterStep1.find((r) => r.k === `Drawing surface, ${WHEN}: the draw and the read-back`);
@@ -1589,6 +1606,16 @@ try {
         const sweepNeed = ["Drawing surface, after the sweep's first draw: the upload", "Drawing surface, after the sweep's first draw: the draw and the read-back", "Drawing surface, after the sweep's first draw: what the context supports", "Drawn frame, after the sweep's first draw: each channel's mean and top", "Drawing surface, after the sweep's first draw: the read-back's bytes before the display-P3 conversion", "Drawn frame, after the sweep's first draw: values at nine places after the conversion"];
         const sweepMissing = sweepNeed.filter((n) => !afterSweep.some((r) => r.k === n));
         if (!sweepMissing.length) ok(`${where} the diagnostic rows of the sweep's first draw are present`); else fail(`${where} diagnostic rows missing after the sweep: ${sweepMissing.join(" | ")}`);
+        // THE SWEEP'S SPLIT (records 084 and 106, plan of 9 November 2026): every drawn row carries the separation figures between its floor count
+        // and its saturation bands (sky, foliage, other, the neutral control, the whole frame, and the distance or why it is undefined), the
+        // settings row carries the measure's four figures, and the labelling has its time row. A row that is not split says so and fails here.
+        const drawnRows = afterSweep.filter((r) => /^Sweep \d+ of \d+/.test(r.k) && !/^not run/.test(r.v));
+        const splitRows = drawnRows.filter((r) => /percent under it · separation, sky: .*foliage: .*other: .*the control, neutral: .*whole frame: .*sky to foliage (Hellinger distance \d\.\d{4}, angle between the circular means .+|distance undefined \(.+\)) · saturation bands/.test(r.v));
+        if (drawnRows.length >= 1 && splitRows.length === drawnRows.length) ok(`${where} each of the ${drawnRows.length} drawn sweep rows carries the separation figures and the distance or why it is undefined`); else fail(`${where} ${drawnRows.length - splitRows.length} of ${drawnRows.length} drawn sweep rows lack the separation figures, the first: "${(drawnRows.find((r) => !splitRows.includes(r)) || { v: "" }).v.slice(0, 200)}"`);
+        const settingsRow = afterSweep.find((r) => r.k === "The sweep's own settings");
+        if (settingsRow && /sky weight 0\.5/.test(settingsRow.v) && /vegetation index at most -0\.05/.test(settingsRow.v) && /colourless under 1 percent/.test(settingsRow.v)) ok(`${where} the sweep's settings row carries the measure's four figures`); else fail(`${where} the sweep's settings row lacks the measure's figures: "${settingsRow ? settingsRow.v.slice(0, 200) : "no row"}"`);
+        const labelTime = afterSweep.find((r) => r.k === "Time: sweep: the labelled counts and the measure");
+        if (labelTime) ok(`${where} the labelled counts have their time row: "${labelTime.v.slice(0, 40)}"`); else fail(`${where} no time row for the sweep's labelled counts`);
         // The same rows under every other theme and shape, from that one press, with nothing pressed again.
         for (const t2 of THEMES) for (const s2 of SIZES) {
           if (t2 === theme && s2 === size) continue;

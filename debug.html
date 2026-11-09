@@ -101,7 +101,10 @@
           drawn pixels. Nothing is saved.
           The sweep button, once step 1 has drawn the photograph, draws it again at a grid of white balances over the camera's whole reach
           and under each of the editor's five channel remaps, and prints for each setting the hue counts, the saturation spread and the share
-          under the floor. It draws many times, so it takes a few minutes on a device; its progress line says where it has got to. It sets no
+          under the floor. It also splits those counts into sky (by the app's own sky selection), neutral (by saturation), foliage (by the
+          vegetation axis) and the rest, and prints, for each setting, how far apart the sky's and the foliage's hues sit, with the neutral part
+          as the control, and what the labelling cost. A raw photograph is drawn at the size the editor works at, a quarter of the pixels of its full
+          size. It draws many times, so it takes a few minutes on a device; its progress line says where it has got to. It sets no
           look, no band and no control, and it needs no spots.
         </p>
         <div class="dbg-actions">

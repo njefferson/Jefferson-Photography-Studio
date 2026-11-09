@@ -44,8 +44,10 @@ function versionCommitAt(hash: string): string {
 /** Version for one commit:
  *  - pre-VERSION history: 0.N (N = update sequence number = commit count);
  *  - the commit that declared the base: the base itself ("1.0");
- *  - commits after it: base.M (M = updates since the declaration) — automatic
- *    point releases: 1.0.1, 1.0.2, ... until VERSION is bumped again.
+ *  - commits after it: base.M (M = updates since the declaration that the
+ *    changelog shows) — automatic point releases: 1.0.1, 1.0.2, ... until
+ *    VERSION is bumped again. A commit the changelog does not show (internal
+ *    subject, or only internal paths) does not move the version.
  *
  *  RESOLVED AS OF THAT COMMIT, which it was not. The base and the commit that
  *  declared it were read once at HEAD and passed in for every entry, so for any
@@ -65,7 +67,7 @@ function versionFor(fullHash: string, base = versionBaseAt(fullHash)): string {
   if (base && baseCommit) {
     if (fullHash === baseCommit) return base;
     try {
-      const since = Number(git(`git rev-list --count ${baseCommit}..${fullHash}`));
+      const since = keptCommitsSince(baseCommit, fullHash);
       if (since > 0) return `${base}.${since}`;
       // Zero is not a failure and must not fall through: it means this commit
       // IS the declaration reached by another route (a rebase, a shallow
@@ -110,6 +112,26 @@ const INTERNAL_PATH = /^(tools|docs|palettes|presets|asset-factory|\.github|\.cl
  *  and is internal too. */
 function internalPaths(paths: string[]): boolean {
   return paths.every((p) => INTERNAL_PATH.test(p));
+}
+
+/** How many commits after `baseCommit`, up to and including `fullHash`, the
+ *  changelog keeps. Takes two full commit ids; reads the log between them with
+ *  each commit's file list; returns a count of at least 0, counting a commit only
+ *  when neither `INTERNAL_SUBJECT` nor `internalPaths` filters it out, through
+ *  the same two patterns `filteredLog` uses. A commit the changelog does not
+ *  show does not move the version, so the bar never reads a number the notes
+ *  have no entry for. Consumed by `versionFor`, whose increment digit is this
+ *  count. */
+function keptCommitsSince(baseCommit: string, fullHash: string): number {
+  const out = git(`git log --pretty=format:"%H|%s" --name-only ${baseCommit}..${fullHash}`);
+  const commits: { subject: string; paths: string[] }[] = [];
+  for (const line of out.split("\n")) {
+    if (!line) continue;
+    const m = line.match(/^([0-9a-f]{40})\|(.*)$/);
+    if (m) commits.push({ subject: m[2], paths: [] });
+    else commits[commits.length - 1]?.paths.push(line);
+  }
+  return commits.filter((c) => !INTERNAL_SUBJECT.test(c.subject) && !internalPaths(c.paths)).length;
 }
 
 /** The last `want` USER-FACING commits, each with its real version number:

@@ -168,6 +168,19 @@ operations goes into the build plan, not into this record. The test page's sweep
 (record 106) is the same count made on the reader's device, on their own
 photographs, at each balance and remap, and is this premise's instrument there.
 
+On 8 November 2026 the judgement the build plan was to make was made. The measure
+stands in IR-SCIENCE.md section 6 and in `docs/research/separation/measure.md`: the
+Hellinger distance between the sky's and the foliage's 72-bin hue histograms over
+the pixels at or above the saturation floor, carried with the arc between the two
+circular means, each population's share above the floor and the neutral population
+as the control, and undefined where a population is colourless. The test page's
+sweep (record 106) prints it for each setting on the device, with a time row for
+the labelling it needs. The rankings of the three routes and of the five mixer
+presets are the numbers `docs/research/separation/measure.md` holds, for the build plan of the panel to
+read; they set no chip, and the figures behind the labelling (the floor, the sky
+weight, the vegetation threshold and the colourless share) are the gather's and
+the page's own and are weighed in that plan before a chip rests on them.
+
 ## Options
 
 1. **One infrared colour panel: a row of swap chips, the colour bands under it,

@@ -1,56 +1,16 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=49d8d10ab3045943
-diffhash=cf43e724e3a3154c
-verdict=IN-SCOPE: every staged file is a copy of step 324, 325 or 326's research output or one of step 327's two named edits, and .githooks/pre-commit is left out of the commit.
-# IN-SCOPE: every staged file is a copy of step 324, 325 or 326's research output or one of step 327's two named edits, and .githooks/pre-commit is left out of the commit.
-# .third-person-allow: covered by the plan's Files, step 327 entry (".third-person-allow"), and step 327's Do stage 2 (one declaration line for the Shea digest by file).
-# NOTES.md: covered by step 327's Do stage 2 (the Found queue lines of the reports not yet queued, under the next free key, no owner named), and by the Files line listing NOTES.md.
-# docs/research/separation/field.md: covered by the Files line for step 327 (field.md, new) and step 327's Do stage 2 (the research folder copied whole).
-# docs/research/separation/shea.md: covered by the Files line for step 327 (shea.md, new) and step 327's Do stage 2.
-# docs/research/separation/levers.md: covered by the Files line for step 327 (levers.md, new) and step 327's Do stage 2.
-# docs/research/separation/gather-frames.json: not named by the Files line; covered by step 327's Do stage 2 (the research folder copied whole) and by step 326's Do stage 3 (the frame list the gather works from); sizes masked by the plan's hash rule.
-# docs/research/separation/gather/summary.md: covered by the Files line for step 327 (gather/ with one JSON per frame and its summary).
-# docs/research/separation/gather/NIR_1376.json: covered by the Files line for step 327 (gather/, one JSON per frame).
-# docs/research/separation/gather/NIR_1638.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1642.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1649.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1651.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1661.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1667.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1679.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1688.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1703.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1707.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1712.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1716.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1737.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1739.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1748.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1749.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1763.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1824.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1827.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1830.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1835.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1851.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_1873.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_2922.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_2927.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3430.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3460.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3461.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3462.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3463.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3466.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3467.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3471.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3472.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3473.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3474.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3698.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3700.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3703.json: covered by the same Files line.
-# docs/research/separation/gather/NIR_3716.json: covered by the same Files line.
-# .githooks/pre-commit: not in any step's Files; left unstaged and out of the commit by step 327's Do stage 1 and stage 3.
-# .plan-scope: the record this verdict mints, covered by the Files line for step 327 (".plan-scope").
+planhash=d2556d0c594517b8
+diffhash=e534437582052de8
+verdict=IN-SCOPE: every staged file is named by the plan's Files and Do of steps 332 to 336, and .githooks/pre-commit stays out.
+# IN-SCOPE: every staged file is named by the plan's Files and Do of steps 332 to 336, and .githooks/pre-commit stays out.
+# IR-SCIENCE.md: step 332 stage 3, one paragraph at the end of section 6 and a sources entry.
+# docs/research/separation/measure.md and measure.json: step 332 stage 2, new, the measure's output computed over the gather.
+# docs/decisions/084 and 106: step 332 stage 4, one paragraph and one sentence, naming no frame.
+# src/debug.ts: step 333 stages 2 to 4, the labels, the measure rows, the time rows and the working-size drawing through the prepared-source entry.
+# debug.html: step 333, the sweep paragraph in words, no control added.
+# tools/a11y-walk.mjs: step 333 stage 5, section 14 reads the new rows, code for the promotion.
+# vite.config.ts: step 334, the increment digit's count and its contract only.
+# NOTES.md and VERSION: step 335 the entry, the queue and 2.75, and step 336 stage 4 the verified bullet and the remaining queue lines.
+# docs/ARCHITECTURE.md: step 336 stage 2, the module map written by the architecture check.
+# .githooks/pre-commit: modified by no step, named in step 336 Facts as left out, and not staged.

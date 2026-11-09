@@ -47,7 +47,8 @@ import { readExifSubset } from "./exif";
 import { photoCamera as cameraOf, choicesFor, loadedFor, profileRule } from "./camprofile";
 import { readBalance, readShown, exactBalance, screenForWhite, TEMPERATURE_MIRED_FAR, TEMPERATURE_MIRED_NEAR } from "./balancestore";
 import { makeRowDenoiser } from "./raw/denoise";
-import { compileEdit, SAT_GUARD_LO, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, type EditParams, type MaskLayer } from "./pipeline";
+import { compileEdit, SAT_GUARD_LO, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, sampleBrush, type BrushMask, type EditParams, type MaskLayer } from "./pipeline";
+import { prepareSkySource, buildSkySelectionFrom } from "./skyfine";
 import { exportImage } from "./export";
 import { drawFrame, canDrawFrame, buildLinearSource, openDrawing, type Drawing, type DrawnFrame, type DrawProbe } from "./gpuexport";
 import { Renderer, VERT, FRAG, MASK_LOOP, dropMaskLoops } from "./gl";
@@ -2489,6 +2490,22 @@ function useOn(drawing: Drawing, tally: PressTally, file: ImportedFile, current:
   timeStage(tally, `the ${label}'s upload to the chip`, Math.max(0, whole - u.source));
 }
 
+/** Gives the Separation check's drawing surface the photograph at the editor's working size when it has one. Takes the surface, the tally,
+ *  the file, its decode and a name for the picture. Returns true when the surface now holds the decode's own working copy (the half-size
+ *  demosaic with red and blue already moved onto green), uploaded by `useLinear` as it stands, one drawn pixel for each of its pixels and
+ *  nothing demosaiced again; false when the photograph has no linear camera copy (a camera-rendered file, or a raw shown by its embedded
+ *  preview), in which case it is given as `useOn` gives it. What it must satisfy: the source is `{ width, height, linear, camMatrix }` of the
+ *  decode and is not copied or changed; the surface gets no lens curve, no rotation and no flip, which is what the press draws; the tally
+ *  counts one more use of the name and puts the stretch since the mark under "the <name>'s upload to the chip". Consumer: the Separation
+ *  check's first press, and through it the sweep. */
+function useAtWorkingSize(drawing: Drawing, tally: PressTally, file: ImportedFile, current: DecodedImage, label: string): boolean {
+  if (!current.isRaw || !current.linear || !current.camMatrix) { useOn(drawing, tally, file, current, label); return false; }
+  tally.uses[label] = (tally.uses[label] ?? 0) + 1;
+  drawing.useLinear({ width: current.width, height: current.height, linear: current.linear, camMatrix: current.camMatrix }, 0, 0);
+  timeStage(tally, `the ${label}'s upload to the chip`, lapMs(tally));
+  return true;
+}
+
 /** The names a software renderer goes by in the unmasked renderer string. */
 const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|\bwarp\b|basic render|software/i;
 
@@ -3168,6 +3185,208 @@ function thin(f: { data: Uint8ClampedArray; width: number; height: number }): { 
   return { data, w, h, k, fromW: f.width, fromH: f.height };
 }
 
+// --- THE SEPARATION MEASURE (records 084 and 106; IR-SCIENCE.md section 6) ----------------------------------------------------
+// The thinned pixels of a photograph are labelled once, by the rule the gather of 8 November used: sky where the app's own sky
+// selection reads at least the sky weight at the pixel's position; else neutral where the opening render's saturation is under the
+// floor; else foliage where the vegetation axis, the balanced red less the green over the green, taken on the linear copy at the
+// opening gains, is at most the foliage threshold; else other. Every setting's counts are then split by label, and the distance
+// between the sky's and the foliage's hue histograms is the Hellinger distance, with each population's circular mean hue and
+// resultant length, the angle between the two means, and the neutral population carried beside as the control. The four figures
+// (the floor, the sky weight, the foliage threshold and the colourless share) are the measure's own and are printed with every result.
+
+/** The share of the sky selection's weight at which a thinned pixel is sky, the foliage threshold of the vegetation axis, and the share of
+ *  a population's own pixels at or above the floor under which it is colourless. The measure's own figures; no source gives them. */
+const SEP_SKY_WEIGHT = 0.5;
+const SEP_FOLIAGE_INDEX_MAX = -0.05;
+const SEP_COLOURLESS_SHARE = 0.01;
+/** The four labels, in the order their codes run. */
+const SEP_LABELS = ["sky", "neutral", "foliage", "other"] as const;
+/** The four figures of the measure in words, printed beside the settings. */
+const SEP_FIGURES = `floor ${SAT_GUARD_LO} · sky weight ${SEP_SKY_WEIGHT} · vegetation index at most ${SEP_FOLIAGE_INDEX_MAX} · a population is colourless under ${SEP_COLOURLESS_SHARE * 100} percent of its pixels at or above the floor`;
+
+/** What the label pass gave: the label code of every thinned pixel (0 sky, 1 neutral, 2 foliage, 3 other), the count of each, whether the sky
+ *  selection found a sky and its note in words, and whether the vegetation axis could be read (a linear camera copy at the drawn size). */
+interface SepLabels { lab: Uint8Array; counts: number[]; skyFound: boolean; skyNote: string; hasAxis: boolean }
+/** One population's counts at one setting: its pixels, those at or above the floor and its 72-bin hue count over those. */
+interface SepPop { n: number; above: number; hist: number[] }
+/** One population's figures: its counts, its share of its own pixels at or above the floor (null for no pixels), and its circular mean hue in
+ *  degrees and resultant length from zero to one (null where undefined). */
+interface SepFigures { n: number; above: number; share: number | null; mean: number | null; length: number | null }
+/** The measure at one setting: the four populations' figures, the whole frame's circular mean and length, the Hellinger distance between the
+ *  sky and the foliage (null where undefined), the angle between their means from 0 to 180 (null where undefined) and, where the distance is
+ *  undefined, the reason in words. */
+interface SepMeasure { pops: SepFigures[]; wholeMean: number | null; wholeLength: number | null; distance: number | null; arc: number | null; why: string | null }
+
+/** Builds the app's own sky selection headless from a decode. Takes the decoded photograph. Returns the refined bitmap, or the coarse one when
+ *  there is no refinement, or null when no clear sky was found or the build threw, with a note in words. What it must satisfy: it is the
+ *  selection the editor reads (`buildSkySelectionFrom` over `prepareSkySource` at the file's own turn), built at gray-world balance and
+ *  nothing else; the page draws the photograph at turn zero, the sensor's own orientation, in which the selection's positions are given. */
+function buildSepSky(img: DecodedImage): { mask: BrushMask | null; note: string } {
+  try {
+    const sel = buildSkySelectionFrom(prepareSkySource(img), true);
+    const mask = sel.fine ?? sel.mask;
+    return mask ? { mask, note: "the app's own sky selection found a sky" } : { mask: null, note: "no sky selection: the app's own selection found no clear sky" };
+  } catch (e) {
+    return { mask: null, note: `no sky selection: it could not be built (${(e as Error).message})` };
+  }
+}
+
+/** Labels the thinned pixels of the first picture. Takes that picture (thinned from the frame at the opening balance with the swap on), the
+ *  sky bitmap or null, the decode, the opening gains and the sky note. Returns the labels by the rule above. What it must satisfy: the
+ *  position of a pixel is ((column times the stride plus one half) over the drawn width, (row times the stride plus one half) over the drawn
+ *  height), as the gather read it; a pixel is read on the linear copy only when the drawn frame is the copy's own size, else no pixel is
+ *  foliage and `hasAxis` is false; the four counts add to the pixels. Consumers: `labelledStats` and the rows that print the shares. */
+function labelPixels(first: ReturnType<typeof thin>, mask: BrushMask | null, img: DecodedImage, gains: [number, number, number], skyNote: string): SepLabels {
+  const { w, h, k, fromW, fromH } = first;
+  const n = w * h;
+  const lab = new Uint8Array(n);
+  const counts = [0, 0, 0, 0];
+  const lin = img.isRaw && img.linear && img.width === fromW && img.height === fromH ? img.linear : null;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x, o = 4 * i;
+      const r = first.data[o], g = first.data[o + 1], b = first.data[o + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      const s = mx > 0 ? (mx - mn) / mx : 0;
+      let code = 3;
+      if (mask && sampleBrush(mask, (x * k + 0.5) / fromW, (y * k + 0.5) / fromH) >= SEP_SKY_WEIGHT) code = 0;
+      else if (s < SAT_GUARD_LO) code = 1;
+      else if (lin) {
+        const q = (y * k * fromW + x * k) * 4;
+        const rr = lin[q] * gains[0], gg = lin[q + 1] * gains[1];
+        const idx = gg > 1e-4 ? (rr - gg) / gg : 0;
+        if (idx <= SEP_FOLIAGE_INDEX_MAX) code = 2;
+      }
+      lab[i] = code;
+      counts[code]++;
+    }
+  }
+  return { lab, counts, skyFound: !!mask, skyNote, hasAxis: !!lin };
+}
+
+/** Splits one hue pass by label. Takes the pass of a drawn, thinned frame and the labels. Returns the four populations' counts. What it must
+ *  satisfy: the pass and the labels are of the same thinned size (else it throws, because a label would then sit on the wrong pixel); the
+ *  four populations' pixels add to the pass's pixels and their hue counts add to the pass's own hue count, which is `huePass`'s. */
+function labelledStats(hp: SepHues, labels: SepLabels): SepPop[] {
+  if (hp.sat.length !== labels.lab.length) throw new Error("the labels and the counted frame are not the same size");
+  const pops: SepPop[] = SEP_LABELS.map(() => ({ n: 0, above: 0, hist: new Array(SEP_BINS).fill(0) }));
+  for (let i = 0; i < labels.lab.length; i++) {
+    const p = pops[labels.lab[i]];
+    p.n++;
+    if (hp.sat[i] >= SAT_GUARD_LO) { p.above++; p.hist[Math.min(SEP_BINS - 1, Math.floor(hp.hue[i] / SEP_BIN_DEG))]++; }
+  }
+  return pops;
+}
+
+/** The circular mean hue and resultant length of a 72-bin hue count. Takes the count. Returns the argument of the sum of the bins' unit
+ *  vectors, each at its bin's centre, in degrees from 0 up to 360, and the length of that sum over the count's total, from 0 to 1; both
+ *  null for an empty count, and the mean null with a length of 0 where the vectors cancel. What it must satisfy: a count in one bin gives
+ *  that bin's centre and a length of 1. */
+function circularOf(hist: ArrayLike<number>): { mean: number | null; length: number | null } {
+  let c = 0, s = 0, tot = 0;
+  for (let i = 0; i < hist.length; i++) {
+    const a = ((i + 0.5) * SEP_BIN_DEG * Math.PI) / 180;
+    c += hist[i] * Math.cos(a); s += hist[i] * Math.sin(a); tot += hist[i];
+  }
+  if (!tot) return { mean: null, length: null };
+  const length = Math.hypot(c, s) / tot;
+  if (length < 1e-9) return { mean: null, length: 0 };
+  let mean = (Math.atan2(s, c) * 180) / Math.PI;
+  if (mean < 0) mean += 360;
+  return { mean, length };
+}
+
+/** The Hellinger distance between two counts. Takes the two 72-bin hue counts. Returns the square root of one minus the sum over the bins of
+ *  the square root of the product of the two normalised shares, from 0 for the same distribution to 1 for two sharing no bin, or null when
+ *  either count is empty. What it must satisfy: bounded from 0 to 1, symmetric, and 0 for equal counts up to rounding. */
+function hellinger(a: ArrayLike<number>, b: ArrayLike<number>): number | null {
+  let ta = 0, tb = 0;
+  for (let i = 0; i < a.length; i++) { ta += a[i]; tb += b[i]; }
+  if (!ta || !tb) return null;
+  let bc = 0;
+  for (let i = 0; i < a.length; i++) bc += Math.sqrt((a[i] / ta) * (b[i] / tb));
+  return Math.sqrt(Math.max(0, 1 - bc));
+}
+
+/** The measure at one setting. Takes the four populations' counts in the order sky, neutral, foliage, other. Returns the figures of each, the
+ *  whole frame's circular mean, and the Hellinger distance between the sky and the foliage with the angle between their means. What it must
+ *  satisfy: a population with fewer than one in a hundred of its own pixels at or above the floor is colourless, and one with no pixels has
+ *  none to compare, so the distance and the angle are null there and `why` names the population, never a number in the distance's place. */
+function sepMeasure(pops: SepPop[]): SepMeasure {
+  const figs: SepFigures[] = pops.map((p) => {
+    const c = circularOf(p.hist);
+    return { n: p.n, above: p.above, share: p.n ? p.above / p.n : null, mean: c.mean, length: c.length };
+  });
+  const all = new Array(SEP_BINS).fill(0);
+  for (const p of pops) for (let i = 0; i < SEP_BINS; i++) all[i] += p.hist[i];
+  const wc = circularOf(all);
+  const none: string[] = [], pale: string[] = [];
+  for (const [code, name] of [[0, "sky"], [2, "foliage"]] as const) {
+    const f = figs[code];
+    if (!f.n) none.push(name);
+    else if ((f.share ?? 0) < SEP_COLOURLESS_SHARE) pale.push(name);
+  }
+  const parts: string[] = [];
+  if (none.length) parts.push(`no pixel is labelled ${none.join(" or ")}`);
+  if (pale.length) parts.push(`colourless: ${pale.join(" and ")}`);
+  if (parts.length) return { pops: figs, wholeMean: wc.mean, wholeLength: wc.length, distance: null, arc: null, why: parts.join("; ") };
+  const distance = hellinger(pops[0].hist, pops[2].hist);
+  const m0 = figs[0].mean, m2 = figs[2].mean;
+  let arc: number | null = null;
+  if (m0 !== null && m2 !== null) { const d = Math.abs(m0 - m2) % 360; arc = d > 180 ? 360 - d : d; }
+  return { pops: figs, wholeMean: wc.mean, wholeLength: wc.length, distance, arc, why: distance === null ? "a hue count was empty" : null };
+}
+
+/** One population's figures in words. Takes its name, its figures and the word for its part ("" or "the control, "). Returns one phrase:
+ *  its count, its share at or above the floor, its circular mean hue and its resultant length as a percent, or what is missing. */
+function popWords(name: string, f: SepFigures, part: string): string {
+  if (!f.n) return `${part}${name}: no pixels`;
+  const head = `${part}${name}: ${f.n} pixels, ${((f.share ?? 0) * 100).toFixed(1)} percent of them at or above the floor (${f.above})`;
+  return f.mean === null ? `${head}, no mean hue` : `${head}, circular mean hue ${f.mean.toFixed(1)} degrees, resultant length ${((f.length ?? 0) * 100).toFixed(1)} percent`;
+}
+
+/** The measure in words, for a row. Takes the measure. Returns the sky, the foliage and the other population, the neutral population as the
+ *  control, the whole frame's mean, and the distance from sky to foliage to four places with the angle between the means, or the word
+ *  undefined with the reason (the word colourless naming the population). */
+function sepWords(m: SepMeasure): string {
+  const dist = m.distance === null
+    ? `sky to foliage distance undefined (${m.why})`
+    : `sky to foliage Hellinger distance ${m.distance.toFixed(4)}, angle between the circular means ${m.arc === null ? "undefined" : `${m.arc.toFixed(1)} degrees`}`;
+  const whole = `whole frame: ${m.wholeMean === null ? "no mean hue" : `circular mean hue ${m.wholeMean.toFixed(1)} degrees, resultant length ${((m.wholeLength ?? 0) * 100).toFixed(1)} percent`}`;
+  return `${popWords("sky", m.pops[0], "")} · ${popWords("foliage", m.pops[2], "")} · ${popWords("other", m.pops[3], "")} · ${popWords("neutral", m.pops[1], "the control, ")} · ${whole} · ${dist}`;
+}
+
+/** Tries the measure on counts made here whose answers are known. Takes nothing. Returns whether every known figure was read (two equal
+ *  counts a distance of 0, two sharing no bin a distance of 1, two sharing half their mass the square root of one half, a count in one bin
+ *  its bin's centre and a length of 1, and a population under one in a hundred colourless with no number in the distance's place), with the
+ *  sentence for the row. What it must satisfy: it runs `sepMeasure`, the function the rows use, and false stops the check, because a
+ *  measure that does not read a known figure is not to be trusted on a photograph. */
+function plantedMeasure(): { ok: boolean; value: string; meaning: string } {
+  const pop = (n: number, bins: [number, number][]): SepPop => {
+    const hist: number[] = new Array(SEP_BINS).fill(0);
+    let above = 0;
+    for (const [b, c] of bins) { hist[b] += c; above += c; }
+    return { n, above, hist };
+  };
+  const empty = pop(0, []);
+  const same = sepMeasure([pop(1000, [[10, 100], [11, 50]]), empty, pop(1000, [[10, 100], [11, 50]]), empty]);
+  const apart = sepMeasure([pop(1000, [[10, 200]]), empty, pop(1000, [[40, 200]]), empty]);
+  const half = sepMeasure([pop(1000, [[10, 100], [11, 100]]), empty, pop(1000, [[11, 100], [12, 100]]), empty]);
+  const one = circularOf(pop(1000, [[10, 200]]).hist);
+  const pale = sepMeasure([pop(1000, [[10, 200]]), empty, pop(1000, [[40, 5]]), empty]);
+  const okSame = same.distance !== null && Math.abs(same.distance) < 1e-6;
+  const okApart = apart.distance !== null && Math.abs(apart.distance - 1) < 1e-9;
+  const okHalf = half.distance !== null && Math.abs(half.distance - Math.sqrt(0.5)) < 1e-9;
+  const okOne = one.mean !== null && one.length !== null && Math.abs(one.mean - 52.5) < 1e-6 && Math.abs(one.length - 1) < 1e-9;
+  const okPale = pale.distance === null && pale.arc === null && /colourless: foliage/.test(pale.why ?? "");
+  const ok = okSame && okApart && okHalf && okOne && okPale;
+  return {
+    ok,
+    value: `${ok ? "read as known" : "did not read as known"} · equal counts ${same.distance === null ? "undefined" : same.distance.toFixed(4)} (known 0.0000) · counts sharing no bin ${apart.distance === null ? "undefined" : apart.distance.toFixed(4)} (known 1.0000) · counts sharing half their mass ${half.distance === null ? "undefined" : half.distance.toFixed(4)} (known 0.7071) · one bin's mean ${one.mean === null ? "undefined" : one.mean.toFixed(1)} degrees, length ${one.length === null ? "undefined" : one.length.toFixed(2)} (known 52.5 and 1.00) · a population with 5 of 1000 pixels at or above the floor ${okPale ? "read colourless, with no distance" : "did not read colourless"}`,
+    meaning: "The separation measure, tried first on hue counts made here whose answers are known, by the same function the rows use: two equal counts must be 0 apart, two sharing no bin 1 apart, two sharing half their mass the square root of one half, a count in one bin must have that bin's centre for its mean and a length of 1, and a population with fewer than one pixel in a hundred at or above the floor must be called colourless and given no distance. A measure that cannot fail would pass anything.",
+  };
+}
+
 // --- WHAT THE DRAWING SURFACE GAVE BACK, AND A PLANTED COLOURED PICTURE THROUGH THE PHOTOGRAPH'S OWN PATH (record 106) -----------
 // An iPad with 8 cores under Safari 26.6.3 read every pixel of a photograph as colourless in all 82 sweep rows while the planted
 // colour (an 8-bit picture) read back exactly. The two differ in the source: the colour is uploaded as 8-bit bytes and the photograph
@@ -3397,6 +3616,8 @@ function sepFigure(parent: HTMLElement, words: string, data: Uint8ClampedArray, 
 interface SepState {
   drawing: Drawing; subject: Subject; wb0: [number, number, number]; exp0: number;
   t: ReturnType<typeof thin>; cv0: HTMLCanvasElement; spec: Parameters<typeof readBalance>[1] | null;
+  /** The label of every thinned pixel, made once from the first picture and the sky selection. */
+  labels: SepLabels;
   /** The picture on show: the opening balance's at first, then the balance of the last usable spot. */
   shown: ReturnType<typeof thin>;
   /** Which balance `shown` is drawn at, in words. */
@@ -3618,6 +3839,11 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       lap(tally, "the checks' own planted pairs, tried");
       row("The checks' own pairs, planted first", pairs.value, pairs.meaning);
       if (!pairs.ok) { row("The Separation check", "not run", "An instrument did not read its planted pair as known, so nothing it says is trustworthy."); progress("Stopped: a planted pair did not read as known.", true); return; }
+      books(tally);
+      const measurePlant = plantedMeasure();
+      lap(tally, "the separation measure's planted counts, tried");
+      row("The separation measure, planted first", measurePlant.value, measurePlant.meaning);
+      if (!measurePlant.ok) { row("The Separation check", "not run", "The separation measure did not read its planted counts as known, so nothing it says is trustworthy."); progress("Stopped: the separation measure did not read its planted counts as known.", true); return; }
       progress("Drawing a planted coloured picture through the photograph's path");
       await pause(tally);
       const picture = plantedPicture(drawing, tally);
@@ -3627,10 +3853,15 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       progress(`Sending the ${subject.label} to the chip`);
       await pause(tally);
       books(tally);
-      useOn(drawing, tally, subject.file, subject.img, subject.label);
+      const atWorkingSize = useAtWorkingSize(drawing, tally, subject.file, subject.img, subject.label);
       const base = freshBaseline(subject.img);
       const cam = cameraOf(subject.img.isRaw, subject.file.bytes);
       const spec = profileRule(choicesFor(cam, loadedFor(cam.keys)), undefined, undefined, undefined).choice?.spec ?? null;
+      progress("Building the app's own sky selection, once");
+      await pause(tally);
+      books(tally);
+      const skyBuilt = buildSepSky(subject.img);
+      lap(tally, "separation: the sky selection's build");
       progress("Drawing the photograph with the swap on at the balance the app opens at");
       await pause(tally);
       books(tally);
@@ -3638,11 +3869,24 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       lap(tally, "separation: the first draw and read-back, at the opening balance");
       const t = thin(frame);
       lap(tally, "separation: the first picture thinned");
+      const labels = labelPixels(t, skyBuilt.mask, subject.img, base.wb, skyBuilt.note);
+      lap(tally, "separation: the label pass");
+      const hp0 = huePass(t.data, t.w, t.h);
+      const measure0 = sepMeasure(labelledStats(hp0, labels));
+      lap(tally, "separation: the first picture's labelled counts and the measure");
+      row("The photograph's drawn size", `${frame.width} by ${frame.height} pixels · ${atWorkingSize ? "the editor's own working copy, one drawn pixel for each of its pixels, handed to the drawing surface as a prepared linear source and not demosaiced again" : "the photograph's own pixels as the picture code builds them; it has no linear camera copy"}`,
+        atWorkingSize
+          ? "The decode's working copy (the half-size demosaic the editor edits, with the red and blue moved onto green before it was binned) is uploaded as it stands, so the frame is drawn at that size and not at twice it, which is a quarter of the pixels. The three picture checks draw at the photograph's full size as before."
+          : "A camera-rendered file, or a raw shown by its embedded preview, has no linear camera copy, so the picture code builds its source as it does for the three picture checks.");
+      row("The photograph's pixels, labelled", `sky ${labels.counts[0]} · neutral ${labels.counts[1]} · foliage ${labels.counts[2]} · other ${labels.counts[3]} of ${t.w * t.h} thinned pixels (${labels.counts.map((c, i) => `${SEP_LABELS[i]} ${((c / Math.max(1, t.w * t.h)) * 100).toFixed(1)} percent`).join(", ")}) · ${labels.skyNote}${labels.hasAxis ? "" : " · no vegetation axis: this photograph has no linear camera copy at the drawn size, so no pixel is called foliage"} · ${SEP_FIGURES}`,
+        "Each thinned pixel is labelled once. Sky where the app's own sky selection (the refined bitmap, or the coarse one when there is none) reads at least the sky weight at its position. Otherwise neutral where its saturation at the opening render, the swap on at the balance the app opens at, is under the floor. Otherwise foliage where the vegetation axis, the white-balanced red less the green over the green, taken on the linear copy at the opening gains, is at most the threshold. Otherwise other. These are the rule of the gather of 8 November; the four figures are the measure's own and no source gives them.");
+      row("The first picture: the four labels and the separation measure", sepWords(measure0),
+        "The same split as each sweep row's, at the opening balance with the swap on: each population's count, its share at or above the floor, its circular mean hue and resultant length, the Hellinger distance between the sky's and the foliage's hue counts and the angle between their means, with the neutral population as the control. A population with fewer than one pixel in a hundred at or above the floor is colourless and the distance is then undefined.");
       probeRows("after the photograph's first draw", drawing.probe());
       channelRows("after the photograph's first draw", frame, t);
       lap(tally, "separation: the drawing surface's report and the frame's raw values");
       row("A float texture upload and read-back on a context of its own", floatUploadProbe(frame.width, frame.height),
-        "The browser's own float upload tested apart from the picture code: a texture of float data is uploaded as RGBA32F and as RGBA16F, first at 4 by 4 and then at the size of the drawn frame (the photograph's full size), attached to a framebuffer and read back at five places, and each place is compared with what was written. It runs on a throwaway context given back at once.");
+        "The browser's own float upload tested apart from the picture code: a texture of float data is uploaded as RGBA32F and as RGBA16F, first at 4 by 4 and then at the size of the drawn frame, attached to a framebuffer and read back at five places, and each place is compared with what was written. It runs on a throwaway context given back at once.");
       lap(tally, "separation: the float upload test");
       const host = $("dSepPics");
       const box = document.createElement("div");
@@ -3659,7 +3903,7 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
         sepBox(neutral ? "dSepNY" : "dSepFY").value = fy.toFixed(1);
         sepSpot(neutral ? "n" : "f");
       });
-      sep = { drawing, subject, wb0: base.wb, exp0: base.exposure, t, cv0, spec, shown: t, shownWhat: "the balance the editor opens at", baseWords, spots: { n: null, f: null } };
+      sep = { drawing, subject, wb0: base.wb, exp0: base.exposure, t, cv0, spec, labels, shown: t, shownWhat: "the balance the editor opens at", baseWords, spots: { n: null, f: null } };
       drawing = null;
       const rd = spec ? readBalance(base.wb, spec) : null;
       row("The opening balance, the first white point", `gains ${base.wb.map((g) => g.toFixed(4)).join(", ")} · exposure ${base.exposure.toFixed(4)} · ${rd ? `reads as ${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read: the file has no matrix to read it through"}`,
@@ -3817,13 +4061,14 @@ interface SweepSetting {
 
 /** Takes one drawn, thinned frame. Returns the 72 hue counts of the pixels at or above the floor, a ten-band saturation count of every pixel
  *  (band 0 holds 0 to 10 percent), how many pixels are above the floor and the share under it. What it must satisfy: the hue counts and the
- *  number above the floor are `huePass`'s own, so the sweep counts exactly as the check does. */
-function sweepCounts(t: ReturnType<typeof thin>): { hue: number[]; sat: number[]; above: number; under: number } {
+ *  number above the floor are `huePass`'s own, so the sweep counts exactly as the check does. It also gives back that pass (`hp`), whole,
+ *  so the labelled split reads the same hue and saturation of every pixel and the frame is not passed twice. */
+function sweepCounts(t: ReturnType<typeof thin>): { hue: number[]; sat: number[]; above: number; under: number; hp: SepHues } {
   const hp = huePass(t.data, t.w, t.h);
   const sat: number[] = new Array(10).fill(0);
   for (let i = 0; i < hp.sat.length; i++) sat[Math.min(9, Math.floor(hp.sat[i] * 10))]++;
   const n = t.w * t.h;
-  return { hue: hp.hist, sat, above: hp.above, under: n ? 1 - hp.above / n : 0 };
+  return { hue: hp.hist, sat, above: hp.above, under: n ? 1 - hp.above / n : 0, hp };
 }
 
 /** Takes a sweep setting. Returns the edit that draws it: the swap as the setting says, the mixer if it has one, the screen-side gains if it
@@ -3882,8 +4127,8 @@ sepSweepBtn.addEventListener("click", (e) => {
     const t0 = performance.now();
     let ran = 0, reused = 0, skipped = 0, notExpr = 0;
     let diagnosed = false;
-    row("The sweep's own settings", `${list.length} settings · grid ${SWEEP_STEPS} Temperatures by ${SWEEP_TINTS.length} Tints over ${TEMPERATURE_MIRED_FAR} to ${TEMPERATURE_MIRED_NEAR} mired and tints ${SWEEP_TINTS.join(", ")} · floor ${SAT_GUARD_LO} · ${SEP_BINS} bins of ${SEP_BIN_DEG} degrees`,
-      "Three routes at each grid point: the camera-side gains the check writes, with the swap on and off, and the screen-side gains the editor writes for Temperature and Tint while the swap is on, over the opening balance. Then the opening balance under each of the editor's five mixer presets. The sweep sets no look, no band and no control; the rule, the floor and the bins are the Separation check's own. A balance that cannot be made is a row that says so and is not drawn.");
+    row("The sweep's own settings", `${list.length} settings · grid ${SWEEP_STEPS} Temperatures by ${SWEEP_TINTS.length} Tints over ${TEMPERATURE_MIRED_FAR} to ${TEMPERATURE_MIRED_NEAR} mired and tints ${SWEEP_TINTS.join(", ")} · ${SEP_FIGURES} · ${SEP_BINS} bins of ${SEP_BIN_DEG} degrees`,
+      "Three routes at each grid point: the camera-side gains the check writes, with the swap on and off, and the screen-side gains the editor writes for Temperature and Tint while the swap is on, over the opening balance. Then the opening balance under each of the editor's five mixer presets. The sweep sets no look, no band and no control; the rule, the floor and the bins are the Separation check's own. A balance that cannot be made is a row that says so and is not drawn. Each counted setting is also split by the labels of the first picture (sky by the app's own sky selection, neutral by saturation at the opening render, foliage by the vegetation axis on the linear copy at the opening gains, the rest other), and the figures in this row are the measure's own.");
     for (let k = 0; k < list.length; k++) {
       const st = list[k];
       const N = k + 1;
@@ -3914,11 +4159,15 @@ sepSweepBtn.addEventListener("click", (e) => {
       }
       const c = sweepCounts(t);
       lap(tally, "sweep: the hue and saturation counts");
+      // THE SPLIT: the same counted pixels, by label, then the measure. A frame that is not the labels' size cannot be split, and says so.
+      let split: string;
+      try { split = sepWords(sepMeasure(labelledStats(c.hp, s.labels))); } catch (err) { split = `not split by label (${(err as Error).message})`; }
+      lap(tally, "sweep: the labelled counts and the measure");
       const rd = st.screen && s.spec ? readShown(st.wb, st.screen, s.spec) : st.reading;
       const px = t.w * t.h;
       row(name,
-        `${rd ? `${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read"} · gains ${st.wb.map((g) => g.toFixed(4)).join(", ")} · screen-side gains ${st.screen ? st.screen.map((g) => g.toFixed(4)).join(", ") : "none"} · exposure ${st.exposure.toFixed(4)} · swap ${st.swap ? "on" : "off"} · mixer ${st.mixer} · ${c.above} of ${px} pixels at or above the floor, ${(c.under * 100).toFixed(1)} percent under it · saturation bands of every pixel, 0 to 10 percent first: ${c.sat.join(" ")} · hue counts: ${c.hue.join(" ")}`,
-        `${st.reuse ? "The first picture, counted again, not drawn again. " : ""}The ${SEP_BINS} hue counts are the pixels at or above the floor in bins of ${SEP_BIN_DEG} degrees from 0; the ten saturation counts are every pixel; the share under the floor is the pixels below ${SAT_GUARD_LO} saturation. Counts only, of the drawn pixels, thinned to every ${t.k === 1 ? "pixel" : `${t.k}th pixel`}.`);
+        `${rd ? `${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read"} · gains ${st.wb.map((g) => g.toFixed(4)).join(", ")} · screen-side gains ${st.screen ? st.screen.map((g) => g.toFixed(4)).join(", ") : "none"} · exposure ${st.exposure.toFixed(4)} · swap ${st.swap ? "on" : "off"} · mixer ${st.mixer} · ${c.above} of ${px} pixels at or above the floor, ${(c.under * 100).toFixed(1)} percent under it · separation, ${split} · saturation bands of every pixel, 0 to 10 percent first: ${c.sat.join(" ")} · hue counts: ${c.hue.join(" ")}`,
+        `${st.reuse ? "The first picture, counted again, not drawn again. " : ""}The ${SEP_BINS} hue counts are the pixels at or above the floor in bins of ${SEP_BIN_DEG} degrees from 0; the ten saturation counts are every pixel; the share under the floor is the pixels below ${SAT_GUARD_LO} saturation. Counts only, of the drawn pixels, thinned to every ${t.k === 1 ? "pixel" : `${t.k}th pixel`}. The separation figures split the same counted pixels into sky, neutral, foliage and other as the first picture labelled them, give each population's circular mean hue and resultant length, and for the sky and the foliage the Hellinger distance between their hue counts (0 for the same counts, 1 for counts sharing no bin) and the angle between their means; the neutral population is the control.`);
       ran++;
     }
     row("The sweep", `${ran} of ${list.length} settings counted (${reused} from the first picture, ${notExpr} not expressible, ${skipped} not run for another reason) in ${dur(performance.now() - t0)}`, "How many settings the sweep counted and how long the whole sweep took, from the first setting to the last row.");

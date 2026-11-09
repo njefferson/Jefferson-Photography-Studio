@@ -4087,6 +4087,50 @@ widened until the best value went interior.
 **Full-frame renders, every round.** A crop hid an orange sky once. Decode
 changes additionally sweep all 44 practice raws.
 
+**TWO POPULATIONS IN ONE RENDERING ARE COMPARED BY THEIR HUE HISTOGRAMS, WITH THE
+CONTROL CARRIED — judged 8 November 2026.** The measure of how far apart the sky
+and the foliage of one rendering sit is the Hellinger distance between their two
+72-bin hue histograms, each taken over its pixels at or above the saturation floor
+and normalised to its own total: the square root of one minus the sum over the
+bins of the square root of the product of the two shares, from 0 for the same
+histogram to 1 for histograms sharing no bin. Beside it go each population's
+circular mean hue from the bin centres and its resultant length, the smaller arc
+between the two means, and each population's share above the floor; the neutral
+population (saturation under the floor at the opening render) is carried as the
+control, with the whole frame's mean beside it. A population with fewer than one
+in a hundred of its pixels above the floor is colourless at that setting and the
+distance is written as undefined there, never as a number. It was chosen for
+being bounded, a metric, free of any assumed shape, computable from counts the
+page already makes, and for carrying the control; the Bhattacharyya distance is
+unbounded and not a metric, the Jeffries-Matusita and Mahalanobis distances
+assume Gaussian classes and this camera's three channels are correlated above
+0.97, and the circular earth mover's distance of the agreement walk above answers
+a different question, how far one rendering sits from another of the same
+photograph. The figures 0.13, 0.5, minus 0.05 and one in a hundred are the
+gather's and the page's own and no source gives them. Computed over the 41 frames
+and 82 settings of the gather of 8 November (`docs/research/separation/measure.md`
+and `measure.json`, which rank every setting and name the frames): at the opening
+balance the median distance is 0.7517 with the swap on, read over the 22 frames
+where sky and foliage are both coloured, and 0.9382 with it off over 26, the sky
+being colourless or absent in 19 frames with the swap on; the pooled medians over
+the 25-setting grids are 0.2924 for camera-side gains with the swap on, 0.2224 with
+it off and 0.3390 for screen-side gains, and 0.7784 over the five mixer presets;
+and 37 of the 75 grid settings, those in the far-mired columns and the highest tint
+at 20 mired, put every coloured label inside one 5-degree bin in at least half of
+the frames, which is one cast and not two colours. The setting ranked first by its
+median distance, 0.9841, also colours the neutral control at a median 88.3 percent
+above the floor, so a high distance is read with the control and the arc. The
+limits are written in `measure.md`: the distance reads overlap of the histograms
+and not angular separation, since two narrow populations in different 5-degree
+bins read near 1 however near their hues are, so the arc is never left out; the
+labelling rule leaves a foliage that sits under the floor at the opening render
+inside the neutral label; the sky selection found no sky on one frame; sixteen
+frames the records name are not in the index; and the gather measures in the
+display space and in a chroma plane read through sRGB, which disagree at some
+settings, while the device's sweep measures in the space its drawn frame ends in.
+No setting is singled out in words: the ranking is the numbers, and the panel of
+record 084 reads them.
+
 ---
 
 ## 7. What the files in this repository actually are
@@ -5228,6 +5272,16 @@ and selective-desaturation practice
 (markus-hagner-photography.com); and Lomography's Aerochrome summary for the
 film's own colour mapping
 (lomography.com/magazine/167094-kodak-aerochrome-the-colored-infrared-film).
+
+**Section 6** (the measure of two populations in one rendering, 8 November 2026)
+reads: Wikipedia, "Hellinger distance"
+(en.wikipedia.org/wiki/Hellinger_distance), for the bounded metric over binned
+distributions and its relation to the Bhattacharyya coefficient; and Wikipedia,
+"Directional statistics" (en.wikipedia.org/wiki/Directional_statistics) with
+"Circular mean" (en.wikipedia.org/wiki/Circular_mean), for the mean angle as the
+argument of the mean unit vector and the resultant length as concentration. Each
+was fetched whole and read on 8 November 2026; `docs/research/separation/field.md`
+records what each says.
 
 ### 9l-ii. THE STAGE CORRUPTED EVERY TIFF EXPORT, AND THE FIRST DIAGNOSIS WAS WRONG
 
