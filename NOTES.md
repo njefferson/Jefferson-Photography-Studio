@@ -2476,6 +2476,12 @@ Q-JPS-262: the open photograph's keying runs a probe compile on each change of b
 Q-JPS-263: the shader declares and sets `u_panelStr` and its GLSL reads no use of it, because the uploads are already scaled at the Strength, so the driver may drop it (step 358, 9 November 2026).
 Q-JPS-264: section 15 of the accessibility walk asserts the Strength range at 44 wide and 28 tall, the track's own measure as section 12 does, and reads the mixer from the nine inputs under the mixer grid and the swap from the swap button's pressed state, so a change to either needs the same change there (step 362, 9 November 2026).
 Q-JPS-265: the stamp check reads `pr.x` in `stampOf`, and the Strength is there as `panelStrengthOf(pr)`, which that pattern does not see; the check passes because it asks only for fields `applyLook` writes (step 359, 9 November 2026).
+Q-JPS-266: `measureFrame` in `src/tile.ts` now takes both box weights from `panelBoxWeights`, so its cool and warm saturation populations shift where the Foliage box is keyed and the two weights summed to more than one, and the lift solves against them; the render and the measurement agree (step 368, 9 November 2026).
+Q-JPS-267: `panelBoxWeights` is called with a shared two-slot array held in `compileEdit`'s closure; the closure is not re-entered, but a caller that nested the compiled function inside itself would share the array (step 368, 9 November 2026).
+Q-JPS-268: the shader's band stage cannot be planted in the container; it is written beside the CPU rule branch for branch and the agreement walk at the promotion compares the two renders (step 368, 9 November 2026).
+Q-JPS-269: the plant of the render at the two midpoints between the centres reads 1.005 against a known 1.005 within 0.01, because the code multiplies the two boxes' value gains; a downstream curve could move it further on a real photograph (step 368, 9 November 2026).
+Q-JPS-270: the PC's report of 9 November shows the keying taking a Sky centre from the photograph under the Copper mixer and at one far balance, where the page's own check on the drawn frame calls the sky colourless, which is the difference Q-JPS-239 names (step 369, 9 November 2026).
+Q-JPS-271: a doubt, not measured: under the swap a Sky box keyed by name sits at 30 degrees beside a Foliage box keyed near the trees' own hue, so the two bands overlap and each box may take half of the trees (step 369, 9 November 2026).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**

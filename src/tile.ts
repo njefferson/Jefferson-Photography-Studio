@@ -28,7 +28,7 @@
 
 import { linearAt, grayWorldWB, autoExposure, autoRecover, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS, type DecodedImage } from "./decode";
 import {
-  compileEdit, cloneParams, sampleBrush, skyBandCentre, panelCentreOf, panelMix3Of, bandWeight, rgb2hsv, TONE_DEFAULT, CROP_DEFAULT, MIX3_DEFAULT,
+  compileEdit, cloneParams, sampleBrush, skyBandCentre, panelCentreOf, panelMix3Of, panelBoxWeights, rgb2hsv, TONE_DEFAULT, CROP_DEFAULT, MIX3_DEFAULT,
   type EditParams, type BrushMask, type LensCurve, type SourceFlat,
 } from "./pipeline";
 import { buildSkyMap } from "./skymap";
@@ -382,6 +382,11 @@ export function measureFrame(p: EditParams, img: DecodedImage, divisions: number
   const edit = compileEdit(p, img.camMatrix, img.width / Math.max(1, img.height), undefined, lens, null, skyMask, srcFlatOf(img));
   const px = new Float32Array(3);
   const lums: number[] = [];
+  // The two boxes' centres as the render reads them (panelBoxWeights is the one rule); read once, not per sample.
+  const keyedSky = panelCentreOf(p.panelCentres?.sky);
+  const keyedFol = panelCentreOf(p.panelCentres?.foliage);
+  const nameSky = skyBandCentre(p.swapRB, panelMix3Of(p));
+  const boxW = [0, 0];
   let warmW = 0, warmS = 0, coolW = 0, coolS = 0, skyW = 0, skyS = 0;
   for (let y = 0; y < img.height; y += step) {
     for (let x = 0; x < img.width; x += step) {
@@ -395,8 +400,8 @@ export function measureFrame(p: EditParams, img: DecodedImage, divisions: number
       const [h, sat] = rgb2hsv(cr, cg, cb);
       // The Sky band's centre as the render reads it: the panel's keyed centre where the edit carries one (record 084), today's rule otherwise.
       // The by-name centre is read from the mixer at the Strength, as compileEdit reads it.
-      const keyedSky = panelCentreOf(p.panelCentres?.sky);
-      const wS = bandWeight(h, keyedSky >= 0 ? keyedSky : skyBandCentre(p.swapRB, panelMix3Of(p)), 55, 105);
+      panelBoxWeights(h, keyedSky, keyedFol, nameSky, boxW);
+      const wS = boxW[0];
       coolW += wS; coolS += sat * wS;
       warmW += 1 - wS; warmS += sat * (1 - wS);
       if (skyMask && sampleBrush(skyMask, u, v) > 0.5) { skyW++; skyS += sat; }

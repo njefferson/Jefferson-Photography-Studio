@@ -1,25 +1,15 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=4a77c8dabb024edf
-diffhash=307fa81c75fd4e31
-verdict=IN-SCOPE: every staged file is named by the plan's Files line for steps 367, 359, 360, 362 and 364 or stands from step 358, and each change is record 084's panel as the Design states it
-# IN-SCOPE: every staged file is named by the plan's Files line for steps 367, 359, 360, 362 and 364 or stands from step 358, and each change is record 084's panel as the Design states it
-# .scope-allow: Files, standing from step 358; adds one line each for the strength and centres fields as the scope check asks.
-# NOTES.md: Files, steps 362 and 364; the 084 roadmap closing sentence and the Found queue lines Q-JPS-256 to Q-JPS-265.
-# VERSION: Files, step 364; moves 2.75 to 2.76 for the capability release.
-# docs/ARCHITECTURE.md: Files, step 364; the generated module map gains the new module.
-# docs/decisions/084-hsl-and-channel-swaps-for-infrared-looks.md: Files, step 362; one Built already paragraph, no frame named.
-# ir.html: Files, step 359; the chips, the keyed words in the box titles, the Strength, Save as a look, the panel's live region.
-# src/debug.ts: Files, step 360; the Separation check's keying row, the sweep rows' pair and two time rows.
-# src/gl.ts: Files, step 367 and standing from 358; the keyed centre uniforms, the strength scaled uploads and the shader's band branches.
-# src/look.ts: Files, standing from step 358; the saved look carries the Strength.
-# src/main.ts: Files, step 359; chip handlers, Strength words, Save as a look, the keying of the open photograph, batch and export, stored edit free of the centres.
-# src/panelkey.ts: Files, step 367; the keying module, new.
-# src/pipeline.ts: Files, step 367 and standing from 358; the two fields, the probe, the strength and the band branches.
-# src/previewcache.ts: Files, standing from step 358; PREVIEW_PIPELINE raised to 103.
-# src/style.css: Files, step 359; the panel's styles from the tokens.
-# src/tile.ts: Files, step 367; keying inside the tile's own render and the by-name centre at strength.
-# tools/.preview-pipeline: Files, step 364; the preview-version check's own record run.
-# tools/a11y-walk.mjs: Files, step 362; section 15 and the header lines, not run.
-# .githooks/commit-msg: left out by this step's Facts, modified by no step, not staged.
-# .githooks/pre-commit: left out by this step's Facts, modified by no step, not staged.
+planhash=e2ca0638e62c8433
+diffhash=f86ff9b9ee7874fb
+verdict=IN-SCOPE: every staged file and change is covered by a line of the plan (steps 368 and 369), and the two hooks stay out per the Facts of step 369.
+# IN-SCOPE: every staged file and change is covered by a line of the plan (steps 368 and 369), and the two hooks stay out per the Facts of step 369.
+# src/pipeline.ts: step 368 stage 3 and Design One function; adds the exported panelBoxWeights with its contract and makes the band stage call it, no new figure, by-name cases unchanged.
+# src/gl.ts: step 368 stage 4; the shader band stage repeats the same rule branch for branch, no backtick written in it.
+# src/tile.ts: step 368 stage 5; measureFrame calls panelBoxWeights where it repeated the weight rule.
+# src/previewcache.ts: step 368 stage 5 and Design gates; PREVIEW_PIPELINE raised from 103 to 104.
+# tools/.preview-pipeline: step 369 stage 4; the preview-version check's own record run wrote version 104 and its hash.
+# docs/ARCHITECTURE.md: step 369 stage 4; the module map write changed only the line counts of the three edited sources.
+# docs/decisions/084-hsl-and-channel-swaps-for-infrared-looks.md: step 369 stage 2 and goal 1; one dated paragraph after the paragraph of 9 November, naming no frame and citing no other decision.
+# NOTES.md: step 369 stage 3; six Found queue lines Q-JPS-266 to Q-JPS-271 at the end of the queue, no roadmap bullet touched.
+# .githooks/commit-msg and .githooks/pre-commit: not staged; step 369 Facts name them as modified by no step and left out of the commit.

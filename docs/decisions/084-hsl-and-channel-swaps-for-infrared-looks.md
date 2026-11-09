@@ -230,6 +230,19 @@ container for it. Record 003 moves the drawer's controls as a whole when it
 comes. The picture is judged by the owner on the device pass, and this record
 says nothing about how it looks.
 
+On 9 November 2026 the device pass of 2.76 found an edge of unmoved pixels
+between the moved trees and the moved sky. The cause was the two keyed bands:
+a hue farther than the plateau from both centres got less than a whole move,
+and the mixed pixels along a tree line fall there. Where both boxes are keyed
+the two now share the whole hue circle, split halfway between the two centres
+on each side with a blend as wide as a band's edge, so every pixel is moved by
+one box or by a blend of the two, and the sentence above about a pixel between
+the bands no longer holds there. A box keyed by name acts as before. Where the
+centres sit closer together than the blend, each box moves both populations in
+part, as the two bands did. The boxes still act by hue and never by place, as
+this record's rejection of its option 4 asks. The picture is judged by the
+owner on the device, and this paragraph says nothing about how it looks.
+
 ## Options
 
 1. **One infrared colour panel: a row of swap chips, the colour bands under it,

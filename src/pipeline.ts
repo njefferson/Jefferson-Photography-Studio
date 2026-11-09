@@ -2284,6 +2284,39 @@ export function bandWeight(hue: number, center: number, plateau: number, edge: n
   return 1 - t * t * (3 - 2 * t);
 }
 
+/** THE SKY AND FOLIAGE BOXES' WEIGHTS FOR ONE HUE (record 084): the one place the rule is written; the band stage calls it and gl.ts repeats it branch for branch.
+ *  Takes `hue`, the pixel's hue in degrees; `keySky` and `keyFol`, the two boxes' carried centres in degrees, each -1 where that box keys by name (`panelCentreOf` gives that form); `nameCentre`, the by-name Sky centre (`skyBandCentre`); and `out`, a two-slot array the result is written into so a per-pixel call allocates nothing.
+ *  Does: with both centres carried, the Sky weight is the Foliage distance less the Sky distance, plus the blend's width, over twice the blend's width, held between 0 and 1 and passed through the curve `bandWeight` follows between its plateau and its edge, and the Foliage weight is one minus it; the blend's width is the band's edge less its plateau (105 less 55), written from those two. With only the Foliage centre carried, the Sky weight is a band around the by-name centre and the Foliage weight a band around its centre, both scaled to sum to one where they sum to more; with only the Sky centre carried or neither, the Sky weight is a band around its centre (or the by-name one) and the Foliage weight is one minus it.
+ *  Returns `out`, `out[0]` the Sky weight and `out[1]` the Foliage weight.
+ *  What the result must satisfy: both weights lie in 0..1; with both centres carried the two sum to exactly 1, so every hue is moved by the boxes in whole, and a centre belongs whole to its own box where the centres are a blend's width or more apart; with a box keyed by name, or neither, the result equals what the band stage computed before the boxes shared the circle. Consumers: the band stage of `compileEdit`, `measureFrame` in tile.ts, and the shader's band stage in gl.ts, which must stay the same rule. */
+export function panelBoxWeights(hue: number, keySky: number, keyFol: number, nameCentre: number, out: number[]): number[] {
+  let wS: number;
+  let wF: number;
+  if (keySky >= 0 && keyFol >= 0) {
+    let dS = Math.abs(hue - keySky);
+    if (dS > 180) dS = 360 - dS;
+    let dF = Math.abs(hue - keyFol);
+    if (dF > 180) dF = 360 - dF;
+    const width = 105 - 55;
+    let t = (dF - dS + width) / (2 * width);
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    wS = t * t * (3 - 2 * t);
+    wF = 1 - wS;
+  } else {
+    wS = bandWeight(hue, keySky >= 0 ? keySky : nameCentre, 55, 105);
+    if (keyFol >= 0) {
+      wF = bandWeight(hue, keyFol, 55, 105);
+      const tot = wS + wF;
+      if (tot > 1) { wS /= tot; wF /= tot; }
+    } else {
+      wF = 1 - wS;
+    }
+  }
+  out[0] = wS;
+  out[1] = wF;
+  return out;
+}
+
 /** The colour panel's keyed band centres (record 084): the Sky and Foliage
  *  boxes' centres in degrees on the hue wheel the bands read, or null for a
  *  box that keys by name. `EditParams.panelCentres` carries it. */
@@ -2977,6 +3010,7 @@ export function compileEdit(
   const keySky = panelCentreOf(p.panelCentres?.sky);
   const keyFol = panelCentreOf(p.panelCentres?.foliage);
   const nameCentre = skyBandCentre(swap, mix3Now);
+  const boxW = [0, 0]; // the two boxes' weights for the pixel in hand (panelBoxWeights)
   // A MASK'S OWN FOLIAGE (042, stage 2) switches the band on too, and is read
   // per pixel below; the groups are taken after maskGroupsActive exists.
   const folGroupsOf = (gs: readonly (readonly MaskLayer[])[]) => gs.filter((g) => groupFolOffset(g) !== null);
@@ -3301,24 +3335,14 @@ export function compileEdit(
       // stays glued to the same subject in both swap states — unless a 3x3
       // mixer has rotated the wheel again, when the bands read it as
       // displayed (skyBandCentre has the measurement).
-      // The Sky weight is always a band (plateau 55, edge 105), around its keyed
-      // centre where it has one and around the by-name centre (read from the
-      // mixer at the Strength) where it has none. The Foliage weight is a band of
-      // the same shape around its keyed centre where it has one, and one minus
-      // the Sky weight where it has none, so a box that keys by name acts as it
-      // does today whatever the other does. Where the Foliage box is keyed and
-      // the two weights sum to more than one they are scaled to sum to one;
-      // what neither takes stays with the eight-band mixer. With neither keyed
-      // this is today's rule exactly. gl.ts has the same branches.
-      let wS = bandWeight(h, keySky >= 0 ? keySky : nameCentre, 55, 105);
-      let wF: number;
-      if (keyFol >= 0) {
-        wF = bandWeight(h, keyFol, 55, 105);
-        const tot = wS + wF;
-        if (tot > 1) { wS /= tot; wF /= tot; }
-      } else {
-        wF = 1 - wS;
-      }
+      // The two weights come from panelBoxWeights, the one place the rule is
+      // written (gl.ts repeats it branch for branch): where both boxes are keyed
+      // they share the whole hue circle between their two centres; a box that
+      // keys by name acts as it does today whatever the other does; with neither
+      // keyed this is today's rule exactly.
+      panelBoxWeights(h, keySky, keyFol, nameCentre, boxW);
+      const wS = boxW[0];
+      const wF = boxW[1];
       h += sk[0] * wS + f[0] * wF;
       // A boost acts only where there is colour to boost (bandGain's guard);
       // the guard reads THIS pixel's saturation before either band touches it.

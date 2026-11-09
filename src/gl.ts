@@ -1260,18 +1260,32 @@ void main() {
     float h = hsv.x * 360.0;
     // pipeline.ts skyBandCentre: the swapped centre only while no mixer is on
     // (u_mix3On is the mixer at the panel's Strength). The branches are
-    // compileEdit's: the Sky weight is always a band, around its keyed centre or
-    // the by-name one; the Foliage weight is a band around its keyed centre,
-    // the two scaled to sum to one where they sum to more, or one minus the Sky
-    // weight where it keys by name (today's rule).
-    float wS = bandWeight(h, u_panelSkyC >= 0.0 ? u_panelSkyC : ((u_swap && !u_mix3On) ? 30.0 : 210.0), 55.0, 105.0);
+    // pipeline.ts panelBoxWeights, branch for branch: with both centres carried
+    // the boxes share the whole hue circle (the blend is as wide as a band's
+    // edge, the edge less the plateau); otherwise the Sky weight is a band
+    // around its keyed centre or the by-name one, and the Foliage weight is a
+    // band around its keyed centre, the two scaled to sum to one where they sum
+    // to more, or one minus the Sky weight where it keys by name (today's rule).
+    float wS;
     float wF;
-    if (u_panelFolC >= 0.0) {
-      wF = bandWeight(h, u_panelFolC, 55.0, 105.0);
-      float tot = wS + wF;
-      if (tot > 1.0) { wS /= tot; wF /= tot; }
-    } else {
+    if (u_panelSkyC >= 0.0 && u_panelFolC >= 0.0) {
+      float dS = abs(h - u_panelSkyC);
+      dS = min(dS, 360.0 - dS);
+      float dF = abs(h - u_panelFolC);
+      dF = min(dF, 360.0 - dF);
+      float bw = 105.0 - 55.0;
+      float t = clamp((dF - dS + bw) / (2.0 * bw), 0.0, 1.0);
+      wS = t * t * (3.0 - 2.0 * t);
       wF = 1.0 - wS;
+    } else {
+      wS = bandWeight(h, u_panelSkyC >= 0.0 ? u_panelSkyC : ((u_swap && !u_mix3On) ? 30.0 : 210.0), 55.0, 105.0);
+      if (u_panelFolC >= 0.0) {
+        wF = bandWeight(h, u_panelFolC, 55.0, 105.0);
+        float tot = wS + wF;
+        if (tot > 1.0) { wS /= tot; wF /= tot; }
+      } else {
+        wF = 1.0 - wS;
+      }
     }
     h += sky.x * wS + fol.x * wF;
     float s = min(1.0, hsv.y * bandGain(sky.y, wS, hsv.y) * bandGain(fol.y, wF, hsv.y));
