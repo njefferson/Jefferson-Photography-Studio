@@ -53,6 +53,8 @@ import { takePanelSample, keyPanelCentres, type PanelKeyed, type PanelSample } f
 import { exportImage } from "./export";
 import { drawFrame, canDrawFrame, buildLinearSource, openDrawing, type Drawing, type DrawnFrame, type DrawProbe } from "./gpuexport";
 import { Renderer, VERT, FRAG, MASK_LOOP, dropMaskLoops } from "./gl";
+import { PLACE_NAMES, PLACE_TARGETS, placesPicture, placeLabels, type PlaceTarget } from "./placesdata";
+import { PLACE_CUES, placeCueValues, placeReport } from "./placecues";
 
 declare const __APP_VERSION__: string;
 
@@ -3799,6 +3801,173 @@ function sepTimeRows(tally: PressTally, whole: number): void {
   row("Time: every row added together", `${dur(sum)} against the whole press ${dur(whole)}, ${dur(Math.max(0, whole - sum))} in no row`, "Every stretch of the press is under a name above, and this line adds them. The difference from the whole press is what lay in no row.");
 }
 
+// --- THE PLACES AND THE CUES (record 050; plan of 9 November 2026) ----------------------------------------------------------------
+// The first press's counted pixels are labelled by place where the photograph is one of the three the places file holds, else by the
+// check's own four labels; eight cues are counted for each; the cue module prints what each cue, alone and joined as the app joins
+// masks, can and cannot tell apart, fits selections, reads the selections kept from other photographs and gives what each takes.
+// Nothing here chooses: the figures are printed with their definitions and the pictures show what a selection takes.
+
+/** The key of the browser's local storage under which each photograph's fitted selections are kept, as text, by the photograph's name. */
+const PLACE_KEPT_KEY = "ips-debug-separation-selections";
+
+/** Reads the kept selections. Takes nothing. Returns whether storage could be read and every photograph's kept selections by name. What it
+ *  must satisfy: every access to storage is inside a try; where storage is refused or holds text that is not an object it gives an empty
+ *  set, and `ok` says only whether storage answered. */
+function keptRead(): { ok: boolean; all: Record<string, unknown> } {
+  try {
+    const raw = window.localStorage.getItem(PLACE_KEPT_KEY);
+    const o: unknown = raw ? JSON.parse(raw) : {};
+    return { ok: true, all: o && typeof o === "object" && !Array.isArray(o) ? (o as Record<string, unknown>) : {} };
+  } catch {
+    return { ok: false, all: {} };
+  }
+}
+
+/** Keeps one photograph's selections. Takes the set read by `keptRead`, the photograph's name and its fitted selections. Returns whether the
+ *  write was accepted. What it must satisfy: the write is inside a try, and the page works whether or not it is accepted. */
+function keptWrite(all: Record<string, unknown>, name: string, fits: unknown): boolean {
+  try {
+    window.localStorage.setItem(PLACE_KEPT_KEY, JSON.stringify({ ...all, [name]: fits }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Draws what one selection takes. Takes the host, the heading and the words, the thinned picture, and one byte for each counted pixel that
+ *  is 1 where the selection takes it. Returns how many pixels it takes. What it must satisfy: the picture is the thinned drawn picture in
+ *  grey with the taken pixels at full strength and the rest at a third of it, and a one-pixel outline in the page's own text colour on every
+ *  taken pixel that has an untaken neighbour, so what is taken reads without colour by strength and by outline; it sits under a heading in
+ *  words and is an image with the same words as its name (`sepFigure`). */
+function placePicture(host: HTMLElement, title: string, t: ReturnType<typeof thin>, taken: ArrayLike<number>): number {
+  const { w, h } = t;
+  const m = /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/.exec(getComputedStyle(document.body).color);
+  const ink = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+  const out = new Uint8ClampedArray(w * h * 4);
+  let count = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x, o = 4 * i;
+      const grey = Math.round(0.299 * t.data[o] + 0.587 * t.data[o + 1] + 0.114 * t.data[o + 2]);
+      const on = taken[i] === 1;
+      if (on) count++;
+      const edge = on && ((x > 0 && taken[i - 1] !== 1) || (x < w - 1 && taken[i + 1] !== 1) || (y > 0 && taken[i - w] !== 1) || (y < h - 1 && taken[i + w] !== 1));
+      const v = on ? grey : Math.round(grey / 3);
+      out[o] = edge ? ink[0] : v; out[o + 1] = edge ? ink[1] : v; out[o + 2] = edge ? ink[2] : v; out[o + 3] = 255;
+    }
+  }
+  const sec = document.createElement("section");
+  sec.style.cssText = "margin:14px 0";
+  const hd = document.createElement("h5");
+  hd.style.cssText = "font-size:0.875rem;margin:0 0 6px";
+  hd.textContent = title;
+  sec.appendChild(hd);
+  const box = document.createElement("div");
+  box.style.cssText = "display:flex;flex-wrap:wrap;gap:10px";
+  sec.appendChild(box);
+  host.appendChild(sec);
+  sepFigure(box, `${title}. The thinned drawn picture in grey, shown at ${w} by ${h} pixels. What the selection takes is at full strength with a one-pixel outline in the page's text colour, and the rest is dimmed to a third. It takes ${count} of the ${w * h} counted pixels.`, out, w, h);
+  return count;
+}
+
+/** The places and the cues of the first press. Takes the press's tally, the subject, the drawn frame at the opening balance, its thinned
+ *  picture, the check's own labels, the app's sky selection or null, and the opening gains. Returns nothing; writes rows into the report, the
+ *  pictures into `#dPlacePics` (replacing the last press's), and this photograph's fitted selections into storage under its name. What it
+ *  must satisfy: a fault inside it writes one row saying the places part did not run and lets the press go on, so the rows the check printed
+ *  before it stand as they were; the counted pixels are the thinned picture's, the columns and rows being their places in the whole frame;
+ *  storage is read and written inside a try. Consumer: the first press. */
+async function placesPart(tally: PressTally, subject: Subject, frame: { data: Uint8ClampedArray; width: number; height: number }, t: ReturnType<typeof thin>, labels: SepLabels, mask: BrushMask | null, gains: [number, number, number]): Promise<void> {
+  const host = $("dPlacePics");
+  host.replaceChildren();
+  try {
+    const n = t.w * t.h;
+    books(tally);
+    progress("Labelling the counted pixels by place");
+    await pause(tally);
+    books(tally);
+    const cols = new Int32Array(n), rows = new Int32Array(n);
+    for (let y = 0; y < t.h; y++) for (let x = 0; x < t.w; x++) { cols[y * t.w + x] = x * t.k; rows[y * t.w + x] = y * t.k; }
+    const picture = placesPicture(subject.name);
+    let lab: Uint8Array, names: string[], targets: PlaceTarget[];
+    if (picture) {
+      lab = placeLabels(picture, cols, rows, t.fromW, t.fromH);
+      names = [...PLACE_NAMES];
+      targets = [...PLACE_TARGETS];
+      row("The places the counted pixels are labelled by", `picture ${picture} of 3 · ${names.join(", ")} · ${targets.map((x) => x.title).join(" · ")}`,
+        "This photograph is one of the three the places file holds, so each counted pixel is labelled by the polygons drawn on it, by place, and the targets are the places joined as the file's targets name them. The polygons were read off the three pictures on 8 November 2026 and are an agent's reading, not a measurement of the photograph.");
+    } else {
+      lab = labels.lab;
+      names = [...SEP_LABELS];
+      targets = [{ title: "Sky", places: [0] }, { title: "Foliage", places: [2] }];
+      row("The places the counted pixels are labelled by", `none held for this photograph · the check's own four labels, ${names.join(", ")} · two targets, ${targets.map((x) => x.title).join(" and ")}`,
+        "Places are held for three photographs only, the three marina raws NIR_3742.NEF, NIR_3736.NEF and NIR_3733.NEF. Any other photograph is labelled by the check's own four labels, sky by the app's sky selection, neutral by saturation, foliage by the vegetation axis and the rest other, and the cue module's targets are the sky and the foliage.");
+    }
+    lap(tally, "separation: the places, the labelling");
+
+    progress("Counting the eight cues");
+    await pause(tally);
+    books(tally);
+    const light = new Uint8Array(frame.width * frame.height);
+    for (let p = 0, q = 0; p < light.length; p++, q += 4) {
+      const r = frame.data[q], g = frame.data[q + 1], b = frame.data[q + 2];
+      light[p] = r > g ? (r > b ? r : b) : (g > b ? g : b);
+    }
+    const img = subject.img;
+    const lin = img.isRaw && img.linear && img.width === t.fromW && img.height === t.fromH ? img.linear : null;
+    const linear = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      if (lin) {
+        const q = (rows[i] * t.fromW + cols[i]) * 4;
+        linear[3 * i] = lin[q] * gains[0]; linear[3 * i + 1] = lin[q + 1] * gains[1]; linear[3 * i + 2] = lin[q + 2] * gains[2];
+      } else {
+        linear[3 * i] = t.data[4 * i] / 255; linear[3 * i + 1] = t.data[4 * i + 1] / 255; linear[3 * i + 2] = t.data[4 * i + 2] / 255;
+      }
+    }
+    const sky = new Uint8Array(n);
+    if (mask) for (let i = 0; i < n; i++) sky[i] = sampleBrush(mask, (cols[i] + 0.5) / t.fromW, (rows[i] + 0.5) / t.fromH) >= SEP_SKY_WEIGHT ? 1 : 0;
+    const cues = placeCueValues(t.data, linear, light, t.fromW, t.fromH, cols, rows);
+    lap(tally, "separation: the eight cues");
+    row("The eight cues counted", PLACE_CUES.join(" · "),
+      `Each is one value for each counted pixel. Lightness is the largest of the drawn pixel's three channels over 255. Saturation is the largest less the smallest over the largest. Red against green, red against blue and green against blue are each the difference of two linear channels over their sum, taken ${lin ? "on the photograph's linear copy at the opening gains" : "on the drawn pixel's own channels over 255, because this photograph has no linear camera copy at the drawn size"}. Texture at 5 and at 15 is the standard deviation of the drawn lightness in a square window of that many pixels centred on the pixel's place in the whole frame, over 255. Height is the pixel's row over the last row.`);
+
+    progress("Fitting and reading the selections");
+    await pause(tally);
+    books(tally);
+    const store = keptRead();
+    const kept = Object.entries(store.all).filter(([k]) => k !== subject.name).map(([, v]) => v);
+    const rep = placeReport(cues, lab, names, targets, sky, subject.name, kept as Parameters<typeof placeReport>[6]);
+    lap(tally, "separation: the places report");
+    for (const text of rep.rows) {
+      const at = text.indexOf(": ");
+      row(at > 0 ? text.slice(0, at) : "The places", at > 0 ? text.slice(at + 2) : text,
+        "Counted by the cue module on this photograph's counted pixels. A selection fitted here is printed as fitted here and is no result; a selection kept from another photograph is read on this one as it was fitted.");
+    }
+    const stored = keptWrite(store.all, subject.name, rep.fits);
+    row("Selections kept on this device", store.ok && stored
+      ? `${kept.length} kept from other photographs · this photograph's ${rep.masks.length} masks' selections are kept under its name`
+      : "cannot be kept on this device",
+    store.ok && stored
+      ? "The fitted selections of each photograph are kept in this browser's local storage, as text, under the photograph's name, and the next photograph opened here is read through them."
+      : "This browser refused local storage, so the selections fitted here are not kept and no other photograph's are read here. The rest of the page works.");
+    lap(tally, "separation: keeping the selections");
+
+    progress("Drawing what the selections take");
+    await pause(tally);
+    books(tally);
+    const head = document.createElement("h4");
+    head.style.cssText = "font-size:0.9375rem;margin:18px 0 6px";
+    head.textContent = "What each selection takes";
+    host.appendChild(head);
+    for (const m of rep.masks) {
+      const took = placePicture(host, m.title, t, m.taken);
+      row(`Picture: ${m.title}`, `takes ${took} of ${n} counted pixels`, "The count of the pixels the selection takes, drawn under the report at full strength with an outline. It is the same selection the report's rows read.");
+    }
+    lap(tally, "separation: drawing the selections");
+  } catch (err) {
+    row("The places and the cues", "not run", `${(err as Error).message}. The rows above stand as the check printed them.`);
+  }
+}
+
 /** Takes the two buttons' common wrapper: runs `body` as a press of the Separation check with the page's other tests held off, the rows
  *  written into the picture checks' own list and copy block, and the press counted in `running` until `body` ends. Returns nothing. */
 async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: PressTally) => Promise<void>): Promise<void> {
@@ -3833,6 +4002,7 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
   void sepPress(e.currentTarget as HTMLButtonElement, true, async (tally) => {
     closeSep();
     $("dSepPics").replaceChildren();
+    $("dPlacePics").replaceChildren();
     await refreshReport();
     lap(tally, "taking the device report again");
     const chip = chipName();
@@ -3932,6 +4102,7 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       const rd = spec ? readBalance(base.wb, spec) : null;
       row("The opening balance, the first white point", `gains ${base.wb.map((g) => g.toFixed(4)).join(", ")} · exposure ${base.exposure.toFixed(4)} · ${rd ? `reads as ${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read: the file has no matrix to read it through"}`,
         `What the editor opens this photograph at, by the app's one copy of the at-open ruling (freshBaseline): for a raw opened from its sensor data, the balance found from the data (gray-world) and the automatic exposure. The drawn picture has the red and blue swap on and no look, every control at its neutral${subject.img.isRaw ? "" : "; this file opened as an 8-bit picture (a camera-rendered file, or a raw shown by its embedded preview, as the row above says), so it opens with no balance and exposure 1, and the swap is switched on here all the same for the check"}.`);
+      await placesPart(tally, subject, frame, t, labels, skyBuilt.mask, base.wb);
       progress("The photograph is drawn. Now tap a neutral spot and a sunlit leaf, or type their points, then press step 3.", true);
       $("dSepHint").textContent = "The picture is drawn above. Choose what a tap sets, then tap the picture or type the two numbers of a spot: the picture is redrawn at that spot's balance and this line says whether the spot is usable. Set both spots, then press step 3.";
       sepMarks();

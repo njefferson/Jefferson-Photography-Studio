@@ -1,15 +1,17 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=e2ca0638e62c8433
-diffhash=f86ff9b9ee7874fb
-verdict=IN-SCOPE: every staged file and change is covered by a line of the plan (steps 368 and 369), and the two hooks stay out per the Facts of step 369.
-# IN-SCOPE: every staged file and change is covered by a line of the plan (steps 368 and 369), and the two hooks stay out per the Facts of step 369.
-# src/pipeline.ts: step 368 stage 3 and Design One function; adds the exported panelBoxWeights with its contract and makes the band stage call it, no new figure, by-name cases unchanged.
-# src/gl.ts: step 368 stage 4; the shader band stage repeats the same rule branch for branch, no backtick written in it.
-# src/tile.ts: step 368 stage 5; measureFrame calls panelBoxWeights where it repeated the weight rule.
-# src/previewcache.ts: step 368 stage 5 and Design gates; PREVIEW_PIPELINE raised from 103 to 104.
-# tools/.preview-pipeline: step 369 stage 4; the preview-version check's own record run wrote version 104 and its hash.
-# docs/ARCHITECTURE.md: step 369 stage 4; the module map write changed only the line counts of the three edited sources.
-# docs/decisions/084-hsl-and-channel-swaps-for-infrared-looks.md: step 369 stage 2 and goal 1; one dated paragraph after the paragraph of 9 November, naming no frame and citing no other decision.
-# NOTES.md: step 369 stage 3; six Found queue lines Q-JPS-266 to Q-JPS-271 at the end of the queue, no roadmap bullet touched.
-# .githooks/commit-msg and .githooks/pre-commit: not staged; step 369 Facts name them as modified by no step and left out of the commit.
+planhash=6df8051af79ceee9
+diffhash=b7039b3b2298cb2e
+verdict=IN-SCOPE: the staged change is the separation instrument's arithmetic module, its places module, the test page's wiring, the science passage, the record's addition, the queued findings, the version and the module map, each named by the plan's steps 373 to 376
+# IN-SCOPE: the staged change is the separation instrument's arithmetic module, its places module, the test page's wiring, the science passage, the record's addition, the queued findings, the version and the module map, each named by the plan's steps 373 to 376
+# src/placecues.ts (new): Steps 373 and the Rules of this plan, ONE INTERFACE; pure functions that read the eight cues, the histograms, distances, thresholds, fitted selections, reads and masks, with a contract above each export and an opening comment; no page code and no file read.
+# src/placesdata.ts (new): Step 374 and the Rules of this plan, ONE INTERFACE; the nine names, the four targets, the three pictures' polygons copied from the places data, the file-name match and the pixel labelling.
+# src/debug.ts: Step 375 Do stage 2; imports of the two modules, the clearing of the pictures' container at the start of the press, one call in the first press after the opening balance row, and the helpers for kept selections, the pictures and the places part, with the time rows; no existing row changed.
+# debug.html: Step 375 Do stage 3; one empty container under the check's report for the pictures, headings made in the script.
+# IR-SCIENCE.md: Step 376 Do stage 2; one dated passage after the places passage in two parts, the field's pages with their addresses and read state, and what the check now counts; it holds no figure and describes no photograph.
+# docs/decisions/050-the-mask-system-is-short-of-standard-convention.md: Step 376 Do stage 3; a dated addition to its Looked up section only, naming each newly read source and what it says a selection is keyed on and how selections are joined; it cites no decision and names no frame.
+# NOTES.md: Step 376 Do stage 4; three lines at the end of the Found queue under the next free keys for findings of steps 372 and 374 about the app; the roadmap is untouched.
+# VERSION: Step 376 Do stage 4 and Facts; moved from 2.76 to 2.77 for a capability.
+# docs/ARCHITECTURE.md: Step 376 Do stage 5; the generated module map now carries the two new modules and the new count and line counts, written by the architecture check.
+# .githooks/commit-msg and .githooks/pre-commit: not staged and not part of this commit; step 376 Facts leave them out (Q-JPS-226).
+# .plan-scope: written by the record command after this verdict and staged last, as the Rules of this plan, THE LANDING'S ORDER, say.

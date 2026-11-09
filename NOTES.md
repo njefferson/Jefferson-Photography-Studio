@@ -2482,6 +2482,9 @@ Q-JPS-268: the shader's band stage cannot be planted in the container; it is wri
 Q-JPS-269: the plant of the render at the two midpoints between the centres reads 1.005 against a known 1.005 within 0.01, because the code multiplies the two boxes' value gains; a downstream curve could move it further on a real photograph (step 368, 9 November 2026).
 Q-JPS-270: the PC's report of 9 November shows the keying taking a Sky centre from the photograph under the Copper mixer and at one far balance, where the page's own check on the drawn frame calls the sky colourless, which is the difference Q-JPS-239 names (step 369, 9 November 2026).
 Q-JPS-271: a doubt, not measured: under the swap a Sky box keyed by name sits at 30 degrees beside a Foliage box keyed near the trees' own hue, so the two bands overlap and each box may take half of the trees (step 369, 9 November 2026).
+Q-JPS-272: Adobe's own help pages and Capture One's support pages could not be read, so the Lightroom lines of the science file's passage of 9 November and of record 050's addition rest on second-hand accounts, and the luma range of Capture One is not described (step 372, 9 November 2026).
+Q-JPS-273: the darktable colour equalizer page and the RawPedia local adjustments page were not found at any address tried and are unread (step 372, 9 November 2026).
+Q-JPS-274: `placeLabels` in `src/placesdata.ts` reads the thinning step from the spacing of the first two columns it is given, so a caller that passes the counted pixels' columns in any order but the rows' order of an every-third grid labels a different grid than the one meant (step 374, 9 November 2026).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**

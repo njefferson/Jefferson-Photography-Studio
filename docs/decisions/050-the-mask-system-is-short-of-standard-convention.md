@@ -93,6 +93,55 @@ Photoshop Essentials, *The Color Range Command*
 Adobe, *Apply Masking for local adjustments*
 (helpx.adobe.com/lightroom-cc/using/masking.html).
 
+**Added 9 November 2026, after reading further pages whole.** Each was fetched to
+disk and read to its end; what each says a selection is keyed on, and how
+selections are joined, is below. Adobe's own help pages and Capture One's support
+pages could not be read (the first answered Access Denied, the second a challenge
+page), so the Lightroom lines rest on two second-hand accounts and are marked so.
+
+- darktable parametric masks (docs.darktable.org/usermanual/4.6/en/darkroom/masking-and-blending/masks/parametric/):
+  keyed on the pixel's value in each channel of the module's colour space, grey,
+  red, green, blue, hue, saturation, lightness, chroma and the Lab components,
+  each a trapezoid with two ramps and a polarity; joined by multiplying the
+  channels' factors.
+- darktable drawn masks (.../masks/drawn/): keyed on place, with circle, ellipse,
+  path, brush and gradient; joined in the mask manager by union, intersection,
+  difference and exclusion.
+- darktable combining drawn and parametric masks (.../masks/drawn-and-parametric/):
+  joined by multiplying the components, so any one excludes, or by invert,
+  multiply and invert, so any one includes, each component with a polarity.
+- darktable refining a mask (.../masks/refinement-controls/): keyed on detail, a
+  details threshold available from raw data, and on the image's own edges, a
+  feathering guide; refinements of one finished mask, not joins.
+- darktable colour zones (.../module-reference/processing-modules/color-zones/):
+  keyed on one chosen axis of hue, lightness or chroma.
+- Fstoppers on Lightroom's masking, 24 June 2026 and 21 December 2021, and on
+  luminosity masks, 14 August 2021 (second-hand accounts): keyed on selections
+  the program makes (subject, sky, background, people, and for landscapes
+  vegetation, buildings and architecture), on a colour range, on a luminance
+  range, and on drawn gradients and brushes; a mask is a list of components that
+  each add, subtract or intersect.
+- Infrared pages, Fstoppers of 27 May 2024, Kolari Vision of 10 July 2018 and
+  Kept Light of 13 April 2018: keyed on a colour range for sky and foliage, on
+  gradients, and on the light in one colour channel; joined by multiplying a
+  selection by itself to narrow it level after level. The Kept Light page
+  describes no selective mask.
+- Wikipedia on the normalized difference water and vegetation indices, NASA
+  Earth Observatory on measuring vegetation, and the USGS page on the Landsat
+  vegetation index: keyed on a normalised difference of two bands, green against
+  near infrared for open water and near infrared against red for vegetation,
+  with ranges given for satellite bands.
+
+What this adds to the survey, from these pages and ranking nothing: selection by
+a lightness range alone, by a chroma range alone, by a single colour channel, by
+several channel ranges held at once, by a normalised difference of two channels,
+by detail and by the image's own edges all exist in the field and in none of the
+app's five mask types; and the joins the field offers beyond the app's three are
+multiply so any component can exclude, a polarity on each component, exclusion
+between two shapes, and invert of a whole selection. The union is the row the
+survey already holds. A browser segmentation model was read as an address only;
+its classes are people and body parts.
+
 ## Weighed against
 
 **048 — the union join.** One item in this survey, already recorded and ranked,

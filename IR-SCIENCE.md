@@ -4164,6 +4164,110 @@ their figures rest on small counts. The figures for every frame, setting, place 
 `docs/research/separation/places.md` and `places.json`; the ranking of
 `docs/research/separation/measure.md` is read with the labelling above.
 
+**THE FIELD'S WAYS OF SELECTING BY SOMETHING OTHER THAN COLOUR WERE READ, AND THE
+TEST PAGE NOW COUNTS EIGHT CUES AND JOINED SELECTIONS — read and built 9 November
+2026.** First, what the pages say. Each page below was fetched to disk and read to
+its end; the notes are in the session's research folder and the address of each
+is named here. The darktable user manual (4.6), parametric masks
+(docs.darktable.org/usermanual/4.6/en/darkroom/masking-and-blending/masks/parametric/):
+a selection keyed on the pixel's value in each colour channel of the module's
+space, among them grey, red, green and blue, hue, saturation and lightness,
+chroma and the Lab components, each a trapezoid of two ramps with a polarity, the
+channels joined by multiplying their factors pixel by pixel. The same manual's
+drawn masks (.../masks/drawn/): selection by place, with shapes of circle,
+ellipse, path of three or more nodes, brush and gradient, joined in a mask
+manager by union, intersection, difference and exclusion. Its page on combining
+drawn and parametric masks (.../masks/drawn-and-parametric/): components joined
+by multiplying, so any one can exclude, or by invert, multiply and invert, so any
+one can include, with a polarity on each. Its page on refining a mask
+(.../masks/refinement-controls/): a details threshold keyed on the amount of fine
+structure at the pixel, available from raw data only, and a feathering guide that
+pulls a mask onto the image's own edges; these refine a finished mask and join
+nothing. Its colour zones page (.../module-reference/processing-modules/color-zones/):
+one axis of hue, lightness or chroma chosen as the one a curve acts on. Two
+accounts of Lightroom's masking, both second-hand accounts of videos and not
+Adobe's own pages: Fstoppers of 24 June 2026
+(fstoppers.com/education/lightrooms-masking-tools-are-more-powerful-think-heres-how-use-them-903183)
+and of 21 December 2021
+(fstoppers.com/lightroom/everything-need-know-about-lightroom-masking-part-2-590123),
+which name selections the program makes (subject, sky, background, people and,
+for landscapes, vegetation, buildings and architecture) and ranges of luminance
+and colour, and a mask as a list of components that each add, subtract or
+intersect; and Fstoppers of 14 August 2021
+(fstoppers.com/lightroom/power-luminosity-masks-lightroom-575509), a range of
+brightness. For infrared: Fstoppers of 27 May 2024
+(fstoppers.com/lightroom/step-step-guide-infrared-emulation-using-lightroom-668026),
+a colour range for the sky, gradients for the foreground and the water, a colour
+range for the foliage; Kolari Vision of 10 July 2018
+(kolarivision.com/advanced-infrared-photography-processing-power-luminosity-masks/),
+luminosity masks made from one colour channel at a time, the page's claim being
+that the red channel is the more sensitive to infrared and the blue the least, a
+selection narrowed by being multiplied by itself level after level; and Kept
+Light of 13 April 2018
+(keptlight.com/infrared-channel-swapping-in-lightroom/), which describes no
+selective mask and bears on selection only by its remark that after the swap the
+colour sliders for sky and foliage sit under other names. For the index
+literature: the pages of Wikipedia on the normalized difference water index and
+the normalized difference vegetation index, NASA's Earth Observatory page on
+measuring vegetation and the USGS page on the Landsat vegetation index: a
+normalised difference of two bands, green against near infrared for open water,
+near infrared against red for vegetation, with ranges for each given for
+satellite bands and not for a converted camera, and the vegetation page's own
+statement that the index carries only part of the information of its two bands. The
+TensorFlow.js body segmentation README is read as an address for a later plan and
+as no method tried: its classes are people and body parts and it names none of
+sky, water, trees or buildings, and it states no size. Not read: Adobe's help and
+learn pages (the site answered Access Denied), Capture One's support pages (a
+challenge page came back), the darktable colour equalizer page and the RawPedia
+local adjustments page (not found at any address tried), and twelve hosts the
+proxy declined, so Adobe's and Capture One's own words about their range and
+join tools are absent from this passage. What of this no mask type of the app's
+five expresses: a range of lightness alone, of chroma alone, of any one colour
+channel, several channel ranges held at once, a normalised difference of two
+channels with a threshold, detail, the image's own edges, a path of nodes, a
+selection made by the program for water, vegetation or buildings, and a
+selection narrowed by itself; and of the joins, multiply so any component can
+exclude, invert-multiply-invert so any can include (the union, which record 048
+holds), a polarity on each component, exclusion between two shapes, and invert of
+a whole selection.
+
+Second, what the test page's Separation check now counts, in the definitions of
+`src/placecues.ts`. For each counted pixel of the first press it reads eight cues:
+lightness, the largest of the drawn pixel's three channels over 255; saturation of
+the drawn pixel, the largest less the smallest over the largest, nought where the
+largest is nought; red against green, red against blue and green against blue,
+each the difference of two linear channels at the opening gains over their sum,
+nought where the sum is nought, the same form as the normalised differences above
+on the camera's own channels; texture at 5 and texture at 15, the standard
+deviation of the drawn lightness in a square window of that many pixels centred
+on the pixel's place in the whole frame, clipped at the frame's edge, over 255;
+and height, the pixel's row over the last row. Each cue is binned in 64 bins on a
+fixed scale (0 to 1 for lightness, saturation and height, minus one to one for the
+differences, and logarithmic from one part in 1024 to 1 for the textures), so a
+range found on one photograph means the same on another. For every two labels it
+prints, cue by cue, the Hellinger distance between the labels' histograms, the
+single threshold and side that give the largest mean of the share of each label on
+its own side (the balanced share), and the pair of cues together whose joint
+histograms on 16 by 16 bins are farthest apart. A selection is a range of whole
+bins of one cue. For a target, the best single range is the one with the largest
+balanced share of the target's pixels inside and the other labelled pixels
+outside, the rest left out of the fit. The second range of a join is fitted the
+same way on the pixels the first took, for Only where both, and as the range whose
+removal from the first gives the largest balanced share, for Subtract from it, the
+two joins the app has. Each is also read with the pixels the app's sky selection
+holds at a weight of 0.5 or more removed. A label with fewer than 50 pixels takes
+no part. A selection is stored as text in the browser's local storage under the
+photograph's name, and the next photograph opened is read through the kept ones,
+each printed as kept from the other photograph and read on this one. The three
+marina photographs are labelled by place; any other photograph is labelled by the
+check's own four labels, with the sky and the foliage as the two targets.
+The limits: three photographs have places, all of one scene, and the places are
+polygons read off pictures by eye; a selection read on the photograph it was
+fitted on is as fitted there and is no result; the balanced share weighs the
+target and the others equally whatever their sizes. The figures themselves come
+from the device's reports and are not in this passage, which describes no
+photograph and chooses nothing.
+
 ---
 
 ## 7. What the files in this repository actually are
