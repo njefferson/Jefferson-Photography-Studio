@@ -181,6 +181,20 @@ read; they set no chip, and the figures behind the labelling (the floor, the sky
 weight, the vegetation threshold and the colourless share) are the gather's and
 the page's own and are weighed in that plan before a chip rests on them.
 
+On 8 November 2026 the populations were measured by place on three frames from the
+owner's own pictures, with the same measure, floor and colourless share: at the
+opening balance the gather's rule put 72.8 to 78.0 percent of the conifers under
+neutral and only 13.2 to 16.4 percent under foliage, the sky against the conifers
+read 0.9896 to 0.994 and the conifers against the broadleaf 0.2512 to 0.3261, and
+at the far balance the sky against the conifers read 0.9221 to 0.9267. The
+panel's plan keys the Sky and Foliage boxes on the measured places, the sky and
+the trees, and leaves water and the built things to a mask, which is the place the
+record on the mask system's shortfall against standard convention names; the water
+was colourless at the opening balance on one frame and 1.0 to 1.1 percent above the
+floor on the other two. The figures are in `docs/research/separation/places.md`
+and `docs/research/separation/places.json`, and the labels of
+`docs/research/separation/measure.md` are read with them.
+
 ## Options
 
 1. **One infrared colour panel: a row of swap chips, the colour bands under it,

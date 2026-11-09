@@ -1,16 +1,17 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=d2556d0c594517b8
-diffhash=e534437582052de8
-verdict=IN-SCOPE: every staged file is named by the plan's Files and Do of steps 332 to 336, and .githooks/pre-commit stays out.
-# IN-SCOPE: every staged file is named by the plan's Files and Do of steps 332 to 336, and .githooks/pre-commit stays out.
-# IR-SCIENCE.md: step 332 stage 3, one paragraph at the end of section 6 and a sources entry.
-# docs/research/separation/measure.md and measure.json: step 332 stage 2, new, the measure's output computed over the gather.
-# docs/decisions/084 and 106: step 332 stage 4, one paragraph and one sentence, naming no frame.
-# src/debug.ts: step 333 stages 2 to 4, the labels, the measure rows, the time rows and the working-size drawing through the prepared-source entry.
-# debug.html: step 333, the sweep paragraph in words, no control added.
-# tools/a11y-walk.mjs: step 333 stage 5, section 14 reads the new rows, code for the promotion.
-# vite.config.ts: step 334, the increment digit's count and its contract only.
-# NOTES.md and VERSION: step 335 the entry, the queue and 2.75, and step 336 stage 4 the verified bullet and the remaining queue lines.
-# docs/ARCHITECTURE.md: step 336 stage 2, the module map written by the architecture check.
-# .githooks/pre-commit: modified by no step, named in step 336 Facts as left out, and not staged.
+planhash=c808119ebbea54b7
+diffhash=2c98f91b2d70e657
+verdict=IN-SCOPE: every staged file is named by the plan's Files line and does what its step's Do says, the sync marker is back at its committed content and out of the commit, and the one modified file left out is the pre-commit hook the plan names as left as it stands
+# IN-SCOPE: every staged file is named by the plan's Files line and does what its step's Do says, the sync marker is back at its committed content and out of the commit, and the one modified file left out is the pre-commit hook the plan names as left as it stands
+# tools/owner-images.json: Files line, step 340; adds the owner's marina folder and six file entries (three raws, three camera JPEGs), nothing else changed.
+# docs/research/separation/places.md (new): Files line, step 342; the digest of counts by place, pairs, polygons and the gather's rule against the places, with two wording slips corrected by step 343 (stage 5a).
+# docs/research/separation/places.json (new): Files line, step 342; the same figures as data, counts of at most six digits and decimals of at most four places.
+# IR-SCIENCE.md: Files line, step 343 stage 2; one paragraph in section 6 after the paragraph of 8 November, naming the caveat and copying figures from places.md.
+# docs/research/separation/measure.md: Files line, step 343 stage 3; one paragraph after the title, naming no frame, pointing at places.md.
+# docs/decisions/084-hsl-and-channel-swaps-for-infrared-looks.md: Files line, step 343 stage 4; one dated paragraph at the end of the Built part, naming no frame and no bare file name.
+# NOTES.md: Files line, step 343 stage 5 and step 344 second send; eight Found queue lines, Q-JPS-247 to Q-JPS-254, and one more, Q-JPS-255, on the sync marker and the hub pin, at the end of the queue.
+# .plan-scope: Files line, step 344; the recorded verdict for this staged diff.
+# .doctrine-sync: not part of the commit; restored to its committed content by step 344's second send, the adoption being outside the Files line's workflow reach.
+# .githooks/pre-commit: not staged; modified by no step of any plan and left out, as step 344's Facts and the Files line state (Q-JPS-226).
+# docs/ARCHITECTURE.md: unchanged by the module map write, so not part of the commit.

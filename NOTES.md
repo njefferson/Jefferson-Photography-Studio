@@ -2457,6 +2457,15 @@ Q-JPS-243: a DNG whose raw image carries an after-demosaic stage has it applied 
 Q-JPS-244: the distance saturates near 1 for narrow populations in different 5-degree bins (a median arc of 8.7 degrees at a 0.9030 median), so the build plan reads the distance with the arc and not alone (step 332, 9 November 2026).
 Q-JPS-245: the display-space and chroma-plane medians disagree widely at some settings (0.9066 against 0.0000 at one camera-side swap-off setting), so the measuring space decides some rankings (step 332, 9 November 2026).
 Q-JPS-246: the zero-case comment in `versionFor` is slightly narrow now that it is also true when only internal commits follow the declaration; the behaviour is right and the comment is left (step 334, 9 November 2026).
+Q-JPS-247: on the device reports of 8 November the distance read near 1 for two populations a few bins apart inside one cast, so a high distance is read with the arc and the control (step 343, 8 November 2026).
+Q-JPS-248: on the device report from the PC's frame the screen-side route collapsed six requested balances onto one result, not yet traced (step 343, 8 November 2026).
+Q-JPS-249: the balance readout differed between two frames whose opening gains were near equal, not yet traced (step 343, 8 November 2026).
+Q-JPS-250: the picture code's build took 45 seconds under Firefox against 40 milliseconds on the iPad, not yet traced (step 343, 8 November 2026).
+Q-JPS-251: the not-expressible count differed by frame or device, and the two are not yet separated (step 343, 8 November 2026).
+Q-JPS-252: the float test's result changed on the 8-core iPad, not yet traced (step 343, 8 November 2026).
+Q-JPS-253: the gather's rule put 72.8, 74.7 and 78.0 percent of the conifers and 88.4, 86.6 and 87.7 percent of the broadleaf under neutral on three frames balanced on their own trees, with 16.4, 15.4 and 13.2 percent of the conifers under foliage, so the foliage label holds the minority of the trees (step 343, 8 November 2026).
+Q-JPS-254: the rankings of `docs/research/separation/measure.md` rest on that labelling, and the foliage population and the neutral control in them are not the places they are named for (step 343, 8 November 2026).
+Q-JPS-255: the doctrine sync marker names a hub commit the hub no longer has, so the drift cannot be listed and every section of the doctrine counts as unread here; adopting it needs the hub pin in the calling workflow under `.github/workflows` moved in the same commit, for the next plan (step 344, 8 November 2026).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**

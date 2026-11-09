@@ -4131,6 +4131,39 @@ settings, while the device's sweep measures in the space its drawn frame ends in
 No setting is singled out in words: the ranking is the numbers, and the panel of
 record 084 reads them.
 
+**THE POPULATIONS WERE THEN MEASURED BY PLACE, AND THE LABELLING RULE'S FOLIAGE
+WAS MOSTLY NOT FOLIAGE — measured 8 November 2026.** Three frames from the
+owner's own pictures (NIR_3733, NIR_3736 and NIR_3742) were counted again with the
+populations drawn as places: sky, conifers, broadleaf, snags, shore, water, docks
+and boats, each a polygon read off the frame's picture by eye with a margin of
+about one part in sixty of the height, the same measure, floor and colourless
+share as above, at seven settings. At the opening render the rule above put 72.8,
+74.7 and 78.0 percent of the conifers under neutral on the three frames, 88.4,
+86.6 and 87.7 percent of the broadleaf and 99.4, 99.0 and 98.9 percent of the
+water, with 16.4, 15.4 and 13.2 percent of the conifers under foliage; the sky
+sat under sky on every pixel. So on frames balanced on their own trees the
+measure of 8 November compared the sky's coloured part with the coloured part of
+a foliage label that holds only the minority of the trees, and
+read its control from a neutral population that is mostly trees and water. By
+place, at the opening balance with the swap on, the sky against the conifers
+read 0.9928, 0.994 and 0.9896 with arcs of 174.5, 174.9 and 174.7 degrees, and the
+conifers against the broadleaf 0.3261, 0.3081 and 0.2512 with arcs of 8.9, 8.3
+and 5.3; the conifers against the boats read 0.2133, 0.3136 and 0.1996, and the
+conifers against the docks, the one place read as spectrally flat and so the
+control, 0.1932, 0.137 and 0.1614. The water was colourless at the opening balance on
+NIR_3733 (0.6 percent above the floor, so its distances are undefined there) and
+at 1.0 and 1.1 percent on the other two, where it read 0.5415 and 0.547 against
+the conifers; the docks read 0.582 and 0.6074 against the water. At the far
+balance (481 mired, tint -75, swap on) every place was 72 percent or more above
+the floor on all three frames: the sky against the conifers read 0.9245, 0.9221
+and 0.9267 with arcs of 49.6, 47.8 and 49.6 degrees, the conifers against the
+broadleaf 0.1974, 0.1566 and 0.1418, the water against the conifers 0.5183, 0.524
+and 0.53, and the docks against the sky 0.9357, 0.8832 and 0.8859. The polygons
+are by eye and the snags and the docks are thin, between 2183 and 3927 pixels, so
+their figures rest on small counts. The figures for every frame, setting, place and pair are in
+`docs/research/separation/places.md` and `places.json`; the ranking of
+`docs/research/separation/measure.md` is read with the labelling above.
+
 ---
 
 ## 7. What the files in this repository actually are

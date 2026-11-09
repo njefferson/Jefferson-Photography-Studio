@@ -1,0 +1,978 @@
+# Populations measured by place
+
+Written by a harness that decodes each raw once, matches it to one of three pictures by correlation, labels each thinned pixel by the polygon of the matched picture that holds it, draws it through the app's computed path (compileEdit) at seven settings with the sRGB to display P3 conversion the drawn path ends with, and counts. It chooses nothing: no setting is called best here, and the figures below are the numbers the build plan for record 084's panel reads.
+
+## The places, the margin and the figures printed with every result
+- The eight places: sky, conifers, broadleaf, snags, shore, water, docks, boats. What no polygon covers is counted as the rest.
+- Each polygon is drawn inside its place with a margin of about one part in sixty of the picture's height, so a border pixel of another place is not counted. The shapes are an agent's reading of the three pictures, kept in fractions of the width and the height.
+- The saturation floor: 0.13. A place with fewer than one in a hundred (0.01) of its pixels at or above the floor is colourless at that setting and its distances are undefined, never a number.
+- Hue is the HSV hue of the 8-bit display P3 pixel the drawn path ends with, in 72 bins of 5 degrees, counted over pixels at or above the floor. The distance is the Hellinger distance between two places' hue histograms, each normalised to its own total: the square root of one minus the sum over the bins of the square root of the product of the two shares; 0 for the same histogram and 1 for histograms sharing no bin. Beside it are the smaller arc between the two circular means, from 0 to 180 degrees, and each place's share at or above the floor.
+- The control: the docks are the one place the science file reads as spectrally flat, so every pair that holds the docks is marked as the control; the boats are the man-made place that carries colour of its own.
+- The settings: 1 the opening balance with the swap on; 2 the opening balance with the swap off; 3 to 5 the Channel cycle, Copper and Film rotation presets at the opening balance with the swap on; 6 and 7 the camera-side gains for 481 mired and tint -75 with the swap on and with it off. The Identity and R⇄B swap presets repeat settings 1 and 2 and are not drawn again.
+- The gather's rule, as the harness states it: a pixel is sky where the app's sky selection reads at least 0.5, else neutral where its saturation at the opening render is under 0.13, else foliage where (R - G) / G at the opening gains is at most -0.05, else other.
+
+## The polygons, as fractions of the width and the height
+### Picture 1 (2000 by 1333 pixels)
+- sky: (0.0075, 0.0113) (0.62, 0.0113) (0.62, 0.045) (0.0075, 0.045); (0.0075, 0.0113) (0.27, 0.0113) (0.27, 0.1013) (0.0075, 0.1013); (0.31, 0.0113) (0.42, 0.0113) (0.42, 0.075) (0.31, 0.075); (0.645, 0.0113) (0.845, 0.0113) (0.845, 0.03) (0.645, 0.03); (0.93, 0.0113) (0.995, 0.0113) (0.995, 0.0713) (0.93, 0.0713)
+- conifers: (0.015, 0.225) (0.34, 0.225) (0.34, 0.42) (0.015, 0.42); (0.39, 0.1725) (0.55, 0.1725) (0.55, 0.375) (0.39, 0.375); (0.565, 0.15) (0.925, 0.15) (0.925, 0.525) (0.565, 0.525); (0.225, 0.435) (0.34, 0.435) (0.34, 0.5475) (0.225, 0.5475)
+- broadleaf: (0.3625, 0.4875) (0.4775, 0.4875) (0.4775, 0.5738) (0.3625, 0.5738); (0.505, 0.51) (0.5425, 0.51) (0.5425, 0.5775) (0.505, 0.5775)
+- snags: (0.075, 0.1313) (0.27, 0.1363) (0.27, 0.1688) (0.075, 0.1613)
+- shore: (0.15, 0.6135) (0.54, 0.609) (0.54, 0.6338) (0.15, 0.6338); (0.875, 0.636) (0.995, 0.6375) (0.995, 0.6488) (0.875, 0.6473)
+- water: (0.0075, 0.6713) (0.445, 0.6713) (0.445, 0.75) (0.0075, 0.75); (0.0075, 0.8063) (0.15, 0.8063) (0.25, 0.8888) (0.7, 0.9563) (0.7, 0.99) (0.0075, 0.99); (0.55, 0.6675) (0.7, 0.6675) (0.7, 0.69) (0.55, 0.69)
+- docks: (0.19, 0.774) (0.44, 0.8085) (0.44, 0.8265) (0.19, 0.792); (0.625, 0.8438) (0.72, 0.8603) (0.72, 0.8813) (0.625, 0.8648)
+- boats: (0.465, 0.7388) (0.515, 0.7388) (0.515, 0.7763) (0.465, 0.7763); (0.9, 0.7125) (0.96, 0.7125) (0.96, 0.7575) (0.9, 0.7575); (0.77, 0.7088) (0.82, 0.7088) (0.82, 0.7575) (0.77, 0.7575); (0.72, 0.75) (0.775, 0.75) (0.775, 0.8063) (0.72, 0.8063); (0.86, 0.8363) (0.975, 0.8363) (0.975, 0.87) (0.86, 0.87); (0.78, 0.8963) (0.89, 0.9113) (0.89, 0.93) (0.78, 0.921)
+### Picture 2 (2000 by 1333 pixels)
+- sky: (0.0075, 0.0113) (0.385, 0.0113) (0.385, 0.2138) (0.0075, 0.2138); (0.0075, 0.2138) (0.15, 0.2138) (0.15, 0.27) (0.0075, 0.27); (0.415, 0.0113) (0.5, 0.0113) (0.5, 0.1725) (0.415, 0.1725); (0.55, 0.0113) (0.69, 0.0113) (0.69, 0.1388) (0.55, 0.1388); (0.72, 0.0113) (0.82, 0.0113) (0.82, 0.1388) (0.72, 0.1388); (0.845, 0.0113) (0.925, 0.0113) (0.925, 0.1238) (0.845, 0.1238); (0.965, 0.0113) (0.995, 0.0113) (0.995, 0.1125) (0.965, 0.1125)
+- conifers: (0.01, 0.3525) (0.19, 0.3525) (0.19, 0.6) (0.01, 0.6); (0.2, 0.36) (0.44, 0.36) (0.44, 0.54) (0.2, 0.54); (0.51, 0.375) (0.58, 0.375) (0.58, 0.48) (0.51, 0.48); (0.6, 0.24) (0.88, 0.24) (0.88, 0.6) (0.6, 0.6); (0.895, 0.225) (0.99, 0.225) (0.99, 0.6) (0.895, 0.6)
+- broadleaf: (0.4625, 0.54) (0.505, 0.54) (0.505, 0.6525) (0.4625, 0.6525); (0.515, 0.6) (0.575, 0.6) (0.575, 0.6525) (0.515, 0.6525); (0.595, 0.585) (0.63, 0.585) (0.63, 0.6675) (0.595, 0.6675)
+- snags: (0.16, 0.2738) (0.36, 0.2738) (0.36, 0.3075) (0.16, 0.3075)
+- shore: (0.24, 0.6825) (0.625, 0.6788) (0.625, 0.7035) (0.24, 0.7065); (0.015, 0.6675) (0.19, 0.6675) (0.19, 0.7013) (0.015, 0.7013); (0.925, 0.6713) (0.995, 0.6713) (0.995, 0.6938) (0.925, 0.6938)
+- water: (0.0075, 0.735) (0.665, 0.735) (0.665, 0.7688) (0.0075, 0.7688); (0.0075, 0.8063) (0.35, 0.8063) (0.35, 0.825) (0.0075, 0.825); (0.0075, 0.8325) (0.35, 0.8325) (0.395, 0.9375) (0.75, 0.9675) (0.75, 0.99) (0.0075, 0.99); (0.71, 0.7313) (0.875, 0.7313) (0.875, 0.7538) (0.71, 0.7538)
+- docks: (0.38, 0.8363) (0.59, 0.8663) (0.59, 0.885) (0.38, 0.855); (0.665, 0.8723) (0.85, 0.8985) (0.85, 0.912) (0.665, 0.8873)
+- boats: (0.625, 0.8063) (0.675, 0.8063) (0.675, 0.8438) (0.625, 0.8438); (0.855, 0.7875) (0.93, 0.7875) (0.93, 0.84) (0.855, 0.84); (0.9, 0.7613) (0.965, 0.7613) (0.965, 0.81) (0.9, 0.81); (0.925, 0.9338) (0.995, 0.9338) (0.995, 0.954) (0.925, 0.9465); (0.695, 0.855) (0.73, 0.855) (0.73, 0.8738) (0.695, 0.8738)
+### Picture 3 (2000 by 1333 pixels)
+- sky: (0.0075, 0.0113) (0.32, 0.0113) (0.32, 0.2063) (0.0075, 0.2063); (0.36, 0.0113) (0.445, 0.0113) (0.445, 0.1538) (0.36, 0.1538); (0.475, 0.0113) (0.575, 0.0113) (0.575, 0.1388) (0.475, 0.1388); (0.64, 0.0113) (0.78, 0.0113) (0.78, 0.1275) (0.64, 0.1275); (0.81, 0.0113) (0.975, 0.0113) (0.975, 0.1125) (0.81, 0.1125)
+- conifers: (0.01, 0.3) (0.15, 0.3) (0.15, 0.555) (0.01, 0.555); (0.19, 0.315) (0.39, 0.315) (0.39, 0.525) (0.19, 0.525); (0.44, 0.345) (0.495, 0.345) (0.495, 0.45) (0.44, 0.45); (0.505, 0.2475) (0.545, 0.2475) (0.545, 0.42) (0.505, 0.42); (0.55, 0.225) (0.78, 0.225) (0.78, 0.525) (0.55, 0.525); (0.79, 0.225) (0.99, 0.225) (0.99, 0.555) (0.79, 0.555)
+- broadleaf: (0.4, 0.495) (0.435, 0.495) (0.435, 0.5813) (0.4, 0.5813); (0.44, 0.5475) (0.505, 0.5475) (0.505, 0.5925) (0.44, 0.5925); (0.515, 0.525) (0.545, 0.525) (0.545, 0.5813) (0.515, 0.5813)
+- snags: (0.15, 0.231) (0.3, 0.234) (0.3, 0.2588) (0.15, 0.2565)
+- shore: (0.21, 0.609) (0.59, 0.606) (0.59, 0.6338) (0.21, 0.6338); (0.015, 0.5925) (0.15, 0.5925) (0.15, 0.6225) (0.015, 0.6225); (0.85, 0.63) (0.995, 0.63) (0.995, 0.6465) (0.85, 0.6465)
+- water: (0.0075, 0.6638) (0.595, 0.6638) (0.595, 0.6938) (0.0075, 0.6938); (0.0075, 0.72) (0.305, 0.72) (0.305, 0.7388) (0.0075, 0.7388); (0.0075, 0.7838) (0.3, 0.7838) (0.36, 0.8475) (0.7, 0.8888) (0.7, 0.99) (0.0075, 0.99); (0.63, 0.6638) (0.785, 0.6638) (0.785, 0.6825) (0.63, 0.6825)
+- docks: (0.33, 0.753) (0.525, 0.7868) (0.525, 0.8055) (0.33, 0.7725); (0.665, 0.81) (0.75, 0.8243) (0.75, 0.8468) (0.665, 0.8325)
+- boats: (0.55, 0.7313) (0.6, 0.7313) (0.6, 0.7688) (0.55, 0.7688); (0.915, 0.7013) (0.965, 0.7013) (0.965, 0.7388) (0.915, 0.7388); (0.805, 0.7125) (0.855, 0.7125) (0.855, 0.7425) (0.805, 0.7425); (0.76, 0.7425) (0.825, 0.7425) (0.825, 0.7725) (0.76, 0.7725); (0.885, 0.8138) (0.965, 0.8138) (0.965, 0.8325) (0.885, 0.8325); (0.81, 0.846) (0.895, 0.8588) (0.895, 0.8715) (0.81, 0.8588)
+
+## The match of each raw to a picture
+- NIR_3733.NEF: picture 3, correlation 0.9763 against picture 1 0.5958, picture 2 0.5359, picture 3 0.9763; second best 0.5958, margin 0.3805; focal length 64 mm.
+- NIR_3736.NEF: picture 2, correlation 0.9772 against picture 1 0.3158, picture 2 0.9772, picture 3 0.5196; second best 0.5196, margin 0.4576; focal length 70 mm.
+- NIR_3742.NEF: picture 1, correlation 0.9711 against picture 1 0.9711, picture 2 0.3485, picture 3 0.6237; second best 0.6237, margin 0.3474; focal length 77 mm.
+
+## NIR_3733.NEF
+- Decoded 2800 by 1864, thinned to 933 by 621 (every third pixel), camera NIKON Z 50, picture 3, sky selection: found.
+- Opening: gains 1, 1.8804, 3.093, exposure 2.4115, reads 1692 K, tint -82.
+- Pixels by place: sky 68844, conifers 130738, broadleaf 4442, snags 2183, shore 9664, water 80543, docks 3276, boats 5703, rest 274000.
+
+### The gather's rule against the places at the opening render
+- sky: n 68844, sky 100.0 percent, neutral 0.0 percent, foliage 0.0 percent, other 0.0 percent.
+- conifers: n 130738, sky 0.0 percent, neutral 72.8 percent, foliage 16.4 percent, other 10.8 percent.
+- broadleaf: n 4442, sky 0.0 percent, neutral 88.4 percent, foliage 5.1 percent, other 6.4 percent.
+- snags: n 2183, sky 10.5 percent, neutral 87.0 percent, foliage 0.4 percent, other 2.1 percent.
+- shore: n 9664, sky 0.0 percent, neutral 95.4 percent, foliage 1.3 percent, other 3.3 percent.
+- water: n 80543, sky 0.0 percent, neutral 99.4 percent, foliage 0.3 percent, other 0.3 percent.
+- docks: n 3276, sky 0.0 percent, neutral 53.4 percent, foliage 35.2 percent, other 11.4 percent.
+- boats: n 5703, sky 0.0 percent, neutral 69.2 percent, foliage 17.2 percent, other 13.6 percent.
+- rest: n 274000, sky 18.9 percent, neutral 65.9 percent, foliage 9.2 percent, other 6.0 percent.
+
+### Setting 1: camera-side gains, swap on, the opening balance
+- sky: counted, n 68844, at or above the floor 10325 (15.0 percent), mean hue 194.4 deg, resultant 0.9965, 80 percent arc 15 deg.
+- conifers: counted, n 130738, at or above the floor 35537 (27.2 percent), mean hue 9.0 deg, resultant 0.9502, 80 percent arc 45 deg.
+- broadleaf: counted, n 4442, at or above the floor 514 (11.6 percent), mean hue 0.1 deg, resultant 0.8035, 80 percent arc 85 deg.
+- snags: counted, n 2183, at or above the floor 54 (2.5 percent), mean hue 324.7 deg, resultant 0.6076, 80 percent arc 135 deg.
+- shore: counted, n 9664, at or above the floor 445 (4.6 percent), mean hue 348.9 deg, resultant 0.7421, 80 percent arc 90 deg.
+- water: colourless, n 80543, at or above the floor 489 (0.6 percent), mean hue 1.6 deg, resultant 0.5156, 80 percent arc 160 deg.
+- docks: counted, n 3276, at or above the floor 1525 (46.6 percent), mean hue 10.9 deg, resultant 0.9785, 80 percent arc 25 deg.
+- boats: counted, n 5703, at or above the floor 1757 (30.8 percent), mean hue 3.7 deg, resultant 0.8105, 80 percent arc 55 deg.
+- rest: counted, n 274000, at or above the floor 46906 (17.1 percent), mean hue 7.2 deg, resultant 0.7035, 80 percent arc 65 deg.
+- sky with conifers: distance 0.9928, arc 174.5 deg, share at or above the floor sky 15.0 percent and conifers 27.2 percent.
+- sky with broadleaf: distance 0.9965, arc 165.7 deg, share at or above the floor sky 15.0 percent and broadleaf 11.6 percent.
+- sky with snags: distance 0.9072, arc 130.3 deg, share at or above the floor sky 15.0 percent and snags 2.5 percent.
+- sky with shore: distance 0.939, arc 154.5 deg, share at or above the floor sky 15.0 percent and shore 4.6 percent.
+- sky with water: distance undefined (colourless: water), arc undefined, share at or above the floor sky 15.0 percent and water 0.6 percent.
+- sky with docks (control: docks): distance 1, arc 176.4 deg, share at or above the floor sky 15.0 percent and docks 46.6 percent.
+- sky with boats: distance 0.9182, arc 169.2 deg, share at or above the floor sky 15.0 percent and boats 30.8 percent.
+- conifers with broadleaf: distance 0.3261, arc 8.9 deg, share at or above the floor conifers 27.2 percent and broadleaf 11.6 percent.
+- conifers with snags: distance 0.6818, arc 44.2 deg, share at or above the floor conifers 27.2 percent and snags 2.5 percent.
+- conifers with shore: distance 0.3774, arc 20.1 deg, share at or above the floor conifers 27.2 percent and shore 4.6 percent.
+- conifers with water: distance undefined (colourless: water), arc undefined, share at or above the floor conifers 27.2 percent and water 0.6 percent.
+- conifers with docks (control: docks): distance 0.1932, arc 1.9 deg, share at or above the floor conifers 27.2 percent and docks 46.6 percent.
+- conifers with boats: distance 0.2133, arc 5.3 deg, share at or above the floor conifers 27.2 percent and boats 30.8 percent.
+- broadleaf with snags: distance 0.5601, arc 35.4 deg, share at or above the floor broadleaf 11.6 percent and snags 2.5 percent.
+- broadleaf with shore: distance 0.2782, arc 11.2 deg, share at or above the floor broadleaf 11.6 percent and shore 4.6 percent.
+- broadleaf with water: distance undefined (colourless: water), arc undefined, share at or above the floor broadleaf 11.6 percent and water 0.6 percent.
+- broadleaf with docks (control: docks): distance 0.4778, arc 10.8 deg, share at or above the floor broadleaf 11.6 percent and docks 46.6 percent.
+- broadleaf with boats: distance 0.3215, arc 3.6 deg, share at or above the floor broadleaf 11.6 percent and boats 30.8 percent.
+- snags with shore: distance 0.5091, arc 24.2 deg, share at or above the floor snags 2.5 percent and shore 4.6 percent.
+- snags with water: distance undefined (colourless: water), arc undefined, share at or above the floor snags 2.5 percent and water 0.6 percent.
+- snags with docks (control: docks): distance 0.7827, arc 46.2 deg, share at or above the floor snags 2.5 percent and docks 46.6 percent.
+- snags with boats: distance 0.6128, arc 38.9 deg, share at or above the floor snags 2.5 percent and boats 30.8 percent.
+- shore with water: distance undefined (colourless: water), arc undefined, share at or above the floor shore 4.6 percent and water 0.6 percent.
+- shore with docks (control: docks): distance 0.5119, arc 22.0 deg, share at or above the floor shore 4.6 percent and docks 46.6 percent.
+- shore with boats: distance 0.3074, arc 14.8 deg, share at or above the floor shore 4.6 percent and boats 30.8 percent.
+- water with docks (control: docks): distance undefined (colourless: water), arc undefined, share at or above the floor water 0.6 percent and docks 46.6 percent.
+- water with boats: distance undefined (colourless: water), arc undefined, share at or above the floor water 0.6 percent and boats 30.8 percent.
+- docks with boats (control: docks): distance 0.3132, arc 7.2 deg, share at or above the floor docks 46.6 percent and boats 30.8 percent.
+
+### Setting 2: camera-side gains, swap off, the opening balance
+- sky: counted, n 68844, at or above the floor 21580 (31.4 percent), mean hue 49.7 deg, resultant 0.9952, 80 percent arc 15 deg.
+- conifers: counted, n 130738, at or above the floor 40393 (30.9 percent), mean hue 235.4 deg, resultant 0.9594, 80 percent arc 40 deg.
+- broadleaf: counted, n 4442, at or above the floor 597 (13.4 percent), mean hue 243.7 deg, resultant 0.8693, 80 percent arc 60 deg.
+- snags: counted, n 2183, at or above the floor 81 (3.7 percent), mean hue 263.6 deg, resultant 0.7022, 80 percent arc 80 deg.
+- shore: counted, n 9664, at or above the floor 597 (6.2 percent), mean hue 251.3 deg, resultant 0.7763, 80 percent arc 65 deg.
+- water: counted, n 80543, at or above the floor 1058 (1.3 percent), mean hue 242.1 deg, resultant 0.3345, 80 percent arc 210 deg.
+- docks: counted, n 3276, at or above the floor 1557 (47.5 percent), mean hue 232.9 deg, resultant 0.9801, 80 percent arc 30 deg.
+- boats: counted, n 5703, at or above the floor 1846 (32.4 percent), mean hue 239.5 deg, resultant 0.8003, 80 percent arc 50 deg.
+- rest: counted, n 274000, at or above the floor 56590 (20.6 percent), mean hue 237.7 deg, resultant 0.5622, 80 percent arc 195 deg.
+- sky with conifers: distance 0.9915, arc 174.3 deg, share at or above the floor sky 31.4 percent and conifers 30.9 percent.
+- sky with broadleaf: distance 0.973, arc 166.0 deg, share at or above the floor sky 31.4 percent and broadleaf 13.4 percent.
+- sky with snags: distance 0.8903, arc 146.1 deg, share at or above the floor sky 31.4 percent and snags 3.7 percent.
+- sky with shore: distance 0.9322, arc 158.4 deg, share at or above the floor sky 31.4 percent and shore 6.2 percent.
+- sky with water: distance 0.8223, arc 167.6 deg, share at or above the floor sky 31.4 percent and water 1.3 percent.
+- sky with docks (control: docks): distance 1, arc 176.8 deg, share at or above the floor sky 31.4 percent and docks 47.5 percent.
+- sky with boats: distance 0.9033, arc 170.2 deg, share at or above the floor sky 31.4 percent and boats 32.4 percent.
+- conifers with broadleaf: distance 0.2778, arc 8.3 deg, share at or above the floor conifers 30.9 percent and broadleaf 13.4 percent.
+- conifers with snags: distance 0.5712, arc 28.2 deg, share at or above the floor conifers 30.9 percent and snags 3.7 percent.
+- conifers with shore: distance 0.3796, arc 15.9 deg, share at or above the floor conifers 30.9 percent and shore 6.2 percent.
+- conifers with water: distance 0.4444, arc 6.7 deg, share at or above the floor conifers 30.9 percent and water 1.3 percent.
+- conifers with docks (control: docks): distance 0.1836, arc 2.5 deg, share at or above the floor conifers 30.9 percent and docks 47.5 percent.
+- conifers with boats: distance 0.2347, arc 4.1 deg, share at or above the floor conifers 30.9 percent and boats 32.4 percent.
+- broadleaf with snags: distance 0.4356, arc 19.9 deg, share at or above the floor broadleaf 13.4 percent and snags 3.7 percent.
+- broadleaf with shore: distance 0.2579, arc 7.6 deg, share at or above the floor broadleaf 13.4 percent and shore 6.2 percent.
+- broadleaf with water: distance 0.4021, arc 1.6 deg, share at or above the floor broadleaf 13.4 percent and water 1.3 percent.
+- broadleaf with docks (control: docks): distance 0.4289, arc 10.8 deg, share at or above the floor broadleaf 13.4 percent and docks 47.5 percent.
+- broadleaf with boats: distance 0.2849, arc 4.2 deg, share at or above the floor broadleaf 13.4 percent and boats 32.4 percent.
+- snags with shore: distance 0.3759, arc 12.3 deg, share at or above the floor snags 3.7 percent and shore 6.2 percent.
+- snags with water: distance 0.4922, arc 21.5 deg, share at or above the floor snags 3.7 percent and water 1.3 percent.
+- snags with docks (control: docks): distance 0.6827, arc 30.7 deg, share at or above the floor snags 3.7 percent and docks 47.5 percent.
+- snags with boats: distance 0.4947, arc 24.1 deg, share at or above the floor snags 3.7 percent and boats 32.4 percent.
+- shore with water: distance 0.3277, arc 9.2 deg, share at or above the floor shore 6.2 percent and water 1.3 percent.
+- shore with docks (control: docks): distance 0.5147, arc 18.4 deg, share at or above the floor shore 6.2 percent and docks 47.5 percent.
+- shore with boats: distance 0.309, arc 11.8 deg, share at or above the floor shore 6.2 percent and boats 32.4 percent.
+- water with docks (control: docks): distance 0.5328, arc 9.2 deg, share at or above the floor water 1.3 percent and docks 47.5 percent.
+- water with boats: distance 0.3309, arc 2.5 deg, share at or above the floor water 1.3 percent and boats 32.4 percent.
+- docks with boats (control: docks): distance 0.3167, arc 6.6 deg, share at or above the floor docks 47.5 percent and boats 32.4 percent.
+
+### Setting 3: mixer preset Channel cycle, swap on, the opening balance, mixer Channel cycle
+- sky: counted, n 68844, at or above the floor 25408 (36.9 percent), mean hue 70.3 deg, resultant 0.9958, 80 percent arc 15 deg.
+- conifers: counted, n 130738, at or above the floor 42109 (32.2 percent), mean hue 246.6 deg, resultant 0.9616, 80 percent arc 40 deg.
+- broadleaf: counted, n 4442, at or above the floor 622 (14.0 percent), mean hue 240.5 deg, resultant 0.8599, 80 percent arc 65 deg.
+- snags: counted, n 2183, at or above the floor 77 (3.5 percent), mean hue 216.3 deg, resultant 0.6228, 80 percent arc 110 deg.
+- shore: counted, n 9664, at or above the floor 557 (5.8 percent), mean hue 235.3 deg, resultant 0.7536, 80 percent arc 70 deg.
+- water: counted, n 80543, at or above the floor 1072 (1.3 percent), mean hue 248.8 deg, resultant 0.3409, 80 percent arc 205 deg.
+- docks: counted, n 3276, at or above the floor 1584 (48.4 percent), mean hue 248.1 deg, resultant 0.982, 80 percent arc 25 deg.
+- boats: counted, n 5703, at or above the floor 1843 (32.3 percent), mean hue 242.2 deg, resultant 0.8053, 80 percent arc 50 deg.
+- rest: counted, n 274000, at or above the floor 59980 (21.9 percent), mean hue 244.5 deg, resultant 0.5162, 80 percent arc 195 deg.
+- sky with conifers: distance 0.992, arc 176.3 deg, share at or above the floor sky 36.9 percent and conifers 32.2 percent.
+- sky with broadleaf: distance 0.9783, arc 170.2 deg, share at or above the floor sky 36.9 percent and broadleaf 14.0 percent.
+- sky with snags: distance 0.8385, arc 146.0 deg, share at or above the floor sky 36.9 percent and snags 3.5 percent.
+- sky with shore: distance 0.9156, arc 165.0 deg, share at or above the floor sky 36.9 percent and shore 5.8 percent.
+- sky with water: distance 0.7873, arc 178.6 deg, share at or above the floor sky 36.9 percent and water 1.3 percent.
+- sky with docks (control: docks): distance 1, arc 177.9 deg, share at or above the floor sky 36.9 percent and docks 48.4 percent.
+- sky with boats: distance 0.9019, arc 172.0 deg, share at or above the floor sky 36.9 percent and boats 32.3 percent.
+- conifers with broadleaf: distance 0.271, arc 6.1 deg, share at or above the floor conifers 32.2 percent and broadleaf 14.0 percent.
+- conifers with snags: distance 0.5952, arc 30.3 deg, share at or above the floor conifers 32.2 percent and snags 3.5 percent.
+- conifers with shore: distance 0.3354, arc 11.3 deg, share at or above the floor conifers 32.2 percent and shore 5.8 percent.
+- conifers with water: distance 0.4201, arc 2.3 deg, share at or above the floor conifers 32.2 percent and water 1.3 percent.
+- conifers with docks (control: docks): distance 0.1783, arc 1.5 deg, share at or above the floor conifers 32.2 percent and docks 48.4 percent.
+- conifers with boats: distance 0.2275, arc 4.4 deg, share at or above the floor conifers 32.2 percent and boats 32.3 percent.
+- broadleaf with snags: distance 0.4778, arc 24.2 deg, share at or above the floor broadleaf 14.0 percent and snags 3.5 percent.
+- broadleaf with shore: distance 0.2651, arc 5.2 deg, share at or above the floor broadleaf 14.0 percent and shore 5.8 percent.
+- broadleaf with water: distance 0.429, arc 8.4 deg, share at or above the floor broadleaf 14.0 percent and water 1.3 percent.
+- broadleaf with docks (control: docks): distance 0.4168, arc 7.6 deg, share at or above the floor broadleaf 14.0 percent and docks 48.4 percent.
+- broadleaf with boats: distance 0.2856, arc 1.7 deg, share at or above the floor broadleaf 14.0 percent and boats 32.3 percent.
+- snags with shore: distance 0.4104, arc 19.0 deg, share at or above the floor snags 3.5 percent and shore 5.8 percent.
+- snags with water: distance 0.5239, arc 32.5 deg, share at or above the floor snags 3.5 percent and water 1.3 percent.
+- snags with docks (control: docks): distance 0.6933, arc 31.8 deg, share at or above the floor snags 3.5 percent and docks 48.4 percent.
+- snags with boats: distance 0.5051, arc 25.9 deg, share at or above the floor snags 3.5 percent and boats 32.3 percent.
+- shore with water: distance 0.3348, arc 13.5 deg, share at or above the floor shore 5.8 percent and water 1.3 percent.
+- shore with docks (control: docks): distance 0.4602, arc 12.8 deg, share at or above the floor shore 5.8 percent and docks 48.4 percent.
+- shore with boats: distance 0.2598, arc 6.9 deg, share at or above the floor shore 5.8 percent and boats 32.3 percent.
+- water with docks (control: docks): distance 0.4901, arc 0.7 deg, share at or above the floor water 1.3 percent and docks 48.4 percent.
+- water with boats: distance 0.3279, arc 6.6 deg, share at or above the floor water 1.3 percent and boats 32.3 percent.
+- docks with boats (control: docks): distance 0.3084, arc 5.9 deg, share at or above the floor docks 48.4 percent and boats 32.3 percent.
+
+### Setting 4: mixer preset Copper, swap on, the opening balance, mixer Copper
+- sky: colourless, n 68844, at or above the floor 0 (0.0 percent), mean hue none, resultant none, 80 percent arc none.
+- conifers: counted, n 130738, at or above the floor 114363 (87.5 percent), mean hue 9.4 deg, resultant 0.9936, 80 percent arc 20 deg.
+- broadleaf: counted, n 4442, at or above the floor 3678 (82.8 percent), mean hue 7.9 deg, resultant 0.9891, 80 percent arc 20 deg.
+- snags: counted, n 2183, at or above the floor 1154 (52.9 percent), mean hue 4.5 deg, resultant 0.9909, 80 percent arc 20 deg.
+- shore: counted, n 9664, at or above the floor 4618 (47.8 percent), mean hue 5.3 deg, resultant 0.9896, 80 percent arc 20 deg.
+- water: counted, n 80543, at or above the floor 34799 (43.2 percent), mean hue 5.0 deg, resultant 0.9914, 80 percent arc 20 deg.
+- docks: counted, n 3276, at or above the floor 2735 (83.5 percent), mean hue 11.8 deg, resultant 0.9942, 80 percent arc 15 deg.
+- boats: counted, n 5703, at or above the floor 3551 (62.3 percent), mean hue 7.9 deg, resultant 0.9815, 80 percent arc 20 deg.
+- rest: counted, n 274000, at or above the floor 160660 (58.6 percent), mean hue 8.2 deg, resultant 0.992, 80 percent arc 20 deg.
+- sky with conifers: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and conifers 87.5 percent.
+- sky with broadleaf: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and broadleaf 82.8 percent.
+- sky with snags: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and snags 52.9 percent.
+- sky with shore: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and shore 47.8 percent.
+- sky with water: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and water 43.2 percent.
+- sky with docks (control: docks): distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and docks 83.5 percent.
+- sky with boats: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and boats 62.3 percent.
+- conifers with broadleaf: distance 0.1105, arc 1.5 deg, share at or above the floor conifers 87.5 percent and broadleaf 82.8 percent.
+- conifers with snags: distance 0.2551, arc 4.9 deg, share at or above the floor conifers 87.5 percent and snags 52.9 percent.
+- conifers with shore: distance 0.2031, arc 4.1 deg, share at or above the floor conifers 87.5 percent and shore 47.8 percent.
+- conifers with water: distance 0.2294, arc 4.4 deg, share at or above the floor conifers 87.5 percent and water 43.2 percent.
+- conifers with docks (control: docks): distance 0.1551, arc 2.4 deg, share at or above the floor conifers 87.5 percent and docks 83.5 percent.
+- conifers with boats: distance 0.1426, arc 1.5 deg, share at or above the floor conifers 87.5 percent and boats 62.3 percent.
+- broadleaf with snags: distance 0.1996, arc 3.5 deg, share at or above the floor broadleaf 82.8 percent and snags 52.9 percent.
+- broadleaf with shore: distance 0.1481, arc 2.6 deg, share at or above the floor broadleaf 82.8 percent and shore 47.8 percent.
+- broadleaf with water: distance 0.1887, arc 2.9 deg, share at or above the floor broadleaf 82.8 percent and water 43.2 percent.
+- broadleaf with docks (control: docks): distance 0.227, arc 3.9 deg, share at or above the floor broadleaf 82.8 percent and docks 83.5 percent.
+- broadleaf with boats: distance 0.1145, arc 0.0 deg, share at or above the floor broadleaf 82.8 percent and boats 62.3 percent.
+- snags with shore: distance 0.0819, arc 0.8 deg, share at or above the floor snags 52.9 percent and shore 47.8 percent.
+- snags with water: distance 0.0792, arc 0.5 deg, share at or above the floor snags 52.9 percent and water 43.2 percent.
+- snags with docks (control: docks): distance 0.3874, arc 7.4 deg, share at or above the floor snags 52.9 percent and docks 83.5 percent.
+- snags with boats: distance 0.244, arc 3.4 deg, share at or above the floor snags 52.9 percent and boats 62.3 percent.
+- shore with water: distance 0.0601, arc 0.3 deg, share at or above the floor shore 47.8 percent and water 43.2 percent.
+- shore with docks (control: docks): distance 0.3351, arc 6.6 deg, share at or above the floor shore 47.8 percent and docks 83.5 percent.
+- shore with boats: distance 0.1871, arc 2.6 deg, share at or above the floor shore 47.8 percent and boats 62.3 percent.
+- water with docks (control: docks): distance 0.3626, arc 6.8 deg, share at or above the floor water 43.2 percent and docks 83.5 percent.
+- water with boats: distance 0.2237, arc 2.9 deg, share at or above the floor water 43.2 percent and boats 62.3 percent.
+- docks with boats (control: docks): distance 0.2169, arc 3.9 deg, share at or above the floor docks 83.5 percent and boats 62.3 percent.
+
+### Setting 5: mixer preset Film rotation, swap on, the opening balance, mixer Film rotation
+- sky: counted, n 68844, at or above the floor 11328 (16.4 percent), mean hue 304.9 deg, resultant 0.9914, 80 percent arc 20 deg.
+- conifers: counted, n 130738, at or above the floor 34532 (26.4 percent), mean hue 118.3 deg, resultant 0.9474, 80 percent arc 45 deg.
+- broadleaf: counted, n 4442, at or above the floor 495 (11.1 percent), mean hue 107.5 deg, resultant 0.8339, 80 percent arc 65 deg.
+- snags: counted, n 2183, at or above the floor 66 (3.0 percent), mean hue 83.0 deg, resultant 0.7003, 80 percent arc 65 deg.
+- shore: counted, n 9664, at or above the floor 506 (5.2 percent), mean hue 99.4 deg, resultant 0.7746, 80 percent arc 65 deg.
+- water: colourless, n 80543, at or above the floor 751 (0.9 percent), mean hue 99.6 deg, resultant 0.1958, 80 percent arc 205 deg.
+- docks: counted, n 3276, at or above the floor 1493 (45.6 percent), mean hue 121.3 deg, resultant 0.9763, 80 percent arc 30 deg.
+- boats: counted, n 5703, at or above the floor 1786 (31.3 percent), mean hue 114.8 deg, resultant 0.7934, 80 percent arc 55 deg.
+- rest: counted, n 274000, at or above the floor 46565 (17.0 percent), mean hue 116.9 deg, resultant 0.6784, 80 percent arc 65 deg.
+- sky with conifers: distance 0.9911, arc 173.4 deg, share at or above the floor sky 16.4 percent and conifers 26.4 percent.
+- sky with broadleaf: distance 0.9908, arc 162.6 deg, share at or above the floor sky 16.4 percent and broadleaf 11.1 percent.
+- sky with snags: distance 0.9148, arc 138.1 deg, share at or above the floor sky 16.4 percent and snags 3.0 percent.
+- sky with shore: distance 0.9408, arc 154.5 deg, share at or above the floor sky 16.4 percent and shore 5.2 percent.
+- sky with water: distance undefined (colourless: water), arc undefined, share at or above the floor sky 16.4 percent and water 0.9 percent.
+- sky with docks (control: docks): distance 1, arc 176.4 deg, share at or above the floor sky 16.4 percent and docks 45.6 percent.
+- sky with boats: distance 0.9039, arc 169.9 deg, share at or above the floor sky 16.4 percent and boats 31.3 percent.
+- conifers with broadleaf: distance 0.3227, arc 10.8 deg, share at or above the floor conifers 26.4 percent and broadleaf 11.1 percent.
+- conifers with snags: distance 0.6723, arc 35.3 deg, share at or above the floor conifers 26.4 percent and snags 3.0 percent.
+- conifers with shore: distance 0.413, arc 18.9 deg, share at or above the floor conifers 26.4 percent and shore 5.2 percent.
+- conifers with water: distance undefined (colourless: water), arc undefined, share at or above the floor conifers 26.4 percent and water 0.9 percent.
+- conifers with docks (control: docks): distance 0.2103, arc 3.0 deg, share at or above the floor conifers 26.4 percent and docks 45.6 percent.
+- conifers with boats: distance 0.2323, arc 3.5 deg, share at or above the floor conifers 26.4 percent and boats 31.3 percent.
+- broadleaf with snags: distance 0.5144, arc 24.6 deg, share at or above the floor broadleaf 11.1 percent and snags 3.0 percent.
+- broadleaf with shore: distance 0.2961, arc 8.1 deg, share at or above the floor broadleaf 11.1 percent and shore 5.2 percent.
+- broadleaf with water: distance undefined (colourless: water), arc undefined, share at or above the floor broadleaf 11.1 percent and water 0.9 percent.
+- broadleaf with docks (control: docks): distance 0.4911, arc 13.8 deg, share at or above the floor broadleaf 11.1 percent and docks 45.6 percent.
+- broadleaf with boats: distance 0.3303, arc 7.3 deg, share at or above the floor broadleaf 11.1 percent and boats 31.3 percent.
+- snags with shore: distance 0.4426, arc 16.5 deg, share at or above the floor snags 3.0 percent and shore 5.2 percent.
+- snags with water: distance undefined (colourless: water), arc undefined, share at or above the floor snags 3.0 percent and water 0.9 percent.
+- snags with docks (control: docks): distance 0.7846, arc 38.4 deg, share at or above the floor snags 3.0 percent and docks 45.6 percent.
+- snags with boats: distance 0.6076, arc 31.9 deg, share at or above the floor snags 3.0 percent and boats 31.3 percent.
+- shore with water: distance undefined (colourless: water), arc undefined, share at or above the floor shore 5.2 percent and water 0.9 percent.
+- shore with docks (control: docks): distance 0.5652, arc 21.9 deg, share at or above the floor shore 5.2 percent and docks 45.6 percent.
+- shore with boats: distance 0.3538, arc 15.4 deg, share at or above the floor shore 5.2 percent and boats 31.3 percent.
+- water with docks (control: docks): distance undefined (colourless: water), arc undefined, share at or above the floor water 0.9 percent and docks 45.6 percent.
+- water with boats: distance undefined (colourless: water), arc undefined, share at or above the floor water 0.9 percent and boats 31.3 percent.
+- docks with boats (control: docks): distance 0.325, arc 6.5 deg, share at or above the floor docks 45.6 percent and boats 31.3 percent.
+
+### Setting 6: camera-side gains, swap on, 481 mired, tint -75
+- sky: counted, n 68844, at or above the floor 68844 (100.0 percent), mean hue 225.7 deg, resultant 0.9984, 80 percent arc 10 deg.
+- conifers: counted, n 130738, at or above the floor 108732 (83.2 percent), mean hue 275.2 deg, resultant 0.9256, 80 percent arc 60 deg.
+- broadleaf: counted, n 4442, at or above the floor 3221 (72.5 percent), mean hue 265.9 deg, resultant 0.9533, 80 percent arc 45 deg.
+- snags: counted, n 2183, at or above the floor 1965 (90.0 percent), mean hue 253.4 deg, resultant 0.97, 80 percent arc 40 deg.
+- shore: counted, n 9664, at or above the floor 9035 (93.5 percent), mean hue 252.6 deg, resultant 0.9587, 80 percent arc 45 deg.
+- water: counted, n 80543, at or above the floor 77109 (95.7 percent), mean hue 248.7 deg, resultant 0.974, 80 percent arc 35 deg.
+- docks: counted, n 3276, at or above the floor 3098 (94.6 percent), mean hue 286.5 deg, resultant 0.8347, 80 percent arc 90 deg.
+- boats: counted, n 5703, at or above the floor 5375 (94.3 percent), mean hue 265.8 deg, resultant 0.8418, 80 percent arc 85 deg.
+- rest: counted, n 274000, at or above the floor 251328 (91.7 percent), mean hue 256.5 deg, resultant 0.8968, 80 percent arc 60 deg.
+- sky with conifers: distance 0.9245, arc 49.6 deg, share at or above the floor sky 100.0 percent and conifers 83.2 percent.
+- sky with broadleaf: distance 0.9112, arc 40.2 deg, share at or above the floor sky 100.0 percent and broadleaf 72.5 percent.
+- sky with snags: distance 0.8304, arc 27.7 deg, share at or above the floor sky 100.0 percent and snags 90.0 percent.
+- sky with shore: distance 0.8185, arc 26.9 deg, share at or above the floor sky 100.0 percent and shore 93.5 percent.
+- sky with water: distance 0.8069, arc 23.0 deg, share at or above the floor sky 100.0 percent and water 95.7 percent.
+- sky with docks (control: docks): distance 0.9357, arc 60.8 deg, share at or above the floor sky 100.0 percent and docks 94.6 percent.
+- sky with boats: distance 0.8175, arc 40.1 deg, share at or above the floor sky 100.0 percent and boats 94.3 percent.
+- conifers with broadleaf: distance 0.1974, arc 9.4 deg, share at or above the floor conifers 83.2 percent and broadleaf 72.5 percent.
+- conifers with snags: distance 0.4387, arc 21.8 deg, share at or above the floor conifers 83.2 percent and snags 90.0 percent.
+- conifers with shore: distance 0.4067, arc 22.6 deg, share at or above the floor conifers 83.2 percent and shore 93.5 percent.
+- conifers with water: distance 0.5183, arc 26.5 deg, share at or above the floor conifers 83.2 percent and water 95.7 percent.
+- conifers with docks (control: docks): distance 0.2927, arc 11.3 deg, share at or above the floor conifers 83.2 percent and docks 94.6 percent.
+- conifers with boats: distance 0.3038, arc 9.4 deg, share at or above the floor conifers 83.2 percent and boats 94.3 percent.
+- broadleaf with snags: distance 0.3033, arc 12.5 deg, share at or above the floor broadleaf 72.5 percent and snags 90.0 percent.
+- broadleaf with shore: distance 0.2994, arc 13.3 deg, share at or above the floor broadleaf 72.5 percent and shore 93.5 percent.
+- broadleaf with water: distance 0.4141, arc 17.2 deg, share at or above the floor broadleaf 72.5 percent and water 95.7 percent.
+- broadleaf with docks (control: docks): distance 0.4043, arc 20.6 deg, share at or above the floor broadleaf 72.5 percent and docks 94.6 percent.
+- broadleaf with boats: distance 0.3409, arc 0.1 deg, share at or above the floor broadleaf 72.5 percent and boats 94.3 percent.
+- snags with shore: distance 0.1371, arc 0.8 deg, share at or above the floor snags 90.0 percent and shore 93.5 percent.
+- snags with water: distance 0.1703, arc 4.7 deg, share at or above the floor snags 90.0 percent and water 95.7 percent.
+- snags with docks (control: docks): distance 0.5269, arc 33.1 deg, share at or above the floor snags 90.0 percent and docks 94.6 percent.
+- snags with boats: distance 0.3774, arc 12.4 deg, share at or above the floor snags 90.0 percent and boats 94.3 percent.
+- shore with water: distance 0.1673, arc 3.9 deg, share at or above the floor shore 93.5 percent and water 95.7 percent.
+- shore with docks (control: docks): distance 0.4952, arc 33.9 deg, share at or above the floor shore 93.5 percent and docks 94.6 percent.
+- shore with boats: distance 0.3226, arc 13.2 deg, share at or above the floor shore 93.5 percent and boats 94.3 percent.
+- water with docks (control: docks): distance 0.5588, arc 37.8 deg, share at or above the floor water 95.7 percent and docks 94.6 percent.
+- water with boats: distance 0.3911, arc 17.1 deg, share at or above the floor water 95.7 percent and boats 94.3 percent.
+- docks with boats (control: docks): distance 0.2481, arc 20.7 deg, share at or above the floor docks 94.6 percent and boats 94.3 percent.
+
+### Setting 7: camera-side gains, swap off, 481 mired, tint -75
+- sky: counted, n 68844, at or above the floor 68844 (100.0 percent), mean hue 17.7 deg, resultant 0.9977, 80 percent arc 15 deg.
+- conifers: counted, n 130738, at or above the floor 90235 (69.0 percent), mean hue 315.1 deg, resultant 0.9035, 80 percent arc 70 deg.
+- broadleaf: counted, n 4442, at or above the floor 2595 (58.4 percent), mean hue 326.9 deg, resultant 0.9265, 80 percent arc 60 deg.
+- snags: counted, n 2183, at or above the floor 1632 (74.8 percent), mean hue 343.8 deg, resultant 0.9489, 80 percent arc 50 deg.
+- shore: counted, n 9664, at or above the floor 8210 (85.0 percent), mean hue 345.7 deg, resultant 0.9365, 80 percent arc 55 deg.
+- water: counted, n 80543, at or above the floor 69101 (85.8 percent), mean hue 352.1 deg, resultant 0.9588, 80 percent arc 45 deg.
+- docks: counted, n 3276, at or above the floor 2912 (88.9 percent), mean hue 306.7 deg, resultant 0.8159, 80 percent arc 100 deg.
+- boats: counted, n 5703, at or above the floor 5125 (89.9 percent), mean hue 331.0 deg, resultant 0.8, 80 percent arc 100 deg.
+- rest: counted, n 274000, at or above the floor 226909 (82.8 percent), mean hue 341.8 deg, resultant 0.8518, 80 percent arc 75 deg.
+- sky with conifers: distance 0.9195, arc 62.5 deg, share at or above the floor sky 100.0 percent and conifers 69.0 percent.
+- sky with broadleaf: distance 0.9065, arc 50.8 deg, share at or above the floor sky 100.0 percent and broadleaf 58.4 percent.
+- sky with snags: distance 0.8172, arc 33.9 deg, share at or above the floor sky 100.0 percent and snags 74.8 percent.
+- sky with shore: distance 0.8046, arc 32.0 deg, share at or above the floor sky 100.0 percent and shore 85.0 percent.
+- sky with water: distance 0.7762, arc 25.6 deg, share at or above the floor sky 100.0 percent and water 85.8 percent.
+- sky with docks (control: docks): distance 0.9312, arc 71.0 deg, share at or above the floor sky 100.0 percent and docks 88.9 percent.
+- sky with boats: distance 0.8038, arc 46.7 deg, share at or above the floor sky 100.0 percent and boats 89.9 percent.
+- conifers with broadleaf: distance 0.1979, arc 11.8 deg, share at or above the floor conifers 69.0 percent and broadleaf 58.4 percent.
+- conifers with snags: distance 0.4617, arc 28.6 deg, share at or above the floor conifers 69.0 percent and snags 74.8 percent.
+- conifers with shore: distance 0.4489, arc 30.6 deg, share at or above the floor conifers 69.0 percent and shore 85.0 percent.
+- conifers with water: distance 0.5688, arc 37.0 deg, share at or above the floor conifers 69.0 percent and water 85.8 percent.
+- conifers with docks (control: docks): distance 0.303, arc 8.4 deg, share at or above the floor conifers 69.0 percent and docks 88.9 percent.
+- conifers with boats: distance 0.3265, arc 15.8 deg, share at or above the floor conifers 69.0 percent and boats 89.9 percent.
+- broadleaf with snags: distance 0.3175, arc 16.9 deg, share at or above the floor broadleaf 58.4 percent and snags 74.8 percent.
+- broadleaf with shore: distance 0.3298, arc 18.8 deg, share at or above the floor broadleaf 58.4 percent and shore 85.0 percent.
+- broadleaf with water: distance 0.4649, arc 25.2 deg, share at or above the floor broadleaf 58.4 percent and water 85.8 percent.
+- broadleaf with docks (control: docks): distance 0.3969, arc 20.2 deg, share at or above the floor broadleaf 58.4 percent and docks 88.9 percent.
+- broadleaf with boats: distance 0.3429, arc 4.1 deg, share at or above the floor broadleaf 58.4 percent and boats 89.9 percent.
+- snags with shore: distance 0.1207, arc 1.9 deg, share at or above the floor snags 74.8 percent and shore 85.0 percent.
+- snags with water: distance 0.2009, arc 8.3 deg, share at or above the floor snags 74.8 percent and water 85.8 percent.
+- snags with docks (control: docks): distance 0.5326, arc 37.1 deg, share at or above the floor snags 74.8 percent and docks 88.9 percent.
+- snags with boats: distance 0.3786, arc 12.8 deg, share at or above the floor snags 74.8 percent and boats 89.9 percent.
+- shore with water: distance 0.1734, arc 6.4 deg, share at or above the floor shore 85.0 percent and water 85.8 percent.
+- shore with docks (control: docks): distance 0.5076, arc 39.0 deg, share at or above the floor shore 85.0 percent and docks 88.9 percent.
+- shore with boats: distance 0.3325, arc 14.7 deg, share at or above the floor shore 85.0 percent and boats 89.9 percent.
+- water with docks (control: docks): distance 0.5806, arc 45.4 deg, share at or above the floor water 85.8 percent and docks 88.9 percent.
+- water with boats: distance 0.3939, arc 21.1 deg, share at or above the floor water 85.8 percent and boats 89.9 percent.
+- docks with boats (control: docks): distance 0.2542, arc 24.3 deg, share at or above the floor docks 88.9 percent and boats 89.9 percent.
+
+## NIR_3736.NEF
+- Decoded 2800 by 1864, thinned to 933 by 621 (every third pixel), camera NIKON Z 50, picture 2, sky selection: found.
+- Opening: gains 1, 1.8822, 3.1039, exposure 2.3286, reads 1691 K, tint -81.
+- Pixels by place: sky 81617, conifers 134162, broadleaf 5958, snags 3927, shore 9742, water 60398, docks 3793, boats 5851, rest 273945.
+
+### The gather's rule against the places at the opening render
+- sky: n 81617, sky 100.0 percent, neutral 0.0 percent, foliage 0.0 percent, other 0.0 percent.
+- conifers: n 134162, sky 0.0 percent, neutral 74.7 percent, foliage 15.4 percent, other 10.0 percent.
+- broadleaf: n 5958, sky 0.0 percent, neutral 86.6 percent, foliage 6.0 percent, other 7.4 percent.
+- snags: n 3927, sky 6.4 percent, neutral 91.4 percent, foliage 0.4 percent, other 1.7 percent.
+- shore: n 9742, sky 0.0 percent, neutral 94.8 percent, foliage 1.7 percent, other 3.5 percent.
+- water: n 60398, sky 0.0 percent, neutral 99.0 percent, foliage 0.3 percent, other 0.7 percent.
+- docks: n 3793, sky 0.0 percent, neutral 64.8 percent, foliage 24.1 percent, other 11.1 percent.
+- boats: n 5851, sky 0.0 percent, neutral 83.6 percent, foliage 6.0 percent, other 10.4 percent.
+- rest: n 273945, sky 20.2 percent, neutral 63.5 percent, foliage 10.0 percent, other 6.3 percent.
+
+### Setting 1: camera-side gains, swap on, the opening balance
+- sky: counted, n 81617, at or above the floor 9400 (11.5 percent), mean hue 194.1 deg, resultant 0.9963, 80 percent arc 15 deg.
+- conifers: counted, n 134162, at or above the floor 34009 (25.4 percent), mean hue 9.0 deg, resultant 0.9536, 80 percent arc 40 deg.
+- broadleaf: counted, n 5958, at or above the floor 800 (13.4 percent), mean hue 0.7 deg, resultant 0.8298, 80 percent arc 80 deg.
+- snags: counted, n 3927, at or above the floor 86 (2.2 percent), mean hue 335.9 deg, resultant 0.6485, 80 percent arc 130 deg.
+- shore: counted, n 9742, at or above the floor 506 (5.2 percent), mean hue 355.6 deg, resultant 0.8451, 80 percent arc 60 deg.
+- water: counted, n 60398, at or above the floor 606 (1.0 percent), mean hue 332.3 deg, resultant 0.161, 80 percent arc 215 deg.
+- docks: counted, n 3793, at or above the floor 1337 (35.3 percent), mean hue 9.7 deg, resultant 0.9633, 80 percent arc 30 deg.
+- boats: counted, n 5851, at or above the floor 960 (16.4 percent), mean hue 358.5 deg, resultant 0.7121, 80 percent arc 70 deg.
+- rest: counted, n 273945, at or above the floor 49768 (18.2 percent), mean hue 8.0 deg, resultant 0.7377, 80 percent arc 55 deg.
+- sky with conifers: distance 0.994, arc 174.9 deg, share at or above the floor sky 11.5 percent and conifers 25.4 percent.
+- sky with broadleaf: distance 0.9825, arc 166.6 deg, share at or above the floor sky 11.5 percent and broadleaf 13.4 percent.
+- sky with snags: distance 0.9541, arc 141.8 deg, share at or above the floor sky 11.5 percent and snags 2.2 percent.
+- sky with shore: distance 0.9773, arc 161.5 deg, share at or above the floor sky 11.5 percent and shore 5.2 percent.
+- sky with water: distance 0.756, arc 138.1 deg, share at or above the floor sky 11.5 percent and water 1.0 percent.
+- sky with docks (control: docks): distance 0.9786, arc 175.6 deg, share at or above the floor sky 11.5 percent and docks 35.3 percent.
+- sky with boats: distance 0.8839, arc 164.3 deg, share at or above the floor sky 11.5 percent and boats 16.4 percent.
+- conifers with broadleaf: distance 0.3081, arc 8.3 deg, share at or above the floor conifers 25.4 percent and broadleaf 13.4 percent.
+- conifers with snags: distance 0.5944, arc 33.2 deg, share at or above the floor conifers 25.4 percent and snags 2.2 percent.
+- conifers with shore: distance 0.301, arc 13.4 deg, share at or above the floor conifers 25.4 percent and shore 5.2 percent.
+- conifers with water: distance 0.5415, arc 36.8 deg, share at or above the floor conifers 25.4 percent and water 1.0 percent.
+- conifers with docks (control: docks): distance 0.137, arc 0.6 deg, share at or above the floor conifers 25.4 percent and docks 35.3 percent.
+- conifers with boats: distance 0.3136, arc 10.6 deg, share at or above the floor conifers 25.4 percent and boats 16.4 percent.
+- broadleaf with snags: distance 0.4576, arc 24.8 deg, share at or above the floor broadleaf 13.4 percent and snags 2.2 percent.
+- broadleaf with shore: distance 0.2746, arc 5.1 deg, share at or above the floor broadleaf 13.4 percent and shore 5.2 percent.
+- broadleaf with water: distance 0.4846, arc 28.5 deg, share at or above the floor broadleaf 13.4 percent and water 1.0 percent.
+- broadleaf with docks (control: docks): distance 0.4106, arc 9.0 deg, share at or above the floor broadleaf 13.4 percent and docks 35.3 percent.
+- broadleaf with boats: distance 0.3379, arc 2.2 deg, share at or above the floor broadleaf 13.4 percent and boats 16.4 percent.
+- snags with shore: distance 0.4609, arc 19.7 deg, share at or above the floor snags 2.2 percent and shore 5.2 percent.
+- snags with water: distance 0.5314, arc 3.6 deg, share at or above the floor snags 2.2 percent and water 1.0 percent.
+- snags with docks (control: docks): distance 0.6646, arc 33.8 deg, share at or above the floor snags 2.2 percent and docks 35.3 percent.
+- snags with boats: distance 0.5193, arc 22.6 deg, share at or above the floor snags 2.2 percent and boats 16.4 percent.
+- shore with water: distance 0.4607, arc 23.3 deg, share at or above the floor shore 5.2 percent and water 1.0 percent.
+- shore with docks (control: docks): distance 0.3725, arc 14.1 deg, share at or above the floor shore 5.2 percent and docks 35.3 percent.
+- shore with boats: distance 0.2897, arc 2.9 deg, share at or above the floor shore 5.2 percent and boats 16.4 percent.
+- water with docks (control: docks): distance 0.582, arc 37.4 deg, share at or above the floor water 1.0 percent and docks 35.3 percent.
+- water with boats: distance 0.3755, arc 26.2 deg, share at or above the floor water 1.0 percent and boats 16.4 percent.
+- docks with boats (control: docks): distance 0.3534, arc 11.2 deg, share at or above the floor docks 35.3 percent and boats 16.4 percent.
+
+### Setting 2: camera-side gains, swap off, the opening balance
+- sky: counted, n 81617, at or above the floor 20825 (25.5 percent), mean hue 49.9 deg, resultant 0.995, 80 percent arc 15 deg.
+- conifers: counted, n 134162, at or above the floor 39214 (29.2 percent), mean hue 235.3 deg, resultant 0.9617, 80 percent arc 40 deg.
+- broadleaf: counted, n 5958, at or above the floor 931 (15.6 percent), mean hue 242.9 deg, resultant 0.8858, 80 percent arc 60 deg.
+- snags: counted, n 3927, at or above the floor 132 (3.4 percent), mean hue 258.5 deg, resultant 0.7412, 80 percent arc 70 deg.
+- shore: counted, n 9742, at or above the floor 588 (6.0 percent), mean hue 246.6 deg, resultant 0.8758, 80 percent arc 50 deg.
+- water: counted, n 60398, at or above the floor 1235 (2.0 percent), mean hue 348.2 deg, resultant 0.0257, 80 percent arc 210 deg.
+- docks: counted, n 3793, at or above the floor 1368 (36.1 percent), mean hue 234.2 deg, resultant 0.9639, 80 percent arc 30 deg.
+- boats: counted, n 5851, at or above the floor 1068 (18.3 percent), mean hue 244.2 deg, resultant 0.6692, 80 percent arc 65 deg.
+- rest: counted, n 273945, at or above the floor 58815 (21.5 percent), mean hue 236.7 deg, resultant 0.6167, 80 percent arc 75 deg.
+- sky with conifers: distance 0.9894, arc 174.6 deg, share at or above the floor sky 25.5 percent and conifers 29.2 percent.
+- sky with broadleaf: distance 0.9849, arc 167.0 deg, share at or above the floor sky 25.5 percent and broadleaf 15.6 percent.
+- sky with snags: distance 0.9597, arc 151.4 deg, share at or above the floor sky 25.5 percent and snags 3.4 percent.
+- sky with shore: distance 0.9694, arc 163.3 deg, share at or above the floor sky 25.5 percent and shore 6.0 percent.
+- sky with water: distance 0.7562, arc 61.6 deg, share at or above the floor sky 25.5 percent and water 2.0 percent.
+- sky with docks (control: docks): distance 0.9671, arc 175.7 deg, share at or above the floor sky 25.5 percent and docks 36.1 percent.
+- sky with boats: distance 0.8533, arc 165.7 deg, share at or above the floor sky 25.5 percent and boats 18.3 percent.
+- conifers with broadleaf: distance 0.2725, arc 7.6 deg, share at or above the floor conifers 29.2 percent and broadleaf 15.6 percent.
+- conifers with snags: distance 0.5113, arc 23.2 deg, share at or above the floor conifers 29.2 percent and snags 3.4 percent.
+- conifers with shore: distance 0.3083, arc 11.3 deg, share at or above the floor conifers 29.2 percent and shore 6.0 percent.
+- conifers with water: distance 0.5728, arc 113.0 deg, share at or above the floor conifers 29.2 percent and water 2.0 percent.
+- conifers with docks (control: docks): distance 0.1422, arc 1.1 deg, share at or above the floor conifers 29.2 percent and docks 36.1 percent.
+- conifers with boats: distance 0.3183, arc 8.9 deg, share at or above the floor conifers 29.2 percent and boats 18.3 percent.
+- broadleaf with snags: distance 0.3832, arc 15.6 deg, share at or above the floor broadleaf 15.6 percent and snags 3.4 percent.
+- broadleaf with shore: distance 0.2375, arc 3.7 deg, share at or above the floor broadleaf 15.6 percent and shore 6.0 percent.
+- broadleaf with water: distance 0.5141, arc 105.4 deg, share at or above the floor broadleaf 15.6 percent and water 2.0 percent.
+- broadleaf with docks (control: docks): distance 0.377, arc 8.7 deg, share at or above the floor broadleaf 15.6 percent and docks 36.1 percent.
+- broadleaf with boats: distance 0.3151, arc 1.3 deg, share at or above the floor broadleaf 15.6 percent and boats 18.3 percent.
+- snags with shore: distance 0.3795, arc 12.0 deg, share at or above the floor snags 3.4 percent and shore 6.0 percent.
+- snags with water: distance 0.5241, arc 89.7 deg, share at or above the floor snags 3.4 percent and water 2.0 percent.
+- snags with docks (control: docks): distance 0.5896, arc 24.3 deg, share at or above the floor snags 3.4 percent and docks 36.1 percent.
+- snags with boats: distance 0.4275, arc 14.3 deg, share at or above the floor snags 3.4 percent and boats 18.3 percent.
+- shore with water: distance 0.4879, arc 101.7 deg, share at or above the floor shore 6.0 percent and water 2.0 percent.
+- shore with docks (control: docks): distance 0.3836, arc 12.4 deg, share at or above the floor shore 6.0 percent and docks 36.1 percent.
+- shore with boats: distance 0.2689, arc 2.4 deg, share at or above the floor shore 6.0 percent and boats 18.3 percent.
+- water with docks (control: docks): distance 0.6076, arc 114.1 deg, share at or above the floor water 2.0 percent and docks 36.1 percent.
+- water with boats: distance 0.3598, arc 104.1 deg, share at or above the floor water 2.0 percent and boats 18.3 percent.
+- docks with boats (control: docks): distance 0.3627, arc 10.0 deg, share at or above the floor docks 36.1 percent and boats 18.3 percent.
+
+### Setting 3: mixer preset Channel cycle, swap on, the opening balance, mixer Channel cycle
+- sky: counted, n 81617, at or above the floor 24813 (30.4 percent), mean hue 70.1 deg, resultant 0.9956, 80 percent arc 15 deg.
+- conifers: counted, n 134162, at or above the floor 41014 (30.6 percent), mean hue 246.6 deg, resultant 0.9637, 80 percent arc 35 deg.
+- broadleaf: counted, n 5958, at or above the floor 939 (15.8 percent), mean hue 239.8 deg, resultant 0.8794, 80 percent arc 60 deg.
+- snags: counted, n 3927, at or above the floor 124 (3.2 percent), mean hue 226.8 deg, resultant 0.7437, 80 percent arc 70 deg.
+- shore: counted, n 9742, at or above the floor 572 (5.9 percent), mean hue 237.9 deg, resultant 0.8698, 80 percent arc 50 deg.
+- water: counted, n 60398, at or above the floor 1196 (2.0 percent), mean hue 320.9 deg, resultant 0.0032, 80 percent arc 210 deg.
+- docks: counted, n 3793, at or above the floor 1394 (36.8 percent), mean hue 247.0 deg, resultant 0.962, 80 percent arc 30 deg.
+- boats: counted, n 5851, at or above the floor 1061 (18.1 percent), mean hue 237.4 deg, resultant 0.6591, 80 percent arc 75 deg.
+- rest: counted, n 273945, at or above the floor 61679 (22.5 percent), mean hue 245.5 deg, resultant 0.5878, 80 percent arc 105 deg.
+- sky with conifers: distance 0.9888, arc 176.5 deg, share at or above the floor sky 30.4 percent and conifers 30.6 percent.
+- sky with broadleaf: distance 0.9776, arc 169.7 deg, share at or above the floor sky 30.4 percent and broadleaf 15.8 percent.
+- sky with snags: distance 0.9539, arc 156.7 deg, share at or above the floor sky 30.4 percent and snags 3.2 percent.
+- sky with shore: distance 0.9607, arc 167.8 deg, share at or above the floor sky 30.4 percent and shore 5.9 percent.
+- sky with water: distance 0.7086, arc 109.2 deg, share at or above the floor sky 30.4 percent and water 2.0 percent.
+- sky with docks (control: docks): distance 0.9599, arc 176.8 deg, share at or above the floor sky 30.4 percent and docks 36.8 percent.
+- sky with boats: distance 0.8478, arc 167.3 deg, share at or above the floor sky 30.4 percent and boats 18.1 percent.
+- conifers with broadleaf: distance 0.2795, arc 6.8 deg, share at or above the floor conifers 30.6 percent and broadleaf 15.8 percent.
+- conifers with snags: distance 0.4767, arc 19.8 deg, share at or above the floor conifers 30.6 percent and snags 3.2 percent.
+- conifers with shore: distance 0.2736, arc 8.7 deg, share at or above the floor conifers 30.6 percent and shore 5.9 percent.
+- conifers with water: distance 0.5437, arc 74.3 deg, share at or above the floor conifers 30.6 percent and water 2.0 percent.
+- conifers with docks (control: docks): distance 0.1327, arc 0.3 deg, share at or above the floor conifers 30.6 percent and docks 36.8 percent.
+- conifers with boats: distance 0.3296, arc 9.2 deg, share at or above the floor conifers 30.6 percent and boats 18.1 percent.
+- broadleaf with snags: distance 0.3639, arc 13.0 deg, share at or above the floor broadleaf 15.8 percent and snags 3.2 percent.
+- broadleaf with shore: distance 0.2796, arc 1.9 deg, share at or above the floor broadleaf 15.8 percent and shore 5.9 percent.
+- broadleaf with water: distance 0.5204, arc 81.1 deg, share at or above the floor broadleaf 15.8 percent and water 2.0 percent.
+- broadleaf with docks (control: docks): distance 0.3704, arc 7.1 deg, share at or above the floor broadleaf 15.8 percent and docks 36.8 percent.
+- broadleaf with boats: distance 0.3197, arc 2.4 deg, share at or above the floor broadleaf 15.8 percent and boats 18.1 percent.
+- snags with shore: distance 0.3701, arc 11.1 deg, share at or above the floor snags 3.2 percent and shore 5.9 percent.
+- snags with water: distance 0.5278, arc 94.1 deg, share at or above the floor snags 3.2 percent and water 2.0 percent.
+- snags with docks (control: docks): distance 0.5471, arc 20.1 deg, share at or above the floor snags 3.2 percent and docks 36.8 percent.
+- snags with boats: distance 0.407, arc 10.6 deg, share at or above the floor snags 3.2 percent and boats 18.1 percent.
+- shore with water: distance 0.4854, arc 83.0 deg, share at or above the floor shore 5.9 percent and water 2.0 percent.
+- shore with docks (control: docks): distance 0.3414, arc 9.0 deg, share at or above the floor shore 5.9 percent and docks 36.8 percent.
+- shore with boats: distance 0.2794, arc 0.5 deg, share at or above the floor shore 5.9 percent and boats 18.1 percent.
+- water with docks (control: docks): distance 0.5573, arc 73.9 deg, share at or above the floor water 2.0 percent and docks 36.8 percent.
+- water with boats: distance 0.3479, arc 83.5 deg, share at or above the floor water 2.0 percent and boats 18.1 percent.
+- docks with boats (control: docks): distance 0.3571, arc 9.6 deg, share at or above the floor docks 36.8 percent and boats 18.1 percent.
+
+### Setting 4: mixer preset Copper, swap on, the opening balance, mixer Copper
+- sky: colourless, n 81617, at or above the floor 0 (0.0 percent), mean hue none, resultant none, 80 percent arc none.
+- conifers: counted, n 134162, at or above the floor 115825 (86.3 percent), mean hue 9.3 deg, resultant 0.994, 80 percent arc 20 deg.
+- broadleaf: counted, n 5958, at or above the floor 4893 (82.1 percent), mean hue 7.7 deg, resultant 0.9887, 80 percent arc 20 deg.
+- snags: counted, n 3927, at or above the floor 2520 (64.2 percent), mean hue 5.8 deg, resultant 0.9925, 80 percent arc 20 deg.
+- shore: counted, n 9742, at or above the floor 5048 (51.8 percent), mean hue 5.7 deg, resultant 0.9907, 80 percent arc 20 deg.
+- water: counted, n 60398, at or above the floor 23593 (39.1 percent), mean hue 4.3 deg, resultant 0.9895, 80 percent arc 20 deg.
+- docks: counted, n 3793, at or above the floor 2683 (70.7 percent), mean hue 10.7 deg, resultant 0.9938, 80 percent arc 20 deg.
+- boats: counted, n 5851, at or above the floor 2910 (49.7 percent), mean hue 5.9 deg, resultant 0.9901, 80 percent arc 20 deg.
+- rest: counted, n 273945, at or above the floor 161675 (59.0 percent), mean hue 8.4 deg, resultant 0.9925, 80 percent arc 20 deg.
+- sky with conifers: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and conifers 86.3 percent.
+- sky with broadleaf: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and broadleaf 82.1 percent.
+- sky with snags: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and snags 64.2 percent.
+- sky with shore: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and shore 51.8 percent.
+- sky with water: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and water 39.1 percent.
+- sky with docks (control: docks): distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and docks 70.7 percent.
+- sky with boats: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and boats 49.7 percent.
+- conifers with broadleaf: distance 0.1279, arc 1.5 deg, share at or above the floor conifers 86.3 percent and broadleaf 82.1 percent.
+- conifers with snags: distance 0.1882, arc 3.4 deg, share at or above the floor conifers 86.3 percent and snags 64.2 percent.
+- conifers with shore: distance 0.1874, arc 3.6 deg, share at or above the floor conifers 86.3 percent and shore 51.8 percent.
+- conifers with water: distance 0.2463, arc 5.0 deg, share at or above the floor conifers 86.3 percent and water 39.1 percent.
+- conifers with docks (control: docks): distance 0.0997, arc 1.4 deg, share at or above the floor conifers 86.3 percent and docks 70.7 percent.
+- conifers with boats: distance 0.184, arc 3.4 deg, share at or above the floor conifers 86.3 percent and boats 49.7 percent.
+- broadleaf with snags: distance 0.1539, arc 1.9 deg, share at or above the floor broadleaf 82.1 percent and snags 64.2 percent.
+- broadleaf with shore: distance 0.1393, arc 2.1 deg, share at or above the floor broadleaf 82.1 percent and shore 51.8 percent.
+- broadleaf with water: distance 0.1813, arc 3.5 deg, share at or above the floor broadleaf 82.1 percent and water 39.1 percent.
+- broadleaf with docks (control: docks): distance 0.176, arc 3.0 deg, share at or above the floor broadleaf 82.1 percent and docks 70.7 percent.
+- broadleaf with boats: distance 0.1297, arc 1.8 deg, share at or above the floor broadleaf 82.1 percent and boats 49.7 percent.
+- snags with shore: distance 0.0723, arc 0.2 deg, share at or above the floor snags 64.2 percent and shore 51.8 percent.
+- snags with water: distance 0.1034, arc 1.6 deg, share at or above the floor snags 64.2 percent and water 39.1 percent.
+- snags with docks (control: docks): distance 0.2676, arc 4.9 deg, share at or above the floor snags 64.2 percent and docks 70.7 percent.
+- snags with boats: distance 0.0795, arc 0.1 deg, share at or above the floor snags 64.2 percent and boats 49.7 percent.
+- shore with water: distance 0.0756, arc 1.4 deg, share at or above the floor shore 51.8 percent and water 39.1 percent.
+- shore with docks (control: docks): distance 0.2606, arc 5.0 deg, share at or above the floor shore 51.8 percent and docks 70.7 percent.
+- shore with boats: distance 0.0454, arc 0.2 deg, share at or above the floor shore 51.8 percent and boats 49.7 percent.
+- water with docks (control: docks): distance 0.3135, arc 6.5 deg, share at or above the floor water 39.1 percent and docks 70.7 percent.
+- water with boats: distance 0.0914, arc 1.6 deg, share at or above the floor water 39.1 percent and boats 49.7 percent.
+- docks with boats (control: docks): distance 0.2551, arc 4.8 deg, share at or above the floor docks 70.7 percent and boats 49.7 percent.
+
+### Setting 5: mixer preset Film rotation, swap on, the opening balance, mixer Film rotation
+- sky: counted, n 81617, at or above the floor 10348 (12.7 percent), mean hue 304.6 deg, resultant 0.991, 80 percent arc 25 deg.
+- conifers: counted, n 134162, at or above the floor 33046 (24.6 percent), mean hue 118.2 deg, resultant 0.9513, 80 percent arc 40 deg.
+- broadleaf: counted, n 5958, at or above the floor 803 (13.5 percent), mean hue 108.7 deg, resultant 0.8511, 80 percent arc 60 deg.
+- snags: counted, n 3927, at or above the floor 106 (2.7 percent), mean hue 86.4 deg, resultant 0.6917, 80 percent arc 90 deg.
+- shore: counted, n 9742, at or above the floor 510 (5.2 percent), mean hue 105.9 deg, resultant 0.8547, 80 percent arc 55 deg.
+- water: counted, n 60398, at or above the floor 985 (1.6 percent), mean hue 322.3 deg, resultant 0.0962, 80 percent arc 200 deg.
+- docks: counted, n 3793, at or above the floor 1320 (34.8 percent), mean hue 120.2 deg, resultant 0.962, 80 percent arc 35 deg.
+- boats: counted, n 5851, at or above the floor 1010 (17.3 percent), mean hue 109.5 deg, resultant 0.6731, 80 percent arc 70 deg.
+- rest: counted, n 273945, at or above the floor 48898 (17.8 percent), mean hue 117.9 deg, resultant 0.7181, 80 percent arc 55 deg.
+- sky with conifers: distance 0.9913, arc 173.7 deg, share at or above the floor sky 12.7 percent and conifers 24.6 percent.
+- sky with broadleaf: distance 0.9862, arc 164.1 deg, share at or above the floor sky 12.7 percent and broadleaf 13.5 percent.
+- sky with snags: distance 0.961, arc 141.9 deg, share at or above the floor sky 12.7 percent and snags 2.7 percent.
+- sky with shore: distance 0.9775, arc 161.3 deg, share at or above the floor sky 12.7 percent and shore 5.2 percent.
+- sky with water: distance 0.7752, arc 17.8 deg, share at or above the floor sky 12.7 percent and water 1.6 percent.
+- sky with docks (control: docks): distance 0.9748, arc 175.6 deg, share at or above the floor sky 12.7 percent and docks 34.8 percent.
+- sky with boats: distance 0.8535, arc 164.9 deg, share at or above the floor sky 12.7 percent and boats 17.3 percent.
+- conifers with broadleaf: distance 0.3035, arc 9.6 deg, share at or above the floor conifers 24.6 percent and broadleaf 13.5 percent.
+- conifers with snags: distance 0.6528, arc 31.8 deg, share at or above the floor conifers 24.6 percent and snags 2.7 percent.
+- conifers with shore: distance 0.3253, arc 12.3 deg, share at or above the floor conifers 24.6 percent and shore 5.2 percent.
+- conifers with water: distance 0.6275, arc 155.9 deg, share at or above the floor conifers 24.6 percent and water 1.6 percent.
+- conifers with docks (control: docks): distance 0.1613, arc 2.0 deg, share at or above the floor conifers 24.6 percent and docks 34.8 percent.
+- conifers with boats: distance 0.3092, arc 8.7 deg, share at or above the floor conifers 24.6 percent and boats 17.3 percent.
+- broadleaf with snags: distance 0.4882, arc 22.2 deg, share at or above the floor broadleaf 13.5 percent and snags 2.7 percent.
+- broadleaf with shore: distance 0.2612, arc 2.8 deg, share at or above the floor broadleaf 13.5 percent and shore 5.2 percent.
+- broadleaf with water: distance 0.5559, arc 146.3 deg, share at or above the floor broadleaf 13.5 percent and water 1.6 percent.
+- broadleaf with docks (control: docks): distance 0.4249, arc 11.5 deg, share at or above the floor broadleaf 13.5 percent and docks 34.8 percent.
+- broadleaf with boats: distance 0.3276, arc 0.8 deg, share at or above the floor broadleaf 13.5 percent and boats 17.3 percent.
+- snags with shore: distance 0.4674, arc 19.5 deg, share at or above the floor snags 2.7 percent and shore 5.2 percent.
+- snags with water: distance 0.5268, arc 124.1 deg, share at or above the floor snags 2.7 percent and water 1.6 percent.
+- snags with docks (control: docks): distance 0.7383, arc 33.7 deg, share at or above the floor snags 2.7 percent and docks 34.8 percent.
+- snags with boats: distance 0.5321, arc 23.0 deg, share at or above the floor snags 2.7 percent and boats 17.3 percent.
+- shore with water: distance 0.5068, arc 143.6 deg, share at or above the floor shore 5.2 percent and water 1.6 percent.
+- shore with docks (control: docks): distance 0.4276, arc 14.3 deg, share at or above the floor shore 5.2 percent and docks 34.8 percent.
+- shore with boats: distance 0.2837, arc 3.6 deg, share at or above the floor shore 5.2 percent and boats 17.3 percent.
+- water with docks (control: docks): distance 0.6833, arc 157.9 deg, share at or above the floor water 1.6 percent and docks 34.8 percent.
+- water with boats: distance 0.4106, arc 147.2 deg, share at or above the floor water 1.6 percent and boats 17.3 percent.
+- docks with boats (control: docks): distance 0.3796, arc 10.7 deg, share at or above the floor docks 34.8 percent and boats 17.3 percent.
+
+### Setting 6: camera-side gains, swap on, 481 mired, tint -75
+- sky: counted, n 81617, at or above the floor 81617 (100.0 percent), mean hue 225.8 deg, resultant 0.9983, 80 percent arc 10 deg.
+- conifers: counted, n 134162, at or above the floor 113532 (84.6 percent), mean hue 273.6 deg, resultant 0.9275, 80 percent arc 60 deg.
+- broadleaf: counted, n 5958, at or above the floor 4481 (75.2 percent), mean hue 265.9 deg, resultant 0.9458, 80 percent arc 45 deg.
+- snags: counted, n 3927, at or above the floor 3396 (86.5 percent), mean hue 255.4 deg, resultant 0.9716, 80 percent arc 35 deg.
+- shore: counted, n 9742, at or above the floor 9154 (94.0 percent), mean hue 253.4 deg, resultant 0.9587, 80 percent arc 45 deg.
+- water: counted, n 60398, at or above the floor 58621 (97.1 percent), mean hue 246.4 deg, resultant 0.9726, 80 percent arc 35 deg.
+- docks: counted, n 3793, at or above the floor 3626 (95.6 percent), mean hue 273.5 deg, resultant 0.8358, 80 percent arc 90 deg.
+- boats: counted, n 5851, at or above the floor 5698 (97.4 percent), mean hue 253.9 deg, resultant 0.9086, 80 percent arc 60 deg.
+- rest: counted, n 273945, at or above the floor 251856 (91.9 percent), mean hue 256.5 deg, resultant 0.8946, 80 percent arc 60 deg.
+- sky with conifers: distance 0.9221, arc 47.8 deg, share at or above the floor sky 100.0 percent and conifers 84.6 percent.
+- sky with broadleaf: distance 0.896, arc 40.1 deg, share at or above the floor sky 100.0 percent and broadleaf 75.2 percent.
+- sky with snags: distance 0.8571, arc 29.6 deg, share at or above the floor sky 100.0 percent and snags 86.5 percent.
+- sky with shore: distance 0.8248, arc 27.6 deg, share at or above the floor sky 100.0 percent and shore 94.0 percent.
+- sky with water: distance 0.7649, arc 20.6 deg, share at or above the floor sky 100.0 percent and water 97.1 percent.
+- sky with docks (control: docks): distance 0.8832, arc 47.7 deg, share at or above the floor sky 100.0 percent and docks 95.6 percent.
+- sky with boats: distance 0.7637, arc 28.1 deg, share at or above the floor sky 100.0 percent and boats 97.4 percent.
+- conifers with broadleaf: distance 0.1566, arc 7.7 deg, share at or above the floor conifers 84.6 percent and broadleaf 75.2 percent.
+- conifers with snags: distance 0.3931, arc 18.1 deg, share at or above the floor conifers 84.6 percent and snags 86.5 percent.
+- conifers with shore: distance 0.3665, arc 20.2 deg, share at or above the floor conifers 84.6 percent and shore 94.0 percent.
+- conifers with water: distance 0.524, arc 27.2 deg, share at or above the floor conifers 84.6 percent and water 97.1 percent.
+- conifers with docks (control: docks): distance 0.2934, arc 0.1 deg, share at or above the floor conifers 84.6 percent and docks 95.6 percent.
+- conifers with boats: distance 0.3433, arc 19.7 deg, share at or above the floor conifers 84.6 percent and boats 97.4 percent.
+- broadleaf with snags: distance 0.2724, arc 10.4 deg, share at or above the floor broadleaf 75.2 percent and snags 86.5 percent.
+- broadleaf with shore: distance 0.2764, arc 12.5 deg, share at or above the floor broadleaf 75.2 percent and shore 94.0 percent.
+- broadleaf with water: distance 0.4411, arc 19.5 deg, share at or above the floor broadleaf 75.2 percent and water 97.1 percent.
+- broadleaf with docks (control: docks): distance 0.3457, arc 7.6 deg, share at or above the floor broadleaf 75.2 percent and docks 95.6 percent.
+- broadleaf with boats: distance 0.3146, arc 12.0 deg, share at or above the floor broadleaf 75.2 percent and boats 97.4 percent.
+- snags with shore: distance 0.1569, arc 2.0 deg, share at or above the floor snags 86.5 percent and shore 94.0 percent.
+- snags with water: distance 0.2565, arc 9.1 deg, share at or above the floor snags 86.5 percent and water 97.1 percent.
+- snags with docks (control: docks): distance 0.4424, arc 18.0 deg, share at or above the floor snags 86.5 percent and docks 95.6 percent.
+- snags with boats: distance 0.3061, arc 1.5 deg, share at or above the floor snags 86.5 percent and boats 97.4 percent.
+- shore with water: distance 0.2031, arc 7.0 deg, share at or above the floor shore 94.0 percent and water 97.1 percent.
+- shore with docks (control: docks): distance 0.3771, arc 20.1 deg, share at or above the floor shore 94.0 percent and docks 95.6 percent.
+- shore with boats: distance 0.2005, arc 0.5 deg, share at or above the floor shore 94.0 percent and boats 97.4 percent.
+- water with docks (control: docks): distance 0.4692, arc 27.1 deg, share at or above the floor water 97.1 percent and docks 95.6 percent.
+- water with boats: distance 0.2639, arc 7.5 deg, share at or above the floor water 97.1 percent and boats 97.4 percent.
+- docks with boats (control: docks): distance 0.274, arc 19.6 deg, share at or above the floor docks 95.6 percent and boats 97.4 percent.
+
+### Setting 7: camera-side gains, swap off, 481 mired, tint -75
+- sky: counted, n 81617, at or above the floor 81617 (100.0 percent), mean hue 17.6 deg, resultant 0.9978, 80 percent arc 15 deg.
+- conifers: counted, n 134162, at or above the floor 93287 (69.5 percent), mean hue 317.1 deg, resultant 0.9033, 80 percent arc 70 deg.
+- broadleaf: counted, n 5958, at or above the floor 3717 (62.4 percent), mean hue 327.1 deg, resultant 0.917, 80 percent arc 60 deg.
+- snags: counted, n 3927, at or above the floor 2694 (68.6 percent), mean hue 340.8 deg, resultant 0.9511, 80 percent arc 50 deg.
+- shore: counted, n 9742, at or above the floor 8466 (86.9 percent), mean hue 344.8 deg, resultant 0.937, 80 percent arc 55 deg.
+- water: counted, n 60398, at or above the floor 54557 (90.3 percent), mean hue 355.2 deg, resultant 0.9579, 80 percent arc 45 deg.
+- docks: counted, n 3793, at or above the floor 3464 (91.3 percent), mean hue 322.6 deg, resultant 0.8019, 80 percent arc 100 deg.
+- boats: counted, n 5851, at or above the floor 5493 (93.9 percent), mean hue 345.2 deg, resultant 0.8736, 80 percent arc 70 deg.
+- rest: counted, n 273945, at or above the floor 228313 (83.3 percent), mean hue 341.9 deg, resultant 0.8484, 80 percent arc 80 deg.
+- sky with conifers: distance 0.9175, arc 60.5 deg, share at or above the floor sky 100.0 percent and conifers 69.5 percent.
+- sky with broadleaf: distance 0.8899, arc 50.5 deg, share at or above the floor sky 100.0 percent and broadleaf 62.4 percent.
+- sky with snags: distance 0.8447, arc 36.8 deg, share at or above the floor sky 100.0 percent and snags 68.6 percent.
+- sky with shore: distance 0.8108, arc 32.8 deg, share at or above the floor sky 100.0 percent and shore 86.9 percent.
+- sky with water: distance 0.7312, arc 22.4 deg, share at or above the floor sky 100.0 percent and water 90.3 percent.
+- sky with docks (control: docks): distance 0.8715, arc 55.0 deg, share at or above the floor sky 100.0 percent and docks 91.3 percent.
+- sky with boats: distance 0.7479, arc 32.4 deg, share at or above the floor sky 100.0 percent and boats 93.9 percent.
+- conifers with broadleaf: distance 0.1624, arc 10.0 deg, share at or above the floor conifers 69.5 percent and broadleaf 62.4 percent.
+- conifers with snags: distance 0.4138, arc 23.7 deg, share at or above the floor conifers 69.5 percent and snags 68.6 percent.
+- conifers with shore: distance 0.4113, arc 27.7 deg, share at or above the floor conifers 69.5 percent and shore 86.9 percent.
+- conifers with water: distance 0.5733, arc 38.1 deg, share at or above the floor conifers 69.5 percent and water 90.3 percent.
+- conifers with docks (control: docks): distance 0.3139, arc 5.5 deg, share at or above the floor conifers 69.5 percent and docks 91.3 percent.
+- conifers with boats: distance 0.3747, arc 28.0 deg, share at or above the floor conifers 69.5 percent and boats 93.9 percent.
+- broadleaf with snags: distance 0.2813, arc 13.7 deg, share at or above the floor broadleaf 62.4 percent and snags 68.6 percent.
+- broadleaf with shore: distance 0.3051, arc 17.7 deg, share at or above the floor broadleaf 62.4 percent and shore 86.9 percent.
+- broadleaf with water: distance 0.4866, arc 28.1 deg, share at or above the floor broadleaf 62.4 percent and water 90.3 percent.
+- broadleaf with docks (control: docks): distance 0.3477, arc 4.5 deg, share at or above the floor broadleaf 62.4 percent and docks 91.3 percent.
+- broadleaf with boats: distance 0.3293, arc 18.1 deg, share at or above the floor broadleaf 62.4 percent and boats 93.9 percent.
+- snags with shore: distance 0.1532, arc 4.0 deg, share at or above the floor snags 68.6 percent and shore 86.9 percent.
+- snags with water: distance 0.3034, arc 14.4 deg, share at or above the floor snags 68.6 percent and water 90.3 percent.
+- snags with docks (control: docks): distance 0.4496, arc 18.2 deg, share at or above the floor snags 68.6 percent and docks 91.3 percent.
+- snags with boats: distance 0.3141, arc 4.4 deg, share at or above the floor snags 68.6 percent and boats 93.9 percent.
+- shore with water: distance 0.2149, arc 10.4 deg, share at or above the floor shore 86.9 percent and water 90.3 percent.
+- shore with docks (control: docks): distance 0.388, arc 22.2 deg, share at or above the floor shore 86.9 percent and docks 91.3 percent.
+- shore with boats: distance 0.212, arc 0.4 deg, share at or above the floor shore 86.9 percent and boats 93.9 percent.
+- water with docks (control: docks): distance 0.472, arc 32.6 deg, share at or above the floor water 90.3 percent and docks 91.3 percent.
+- water with boats: distance 0.2581, arc 10.0 deg, share at or above the floor water 90.3 percent and boats 93.9 percent.
+- docks with boats (control: docks): distance 0.2788, arc 22.6 deg, share at or above the floor docks 91.3 percent and boats 93.9 percent.
+
+## NIR_3742.NEF
+- Decoded 2800 by 1864, thinned to 933 by 621 (every third pixel), camera NIKON Z 50, picture 1, sky selection: found.
+- Opening: gains 1, 1.8674, 3.0228, exposure 2.35, reads 1701 K, tint -83.
+- Pixels by place: sky 26975, conifers 141215, broadleaf 7194, snags 3530, shore 6031, water 62907, docks 3773, boats 9444, rest 318324.
+
+### The gather's rule against the places at the opening render
+- sky: n 26975, sky 100.0 percent, neutral 0.0 percent, foliage 0.0 percent, other 0.0 percent.
+- conifers: n 141215, sky 0.0 percent, neutral 78.0 percent, foliage 13.2 percent, other 8.9 percent.
+- broadleaf: n 7194, sky 0.0 percent, neutral 87.7 percent, foliage 6.1 percent, other 6.2 percent.
+- snags: n 3530, sky 18.9 percent, neutral 80.1 percent, foliage 0.1 percent, other 0.9 percent.
+- shore: n 6031, sky 0.0 percent, neutral 97.8 percent, foliage 0.4 percent, other 1.8 percent.
+- water: n 62907, sky 0.0 percent, neutral 98.9 percent, foliage 0.3 percent, other 0.8 percent.
+- docks: n 3773, sky 0.0 percent, neutral 69.0 percent, foliage 20.3 percent, other 10.7 percent.
+- boats: n 9444, sky 0.0 percent, neutral 73.9 percent, foliage 15.0 percent, other 11.1 percent.
+- rest: n 318324, sky 11.7 percent, neutral 73.0 percent, foliage 8.8 percent, other 6.6 percent.
+
+### Setting 1: camera-side gains, swap on, the opening balance
+- sky: counted, n 26975, at or above the floor 7714 (28.6 percent), mean hue 194.4 deg, resultant 0.9963, 80 percent arc 15 deg.
+- conifers: counted, n 141215, at or above the floor 31122 (22.0 percent), mean hue 9.1 deg, resultant 0.9442, 80 percent arc 45 deg.
+- broadleaf: counted, n 7194, at or above the floor 886 (12.3 percent), mean hue 3.8 deg, resultant 0.8025, 80 percent arc 80 deg.
+- snags: counted, n 3530, at or above the floor 44 (1.3 percent), mean hue 226.7 deg, resultant 0.4774, 80 percent arc 150 deg.
+- shore: counted, n 6031, at or above the floor 130 (2.2 percent), mean hue 324.0 deg, resultant 0.5589, 80 percent arc 155 deg.
+- water: counted, n 62907, at or above the floor 707 (1.1 percent), mean hue 331.1 deg, resultant 0.0554, 80 percent arc 220 deg.
+- docks: counted, n 3773, at or above the floor 1168 (31.0 percent), mean hue 8.7 deg, resultant 0.9677, 80 percent arc 35 deg.
+- boats: counted, n 9444, at or above the floor 2469 (26.1 percent), mean hue 5.4 deg, resultant 0.8006, 80 percent arc 50 deg.
+- rest: counted, n 318324, at or above the floor 55773 (17.5 percent), mean hue 6.6 deg, resultant 0.6574, 80 percent arc 75 deg.
+- sky with conifers: distance 0.9896, arc 174.7 deg, share at or above the floor sky 28.6 percent and conifers 22.0 percent.
+- sky with broadleaf: distance 0.9853, arc 169.4 deg, share at or above the floor sky 28.6 percent and broadleaf 12.3 percent.
+- sky with snags: distance 0.5635, arc 32.3 deg, share at or above the floor sky 28.6 percent and snags 1.3 percent.
+- sky with shore: distance 0.925, arc 129.6 deg, share at or above the floor sky 28.6 percent and shore 2.2 percent.
+- sky with water: distance 0.7267, arc 136.7 deg, share at or above the floor sky 28.6 percent and water 1.1 percent.
+- sky with docks (control: docks): distance 0.9983, arc 174.3 deg, share at or above the floor sky 28.6 percent and docks 31.0 percent.
+- sky with boats: distance 0.8896, arc 171.1 deg, share at or above the floor sky 28.6 percent and boats 26.1 percent.
+- conifers with broadleaf: distance 0.2512, arc 5.3 deg, share at or above the floor conifers 22.0 percent and broadleaf 12.3 percent.
+- conifers with snags: distance 0.9172, arc 142.4 deg, share at or above the floor conifers 22.0 percent and snags 1.3 percent.
+- conifers with shore: distance 0.5548, arc 45.1 deg, share at or above the floor conifers 22.0 percent and shore 2.2 percent.
+- conifers with water: distance 0.547, arc 38.0 deg, share at or above the floor conifers 22.0 percent and water 1.1 percent.
+- conifers with docks (control: docks): distance 0.1614, arc 0.4 deg, share at or above the floor conifers 22.0 percent and docks 31.0 percent.
+- conifers with boats: distance 0.1996, arc 3.7 deg, share at or above the floor conifers 22.0 percent and boats 26.1 percent.
+- broadleaf with snags: distance 0.8399, arc 137.1 deg, share at or above the floor broadleaf 12.3 percent and snags 1.3 percent.
+- broadleaf with shore: distance 0.4739, arc 39.8 deg, share at or above the floor broadleaf 12.3 percent and shore 2.2 percent.
+- broadleaf with water: distance 0.4961, arc 32.7 deg, share at or above the floor broadleaf 12.3 percent and water 1.1 percent.
+- broadleaf with docks (control: docks): distance 0.3751, arc 4.9 deg, share at or above the floor broadleaf 12.3 percent and docks 31.0 percent.
+- broadleaf with boats: distance 0.3014, arc 1.6 deg, share at or above the floor broadleaf 12.3 percent and boats 26.1 percent.
+- snags with shore: distance 0.7426, arc 97.3 deg, share at or above the floor snags 1.3 percent and shore 2.2 percent.
+- snags with water: distance 0.6345, arc 104.4 deg, share at or above the floor snags 1.3 percent and water 1.1 percent.
+- snags with docks (control: docks): distance 0.9588, arc 142.0 deg, share at or above the floor snags 1.3 percent and docks 31.0 percent.
+- snags with boats: distance 0.8276, arc 138.8 deg, share at or above the floor snags 1.3 percent and boats 26.1 percent.
+- shore with water: distance 0.5485, arc 7.1 deg, share at or above the floor shore 2.2 percent and water 1.1 percent.
+- shore with docks (control: docks): distance 0.6196, arc 44.7 deg, share at or above the floor shore 2.2 percent and docks 31.0 percent.
+- shore with boats: distance 0.501, arc 41.5 deg, share at or above the floor shore 2.2 percent and boats 26.1 percent.
+- water with docks (control: docks): distance 0.6074, arc 37.6 deg, share at or above the floor water 1.1 percent and docks 31.0 percent.
+- water with boats: distance 0.4354, arc 34.4 deg, share at or above the floor water 1.1 percent and boats 26.1 percent.
+- docks with boats (control: docks): distance 0.2463, arc 3.3 deg, share at or above the floor docks 31.0 percent and boats 26.1 percent.
+
+### Setting 2: camera-side gains, swap off, the opening balance
+- sky: counted, n 26975, at or above the floor 13948 (51.7 percent), mean hue 49.6 deg, resultant 0.9957, 80 percent arc 15 deg.
+- conifers: counted, n 141215, at or above the floor 35490 (25.1 percent), mean hue 235.5 deg, resultant 0.953, 80 percent arc 40 deg.
+- broadleaf: counted, n 7194, at or above the floor 1040 (14.5 percent), mean hue 241.0 deg, resultant 0.8565, 80 percent arc 60 deg.
+- snags: counted, n 3530, at or above the floor 142 (4.0 percent), mean hue 43.4 deg, resultant 0.6934, 80 percent arc 60 deg.
+- shore: counted, n 6031, at or above the floor 155 (2.6 percent), mean hue 271.1 deg, resultant 0.4524, 80 percent arc 180 deg.
+- water: counted, n 62907, at or above the floor 1362 (2.2 percent), mean hue 56.2 deg, resultant 0.1286, 80 percent arc 205 deg.
+- docks: counted, n 3773, at or above the floor 1201 (31.8 percent), mean hue 235.0 deg, resultant 0.9649, 80 percent arc 30 deg.
+- boats: counted, n 9444, at or above the floor 2676 (28.3 percent), mean hue 237.7 deg, resultant 0.7589, 80 percent arc 50 deg.
+- rest: counted, n 318324, at or above the floor 67377 (21.2 percent), mean hue 238.3 deg, resultant 0.4896, 80 percent arc 190 deg.
+- sky with conifers: distance 0.9852, arc 174.1 deg, share at or above the floor sky 51.7 percent and conifers 25.1 percent.
+- sky with broadleaf: distance 0.9823, arc 168.6 deg, share at or above the floor sky 51.7 percent and broadleaf 14.5 percent.
+- sky with snags: distance 0.3657, arc 6.2 deg, share at or above the floor sky 51.7 percent and snags 4.0 percent.
+- sky with shore: distance 0.8544, arc 138.5 deg, share at or above the floor sky 51.7 percent and shore 2.6 percent.
+- sky with water: distance 0.723, arc 6.6 deg, share at or above the floor sky 51.7 percent and water 2.2 percent.
+- sky with docks (control: docks): distance 0.9942, arc 174.6 deg, share at or above the floor sky 51.7 percent and docks 31.8 percent.
+- sky with boats: distance 0.8644, arc 171.9 deg, share at or above the floor sky 51.7 percent and boats 28.3 percent.
+- conifers with broadleaf: distance 0.2191, arc 5.5 deg, share at or above the floor conifers 25.1 percent and broadleaf 14.5 percent.
+- conifers with snags: distance 0.8943, arc 167.9 deg, share at or above the floor conifers 25.1 percent and snags 4.0 percent.
+- conifers with shore: distance 0.5476, arc 35.6 deg, share at or above the floor conifers 25.1 percent and shore 2.6 percent.
+- conifers with water: distance 0.5883, arc 179.3 deg, share at or above the floor conifers 25.1 percent and water 2.2 percent.
+- conifers with docks (control: docks): distance 0.1487, arc 0.5 deg, share at or above the floor conifers 25.1 percent and docks 31.8 percent.
+- conifers with boats: distance 0.2235, arc 2.2 deg, share at or above the floor conifers 25.1 percent and boats 28.3 percent.
+- broadleaf with snags: distance 0.8436, arc 162.4 deg, share at or above the floor broadleaf 14.5 percent and snags 4.0 percent.
+- broadleaf with shore: distance 0.4497, arc 30.1 deg, share at or above the floor broadleaf 14.5 percent and shore 2.6 percent.
+- broadleaf with water: distance 0.5425, arc 175.2 deg, share at or above the floor broadleaf 14.5 percent and water 2.2 percent.
+- broadleaf with docks (control: docks): distance 0.3277, arc 6.0 deg, share at or above the floor broadleaf 14.5 percent and docks 31.8 percent.
+- broadleaf with boats: distance 0.2753, arc 3.3 deg, share at or above the floor broadleaf 14.5 percent and boats 28.3 percent.
+- snags with shore: distance 0.6736, arc 132.2 deg, share at or above the floor snags 4.0 percent and shore 2.6 percent.
+- snags with water: distance 0.5598, arc 12.8 deg, share at or above the floor snags 4.0 percent and water 2.2 percent.
+- snags with docks (control: docks): distance 0.924, arc 168.4 deg, share at or above the floor snags 4.0 percent and docks 31.8 percent.
+- snags with boats: distance 0.7584, arc 165.7 deg, share at or above the floor snags 4.0 percent and boats 28.3 percent.
+- shore with water: distance 0.4632, arc 145.1 deg, share at or above the floor shore 2.6 percent and water 2.2 percent.
+- shore with docks (control: docks): distance 0.6085, arc 36.2 deg, share at or above the floor shore 2.6 percent and docks 31.8 percent.
+- shore with boats: distance 0.451, arc 33.4 deg, share at or above the floor shore 2.6 percent and boats 28.3 percent.
+- water with docks (control: docks): distance 0.6284, arc 178.7 deg, share at or above the floor water 2.2 percent and docks 31.8 percent.
+- water with boats: distance 0.4625, arc 178.5 deg, share at or above the floor water 2.2 percent and boats 28.3 percent.
+- docks with boats (control: docks): distance 0.2625, arc 2.7 deg, share at or above the floor docks 31.8 percent and boats 28.3 percent.
+
+### Setting 3: mixer preset Channel cycle, swap on, the opening balance, mixer Channel cycle
+- sky: counted, n 26975, at or above the floor 16272 (60.3 percent), mean hue 70.5 deg, resultant 0.996, 80 percent arc 15 deg.
+- conifers: counted, n 141215, at or above the floor 37084 (26.3 percent), mean hue 246.7 deg, resultant 0.9555, 80 percent arc 40 deg.
+- broadleaf: counted, n 7194, at or above the floor 1053 (14.6 percent), mean hue 242.5 deg, resultant 0.8611, 80 percent arc 60 deg.
+- snags: counted, n 3530, at or above the floor 203 (5.8 percent), mean hue 73.6 deg, resultant 0.8279, 80 percent arc 20 deg.
+- shore: counted, n 6031, at or above the floor 148 (2.5 percent), mean hue 211.1 deg, resultant 0.4135, 80 percent arc 185 deg.
+- water: counted, n 62907, at or above the floor 1383 (2.2 percent), mean hue 56.1 deg, resultant 0.1473, 80 percent arc 205 deg.
+- docks: counted, n 3773, at or above the floor 1218 (32.3 percent), mean hue 246.3 deg, resultant 0.9623, 80 percent arc 30 deg.
+- boats: counted, n 9444, at or above the floor 2664 (28.2 percent), mean hue 243.5 deg, resultant 0.7534, 80 percent arc 45 deg.
+- rest: counted, n 318324, at or above the floor 71526 (22.5 percent), mean hue 244.1 deg, resultant 0.4378, 80 percent arc 195 deg.
+- sky with conifers: distance 0.9851, arc 176.2 deg, share at or above the floor sky 60.3 percent and conifers 26.3 percent.
+- sky with broadleaf: distance 0.9767, arc 172.0 deg, share at or above the floor sky 60.3 percent and broadleaf 14.6 percent.
+- sky with snags: distance 0.2687, arc 3.1 deg, share at or above the floor sky 60.3 percent and snags 5.8 percent.
+- sky with shore: distance 0.8423, arc 140.6 deg, share at or above the floor sky 60.3 percent and shore 2.5 percent.
+- sky with water: distance 0.6635, arc 14.4 deg, share at or above the floor sky 60.3 percent and water 2.2 percent.
+- sky with docks (control: docks): distance 0.9873, arc 175.8 deg, share at or above the floor sky 60.3 percent and docks 32.3 percent.
+- sky with boats: distance 0.8593, arc 172.9 deg, share at or above the floor sky 60.3 percent and boats 28.2 percent.
+- conifers with broadleaf: distance 0.2098, arc 4.2 deg, share at or above the floor conifers 26.3 percent and broadleaf 14.6 percent.
+- conifers with snags: distance 0.9225, arc 173.1 deg, share at or above the floor conifers 26.3 percent and snags 5.8 percent.
+- conifers with shore: distance 0.5617, arc 35.6 deg, share at or above the floor conifers 26.3 percent and shore 2.5 percent.
+- conifers with water: distance 0.5821, arc 169.4 deg, share at or above the floor conifers 26.3 percent and water 2.2 percent.
+- conifers with docks (control: docks): distance 0.1607, arc 0.4 deg, share at or above the floor conifers 26.3 percent and docks 32.3 percent.
+- conifers with boats: distance 0.233, arc 3.2 deg, share at or above the floor conifers 26.3 percent and boats 28.2 percent.
+- broadleaf with snags: distance 0.8835, arc 168.9 deg, share at or above the floor broadleaf 14.6 percent and snags 5.8 percent.
+- broadleaf with shore: distance 0.4786, arc 31.4 deg, share at or above the floor broadleaf 14.6 percent and shore 2.5 percent.
+- broadleaf with water: distance 0.5469, arc 173.7 deg, share at or above the floor broadleaf 14.6 percent and water 2.2 percent.
+- broadleaf with docks (control: docks): distance 0.3254, arc 3.8 deg, share at or above the floor broadleaf 14.6 percent and docks 32.3 percent.
+- broadleaf with boats: distance 0.2816, arc 1.0 deg, share at or above the floor broadleaf 14.6 percent and boats 28.2 percent.
+- snags with shore: distance 0.7189, arc 137.5 deg, share at or above the floor snags 5.8 percent and shore 2.5 percent.
+- snags with water: distance 0.5726, arc 17.4 deg, share at or above the floor snags 5.8 percent and water 2.2 percent.
+- snags with docks (control: docks): distance 0.9415, arc 172.8 deg, share at or above the floor snags 5.8 percent and docks 32.3 percent.
+- snags with boats: distance 0.7857, arc 169.9 deg, share at or above the floor snags 5.8 percent and boats 28.2 percent.
+- shore with water: distance 0.4852, arc 154.9 deg, share at or above the floor shore 2.5 percent and water 2.2 percent.
+- shore with docks (control: docks): distance 0.6136, arc 35.3 deg, share at or above the floor shore 2.5 percent and docks 32.3 percent.
+- shore with boats: distance 0.4421, arc 32.4 deg, share at or above the floor shore 2.5 percent and boats 28.2 percent.
+- water with docks (control: docks): distance 0.6162, arc 169.8 deg, share at or above the floor water 2.2 percent and docks 32.3 percent.
+- water with boats: distance 0.4454, arc 172.7 deg, share at or above the floor water 2.2 percent and boats 28.2 percent.
+- docks with boats (control: docks): distance 0.2622, arc 2.9 deg, share at or above the floor docks 32.3 percent and boats 28.2 percent.
+
+### Setting 4: mixer preset Copper, swap on, the opening balance, mixer Copper
+- sky: colourless, n 26975, at or above the floor 0 (0.0 percent), mean hue none, resultant none, 80 percent arc none.
+- conifers: counted, n 141215, at or above the floor 117480 (83.2 percent), mean hue 9.1 deg, resultant 0.9934, 80 percent arc 20 deg.
+- broadleaf: counted, n 7194, at or above the floor 5570 (77.4 percent), mean hue 7.4 deg, resultant 0.9878, 80 percent arc 25 deg.
+- snags: counted, n 3530, at or above the floor 793 (22.5 percent), mean hue 2.4 deg, resultant 0.9898, 80 percent arc 20 deg.
+- shore: counted, n 6031, at or above the floor 1490 (24.7 percent), mean hue 3.0 deg, resultant 0.9833, 80 percent arc 30 deg.
+- water: counted, n 62907, at or above the floor 21123 (33.6 percent), mean hue 3.1 deg, resultant 0.989, 80 percent arc 25 deg.
+- docks: counted, n 3773, at or above the floor 2472 (65.5 percent), mean hue 10.2 deg, resultant 0.9938, 80 percent arc 20 deg.
+- boats: counted, n 9444, at or above the floor 5377 (56.9 percent), mean hue 7.8 deg, resultant 0.9883, 80 percent arc 20 deg.
+- rest: counted, n 318324, at or above the floor 182259 (57.3 percent), mean hue 7.9 deg, resultant 0.9918, 80 percent arc 20 deg.
+- sky with conifers: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and conifers 83.2 percent.
+- sky with broadleaf: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and broadleaf 77.4 percent.
+- sky with snags: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and snags 22.5 percent.
+- sky with shore: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and shore 24.7 percent.
+- sky with water: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and water 33.6 percent.
+- sky with docks (control: docks): distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and docks 65.5 percent.
+- sky with boats: distance undefined (colourless: sky), arc undefined, share at or above the floor sky 0.0 percent and boats 56.9 percent.
+- conifers with broadleaf: distance 0.125, arc 1.7 deg, share at or above the floor conifers 83.2 percent and broadleaf 77.4 percent.
+- conifers with snags: distance 0.344, arc 6.7 deg, share at or above the floor conifers 83.2 percent and snags 22.5 percent.
+- conifers with shore: distance 0.2605, arc 6.1 deg, share at or above the floor conifers 83.2 percent and shore 24.7 percent.
+- conifers with water: distance 0.2803, arc 5.9 deg, share at or above the floor conifers 83.2 percent and water 33.6 percent.
+- conifers with docks (control: docks): distance 0.0932, arc 1.2 deg, share at or above the floor conifers 83.2 percent and docks 65.5 percent.
+- conifers with boats: distance 0.102, arc 1.3 deg, share at or above the floor conifers 83.2 percent and boats 56.9 percent.
+- broadleaf with snags: distance 0.2746, arc 5.0 deg, share at or above the floor broadleaf 77.4 percent and snags 22.5 percent.
+- broadleaf with shore: distance 0.1666, arc 4.4 deg, share at or above the floor broadleaf 77.4 percent and shore 24.7 percent.
+- broadleaf with water: distance 0.2129, arc 4.2 deg, share at or above the floor broadleaf 77.4 percent and water 33.6 percent.
+- broadleaf with docks (control: docks): distance 0.1818, arc 2.9 deg, share at or above the floor broadleaf 77.4 percent and docks 65.5 percent.
+- broadleaf with boats: distance 0.0812, arc 0.4 deg, share at or above the floor broadleaf 77.4 percent and boats 56.9 percent.
+- snags with shore: distance 0.2009, arc 0.6 deg, share at or above the floor snags 22.5 percent and shore 24.7 percent.
+- snags with water: distance 0.1406, arc 0.7 deg, share at or above the floor snags 22.5 percent and water 33.6 percent.
+- snags with docks (control: docks): distance 0.4087, arc 7.8 deg, share at or above the floor snags 22.5 percent and docks 65.5 percent.
+- snags with boats: distance 0.3008, arc 5.4 deg, share at or above the floor snags 22.5 percent and boats 56.9 percent.
+- shore with water: distance 0.1106, arc 0.1 deg, share at or above the floor shore 24.7 percent and water 33.6 percent.
+- shore with docks (control: docks): distance 0.3145, arc 7.2 deg, share at or above the floor shore 24.7 percent and docks 65.5 percent.
+- shore with boats: distance 0.1926, arc 4.8 deg, share at or above the floor shore 24.7 percent and boats 56.9 percent.
+- water with docks (control: docks): distance 0.3392, arc 7.1 deg, share at or above the floor water 33.6 percent and docks 65.5 percent.
+- water with boats: distance 0.2259, arc 4.7 deg, share at or above the floor water 33.6 percent and boats 56.9 percent.
+- docks with boats (control: docks): distance 0.1478, arc 2.5 deg, share at or above the floor docks 65.5 percent and boats 56.9 percent.
+
+### Setting 5: mixer preset Film rotation, swap on, the opening balance, mixer Film rotation
+- sky: counted, n 26975, at or above the floor 7663 (28.4 percent), mean hue 305.2 deg, resultant 0.992, 80 percent arc 20 deg.
+- conifers: counted, n 141215, at or above the floor 30577 (21.6 percent), mean hue 118.3 deg, resultant 0.9406, 80 percent arc 45 deg.
+- broadleaf: counted, n 7194, at or above the floor 884 (12.3 percent), mean hue 111.2 deg, resultant 0.8063, 80 percent arc 70 deg.
+- snags: counted, n 3530, at or above the floor 68 (1.9 percent), mean hue 318.3 deg, resultant 0.4276, 80 percent arc 170 deg.
+- shore: counted, n 6031, at or above the floor 139 (2.3 percent), mean hue 78.6 deg, resultant 0.4585, 80 percent arc 175 deg.
+- water: counted, n 62907, at or above the floor 1150 (1.8 percent), mean hue 302.8 deg, resultant 0.2166, 80 percent arc 195 deg.
+- docks: counted, n 3773, at or above the floor 1143 (30.3 percent), mean hue 119.2 deg, resultant 0.9641, 80 percent arc 35 deg.
+- boats: counted, n 9444, at or above the floor 2539 (26.9 percent), mean hue 116.6 deg, resultant 0.7699, 80 percent arc 50 deg.
+- rest: counted, n 318324, at or above the floor 54940 (17.3 percent), mean hue 116.9 deg, resultant 0.62, 80 percent arc 80 deg.
+- sky with conifers: distance 0.9869, arc 173.2 deg, share at or above the floor sky 28.4 percent and conifers 21.6 percent.
+- sky with broadleaf: distance 0.9821, arc 166.1 deg, share at or above the floor sky 28.4 percent and broadleaf 12.3 percent.
+- sky with snags: distance 0.6264, arc 13.1 deg, share at or above the floor sky 28.4 percent and snags 1.9 percent.
+- sky with shore: distance 0.8832, arc 133.5 deg, share at or above the floor sky 28.4 percent and shore 2.3 percent.
+- sky with water: distance 0.712, arc 2.3 deg, share at or above the floor sky 28.4 percent and water 1.8 percent.
+- sky with docks (control: docks): distance 0.9962, arc 174.0 deg, share at or above the floor sky 28.4 percent and docks 30.3 percent.
+- sky with boats: distance 0.869, arc 171.4 deg, share at or above the floor sky 28.4 percent and boats 26.9 percent.
+- conifers with broadleaf: distance 0.2655, arc 7.1 deg, share at or above the floor conifers 21.6 percent and broadleaf 12.3 percent.
+- conifers with snags: distance 0.8897, arc 160.0 deg, share at or above the floor conifers 21.6 percent and snags 1.9 percent.
+- conifers with shore: distance 0.6002, arc 39.7 deg, share at or above the floor conifers 21.6 percent and shore 2.3 percent.
+- conifers with water: distance 0.6306, arc 175.5 deg, share at or above the floor conifers 21.6 percent and water 1.8 percent.
+- conifers with docks (control: docks): distance 0.1729, arc 0.9 deg, share at or above the floor conifers 21.6 percent and docks 30.3 percent.
+- conifers with boats: distance 0.2289, arc 1.8 deg, share at or above the floor conifers 21.6 percent and boats 26.9 percent.
+- broadleaf with snags: distance 0.8122, arc 152.9 deg, share at or above the floor broadleaf 12.3 percent and snags 1.9 percent.
+- broadleaf with shore: distance 0.4927, arc 32.6 deg, share at or above the floor broadleaf 12.3 percent and shore 2.3 percent.
+- broadleaf with water: distance 0.574, arc 168.4 deg, share at or above the floor broadleaf 12.3 percent and water 1.8 percent.
+- broadleaf with docks (control: docks): distance 0.3894, arc 8.0 deg, share at or above the floor broadleaf 12.3 percent and docks 30.3 percent.
+- broadleaf with boats: distance 0.3139, arc 5.3 deg, share at or above the floor broadleaf 12.3 percent and boats 26.9 percent.
+- snags with shore: distance 0.6689, arc 120.3 deg, share at or above the floor snags 1.9 percent and shore 2.3 percent.
+- snags with water: distance 0.5697, arc 15.5 deg, share at or above the floor snags 1.9 percent and water 1.8 percent.
+- snags with docks (control: docks): distance 0.9413, arc 160.9 deg, share at or above the floor snags 1.9 percent and docks 30.3 percent.
+- snags with boats: distance 0.7932, arc 158.3 deg, share at or above the floor snags 1.9 percent and boats 26.9 percent.
+- shore with water: distance 0.4749, arc 135.8 deg, share at or above the floor shore 2.3 percent and water 1.8 percent.
+- shore with docks (control: docks): distance 0.673, arc 40.6 deg, share at or above the floor shore 2.3 percent and docks 30.3 percent.
+- shore with boats: distance 0.5408, arc 37.9 deg, share at or above the floor shore 2.3 percent and boats 26.9 percent.
+- water with docks (control: docks): distance 0.6833, arc 176.4 deg, share at or above the floor water 1.8 percent and docks 30.3 percent.
+- water with boats: distance 0.5121, arc 173.7 deg, share at or above the floor water 1.8 percent and boats 26.9 percent.
+- docks with boats (control: docks): distance 0.2585, arc 2.6 deg, share at or above the floor docks 30.3 percent and boats 26.9 percent.
+
+### Setting 6: camera-side gains, swap on, 481 mired, tint -75
+- sky: counted, n 26975, at or above the floor 26975 (100.0 percent), mean hue 226.1 deg, resultant 0.9982, 80 percent arc 10 deg.
+- conifers: counted, n 141215, at or above the floor 117732 (83.4 percent), mean hue 275.7 deg, resultant 0.9266, 80 percent arc 60 deg.
+- broadleaf: counted, n 7194, at or above the floor 5329 (74.1 percent), mean hue 268.2 deg, resultant 0.9423, 80 percent arc 50 deg.
+- snags: counted, n 3530, at or above the floor 3391 (96.1 percent), mean hue 245.1 deg, resultant 0.9666, 80 percent arc 40 deg.
+- shore: counted, n 6031, at or above the floor 5562 (92.2 percent), mean hue 248.0 deg, resultant 0.9696, 80 percent arc 35 deg.
+- water: counted, n 62907, at or above the floor 61203 (97.3 percent), mean hue 247.9 deg, resultant 0.9731, 80 percent arc 35 deg.
+- docks: counted, n 3773, at or above the floor 3607 (95.6 percent), mean hue 273.1 deg, resultant 0.842, 80 percent arc 85 deg.
+- boats: counted, n 9444, at or above the floor 9082 (96.2 percent), mean hue 264.8 deg, resultant 0.8538, 80 percent arc 85 deg.
+- rest: counted, n 318324, at or above the floor 292810 (92.0 percent), mean hue 259.9 deg, resultant 0.898, 80 percent arc 65 deg.
+- sky with conifers: distance 0.9267, arc 49.6 deg, share at or above the floor sky 100.0 percent and conifers 83.4 percent.
+- sky with broadleaf: distance 0.9043, arc 42.1 deg, share at or above the floor sky 100.0 percent and broadleaf 74.1 percent.
+- sky with snags: distance 0.6666, arc 19.0 deg, share at or above the floor sky 100.0 percent and snags 96.1 percent.
+- sky with shore: distance 0.7776, arc 21.9 deg, share at or above the floor sky 100.0 percent and shore 92.2 percent.
+- sky with water: distance 0.7842, arc 21.8 deg, share at or above the floor sky 100.0 percent and water 97.3 percent.
+- sky with docks (control: docks): distance 0.8859, arc 47.0 deg, share at or above the floor sky 100.0 percent and docks 95.6 percent.
+- sky with boats: distance 0.802, arc 38.7 deg, share at or above the floor sky 100.0 percent and boats 96.2 percent.
+- conifers with broadleaf: distance 0.1418, arc 7.5 deg, share at or above the floor conifers 83.4 percent and broadleaf 74.1 percent.
+- conifers with snags: distance 0.56, arc 30.6 deg, share at or above the floor conifers 83.4 percent and snags 96.1 percent.
+- conifers with shore: distance 0.5132, arc 27.7 deg, share at or above the floor conifers 83.4 percent and shore 92.2 percent.
+- conifers with water: distance 0.53, arc 27.9 deg, share at or above the floor conifers 83.4 percent and water 97.3 percent.
+- conifers with docks (control: docks): distance 0.2964, arc 2.6 deg, share at or above the floor conifers 83.4 percent and docks 95.6 percent.
+- conifers with boats: distance 0.31, arc 11.0 deg, share at or above the floor conifers 83.4 percent and boats 96.2 percent.
+- broadleaf with snags: distance 0.4771, arc 23.1 deg, share at or above the floor broadleaf 74.1 percent and snags 96.1 percent.
+- broadleaf with shore: distance 0.4364, arc 20.2 deg, share at or above the floor broadleaf 74.1 percent and shore 92.2 percent.
+- broadleaf with water: distance 0.4504, arc 20.3 deg, share at or above the floor broadleaf 74.1 percent and water 97.3 percent.
+- broadleaf with docks (control: docks): distance 0.3341, arc 4.9 deg, share at or above the floor broadleaf 74.1 percent and docks 95.6 percent.
+- broadleaf with boats: distance 0.3085, arc 3.5 deg, share at or above the floor broadleaf 74.1 percent and boats 96.2 percent.
+- snags with shore: distance 0.1653, arc 2.8 deg, share at or above the floor snags 96.1 percent and shore 92.2 percent.
+- snags with water: distance 0.1872, arc 2.7 deg, share at or above the floor snags 96.1 percent and water 97.3 percent.
+- snags with docks (control: docks): distance 0.4968, arc 28.0 deg, share at or above the floor snags 96.1 percent and docks 95.6 percent.
+- snags with boats: distance 0.391, arc 19.6 deg, share at or above the floor snags 96.1 percent and boats 96.2 percent.
+- shore with water: distance 0.1067, arc 0.1 deg, share at or above the floor shore 92.2 percent and water 97.3 percent.
+- shore with docks (control: docks): distance 0.4291, arc 25.1 deg, share at or above the floor shore 92.2 percent and docks 95.6 percent.
+- shore with boats: distance 0.3458, arc 16.8 deg, share at or above the floor shore 92.2 percent and boats 96.2 percent.
+- water with docks (control: docks): distance 0.4469, arc 25.2 deg, share at or above the floor water 97.3 percent and docks 95.6 percent.
+- water with boats: distance 0.3614, arc 16.9 deg, share at or above the floor water 97.3 percent and boats 96.2 percent.
+- docks with boats (control: docks): distance 0.1664, arc 8.3 deg, share at or above the floor docks 95.6 percent and boats 96.2 percent.
+
+### Setting 7: camera-side gains, swap off, 481 mired, tint -75
+- sky: counted, n 26975, at or above the floor 26975 (100.0 percent), mean hue 17.4 deg, resultant 0.9976, 80 percent arc 15 deg.
+- conifers: counted, n 141215, at or above the floor 96234 (68.2 percent), mean hue 314.3 deg, resultant 0.9056, 80 percent arc 70 deg.
+- broadleaf: counted, n 7194, at or above the floor 4407 (61.3 percent), mean hue 323.9 deg, resultant 0.9137, 80 percent arc 65 deg.
+- snags: counted, n 3530, at or above the floor 3039 (86.1 percent), mean hue 355.1 deg, resultant 0.9473, 80 percent arc 45 deg.
+- shore: counted, n 6031, at or above the floor 5019 (83.2 percent), mean hue 351.4 deg, resultant 0.9518, 80 percent arc 45 deg.
+- water: counted, n 62907, at or above the floor 57271 (91.0 percent), mean hue 353.6 deg, resultant 0.9573, 80 percent arc 45 deg.
+- docks: counted, n 3773, at or above the floor 3452 (91.5 percent), mean hue 322.9 deg, resultant 0.809, 80 percent arc 95 deg.
+- boats: counted, n 9444, at or above the floor 8656 (91.7 percent), mean hue 332.4 deg, resultant 0.8125, 80 percent arc 100 deg.
+- rest: counted, n 318324, at or above the floor 265648 (83.5 percent), mean hue 337.5 deg, resultant 0.8552, 80 percent arc 80 deg.
+- sky with conifers: distance 0.9236, arc 63.0 deg, share at or above the floor sky 100.0 percent and conifers 68.2 percent.
+- sky with broadleaf: distance 0.9047, arc 53.4 deg, share at or above the floor sky 100.0 percent and broadleaf 61.3 percent.
+- sky with snags: distance 0.6495, arc 22.3 deg, share at or above the floor sky 100.0 percent and snags 86.1 percent.
+- sky with shore: distance 0.7679, arc 26.0 deg, share at or above the floor sky 100.0 percent and shore 83.2 percent.
+- sky with water: distance 0.7448, arc 23.8 deg, share at or above the floor sky 100.0 percent and water 91.0 percent.
+- sky with docks (control: docks): distance 0.879, arc 54.4 deg, share at or above the floor sky 100.0 percent and docks 91.5 percent.
+- sky with boats: distance 0.7898, arc 45.0 deg, share at or above the floor sky 100.0 percent and boats 91.7 percent.
+- conifers with broadleaf: distance 0.1475, arc 9.6 deg, share at or above the floor conifers 68.2 percent and broadleaf 61.3 percent.
+- conifers with snags: distance 0.5938, arc 40.8 deg, share at or above the floor conifers 68.2 percent and snags 86.1 percent.
+- conifers with shore: distance 0.5492, arc 37.1 deg, share at or above the floor conifers 68.2 percent and shore 83.2 percent.
+- conifers with water: distance 0.5839, arc 39.2 deg, share at or above the floor conifers 68.2 percent and water 91.0 percent.
+- conifers with docks (control: docks): distance 0.3164, arc 8.6 deg, share at or above the floor conifers 68.2 percent and docks 91.5 percent.
+- conifers with boats: distance 0.3352, arc 18.1 deg, share at or above the floor conifers 68.2 percent and boats 91.7 percent.
+- broadleaf with snags: distance 0.5064, arc 31.2 deg, share at or above the floor broadleaf 61.3 percent and snags 86.1 percent.
+- broadleaf with shore: distance 0.4604, arc 27.5 deg, share at or above the floor broadleaf 61.3 percent and shore 83.2 percent.
+- broadleaf with water: distance 0.4999, arc 29.6 deg, share at or above the floor broadleaf 61.3 percent and water 91.0 percent.
+- broadleaf with docks (control: docks): distance 0.331, arc 1.0 deg, share at or above the floor broadleaf 61.3 percent and docks 91.5 percent.
+- broadleaf with boats: distance 0.3167, arc 8.5 deg, share at or above the floor broadleaf 61.3 percent and boats 91.7 percent.
+- snags with shore: distance 0.1757, arc 3.7 deg, share at or above the floor snags 86.1 percent and shore 83.2 percent.
+- snags with water: distance 0.1713, arc 1.5 deg, share at or above the floor snags 86.1 percent and water 91.0 percent.
+- snags with docks (control: docks): distance 0.503, arc 32.2 deg, share at or above the floor snags 86.1 percent and docks 91.5 percent.
+- snags with boats: distance 0.4003, arc 22.7 deg, share at or above the floor snags 86.1 percent and boats 91.7 percent.
+- shore with water: distance 0.1094, arc 2.2 deg, share at or above the floor shore 83.2 percent and water 91.0 percent.
+- shore with docks (control: docks): distance 0.4351, arc 28.5 deg, share at or above the floor shore 83.2 percent and docks 91.5 percent.
+- shore with boats: distance 0.3564, arc 19.0 deg, share at or above the floor shore 83.2 percent and boats 91.7 percent.
+- water with docks (control: docks): distance 0.4586, arc 30.6 deg, share at or above the floor water 91.0 percent and docks 91.5 percent.
+- water with boats: distance 0.3659, arc 21.2 deg, share at or above the floor water 91.0 percent and boats 91.7 percent.
+- docks with boats (control: docks): distance 0.181, arc 9.5 deg, share at or above the floor docks 91.5 percent and boats 91.7 percent.
+
+## What the numbers answer, as numbers
+### Where each place sat in hue, at the opening balance (setting 1) and at the far balance (setting 6)
+- NIR_3733.NEF, setting 1: sky 194.4 deg (counted, 15.0 percent above the floor); conifers 9.0 deg (counted, 27.2 percent above the floor); broadleaf 0.1 deg (counted, 11.6 percent above the floor); snags 324.7 deg (counted, 2.5 percent above the floor); shore 348.9 deg (counted, 4.6 percent above the floor); water 1.6 deg (colourless, 0.6 percent above the floor); docks 10.9 deg (counted, 46.6 percent above the floor); boats 3.7 deg (counted, 30.8 percent above the floor).
+- NIR_3733.NEF, setting 6: sky 225.7 deg (counted, 100.0 percent above the floor); conifers 275.2 deg (counted, 83.2 percent above the floor); broadleaf 265.9 deg (counted, 72.5 percent above the floor); snags 253.4 deg (counted, 90.0 percent above the floor); shore 252.6 deg (counted, 93.5 percent above the floor); water 248.7 deg (counted, 95.7 percent above the floor); docks 286.5 deg (counted, 94.6 percent above the floor); boats 265.8 deg (counted, 94.3 percent above the floor).
+- NIR_3736.NEF, setting 1: sky 194.1 deg (counted, 11.5 percent above the floor); conifers 9.0 deg (counted, 25.4 percent above the floor); broadleaf 0.7 deg (counted, 13.4 percent above the floor); snags 335.9 deg (counted, 2.2 percent above the floor); shore 355.6 deg (counted, 5.2 percent above the floor); water 332.3 deg (counted, 1.0 percent above the floor); docks 9.7 deg (counted, 35.3 percent above the floor); boats 358.5 deg (counted, 16.4 percent above the floor).
+- NIR_3736.NEF, setting 6: sky 225.8 deg (counted, 100.0 percent above the floor); conifers 273.6 deg (counted, 84.6 percent above the floor); broadleaf 265.9 deg (counted, 75.2 percent above the floor); snags 255.4 deg (counted, 86.5 percent above the floor); shore 253.4 deg (counted, 94.0 percent above the floor); water 246.4 deg (counted, 97.1 percent above the floor); docks 273.5 deg (counted, 95.6 percent above the floor); boats 253.9 deg (counted, 97.4 percent above the floor).
+- NIR_3742.NEF, setting 1: sky 194.4 deg (counted, 28.6 percent above the floor); conifers 9.1 deg (counted, 22.0 percent above the floor); broadleaf 3.8 deg (counted, 12.3 percent above the floor); snags 226.7 deg (counted, 1.3 percent above the floor); shore 324.0 deg (counted, 2.2 percent above the floor); water 331.1 deg (counted, 1.1 percent above the floor); docks 8.7 deg (counted, 31.0 percent above the floor); boats 5.4 deg (counted, 26.1 percent above the floor).
+- NIR_3742.NEF, setting 6: sky 226.1 deg (counted, 100.0 percent above the floor); conifers 275.7 deg (counted, 83.4 percent above the floor); broadleaf 268.2 deg (counted, 74.1 percent above the floor); snags 245.1 deg (counted, 96.1 percent above the floor); shore 248.0 deg (counted, 92.2 percent above the floor); water 247.9 deg (counted, 97.3 percent above the floor); docks 273.1 deg (counted, 95.6 percent above the floor); boats 264.8 deg (counted, 96.2 percent above the floor).
+
+### The gather's rule against the places: the share of each place under neutral, and of the sky under sky
+- NIR_3733.NEF: conifers neutral 72.8 percent, broadleaf neutral 88.4 percent, water neutral 99.4 percent, docks neutral 53.4 percent, sky under sky 100.0 percent, conifers under foliage 16.4 percent.
+- NIR_3736.NEF: conifers neutral 74.7 percent, broadleaf neutral 86.6 percent, water neutral 99.0 percent, docks neutral 64.8 percent, sky under sky 100.0 percent, conifers under foliage 15.4 percent.
+- NIR_3742.NEF: conifers neutral 78.0 percent, broadleaf neutral 87.7 percent, water neutral 98.9 percent, docks neutral 69.0 percent, sky under sky 100.0 percent, conifers under foliage 13.2 percent.
+
+### The measure for the pairs the plan reads, at settings 1 and 6
+- NIR_3733.NEF, setting 1: sky with conifers: distance 0.9928, arc 174.5 deg, share at or above the floor sky 15.0 percent and conifers 27.2 percent.
+- NIR_3733.NEF, setting 1: sky with broadleaf: distance 0.9965, arc 165.7 deg, share at or above the floor sky 15.0 percent and broadleaf 11.6 percent.
+- NIR_3733.NEF, setting 1: conifers with broadleaf: distance 0.3261, arc 8.9 deg, share at or above the floor conifers 27.2 percent and broadleaf 11.6 percent.
+- NIR_3733.NEF, setting 1: conifers with water: distance undefined (colourless: water), arc undefined, share at or above the floor conifers 27.2 percent and water 0.6 percent.
+- NIR_3733.NEF, setting 1: conifers with boats: distance 0.2133, arc 5.3 deg, share at or above the floor conifers 27.2 percent and boats 30.8 percent.
+- NIR_3733.NEF, setting 1: water with boats: distance undefined (colourless: water), arc undefined, share at or above the floor water 0.6 percent and boats 30.8 percent.
+- NIR_3733.NEF, setting 1: water with docks (control: docks): distance undefined (colourless: water), arc undefined, share at or above the floor water 0.6 percent and docks 46.6 percent.
+- NIR_3733.NEF, setting 1: sky with docks (control: docks): distance 1, arc 176.4 deg, share at or above the floor sky 15.0 percent and docks 46.6 percent.
+- NIR_3733.NEF, setting 6: sky with conifers: distance 0.9245, arc 49.6 deg, share at or above the floor sky 100.0 percent and conifers 83.2 percent.
+- NIR_3733.NEF, setting 6: sky with broadleaf: distance 0.9112, arc 40.2 deg, share at or above the floor sky 100.0 percent and broadleaf 72.5 percent.
+- NIR_3733.NEF, setting 6: conifers with broadleaf: distance 0.1974, arc 9.4 deg, share at or above the floor conifers 83.2 percent and broadleaf 72.5 percent.
+- NIR_3733.NEF, setting 6: conifers with water: distance 0.5183, arc 26.5 deg, share at or above the floor conifers 83.2 percent and water 95.7 percent.
+- NIR_3733.NEF, setting 6: conifers with boats: distance 0.3038, arc 9.4 deg, share at or above the floor conifers 83.2 percent and boats 94.3 percent.
+- NIR_3733.NEF, setting 6: water with boats: distance 0.3911, arc 17.1 deg, share at or above the floor water 95.7 percent and boats 94.3 percent.
+- NIR_3733.NEF, setting 6: water with docks (control: docks): distance 0.5588, arc 37.8 deg, share at or above the floor water 95.7 percent and docks 94.6 percent.
+- NIR_3733.NEF, setting 6: sky with docks (control: docks): distance 0.9357, arc 60.8 deg, share at or above the floor sky 100.0 percent and docks 94.6 percent.
+- NIR_3736.NEF, setting 1: sky with conifers: distance 0.994, arc 174.9 deg, share at or above the floor sky 11.5 percent and conifers 25.4 percent.
+- NIR_3736.NEF, setting 1: sky with broadleaf: distance 0.9825, arc 166.6 deg, share at or above the floor sky 11.5 percent and broadleaf 13.4 percent.
+- NIR_3736.NEF, setting 1: conifers with broadleaf: distance 0.3081, arc 8.3 deg, share at or above the floor conifers 25.4 percent and broadleaf 13.4 percent.
+- NIR_3736.NEF, setting 1: conifers with water: distance 0.5415, arc 36.8 deg, share at or above the floor conifers 25.4 percent and water 1.0 percent.
+- NIR_3736.NEF, setting 1: conifers with boats: distance 0.3136, arc 10.6 deg, share at or above the floor conifers 25.4 percent and boats 16.4 percent.
+- NIR_3736.NEF, setting 1: water with boats: distance 0.3755, arc 26.2 deg, share at or above the floor water 1.0 percent and boats 16.4 percent.
+- NIR_3736.NEF, setting 1: water with docks (control: docks): distance 0.582, arc 37.4 deg, share at or above the floor water 1.0 percent and docks 35.3 percent.
+- NIR_3736.NEF, setting 1: sky with docks (control: docks): distance 0.9786, arc 175.6 deg, share at or above the floor sky 11.5 percent and docks 35.3 percent.
+- NIR_3736.NEF, setting 6: sky with conifers: distance 0.9221, arc 47.8 deg, share at or above the floor sky 100.0 percent and conifers 84.6 percent.
+- NIR_3736.NEF, setting 6: sky with broadleaf: distance 0.896, arc 40.1 deg, share at or above the floor sky 100.0 percent and broadleaf 75.2 percent.
+- NIR_3736.NEF, setting 6: conifers with broadleaf: distance 0.1566, arc 7.7 deg, share at or above the floor conifers 84.6 percent and broadleaf 75.2 percent.
+- NIR_3736.NEF, setting 6: conifers with water: distance 0.524, arc 27.2 deg, share at or above the floor conifers 84.6 percent and water 97.1 percent.
+- NIR_3736.NEF, setting 6: conifers with boats: distance 0.3433, arc 19.7 deg, share at or above the floor conifers 84.6 percent and boats 97.4 percent.
+- NIR_3736.NEF, setting 6: water with boats: distance 0.2639, arc 7.5 deg, share at or above the floor water 97.1 percent and boats 97.4 percent.
+- NIR_3736.NEF, setting 6: water with docks (control: docks): distance 0.4692, arc 27.1 deg, share at or above the floor water 97.1 percent and docks 95.6 percent.
+- NIR_3736.NEF, setting 6: sky with docks (control: docks): distance 0.8832, arc 47.7 deg, share at or above the floor sky 100.0 percent and docks 95.6 percent.
+- NIR_3742.NEF, setting 1: sky with conifers: distance 0.9896, arc 174.7 deg, share at or above the floor sky 28.6 percent and conifers 22.0 percent.
+- NIR_3742.NEF, setting 1: sky with broadleaf: distance 0.9853, arc 169.4 deg, share at or above the floor sky 28.6 percent and broadleaf 12.3 percent.
+- NIR_3742.NEF, setting 1: conifers with broadleaf: distance 0.2512, arc 5.3 deg, share at or above the floor conifers 22.0 percent and broadleaf 12.3 percent.
+- NIR_3742.NEF, setting 1: conifers with water: distance 0.547, arc 38.0 deg, share at or above the floor conifers 22.0 percent and water 1.1 percent.
+- NIR_3742.NEF, setting 1: conifers with boats: distance 0.1996, arc 3.7 deg, share at or above the floor conifers 22.0 percent and boats 26.1 percent.
+- NIR_3742.NEF, setting 1: water with boats: distance 0.4354, arc 34.4 deg, share at or above the floor water 1.1 percent and boats 26.1 percent.
+- NIR_3742.NEF, setting 1: water with docks (control: docks): distance 0.6074, arc 37.6 deg, share at or above the floor water 1.1 percent and docks 31.0 percent.
+- NIR_3742.NEF, setting 1: sky with docks (control: docks): distance 0.9983, arc 174.3 deg, share at or above the floor sky 28.6 percent and docks 31.0 percent.
+- NIR_3742.NEF, setting 6: sky with conifers: distance 0.9267, arc 49.6 deg, share at or above the floor sky 100.0 percent and conifers 83.4 percent.
+- NIR_3742.NEF, setting 6: sky with broadleaf: distance 0.9043, arc 42.1 deg, share at or above the floor sky 100.0 percent and broadleaf 74.1 percent.
+- NIR_3742.NEF, setting 6: conifers with broadleaf: distance 0.1418, arc 7.5 deg, share at or above the floor conifers 83.4 percent and broadleaf 74.1 percent.
+- NIR_3742.NEF, setting 6: conifers with water: distance 0.53, arc 27.9 deg, share at or above the floor conifers 83.4 percent and water 97.3 percent.
+- NIR_3742.NEF, setting 6: conifers with boats: distance 0.31, arc 11.0 deg, share at or above the floor conifers 83.4 percent and boats 96.2 percent.
+- NIR_3742.NEF, setting 6: water with boats: distance 0.3614, arc 16.9 deg, share at or above the floor water 97.3 percent and boats 96.2 percent.
+- NIR_3742.NEF, setting 6: water with docks (control: docks): distance 0.4469, arc 25.2 deg, share at or above the floor water 97.3 percent and docks 95.6 percent.
+- NIR_3742.NEF, setting 6: sky with docks (control: docks): distance 0.8859, arc 47.0 deg, share at or above the floor sky 100.0 percent and docks 95.6 percent.
+

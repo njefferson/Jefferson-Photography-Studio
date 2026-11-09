@@ -35,6 +35,11 @@
    "id": "1AbzGVg-gXVRv0ailmu0GozNB8a_QbCpG",
    "shared": "2026-09-27",
    "holds": "IMG_7254.HEIC and NIR_3719.JPG, sent for the conversion-wavelength question"
+  },
+  {
+   "id": "1p8__YvBqvhe13IgS6inY24KBaY-NYQAC",
+   "shared": "2026-11-08",
+   "holds": "NIR_3733, NIR_3736 and NIR_3742: raws and camera JPEGs of the marina frames the populations-by-place measurement was run on"
   }
  ],
  "files": [
@@ -2728,6 +2733,42 @@
    "id": "14OQYI7wjeVUdZd2ZqzT7WziWpxm9HSwx",
    "folder": "1AbzGVg-gXVRv0ailmu0GozNB8a_QbCpG",
    "size": 8603093
+  },
+  {
+   "name": "NIR_3733.NEF",
+   "id": "1mM2IWC6cI_ofVgzkGFaR5tp4JJfN6H30",
+   "folder": "1p8__YvBqvhe13IgS6inY24KBaY-NYQAC",
+   "size": 29653055
+  },
+  {
+   "name": "NIR_3736.NEF",
+   "id": "1QW8SQSj-30Dl7oUD1RNJ7-h2eCRrZ9-K",
+   "folder": "1p8__YvBqvhe13IgS6inY24KBaY-NYQAC",
+   "size": 29770541
+  },
+  {
+   "name": "NIR_3742.NEF",
+   "id": "1_KKe6JsQPENoLZORy3R1jTcOVOyelZk1",
+   "folder": "1p8__YvBqvhe13IgS6inY24KBaY-NYQAC",
+   "size": 29490450
+  },
+  {
+   "name": "NIR_3733.jpg",
+   "id": "1p2f2NQPlzTA7cpXn0mADVpP45gJhW3dk",
+   "folder": "1p8__YvBqvhe13IgS6inY24KBaY-NYQAC",
+   "size": 1410114
+  },
+  {
+   "name": "NIR_3736.jpg",
+   "id": "1UKbgBcwHJv6mmn5oGoVHO0dUJyUn52ag",
+   "folder": "1p8__YvBqvhe13IgS6inY24KBaY-NYQAC",
+   "size": 1393619
+  },
+  {
+   "name": "NIR_3742.jpg",
+   "id": "1C72kOWlPvShuIj81VU4vomTdOogKNyuj",
+   "folder": "1p8__YvBqvhe13IgS6inY24KBaY-NYQAC",
+   "size": 1494865
   }
  ]
 }

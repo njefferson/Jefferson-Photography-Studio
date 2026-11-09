@@ -1,5 +1,7 @@
 # The separation measure, computed over the gather of 8 November 2026
 
+Read the labels below as the gather's rule makes them, not as places. On frames balanced on their own trees that rule put most of the foliage under neutral at the opening render (72.8, 74.7 and 78.0 percent of the conifers on three frames, and 86.6 to 88.4 percent of the broadleaf), so the foliage label holds the minority of the trees and the neutral control is mostly trees and water; the distances and the control below are read with that. `docs/research/separation/places.md` holds the same three frames measured by place.
+
 This file is written by a harness that reads the 41 frame files under docs/research/separation/gather/ and nothing else. It decodes, draws and fetches nothing. It ranks 82 settings of white balance and channel remap by how far apart the sky and the foliage of one rendering sit in hue. No setting is singled out in words here: the ranking is the numbers, and the build plan for record 084's panel reads them.
 
 ## The measure, in words
