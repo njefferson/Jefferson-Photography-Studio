@@ -15,7 +15,7 @@
 
 // Single source of truth for edit parameters lives in pipeline.ts so the GPU
 // preview and CPU export can never drift apart.
-import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, colorReach, groupHslOffset, groupGradeOf, groupLumLutOf, groupShadowOf, maskCurvesStraight, LUM_MIN, LUM_MAX, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, screenGainsOf, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
+import { toneEvaluator, toneIsIdentity, maskGroups, maskGroupsForRender, colorReach, groupHslOffset, groupGradeOf, groupLumLutOf, groupShadowOf, maskCurvesStraight, LUM_MIN, LUM_MAX, hslIsNeutral, MAX_MASKS, MAX_BITMAP_MASKS, CROP_DEFAULT, cropToDisplayUv, displayUvToCrop, GRADE_DEFAULT, gradeIsNeutral, gradeTintVec, grainCellPx, MIX3_DEFAULT, mix3IsIdentity, screenGainsOf, SAT_GUARD_LO, SAT_GUARD_HI, SKY_SAT_GATE_LO, SKY_SAT_GATE_HI, skyReference, SKY_SAT_SECOND_GATE, panelStrengthOf, panelMix3Of, panelBoxOf, panelHslOf, panelCentreOf, lensGainsFor, lensGeom, aimsAt, AIM_NOISE, type LensCurve, type EditParams, type LocalMap, type SkyMap, type SkyReference, type BrushMask, type CropRect } from "./pipeline";
 import { toHalfBuffer, toHalf } from "./half";
 import { sharpenSigmaTexels } from "./raw/detail";
 export type { EditParams };
@@ -172,6 +172,9 @@ uniform bool u_mix3On;   // custom 3×3 channel mixer active
 uniform mat3 u_mix3;     // false-colour mixer (column-major upload; after swap, before hue)
 uniform vec3 u_sky;      // sky band [hueShiftDeg, satScale, lumScale]
 uniform vec3 u_fol;      // foliage band [hueShiftDeg, satScale, lumScale]
+uniform float u_panelSkyC;  // colour panel (084): the Sky box's keyed centre in degrees; negative = by name
+uniform float u_panelFolC;  // the Foliage box's keyed centre in degrees; negative = by name
+uniform float u_panelStr;   // the panel's Strength, 0..1 (the uploads above are already scaled by it; kept so the program names it)
 uniform sampler2D u_glowTex; // per-image blurred highlight map (see glow.ts)
 uniform float u_glow;        // 0..1 HIE halation strength
 uniform sampler2D u_toneTex; // 256x1 R16F master tone-curve LUT, texel i = f(i/255)
@@ -1256,8 +1259,20 @@ void main() {
     vec3 hsv = rgb2hsv(max(c, 0.0));
     float h = hsv.x * 360.0;
     // pipeline.ts skyBandCentre: the swapped centre only while no mixer is on
-    float wS = bandWeight(h, (u_swap && !u_mix3On) ? 30.0 : 210.0, 55.0, 105.0);
-    float wF = 1.0 - wS;
+    // (u_mix3On is the mixer at the panel's Strength). The branches are
+    // compileEdit's: the Sky weight is always a band, around its keyed centre or
+    // the by-name one; the Foliage weight is a band around its keyed centre,
+    // the two scaled to sum to one where they sum to more, or one minus the Sky
+    // weight where it keys by name (today's rule).
+    float wS = bandWeight(h, u_panelSkyC >= 0.0 ? u_panelSkyC : ((u_swap && !u_mix3On) ? 30.0 : 210.0), 55.0, 105.0);
+    float wF;
+    if (u_panelFolC >= 0.0) {
+      wF = bandWeight(h, u_panelFolC, 55.0, 105.0);
+      float tot = wS + wF;
+      if (tot > 1.0) { wS /= tot; wF /= tot; }
+    } else {
+      wF = 1.0 - wS;
+    }
     h += sky.x * wS + fol.x * wF;
     float s = min(1.0, hsv.y * bandGain(sky.y, wS, hsv.y) * bandGain(fol.y, wF, hsv.y));
     float v = hsv.z * (1.0 + (sky.z - 1.0) * wS) * (1.0 + (fol.z - 1.0) * wF);
@@ -1687,7 +1702,7 @@ export type MaskState = "in" | "idle" | "building" | "failed";
 
 /** Every uniform the edit program declares that a draw sets, looked up once
  *  the program has linked. */
-const UNIFORMS = ["u_tex", "u_wb", "u_wbScreen", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskLumLut", "u_maskLumLutOn", "u_maskCurveOn", "u_maskShadow", "u_maskShadowOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_skyRef", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
+const UNIFORMS = ["u_tex", "u_wb", "u_wbScreen", "u_swap", "u_hue", "u_sat", "u_con", "u_exposure", "u_linear", "u_cam", "u_useCam", "u_denoise", "u_chroma", "u_despeckle", "u_sharpen", "u_texture", "u_texel", "u_split", "u_tint", "u_glowTex", "u_glow", "u_sky", "u_fol", "u_panelSkyC", "u_panelFolC", "u_panelStr", "u_mix3On", "u_mix3", "u_rot", "u_crop", "u_straighten", "u_straightenCS", "u_dispAspect", "u_toneTex", "u_toneOn", "u_toneRgbTex", "u_toneRgbOn", "u_lum", "u_maskCount", "u_maskType", "u_maskGeoA", "u_maskGeoB", "u_maskAdj", "u_maskHue", "u_maskSlot", "u_maskOp", "u_maskAims", "u_maskFol", "u_maskFolOn", "u_maskSkyBand", "u_maskSkyBandOn", "u_maskHsl", "u_maskHslOn", "u_maskGrade", "u_maskGradeBal", "u_maskGradeOn", "u_maskLumLut", "u_maskLumLutOn", "u_maskCurveOn", "u_maskShadow", "u_maskShadowOn", "u_maskTex", "u_maskFineTex", "u_maskFineOn", "u_readMode", "u_hotspot", "u_hotspotSize", "u_hotspotColor", "u_lensTex", "u_lensN", "u_lensC", "u_lensInvD", "u_vignette", "u_aspect", "u_recover", "u_flatTex", "u_flatN", "u_flatC", "u_flatInvD", "u_clarity", "u_dehaze", "u_localTex", "u_localScale", "u_hslOn", "u_hsl", "u_bwOn", "u_bwMix", "u_skyTex", "u_skySmooth", "u_skyFineTex", "u_skyDepth", "u_skySat", "u_skyRef", "u_shadowSat", "u_gradeOn", "u_gradeTintS", "u_gradeTintM", "u_gradeTintH", "u_gradeAmt", "u_gradeBal", "u_grainAmt", "u_grainCell", "u_vigAmt", "u_vigMid", "u_outAspect", "u_outPx", "u_warpTex", "u_warpOn", "u_warpScale", "u_spotVis", "u_maskViz", "u_maskMatte", "u_lutTex", "u_lutSize", "u_lutStrength", "u_flip", "u_overlayTex", "u_overlayOn", "u_overlayScreenTex", "u_overlayScreenOn", "u_hazeA", "u_sharpK", "u_detailTex", "u_detailPre", "u_stage"] as const;
 
 export class Renderer {
   private gl: WebGL2RenderingContext;
@@ -3064,18 +3079,28 @@ export class Renderer {
     // Custom 3×3 channel mixer. The param is row-major [rr,rg,rb, gr,gg,gb,
     // br,bg,bb]; GLSL mat3 is column-major, so upload the transpose — then
     // `u_mix3 * c` computes the same M*input the CPU path does.
-    const mix3On = !mix3IsIdentity(p.mix3);
+    // The colour panel's Strength (record 084): the mixer, the eight bands and
+    // the two boxes go up as compileEdit reads them, panelS = 1 the very same
+    // numbers as before. Its keyed centres go up as degrees, negative = by name.
+    const panelS = panelStrengthOf(p);
+    const mix3Now = panelMix3Of(p);
+    const mix3On = !mix3IsIdentity(mix3Now);
     gl.uniform1i(this.loc.u_mix3On, mix3On ? 1 : 0);
+    gl.uniform1f(this.loc.u_panelStr, panelS);
+    gl.uniform1f(this.loc.u_panelSkyC, panelCentreOf(p.panelCentres?.sky));
+    gl.uniform1f(this.loc.u_panelFolC, panelCentreOf(p.panelCentres?.foliage));
     if (mix3On) {
-      const m = p.mix3 ?? MIX3_DEFAULT;
+      const m = mix3Now ?? MIX3_DEFAULT;
       gl.uniformMatrix3fv(this.loc.u_mix3, false, new Float32Array([
         m[0], m[3], m[6],
         m[1], m[4], m[7],
         m[2], m[5], m[8],
       ]));
     }
-    gl.uniform3f(this.loc.u_sky, p.sky[0], p.sky[1], p.sky[2]);
-    gl.uniform3f(this.loc.u_fol, p.foliage[0], p.foliage[1], p.foliage[2]);
+    const skyNow = panelBoxOf(p.sky, panelS);
+    const folNow = panelBoxOf(p.foliage, panelS);
+    gl.uniform3f(this.loc.u_sky, skyNow[0], skyNow[1], skyNow[2]);
+    gl.uniform3f(this.loc.u_fol, folNow[0], folNow[1], folNow[2]);
     gl.uniform2f(this.loc.u_texel, this.tapScale / this.imgW, this.tapScale / this.imgH);
     gl.uniform1f(this.loc.u_split, split);
     gl.uniform3f(this.loc.u_wb, p.wb[0], p.wb[1], p.wb[2]);
@@ -3113,9 +3138,10 @@ export class Renderer {
     // A head's own colour mixer switches the mixer on too (042, stage 2b), even
     // with the whole photo's neutral.
     const maskHslOn = maskGroupsForRender(p.masks).some((g) => !!groupHslOffset(g));
-    const mixerOn = !hslIsNeutral(p.hsl) || maskHslOn;
+    const hslNow = panelHslOf(p.hsl, panelS);
+    const mixerOn = !hslIsNeutral(hslNow) || maskHslOn;
     gl.uniform1i(this.loc.u_hslOn, mixerOn ? 1 : 0);
-    if (mixerOn) gl.uniform3fv(this.loc.u_hsl, new Float32Array(p.hsl));
+    if (mixerOn) gl.uniform3fv(this.loc.u_hsl, new Float32Array(hslNow!));
     gl.uniform1i(this.loc.u_maskHslOn, maskHslOn ? 1 : 0);
     const maskGradeOn = maskGroupsForRender(p.masks).some((g) => !!groupGradeOf(g));
     gl.uniform1i(this.loc.u_maskGradeOn, maskGradeOn ? 1 : 0);

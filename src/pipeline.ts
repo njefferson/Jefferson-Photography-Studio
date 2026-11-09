@@ -211,6 +211,24 @@ export interface EditParams {
    *  the .cube LUT, and (best-effort, via creativeLinear) the .dcp hue-sat
    *  map. Identity = MIX3_DEFAULT. */
   mix3?: number[];
+  /** THE COLOUR PANEL'S STRENGTH (record 084), 0..1, absent reads 1. One amount
+   *  over the mixer and the band moves: the mixer the render uses is the
+   *  identity times (1 - s) plus `mix3` times s, and every band move (the eight
+   *  bands and the Sky and Foliage boxes) is scaled by s about its neutral. The
+   *  swap flag is NOT touched (record 104's screen-side gains act only with the
+   *  swap on, so a half swap has no reading). At 1 nothing changes in any
+   *  render. Saved by a look; in the stamp. */
+  panelStrength?: number;
+  /** THE PANEL'S KEYED CENTRES (record 084), RUNTIME-ONLY like `lut` and `warp`:
+   *  the Sky and Foliage boxes' band centres in degrees, derived from the
+   *  photograph (panelkey.ts) and set by main.ts wherever the editor hands a
+   *  photograph's edit to a renderer, so the screen, the tiles, the batch and
+   *  the exports read one value by one route. A null degree (or the whole field
+   *  absent) means that box keys by name and keeps today's centre. Copied by
+   *  `cloneParams`; never serialised, never restored by Undo, never in a look
+   *  or the stamp - it is derived from the photograph and from fields the stamp
+   *  already holds. */
+  panelCentres?: PanelCentres | null;
   /** Color grade: split-tone wheels [hueS, amtS, hueM, amtM, hueH, amtH,
    *  balance] — one hue (deg) + amount (0..1) per tonal band, balance -1..1
    *  shifting the shadow/highlight crossovers. Each band adds a PURE-CHROMA
@@ -2019,6 +2037,10 @@ export function cloneParams(p: EditParams): EditParams {
     vigAmt: p.vigAmt ?? 0,
     vigMid: p.vigMid ?? 0.5,
     mix3: [...(p.mix3 ?? MIX3_DEFAULT)],
+    // Full is written as absent (record 084): the strength is copied only where it is present and under 1, so an edit nobody moved keeps the spelling it had before the panel and every reader takes absent as full through panelStrengthOf.
+    ...(typeof p.panelStrength === "number" && p.panelStrength < 1 ? { panelStrength: p.panelStrength } : {}),
+    // Runtime-only, like the lens and warp fields: carried on a copy so a tile, the batch and an export read the centres the editor set, absent stays absent.
+    ...(p.panelCentres ? { panelCentres: { sky: p.panelCentres.sky, foliage: p.panelCentres.foliage } } : {}),
     spots: (p.spots ?? []).map((s) => ({ ...s })),
     // corners + match arrays are nested — deep-copy so an undo snapshot doesn't
     // share the live sticker's perspective/transfer (the mask rides by ref,
@@ -2260,6 +2282,75 @@ export function bandWeight(hue: number, center: number, plateau: number, edge: n
   if (d >= edge) return 0;
   const t = (d - plateau) / (edge - plateau);
   return 1 - t * t * (3 - 2 * t);
+}
+
+/** The colour panel's keyed band centres (record 084): the Sky and Foliage
+ *  boxes' centres in degrees on the hue wheel the bands read, or null for a
+ *  box that keys by name. `EditParams.panelCentres` carries it. */
+export interface PanelCentres { sky: number | null; foliage: number | null }
+
+/** The panel's Strength as the render reads it.
+ *  @param p  the edit.
+ *  @returns `p.panelStrength` held to 0..1, 1 when absent or not a finite number.
+ *  What the result must satisfy: it is the one reading of the field, so the CPU
+ *  render, the shader's uploads and the keying agree on what a missing or
+ *  broken value means (full strength: no panel move changes nothing). */
+export function panelStrengthOf(p: EditParams): number {
+  const s = p.panelStrength;
+  return typeof s === "number" && Number.isFinite(s) ? Math.min(1, Math.max(0, s)) : 1;
+}
+
+/** The mixer the render uses at the panel's Strength.
+ *  @param p  the edit.
+ *  @returns the 3x3 mixer, row-major, equal to the identity times (1 - s) plus
+ *  `p.mix3` times s; `p.mix3` itself (the same array, or undefined) at s = 1, so
+ *  a strength of one is byte-for-byte today's render.
+ *  What the result must satisfy: the CPU render (compileEdit), the shader's
+ *  upload (gl.ts bindPipeline) and the by-name band centre all read this one
+ *  function, so `mix3IsIdentity` of it is the mixer-on switch everywhere. */
+export function panelMix3Of(p: EditParams): number[] | undefined {
+  const s = panelStrengthOf(p);
+  if (s === 1) return p.mix3;
+  const m = p.mix3 ?? MIX3_DEFAULT;
+  const out: number[] = [];
+  for (let i = 0; i < 9; i++) out.push(MIX3_DEFAULT[i] * (1 - s) + (m[i] ?? MIX3_DEFAULT[i]) * s);
+  return out;
+}
+
+/** A Sky or Foliage box at the panel's Strength.
+ *  @param box  the box, [hueShiftDeg, satScale, lumScale]; neutral is [0, 1, 1].
+ *  @param s  the strength, 0..1.
+ *  @returns `box` itself at s = 1, else the box scaled about neutral: hue times
+ *  s, and each scale 1 + (value - 1) times s.
+ *  What the result must satisfy: at s = 0 it is exactly neutral, and the shader
+ *  uploads the same numbers. */
+export function panelBoxOf(box: readonly [number, number, number], s: number): readonly [number, number, number] {
+  if (s === 1) return box;
+  return [box[0] * s, 1 + (box[1] - 1) * s, 1 + (box[2] - 1) * s];
+}
+
+/** The eight-band mixer's moves at the panel's Strength.
+ *  @param hsl  the 24 numbers, [hueShiftDeg, satScale, lumScale] per band, or undefined.
+ *  @param s  the strength, 0..1.
+ *  @returns `hsl` itself at s = 1 or when it is not 24 numbers, else a new array
+ *  with each band scaled about neutral as `panelBoxOf` does.
+ *  What the result must satisfy: at s = 0 `hslIsNeutral` of it is true, and the
+ *  shader uploads the same numbers. */
+export function panelHslOf(hsl: readonly number[] | undefined, s: number): readonly number[] | undefined {
+  if (s === 1 || !hsl || hsl.length !== 24) return hsl;
+  const out: number[] = [];
+  for (let i = 0; i < 8; i++) out.push(hsl[i * 3] * s, 1 + (hsl[i * 3 + 1] - 1) * s, 1 + (hsl[i * 3 + 2] - 1) * s);
+  return out;
+}
+
+/** One keyed centre as the renderers read it.
+ *  @param deg  a centre in degrees from `EditParams.panelCentres`, null or undefined for by name.
+ *  @returns the centre brought to 0..360 as a number, or -1 when the box keys by name (null, undefined or not finite).
+ *  What the result must satisfy: the shader's centre uniform takes this number
+ *  as it is, a negative meaning by name, and the CPU band stage tests it the same way. */
+export function panelCentreOf(deg: number | null | undefined): number {
+  if (typeof deg !== "number" || !Number.isFinite(deg)) return -1;
+  return ((deg % 360) + 360) % 360;
 }
 
 const REC709 = [0.2126, 0.7152, 0.0722];
@@ -2792,6 +2883,13 @@ export function recoverHighlight(c: Float32Array | Float64Array | number[], s0: 
  * @param skyMap  the per-edit sky chroma map, or null.
  * @param skyFine  the refined sky bitmap, or null.
  * @param srcFlat  the lens flat already in a raw's source pixels, or null.
+ * @param probe  the colour panel's keying (panelkey.ts), or omitted. Given, the
+ *   returned function stops at the band stage's door: it writes the hue in
+ *   degrees, the saturation and the value of the colour the bands would read
+ *   (after the swap, the mixer, the hue turn, the screen-side gains and the
+ *   saturation, in linear light) into `probe[0..2]` and returns without
+ *   writing `out`. There is one copy of those stages, so the keying cannot
+ *   drift from the render.
  * @returns a function `(r, g, b, out, glow, u, v, mu, mv)` that writes the
  *   finished DISPLAY sRGB pixel into `out` for one linear source pixel. `u`,
  *   `v` are its image uv and switch the spatial stages on; `mu`, `mv` are
@@ -2834,6 +2932,8 @@ export function compileEdit(
    *  than the corrected one; nothing else here uses it. Omit for an 8-bit
    *  source, whose correction is the in-grade stage above. */
   srcFlat?: SourceFlat | null,
+  /** The colour panel's keying probe (see the doc above); omit for a render. */
+  probe?: Float64Array,
 ): (r: number, g: number, b: number, out: Float32Array, glow?: number, u?: number, v?: number, mu?: number, mv?: number) => void {
   // The hue rotation about the Rec.709 luminance axis (hueRotate: W3C
   // feColorMatrix hueRotate), so turning Hue keeps brightness and grey. It
@@ -2865,8 +2965,18 @@ export function compileEdit(
   // (lum>1 brightens). 1 = neutral.
   const lumExp = p.lum && p.lum !== 1 ? 1 / p.lum : 0;
   const lumFn = lumExp ? (v: number) => Math.pow(v, lumExp) : null;
-  const sky = p.sky;
-  const fol = p.foliage;
+  // THE COLOUR PANEL'S STRENGTH (record 084): the mixer, the eight bands and the
+  // two boxes at s; the very same objects at s = 1.
+  const panelS = panelStrengthOf(p);
+  const sky = panelBoxOf(p.sky, panelS);
+  const fol = panelBoxOf(p.foliage, panelS);
+  const hslNow = panelHslOf(p.hsl, panelS);
+  const mix3Now = panelMix3Of(p);
+  // The keyed centres (-1: by name), and the by-name centre the band keeps
+  // today, read off the mixer the render uses.
+  const keySky = panelCentreOf(p.panelCentres?.sky);
+  const keyFol = panelCentreOf(p.panelCentres?.foliage);
+  const nameCentre = skyBandCentre(swap, mix3Now);
   // A MASK'S OWN FOLIAGE (042, stage 2) switches the band on too, and is read
   // per pixel below; the groups are taken after maskGroupsActive exists.
   const folGroupsOf = (gs: readonly (readonly MaskLayer[])[]) => gs.filter((g) => groupFolOffset(g) !== null);
@@ -2963,14 +3073,14 @@ export function compileEdit(
   // once per pixel into one array rather than a fresh tuple per call.
   const lm = new Float64Array(3);
   const airR = local ? local.air[0] : 1, airG = local ? local.air[1] : 1, airB = local ? local.air[2] : 1;
-  const mixerOn = !hslIsNeutral(p.hsl) || hslGroups.length > 0;
+  const mixerOn = !hslIsNeutral(hslNow) || hslGroups.length > 0;
   const bwOn = !!p.bwOn;
   const bwMix = p.bwMix ?? [1, 1, 1];
   // Normalised weights: only the ratio matters. An all-zero mix divides by the
   // epsilon and lands at black — honest feedback, never NaN.
   const bwDen = Math.max(1e-4, bwMix[0] + bwMix[1] + bwMix[2]);
-  const mix3 = p.mix3 ?? MIX3_DEFAULT;
-  const mix3On = !mix3IsIdentity(p.mix3);
+  const mix3 = mix3Now ?? MIX3_DEFAULT;
+  const mix3On = !mix3IsIdentity(mix3Now);
   const m0 = mix3[0], m1 = mix3[1], m2 = mix3[2];
   const m3 = mix3[3], m4 = mix3[4], m5 = mix3[5];
   const m6 = mix3[6], m7 = mix3[7], m8 = mix3[8];
@@ -3162,6 +3272,12 @@ export function compileEdit(
     nr = luma + (nr - luma) * satEff;
     ng = luma + (ng - luma) * satEff;
     nb = luma + (nb - luma) * satEff;
+    // THE PANEL'S KEYING PROBE: the colour the bands would read, and no further.
+    if (probe) {
+      const [ph, ps, pv] = rgb2hsv(Math.max(0, nr), Math.max(0, ng), Math.max(0, nb));
+      probe[0] = ph; probe[1] = ps; probe[2] = pv;
+      return;
+    }
     // Per-colour bands (complementary cool/warm halves), matching the shader:
     // hue shift, sat scale and lum scale weighted by hue distance to the band.
     // Where a mask carries its own Foliage, the band reads the value HERE.
@@ -3185,8 +3301,24 @@ export function compileEdit(
       // stays glued to the same subject in both swap states — unless a 3x3
       // mixer has rotated the wheel again, when the bands read it as
       // displayed (skyBandCentre has the measurement).
-      const wS = bandWeight(h, skyBandCentre(swap, p.mix3), 55, 105);
-      const wF = 1 - wS;
+      // The Sky weight is always a band (plateau 55, edge 105), around its keyed
+      // centre where it has one and around the by-name centre (read from the
+      // mixer at the Strength) where it has none. The Foliage weight is a band of
+      // the same shape around its keyed centre where it has one, and one minus
+      // the Sky weight where it has none, so a box that keys by name acts as it
+      // does today whatever the other does. Where the Foliage box is keyed and
+      // the two weights sum to more than one they are scaled to sum to one;
+      // what neither takes stays with the eight-band mixer. With neither keyed
+      // this is today's rule exactly. gl.ts has the same branches.
+      let wS = bandWeight(h, keySky >= 0 ? keySky : nameCentre, 55, 105);
+      let wF: number;
+      if (keyFol >= 0) {
+        wF = bandWeight(h, keyFol, 55, 105);
+        const tot = wS + wF;
+        if (tot > 1) { wS /= tot; wF /= tot; }
+      } else {
+        wF = 1 - wS;
+      }
       h += sk[0] * wS + f[0] * wF;
       // A boost acts only where there is colour to boost (bandGain's guard);
       // the guard reads THIS pixel's saturation before either band touches it.
@@ -3300,7 +3432,7 @@ export function compileEdit(
     // image — field feedback 2026-07-05.)
     if (mixerOn) {
       let [h, s, v] = rgb2hsv(out[0], out[1], out[2]);
-      let [dh, ds, dl] = hslAt(p.hsl, h);
+      let [dh, ds, dl] = hslAt(hslNow!, h);
       // A mask's own offsets (042, stage 2b), interpolated by hue the way the
       // whole photo's are, weighted by its group and summed where masks
       // overlap, then held to the sliders' ranges. hslAt is linear in the

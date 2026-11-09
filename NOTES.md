@@ -2466,6 +2466,16 @@ Q-JPS-252: the float test's result changed on the 8-core iPad, not yet traced (s
 Q-JPS-253: the gather's rule put 72.8, 74.7 and 78.0 percent of the conifers and 88.4, 86.6 and 87.7 percent of the broadleaf under neutral on three frames balanced on their own trees, with 16.4, 15.4 and 13.2 percent of the conifers under foliage, so the foliage label holds the minority of the trees (step 343, 8 November 2026).
 Q-JPS-254: the rankings of `docs/research/separation/measure.md` rest on that labelling, and the foliage population and the neutral control in them are not the places they are named for (step 343, 8 November 2026).
 Q-JPS-255: the doctrine sync marker names a hub commit the hub no longer has, so the drift cannot be listed and every section of the doctrine counts as unread here; adopting it needs the hub pin in the calling workflow under `.github/workflows` moved in the same commit, for the next plan (step 344, 8 November 2026).
+Q-JPS-256: the owner-images index lacks a trailing newline at its end (step 362, 9 November 2026).
+Q-JPS-257: the owner-images tool's summary counts file names ending in lowercase .jpg under neither of its two extensions, so the totals it prints do not add up to the index (step 362, 9 November 2026).
+Q-JPS-258: the queue lines Q-JPS-238 to Q-JPS-246 carry 9 November dates read from UTC where the queue's other lines carry California dates, so some of them may belong to 8 November in California time (step 362, 9 November 2026).
+Q-JPS-259: `.githooks/commit-msg` stands modified in the working tree beside `.githooks/pre-commit`, which Q-JPS-226 names alone, and no step of any plan has touched either (step 362, 9 November 2026).
+Q-JPS-260: `updateBandLabels` in `src/main.ts` reads the by-name Sky centre with `skyBandCentre(params.swapRB, params.mix3)`, the mixer at full strength, and not through `panelMix3Of`, so at a Strength under full a heading's by-name words can disagree with the render (step 367, 9 November 2026).
+Q-JPS-261: `keyPanelCentres` and the tile's keying compile with no lens curve, so an 8-bit source's lens grade is not in the keyed hue on any route (step 367, 9 November 2026).
+Q-JPS-262: the open photograph's keying runs a probe compile on each change of balance, swap, mixer, hue, saturation or Strength during a drag, and its cost on the device is not measured; the test page's time rows name the sample and the keying for the device pass (step 359, 9 November 2026).
+Q-JPS-263: the shader declares and sets `u_panelStr` and its GLSL reads no use of it, because the uploads are already scaled at the Strength, so the driver may drop it (step 358, 9 November 2026).
+Q-JPS-264: section 15 of the accessibility walk asserts the Strength range at 44 wide and 28 tall, the track's own measure as section 12 does, and reads the mixer from the nine inputs under the mixer grid and the swap from the swap button's pressed state, so a change to either needs the same change there (step 362, 9 November 2026).
+Q-JPS-265: the stamp check reads `pr.x` in `stampOf`, and the Strength is there as `panelStrengthOf(pr)`, which that pattern does not see; the check passes because it asks only for fields `applyLook` writes (step 359, 9 November 2026).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -4253,8 +4263,7 @@ user-scalable=no.
   eight bands entered from the photo, the Sky and Foliage boxes keyed on where
   the subjects sit after the swap, one Strength, and Save as a look. After Big
   image, before the screens are assessed. Its premise is measured by the Separation check on
-  the test page, built on staging as 2.72 and waiting on the device pass; nothing of the
-  panel is built.
+  the test page; the panel itself is built on staging as 2.76 and open for the device pass.
 
 - [ ] **Housekeeping: walks that cannot see what they claim, and paths into dead sessions** <!-- decision: 083 -->
   **Shown as:** internal

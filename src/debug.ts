@@ -49,6 +49,7 @@ import { readBalance, readShown, exactBalance, screenForWhite, TEMPERATURE_MIRED
 import { makeRowDenoiser } from "./raw/denoise";
 import { compileEdit, SAT_GUARD_LO, TONE_DEFAULT, GRADE_DEFAULT, MIX3_DEFAULT, hslDefault, CROP_DEFAULT, neutralMask, MAX_MASKS, sampleBrush, type BrushMask, type EditParams, type MaskLayer } from "./pipeline";
 import { prepareSkySource, buildSkySelectionFrom } from "./skyfine";
+import { takePanelSample, keyPanelCentres, type PanelKeyed, type PanelSample } from "./panelkey";
 import { exportImage } from "./export";
 import { drawFrame, canDrawFrame, buildLinearSource, openDrawing, type Drawing, type DrawnFrame, type DrawProbe } from "./gpuexport";
 import { Renderer, VERT, FRAG, MASK_LOOP, dropMaskLoops } from "./gl";
@@ -3231,6 +3232,20 @@ function buildSepSky(img: DecodedImage): { mask: BrushMask | null; note: string 
   }
 }
 
+/** Says the panel's keying in words, the same words the editor's Sky and Foliage headings use.
+ *  @param k  the keying (`keyPanelCentres`' result).
+ *  @returns each box as a degree "from this photograph" or "by name", and the arc between the two centres in degrees (the smaller way round, 0 to 180) where both are degrees, else a line saying why there is none.
+ *  What the result must satisfy: it reads only `k`; it is one string with no vertical bar and no separator the sweep row's walk regexes read, so it sits in a sweep row's first segment (consumers: the first picture's keying row and each drawn sweep row). */
+function panelKeyWords(k: PanelKeyed): string {
+  const one = (name: string, deg: number | null): string => (deg === null ? `${name} by name` : `${name} ${deg.toFixed(1)} degrees, from this photograph`);
+  let arc = "no arc, a box is keyed by name";
+  if (k.sky !== null && k.foliage !== null) {
+    const d = Math.abs(k.sky - k.foliage) % 360;
+    arc = `arc ${(d > 180 ? 360 - d : d).toFixed(1)} degrees`;
+  }
+  return `${one("Sky", k.sky)}, ${one("Foliage", k.foliage)}, ${arc}`;
+}
+
 /** Labels the thinned pixels of the first picture. Takes that picture (thinned from the frame at the opening balance with the swap on), the
  *  sky bitmap or null, the decode, the opening gains and the sky note. Returns the labels by the rule above. What it must satisfy: the
  *  position of a pixel is ((column times the stride plus one half) over the drawn width, (row times the stride plus one half) over the drawn
@@ -3626,6 +3641,8 @@ interface SepState {
   baseWords: string;
   /** What each spot's last reading said. Null until the spot has been read. */
   spots: { n: SpotRead | null; f: SpotRead | null };
+  /** The sky selection's bitmap the first press built (null when no clear sky was found), kept so the sweep's keying sample reads the same selection. */
+  mask: BrushMask | null;
 }
 /** One spot's reading by the editor's tap rule: where it is, whether it is usable, the balance it sets and, when usable, the picture drawn at it. */
 interface SpotRead { px: number; py: number; verdict: "ok" | "blown" | "dark"; wb: [number, number, number] | null; exposure: number; t: ReturnType<typeof thin> | null }
@@ -3862,6 +3879,9 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       books(tally);
       const skyBuilt = buildSepSky(subject.img);
       lap(tally, "separation: the sky selection's build");
+      // The keying's sample is the photograph's own linear pixels and the bitmap, taken once; never the drawn frame, which has been through the swap and the mixer.
+      const keySample = takePanelSample(subject.img, skyBuilt.mask, 0);
+      lap(tally, "separation: the keying's sample");
       progress("Drawing the photograph with the swap on at the balance the app opens at");
       await pause(tally);
       books(tally);
@@ -3882,6 +3902,10 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
         "Each thinned pixel is labelled once. Sky where the app's own sky selection (the refined bitmap, or the coarse one when there is none) reads at least the sky weight at its position. Otherwise neutral where its saturation at the opening render, the swap on at the balance the app opens at, is under the floor. Otherwise foliage where the vegetation axis, the white-balanced red less the green over the green, taken on the linear copy at the opening gains, is at most the threshold. Otherwise other. These are the rule of the gather of 8 November; the four figures are the measure's own and no source gives them.");
       row("The first picture: the four labels and the separation measure", sepWords(measure0),
         "The same split as each sweep row's, at the opening balance with the swap on: each population's count, its share at or above the floor, its circular mean hue and resultant length, the Hellinger distance between the sky's and the foliage's hue counts and the angle between their means, with the neutral population as the control. A population with fewer than one pixel in a hundred at or above the floor is colourless and the distance is then undefined.");
+      const keyed0 = keyPanelCentres(keySample, sepEdit(base.wb, base.exposure), subject.img.camMatrix, subject.img.width / subject.img.height, null);
+      lap(tally, "separation: the panel's keying");
+      row("The first picture: the panel's keying", `${panelKeyWords(keyed0)} · ${keySample.n} sampled pixels of the photograph's own linear pixels`,
+        "The two centres the editor's Sky and Foliage boxes are keyed on for this photograph, at the opening balance with the swap on and no box moved: the circular mean hue, read at the band stage in linear light, of the sampled pixels the app's sky selection covers (Sky) and of those it leaves out (Foliage), each at or above the saturation floor, by the same two functions the editor uses. A box says by name where no sky was found or where fewer than one pixel in a hundred of its population is at or above the floor. The sample is taken from the photograph's own pixels and never from the drawn frame, which has already been through the swap and the mixer.");
       probeRows("after the photograph's first draw", drawing.probe());
       channelRows("after the photograph's first draw", frame, t);
       lap(tally, "separation: the drawing surface's report and the frame's raw values");
@@ -3903,7 +3927,7 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
         sepBox(neutral ? "dSepNY" : "dSepFY").value = fy.toFixed(1);
         sepSpot(neutral ? "n" : "f");
       });
-      sep = { drawing, subject, wb0: base.wb, exp0: base.exposure, t, cv0, spec, labels, shown: t, shownWhat: "the balance the editor opens at", baseWords, spots: { n: null, f: null } };
+      sep = { drawing, subject, wb0: base.wb, exp0: base.exposure, t, cv0, spec, labels, shown: t, shownWhat: "the balance the editor opens at", baseWords, spots: { n: null, f: null }, mask: skyBuilt.mask };
       drawing = null;
       const rd = spec ? readBalance(base.wb, spec) : null;
       row("The opening balance, the first white point", `gains ${base.wb.map((g) => g.toFixed(4)).join(", ")} · exposure ${base.exposure.toFixed(4)} · ${rd ? `reads as ${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read: the file has no matrix to read it through"}`,
@@ -4127,6 +4151,9 @@ sepSweepBtn.addEventListener("click", (e) => {
     const t0 = performance.now();
     let ran = 0, reused = 0, skipped = 0, notExpr = 0;
     let diagnosed = false;
+    // One sample for the whole press, taken from the photograph's own linear pixels and the bitmap the first press built.
+    const sweepSample: PanelSample = takePanelSample(s.subject.img, s.mask, 0);
+    lap(tally, "sweep: the keying's sample");
     row("The sweep's own settings", `${list.length} settings · grid ${SWEEP_STEPS} Temperatures by ${SWEEP_TINTS.length} Tints over ${TEMPERATURE_MIRED_FAR} to ${TEMPERATURE_MIRED_NEAR} mired and tints ${SWEEP_TINTS.join(", ")} · ${SEP_FIGURES} · ${SEP_BINS} bins of ${SEP_BIN_DEG} degrees`,
       "Three routes at each grid point: the camera-side gains the check writes, with the swap on and off, and the screen-side gains the editor writes for Temperature and Tint while the swap is on, over the opening balance. Then the opening balance under each of the editor's five mixer presets. The sweep sets no look, no band and no control; the rule, the floor and the bins are the Separation check's own. A balance that cannot be made is a row that says so and is not drawn. Each counted setting is also split by the labels of the first picture (sky by the app's own sky selection, neutral by saturation at the opening render, foliage by the vegetation axis on the linear copy at the opening gains, the rest other), and the figures in this row are the measure's own.");
     for (let k = 0; k < list.length; k++) {
@@ -4163,10 +4190,13 @@ sepSweepBtn.addEventListener("click", (e) => {
       let split: string;
       try { split = sepWords(sepMeasure(labelledStats(c.hp, s.labels))); } catch (err) { split = `not split by label (${(err as Error).message})`; }
       lap(tally, "sweep: the labelled counts and the measure");
-      const rd = st.screen && s.spec ? readShown(st.wb, st.screen, s.spec) : st.reading;
+      let keyWords: string;
+      try { keyWords = panelKeyWords(keyPanelCentres(sweepSample, sweepEdit(st), s.subject.img.camMatrix, s.subject.img.width / s.subject.img.height, null)); } catch (err) { keyWords = `not keyed (${(err as Error).message})`; }
+      lap(tally, "sweep: the panel's keying");
+      const rd =st.screen && s.spec ? readShown(st.wb, st.screen, s.spec) : st.reading;
       const px = t.w * t.h;
       row(name,
-        `${rd ? `${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read"} · gains ${st.wb.map((g) => g.toFixed(4)).join(", ")} · screen-side gains ${st.screen ? st.screen.map((g) => g.toFixed(4)).join(", ") : "none"} · exposure ${st.exposure.toFixed(4)} · swap ${st.swap ? "on" : "off"} · mixer ${st.mixer} · ${c.above} of ${px} pixels at or above the floor, ${(c.under * 100).toFixed(1)} percent under it · separation, ${split} · saturation bands of every pixel, 0 to 10 percent first: ${c.sat.join(" ")} · hue counts: ${c.hue.join(" ")}`,
+        `${rd ? `${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read"} · gains ${st.wb.map((g) => g.toFixed(4)).join(", ")} · screen-side gains ${st.screen ? st.screen.map((g) => g.toFixed(4)).join(", ") : "none"} · exposure ${st.exposure.toFixed(4)} · swap ${st.swap ? "on" : "off"} · mixer ${st.mixer} · panel keying, ${keyWords} · ${c.above} of ${px} pixels at or above the floor, ${(c.under * 100).toFixed(1)} percent under it · separation, ${split} · saturation bands of every pixel, 0 to 10 percent first: ${c.sat.join(" ")} · hue counts: ${c.hue.join(" ")}`,
         `${st.reuse ? "The first picture, counted again, not drawn again. " : ""}The ${SEP_BINS} hue counts are the pixels at or above the floor in bins of ${SEP_BIN_DEG} degrees from 0; the ten saturation counts are every pixel; the share under the floor is the pixels below ${SAT_GUARD_LO} saturation. Counts only, of the drawn pixels, thinned to every ${t.k === 1 ? "pixel" : `${t.k}th pixel`}. The separation figures split the same counted pixels into sky, neutral, foliage and other as the first picture labelled them, give each population's circular mean hue and resultant length, and for the sky and the foliage the Hellinger distance between their hue counts (0 for the same counts, 1 for counts sharing no bin) and the angle between their means; the neutral population is the control.`);
       ran++;
     }

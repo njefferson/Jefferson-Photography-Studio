@@ -38,6 +38,7 @@ import { importFile, sniff, refineKind, isZip, readLimitMs, type ImportedFile, t
 import { wireForceUpdate, wireUpdateStrip, setUpdateCost } from "./swupdate";
 import { type DecodedImage, type SkySelection, pickLargestPreview, linearAt, grayWorldWB, grayWorldMeans, unitMinGains, exposureHoldingNeutral, autoExposure, autoRecover, sampleForWb, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS } from "./decode";
 import { decodeOffThread, tileOffThread, decodeLanes, decodeLaneTarget, skySelectionAt, canAskSkyAt, requestSkySelectionAt, type DecodeTiming } from "./decodeClient";
+import { takePanelSample, keyPanelCentres, panelBoxMoved, type PanelSample, type PanelKeyed } from "./panelkey";
 import { renderTile, TILE_QUALITY, solveLift, scaleLift, liftBaseNeutral, BAND_NEUTRAL, isOneBand, freshBaseline, bringLensTo, lensForSource, srcFlatOf, trackPos, trackVal, snapGain, snapExposure, EXPOSURE_LO, EXPOSURE_HI, type LiftBase, type TileInputs, type TileTimings } from "./tile";
 import { sourceIsMosaiced, type ExportOptions } from "./export";
 import { Renderer, VERT, FRAG, type EditParams } from "./gl";
@@ -51,7 +52,7 @@ import { putFrame, eachFrame, frameMetas, frameCount, clearFrames, frameStore } 
 import * as Session from "./session";
 import { keepAwake } from "./wakelock";
 import { canTravel, shapeOf, putMask, getMask, listMasks, deleteMask as forgetMask, MASK_COUNT_CAP, keepSkyMap, getKeptSkyMap, keptSkyMapHint, photographStamp, digestBytes } from "./maskstore";
-import { cloneParams, screenGainsOf, screenGainsNeutral, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, MASK_CURVE_LEN, maskCurvesStraight, radialLocal, radialPoint, type MaskLayer, type FixStroke, type CropRect, BRUSH_MAX_EDGE, skyReference, SKY_SAT_SECOND_GATE, type SkyMap } from "./pipeline";
+import { cloneParams, screenGainsOf, screenGainsNeutral, sampleBrush, rebuildFix, stampFix, stampSegment, skyBandCentre, TONE_DEFAULT, TONE_X, toneEvaluator, toneIsIdentity, neutralMask, hslDefault, HSL_CENTERS, MAX_MASKS, MAX_BITMAP_MASKS, chromaVec, hsv2rgb, CROP_DEFAULT, cropIsIdentity, autoInscribedCrop, GRADE_DEFAULT, MIX3_DEFAULT, AIM_DEHAZE, AIM_CLARITY, AIM_SHADOW, AIM_LENS, AIM_NOISE, AIM_TEXTURE, maskGroups, groupCanAim, MASK_CURVE_LEN, maskCurvesStraight, radialLocal, radialPoint, type MaskLayer, type FixStroke, type CropRect, BRUSH_MAX_EDGE, skyReference, SKY_SAT_SECOND_GATE, panelStrengthOf, type SkyMap } from "./pipeline";
 import { sensorPitchMicrons } from "./color";
 import { lensGains, lensCentreLine, lensPlanStamp, type LensPlan } from "./lensflat";
 import { bakeRgba8, bakeRgbaF32, spotRect, findHealSource, detectSpots, lumaAccessor, SPOT_R_MIN, SPOT_R_MAX, spotMode, type HealSpot, type HealCache, type HealSolves } from "./heal";
@@ -645,7 +646,46 @@ const ui = {
   lookMono: $("lookMono") as HTMLButtonElement,
   lookSepia: $("lookSepia") as HTMLButtonElement,
   lookHie: $("lookHie") as HTMLButtonElement,
+  // THE COLOUR PANEL (record 084): the three channel-swap chips, the Strength with its words, Save as a look, the two boxes' keying words
+  // and the panel's own live region. Declared here because `syncToUI` reaches them and runs early.
+  panelSwapRB: $("panelSwapRB") as HTMLButtonElement,
+  panelSwapGB: $("panelSwapGB") as HTMLButtonElement,
+  panelSwapRG: $("panelSwapRG") as HTMLButtonElement,
+  panelStrength: $("panelStrength") as HTMLInputElement,
+  panelStrengthVal: $("panelStrengthVal") as HTMLElement,
+  panelSaveLook: $("panelSaveLook") as HTMLButtonElement,
+  skyKeyed: $("skyKeyed") as HTMLElement,
+  folKeyed: $("folKeyed") as HTMLElement,
+  panelLive: $("panelLive") as HTMLElement,
 };
+
+/** THE COLOUR PANEL'S STATE BETWEEN DRAWS (record 084). `keyed` is the last keying of the open photograph (its two centres with where each
+ *  came from), null before the first or with nothing open; `keySig` is what that keying was made from, so a draw that changes none of it
+ *  keys nothing again; `sample` is the open photograph's sample with the image and bitmap it was taken from, so it is taken once;
+ *  `said` is the last keying sentence spoken, so the live region says a change and not a repeat. */
+const panelState: {
+  keyed: PanelKeyed | null; keySig: string;
+  sample: { img: DecodedImage; mask: BrushMask | null; turn: number; lens: string; sample: PanelSample } | null;
+  said: string;
+} = { keyed: null, keySig: "", sample: null, said: "" };
+/** A small number for each object, so a signature can say "this image, this bitmap" without holding either. */
+const panelIds = new WeakMap<object, number>();
+let panelIdNext = 1;
+function panelIdOf(o: object | null | undefined): number {
+  if (!o) return 0;
+  let n = panelIds.get(o);
+  if (!n) { n = panelIdNext++; panelIds.set(o, n); }
+  return n;
+}
+
+/** THE COLOUR PANEL'S THREE CHIPS AND THEIR RECIPES (record 084, its Looked at). Each is the swap flag and the mixer that make the swap
+ *  named: red and blue is the swap flag on with the mixer at identity (the swap a raw opens with), green and blue and red and green are
+ *  the flag off with the mixer at the rows given. Row-major, as `mix3` is. */
+const PANEL_SWAPS: readonly { id: "panelSwapRB" | "panelSwapGB" | "panelSwapRG"; label: string; swapRB: boolean; mix3: readonly number[]; said: string }[] = [
+  { id: "panelSwapRB", label: "Swap red and blue", swapRB: true, mix3: [1, 0, 0, 0, 1, 0, 0, 0, 1], said: "Red and blue swapped" },
+  { id: "panelSwapGB", label: "Swap green and blue", swapRB: false, mix3: [1, 0, 0, 0, 0, 1, 0, 1, 0], said: "Green and blue swapped" },
+  { id: "panelSwapRG", label: "Swap red and green", swapRB: false, mix3: [0, 1, 0, 1, 0, 0, 0, 0, 1], said: "Red and green swapped" },
+];
 
 /** THE BALANCE CONTROLS' ELEMENTS (decisions 101 and 102): Temperature (in kelvin) and Tint with their typed numbers, the profile switch
  *  with the door that loads a profile and the button that forgets a loaded one, the line that says which profile or matrix the figures are
@@ -1812,6 +1852,13 @@ function syncFromUI() {
   params.chroma = Number(ui.chroma.value);
   params.despeckle = Number(ui.despeckle.value);
   params.recover = Number(ui.recover.value);
+  // The colour panel's Strength is whole-photo, so it is read with a mask picked as well (record 084).
+  // The slider rests on whole percents, so a Strength a look carried between them is kept until the slider is moved.
+  // Full is written as absent (record 084), so an edit nobody has moved keeps the spelling it had before the panel.
+  if (Number(ui.panelStrength.value) !== Math.round(panelStrengthOf(params) * 100)) {
+    const pct = Number(ui.panelStrength.value);
+    params.panelStrength = pct >= 100 ? undefined : pct / 100;
+  }
   // With a mask picked the two bands' sliders show THE MASK'S offsets, so
   // neither is read into the whole photo then; writeMaskControls takes them.
   if (!tm) {
@@ -1851,6 +1898,8 @@ function syncToUI() {
   ui.despeckle.value = String(params.despeckle ?? 0);
   ui.recover.value = String(params.recover ?? 0);
   ui.swapBtn.setAttribute("aria-pressed", String(params.swapRB));
+  ui.panelStrength.value = String(Math.round(panelStrengthOf(params) * 100)); // the colour panel's Strength (record 084)
+  updatePanelUI();
   ui.hue.value = String(params.hue);
   ui.sat.value = String(params.sat);
   ui.con.value = String(params.contrast);
@@ -1905,9 +1954,18 @@ function updateBandLabels() {
   if (!skySub || !folSub) return;
   // The same rule as the pipeline's skyBandCentre: a mixer (Aerochrome) puts
   // the sky back on the blues, so the bands read the wheel as displayed.
-  const swapped = skyBandCentre(params.swapRB, params.mix3) === 30;
-  skySub.textContent = swapped ? "(reds & golds — swapped)" : "(teals & blues)";
-  folSub.textContent = swapped ? "(teals & blues — swapped)" : "(reds & golds)";
+  // A KEYED CENTRE (record 084) puts the labels on the colours the box is really grabbing: the warm side of the wheel is the one nearer
+  // 30 degrees than 210, which is the same two answers the rule above gives when no centre is carried.
+  const keyed = panelState.keyed;
+  const warmSide = (deg: number) => Math.min(Math.abs(deg - 30), 360 - Math.abs(deg - 30)) < Math.min(Math.abs(deg - 210), 360 - Math.abs(deg - 210));
+  const skyWarm = keyed && keyed.sky !== null ? warmSide(keyed.sky) : skyBandCentre(params.swapRB, params.mix3) === 30;
+  const folWarm = keyed && keyed.foliage !== null ? warmSide(keyed.foliage) : !skyWarm;
+  const swappedByName = skyBandCentre(params.swapRB, params.mix3) === 30;
+  skySub.textContent = `(${skyWarm ? "reds & golds" : "teals & blues"}${swappedByName ? " — swapped" : ""})`;
+  folSub.textContent = `(${folWarm ? "reds & golds" : "teals & blues"}${swappedByName ? " — swapped" : ""})`;
+  // And the words that say how each box was keyed, in the headings (the same words the test page's row uses).
+  ui.skyKeyed.textContent = keyed && keyed.skySource === "photograph" ? "keyed from this photograph" : "keyed by name";
+  ui.folKeyed.textContent = keyed && keyed.foliageSource === "photograph" ? "keyed from this photograph" : "keyed by name";
 }
 
 // Auto: gray-world white balance (smallest gain 1) + auto-exposure.
@@ -2447,7 +2505,7 @@ balUi.back.addEventListener("click", () => {
 function editJsonFromLive(live: LiveEdit): string {
   const s = live.snapshot;
   return JSON.stringify({
-    params: { ...s.params, masks: [], lut: null, warp: null },
+    params: { ...s.params, masks: [], lut: null, warp: null, panelCentres: undefined }, // the panel's centres are never stored (record 084)
     lutRef: s.params.lut ? { id: s.params.lut.id, strength: s.params.lut.strength } : null,
     activeLook: s.activeLook, lookBias: s.lookBias, lookMark: live.lookMark ?? null,
     rot: live.rot, flip: live.flip,
@@ -3304,7 +3362,9 @@ function seekSky(img: DecodedImage): void {
 function skyLanded(img: DecodedImage): void {
   noteSkyStage(img, skyMapAskers(params));
   const lifted = resolveLiftWithSky(img);
-  if (lifted || (params.skySmooth ?? 0) > 0 || (params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0) {
+  // The selection has landed, so the colour panel's boxes are keyed again (record 084); a draw is owed only where a box is moved.
+  const rekeyed = img === current && keyOpenPanel() && panelBoxMoved(params);
+  if (lifted || rekeyed || (params.skySmooth ?? 0) > 0 || (params.skyDepth ?? 0) > 0 || (params.skySat ?? 0) > 0) {
     syncSkyMap();
     drawWithMap();
   }
@@ -4652,7 +4712,10 @@ function snapSig(s: Snapshot): string {
 }
 
 function snapshot(): Snapshot {
-  return { params: cloneParams(params), activeLook, lookBias: [...lookBias] as [number, number, number], lookWb: lookWb ? [...lookWb] as [number, number, number] : null,
+  // The colour panel's centres are derived from the photograph and never stored (record 084): a keying that moves alone must not read as an edit.
+  const snapParams = cloneParams(params);
+  delete snapParams.panelCentres;
+  return { params: snapParams, activeLook, lookBias: [...lookBias] as [number, number, number], lookWb: lookWb ? [...lookWb] as [number, number, number] : null,
            measuredDenoise, lookDenoise, lookTexture };
 }
 
@@ -4727,6 +4790,9 @@ function applySnapshot(s: Snapshot) {
   params.vigAmt = c.vigAmt ?? 0;
   params.vigMid = c.vigMid ?? 0.5;
   params.mix3 = c.mix3?.length === 9 ? c.mix3 : [...MIX3_DEFAULT];
+  // The colour panel's Strength (record 084), from the SNAPSHOT directly like the LUT below: an edit stored before the field existed has
+  // none, and that must mean full and never the live photograph's, which the merge above would otherwise hand it.
+  { const ps = panelStrengthOf(s.params); params.panelStrength = ps < 1 ? ps : undefined; }
   params.spots = c.spots ?? [];
   params.stickers = c.stickers ?? [];
   params.crop = c.crop ?? { ...CROP_DEFAULT };
@@ -4920,6 +4986,7 @@ function lookFrom(params: EditParams): SavedLook {
     vigAmt: params.vigAmt ?? 0,
     vigMid: params.vigMid ?? 0.5,
     mix3: [...(params.mix3 ?? MIX3_DEFAULT)],
+    panelStrength: panelStrengthOf(params),
   };
 }
 
@@ -5025,6 +5092,7 @@ function applySavedLook(look: SavedLook, lut: EditParams["lut"] = null) {
   params.vigAmt = look.vigAmt;
   params.vigMid = look.vigMid;
   params.mix3 = [...look.mix3];
+  params.panelStrength = look.panelStrength < 1 ? look.panelStrength : undefined; // full is written as absent (record 084)
   activeLook = null; // a loaded custom grade isn't one specific built-in look
   clampToneOrder();
   syncToUI();
@@ -5127,6 +5195,7 @@ function draw(byReader: unknown = true) {
     raf = 0;
     skyMapDrawOwed = false; // this frame is the draw a held-back one was waiting for
     ensureLensApplied(); // the flat on the working copy first; everything below reads it
+    keyOpenPanel(); // the colour panel's two centres on the edit before it is handed to the renderer (record 084)
     const key = [params.tone, params.toneR, params.toneG, params.toneB].map((t) => t.join(",")).join(";");
     if (key !== lastToneKey) {
       lastToneKey = key;
@@ -5637,7 +5706,7 @@ panelTabsEl.addEventListener("keydown", (e) => {
 
 for (const el of [ui.wbR, ui.wbG, ui.wbB, ui.expo, ui.dn, ui.chroma, ui.despeckle, ui.recover, ui.hue, ui.sat, ui.con, ui.glow, ui.lum,
   ui.hotspot, ui.hotspotSize, ui.hotspotColor, ui.vignette, ui.clarity, ui.dehaze, ui.sharpen, ui.texture, ui.shadowSat, ui.skySmooth, ui.skyDepth, ui.skySatSel,
-  ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ...ui.tones]) {
+  ui.skyHue, ui.skySat, ui.skyLum, ui.folHue, ui.folSat, ui.folLum, ui.panelStrength, ...ui.tones]) {
   el.addEventListener("input", syncFromUI);
 }
 
@@ -6935,6 +7004,7 @@ function updateMix3UI() {
     b.textContent = (on ? "✓ " : "") + def.label;
     b.setAttribute("aria-pressed", String(on));
   });
+  updatePanelUI(); // the colour panel's chips read the same mixer (record 084)
 }
 
 $("mix3Reset").addEventListener("click", () => {
@@ -6944,6 +7014,116 @@ $("mix3Reset").addEventListener("click", () => {
   flushRecord();
 });
 updateMix3UI();
+
+// ===== THE COLOUR PANEL (record 084): the three channel-swap chips, the Strength's words, Save as a look, the keying of the open photograph =====
+// The chips write the SAME swap flag and mixer the IR tab's swap button and the Grade tab's mixer write, so there is one state and three
+// places that show it (hub lesson 267: one shared path, no special case).
+
+/** Whether a chip's recipe is what the edit holds now.
+ *  @param c  one of `PANEL_SWAPS`.
+ *  @returns true where the swap flag equals the recipe's and every mixer entry is within one part in a million of it. Consumer: `updatePanelUI` and the chip handlers, so the shown state and the press agree. */
+function panelChipOn(c: (typeof PANEL_SWAPS)[number]): boolean {
+  const m = params.mix3 ?? MIX3_DEFAULT;
+  return params.swapRB === c.swapRB && c.mix3.every((v, k) => Math.abs(v - (m[k] ?? MIX3_DEFAULT[k])) < 1e-6);
+}
+
+/** Show the colour panel's state: each chip's pressed attribute and leading check mark from the swap flag and the mixer, and the Strength's value in words.
+ *  @returns nothing. What it must satisfy: state is carried by the pressed attribute, a check mark in the text and the fill, never colour alone; it is safe to call before a photograph opens. */
+function updatePanelUI(): void {
+  for (const c of PANEL_SWAPS) {
+    const on = panelChipOn(c);
+    ui[c.id].textContent = (on ? "✓ " : "") + c.label;
+    ui[c.id].setAttribute("aria-pressed", String(on));
+  }
+  const pct = Math.round(panelStrengthOf(params) * 100);
+  ui.panelStrengthVal.textContent = pct >= 100 ? "100 percent, all of it" : pct <= 0 ? "0 percent, none of it" : `${pct} percent`;
+}
+
+/** Say something through the colour panel's own live region.
+ *  @param words  the sentence. @returns nothing. The region is emptied first so the same sentence said twice is still heard. */
+function announcePanel(words: string): void {
+  ui.panelLive.textContent = "";
+  window.requestAnimationFrame(() => { ui.panelLive.textContent = words; });
+}
+
+for (const c of PANEL_SWAPS) {
+  ui[c.id].addEventListener("click", () => {
+    const wasOn = panelChipOn(c);
+    // Pressing the pressed chip writes no remap: the swap off and the mixer at identity.
+    params.swapRB = wasOn ? false : c.swapRB;
+    params.mix3 = wasOn ? [...MIX3_DEFAULT] : [...c.mix3];
+    syncToUI(); // the IR tab's swap button, the Grade tab's mixer and these chips all read the same two fields
+    updateLookUI();
+    draw();
+    flushRecord(); // one press = one undo step
+    announcePanel(wasOn ? "Channel swap taken off. The swap is off and the mixer is at identity." : `${c.said}.`);
+  });
+}
+
+// The Strength's words follow the slider (the value itself is read by syncFromUI, whose listener is attached first), and a settled change is said.
+ui.panelStrength.addEventListener("input", updatePanelUI);
+ui.panelStrength.addEventListener("change", () => {
+  const pct = Math.round(panelStrengthOf(params) * 100);
+  announcePanel(`Strength ${pct} percent.`);
+});
+
+// Save as a look: the save is per slot, five slots each with its own Save button, so this button does not choose one for the reader.
+// It takes the reader to My looks (the Export tab) and puts the focus on the first empty slot's Save, or the first slot's where all five are full.
+ui.panelSaveLook.addEventListener("click", () => {
+  setPanelTab("export");
+  let target = 0;
+  let free = false;
+  for (let i = 0; i < SLOTS; i++) {
+    if (!readSlot(i)) { target = i; free = true; break; }
+  }
+  slotEls[target].save.focus();
+  announcePanel(free
+    ? `My looks is open on the Export tab. Slot ${target + 1} is the first empty one: its Save keeps this look.`
+    : "My looks is open on the Export tab. All five slots are full: a slot's Save replaces the look in it with this one.");
+});
+
+/** Key the Sky and Foliage boxes on the open photograph, once per change of what the keying reads.
+ *  Takes nothing and reads the open photograph, its sky bitmap, the turn the bitmap was found at and the edit. It takes the photograph's sample once (again only when the photograph, its bitmap, its turn or its lens change), runs `keyPanelCentres` only when the balance, swap, mixer, hue shift, saturation, screen gains, Strength or lens move (a move of a box never does), writes the two centres onto `params.panelCentres`, rewrites the boxes' headings, and says in the live region when a box's source changes while the Colour tab is open.
+ *  @returns true when the keyed centres or their sources differ from the last keying, false when nothing changed.
+ *  What it must satisfy: `params.panelCentres` is set before every handoff of the edit to the renderer (`draw`, the export job); with nothing open it is null; the centres never reach a stored edit (`snapshot` and `editToJson` leave them out). */
+function keyOpenPanel(): boolean {
+  if (!current) {
+    const had = panelState.keyed !== null;
+    params.panelCentres = null;
+    panelState.keyed = null; panelState.keySig = ""; panelState.sample = null; panelState.said = "";
+    return had;
+  }
+  const img = current;
+  const mask = skyBitmap;
+  const turn = lookSkyTurn ?? shownSkyTurn();
+  const lens = `${params.lensFix}|${params.lensBypass ? 1 : 0}`;
+  const sig = [
+    panelIdOf(img), panelIdOf(mask), turn, lens, params.wb.join(","), params.exposure, params.recover ?? 0, params.swapRB ? 1 : 0,
+    (params.mix3 ?? MIX3_DEFAULT).join(","), params.hue, params.sat, (params.wbScreen ?? []).join(","), panelStrengthOf(params),
+  ].join("|");
+  if (sig === panelState.keySig && panelState.keyed) {
+    params.panelCentres = { sky: panelState.keyed.sky, foliage: panelState.keyed.foliage };
+    return false;
+  }
+  let s = panelState.sample;
+  if (!s || s.img !== img || s.mask !== mask || s.turn !== turn || s.lens !== lens) {
+    s = { img, mask, turn, lens, sample: takePanelSample(img, mask, turn) };
+    panelState.sample = s;
+  }
+  const before = panelState.keyed;
+  const keyed = keyPanelCentres(s.sample, params, img.camMatrix, img.width / Math.max(1, img.height), srcFlatOf(img));
+  panelState.keyed = keyed;
+  panelState.keySig = sig;
+  params.panelCentres = { sky: keyed.sky, foliage: keyed.foliage };
+  updateBandLabels();
+  const changed = !before || before.sky !== keyed.sky || before.foliage !== keyed.foliage || before.skySource !== keyed.skySource || before.foliageSource !== keyed.foliageSource;
+  const said = `Sky box ${keyed.skySource === "photograph" ? "keyed from this photograph" : "keyed by name"}. Foliage box ${keyed.foliageSource === "photograph" ? "keyed from this photograph" : "keyed by name"}.`;
+  if (said !== panelState.said) {
+    if (panelState.said !== "" && activePanelTab === "color") announcePanel(said);
+    panelState.said = said;
+  }
+  return changed;
+}
 
 // --- Stickers (Creative): drop a UFO into the trees. Tap an asset to add it
 // (placed at centre, selected), then DRAG it on the photo; sliders size, spin
@@ -14796,8 +14976,9 @@ function editToJson(): string {
   // the stored file and its strength, the way a saved look already does, and a
   // resume looks the file up again (`restoreLutRef`). The lattice itself is
   // never written here; it is in the LUT store once already.
+  // panelCentres is derived from the photograph (record 084) and is never stored: left out here as well as in the snapshot.
   return JSON.stringify({
-    params: { ...s.params, masks: [], lut: null, warp: null },
+    params: { ...s.params, masks: [], lut: null, warp: null, panelCentres: undefined },
     lutRef: s.params.lut ? { id: s.params.lut.id, strength: s.params.lut.strength } : null,
     activeLook: s.activeLook, lookBias: s.lookBias, lookMark,
     // Which way up, kept with the edit so a resumed session and a bulk export
@@ -17069,6 +17250,8 @@ function stampOf(pr: EditParams, look: string | null, bias: [number, number, num
     pr.sky, pr.foliage, pr.tone, pr.texture,
     pr.skySmooth, pr.skyDepth, pr.skySat,
     pr.grainAmt, pr.grainSize, pr.vigAmt, pr.vigMid,
+    // The colour panel's Strength (record 084) scales the mixer and every band move, so a tile drawn at another one is stale.
+    panelStrengthOf(pr),
     // The lift's OWN controls belong to a thumbnail's question ("is this tile
     // still a true picture of that photo") and not to the look's ("has the
     // reader graded this photo by hand since"). Including them there would read
@@ -20706,7 +20889,12 @@ function openPhotoExportJob(): {
   const frame: DecodedImage = sourceIsMosaiced(file)
     ? ({ width: current.width, height: current.height, isRaw: current.isRaw } as DecodedImage)
     : current;
-  return { file, frame, params: cloneParams(params), opts, lens: currentLensCurve(), sky: skyBitmap, skyFine };
+  // The colour panel's centres of the open photograph's own keying ride the edit to the export (record 084), only where a box is moved;
+  // keyed now, so a draw still waiting for its frame cannot leave them one edit behind.
+  const jobParams = cloneParams(params);
+  keyOpenPanel();
+  jobParams.panelCentres = panelBoxMoved(jobParams) && panelState.keyed ? { sky: panelState.keyed.sky, foliage: panelState.keyed.foliage } : null;
+  return { file, frame, params: jobParams, opts, lens: currentLensCurve(), sky: skyBitmap, skyFine };
 }
 
 /** LET THE PAGE PAINT BEFORE HEAVY WORK STARTS: resolves once the frame after this
@@ -20865,6 +21053,7 @@ function neutralLook(): SavedLook {
     bwOn: false, bwMix: [1, 1, 1],
     grade: [0, 0, 0, 0, 0, 0, 0], grainAmt: 0, grainSize: 1.5, vigAmt: 0, vigMid: 0.5,
     mix3: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    panelStrength: 1,
   };
 }
 
@@ -21032,6 +21221,7 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     vigAmt: look.vigAmt,
     vigMid: look.vigMid,
     mix3: [...look.mix3],
+    panelStrength: look.panelStrength,
     spots: [], // composition-specific — a batch frame heals nothing
     stickers: [], // composition-specific — stickers are placed per photo, never batched
     crop: { ...CROP_DEFAULT }, // composition-specific — a batch frame crops nothing
@@ -21059,6 +21249,14 @@ function batchParamsFor(img: DecodedImage, grade: BatchGrade, lut: EditParams["l
     const solved = solveLift(hasLook, img, p, hasLook ? (skyMask ?? skyMaskFor(img, img.rotate ?? 0)) : null, base, lensForEdit(img));
     const lift = solved && scaleLift(solved, liftAmount, base);
     if (lift) { p.tone = lift.tone as typeof p.tone; p.sky = lift.sky as typeof p.sky; p.foliage = lift.foliage as typeof p.foliage; p.skySat = lift.skySat; }
+  }
+  // THE COLOUR PANEL'S TWO CENTRES FROM THIS FRAME'S OWN PIXELS AND SKY SELECTION (record 084), only where the edit moves a box: a frame
+  // whose boxes are neutral reads no centre. The same two functions the screen uses, at the file's own turn, which is the turn this
+  // frame is exported at.
+  if (panelBoxMoved(p)) {
+    const turn = img.rotate ?? 0;
+    const keyed = keyPanelCentres(takePanelSample(img, skyMask ?? skyMaskFor(img, turn), skyTurn(turn)), p, img.camMatrix, img.width / Math.max(1, img.height), srcFlatOf(img));
+    p.panelCentres = { sky: keyed.sky, foliage: keyed.foliage };
   }
   return p;
 }

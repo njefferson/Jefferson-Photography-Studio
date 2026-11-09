@@ -166,6 +166,11 @@
            parse and empty at rest; src/main.ts writes into it when a balance is held,
            let go, put on the set, picked or forgotten. -->
       <p id="balLive" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+      <!-- THE COLOUR PANEL'S OWN LIVE REGION (record 084), standing here for the reason the two above do:
+           #panel is `hidden` until a photograph opens. The balance's region above is the balance's and is
+           asserted by its own walk section, so it is not shared. src/main.ts writes into it each chip press,
+           each change of how a box is keyed, and the move to My looks. -->
+      <p id="panelLive" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
 
       <main id="stage">
         <h1 class="sr-only">Infrared photo editor</h1>
@@ -1160,6 +1165,20 @@
 
           <!-- ===== COLOR ===== -->
           <section class="section" role="tabpanel" id="sec-color" aria-labelledby="ptab-color" data-tab="color" hidden>
+            <!-- THE COLOUR PANEL (record 084). Three channel-swap chips that write the SAME swap flag and mixer the IR and
+                 Grade tabs show, so there is one state and three places to see it. Each chip is a real button with its name in
+                 words; the pressed state is aria-pressed, a leading check mark and a fill (src/main.ts updatePanelUI). No chip
+                 promises a colour: what a swap looks like on this camera is what the photograph shows. -->
+            <div id="panelSwapGroup" class="panel-swap" role="group" aria-labelledby="panelSwapHead">
+              <div class="sub-title" id="panelSwapHead">Channel swap</div>
+              <div class="bw-mixes">
+                <button id="panelSwapRB" type="button" class="mix-chip" aria-pressed="false">Swap red and blue</button>
+                <button id="panelSwapGB" type="button" class="mix-chip" aria-pressed="false">Swap green and blue</button>
+                <button id="panelSwapRG" type="button" class="mix-chip" aria-pressed="false">Swap red and green</button>
+              </div>
+              <small class="note">Each chip sets the swap and the Grade tab&rsquo;s mixer, so the IR and Grade tabs show the same state. Tap a pressed chip to take the swap off. The first one is the swap a raw opens with.</small>
+            </div>
+            <hr class="divider" />
             <label>Hue shift <input id="hue" type="range" min="-180" max="180" step="1" value="0" /></label>
             <label>Saturation <input id="sat" type="range" min="0" max="3" step="0.01" value="1" /></label>
             <label>Contrast <input id="con" type="range" min="0.5" max="2" step="0.01" value="1" /></label>
@@ -1168,16 +1187,16 @@
             <p class="note">Clarity punches up local contrast (midtone structure); Dehaze cuts atmospheric haze (left adds it back for mood).</p>
             <hr class="divider" />
             <div class="sub-title">Per-color</div>
-            <p class="note">The boxes follow the subject through a channel swap &mdash; Sky keeps meaning sky. The small text shows the colors each box is grabbing right now.</p>
+            <p class="note">The boxes follow the subject through a channel swap &mdash; Sky keeps meaning sky. The small text shows the colors each box is grabbing right now, and whether each box took its place on the color wheel from this photograph&rsquo;s sky selection and what it leaves out, or by name. A color is not a place: a dock or a wall that shares the trees&rsquo; color follows the Foliage box, and a mask joined to it as Subtract keeps it out.</p>
             <div class="band">
-              <div class="band-title"><span class="band-sq band-sq-sky" aria-hidden="true"></span>Sky <small id="skyBandSub">(teals &amp; blues)</small></div>
+              <div class="band-title"><span class="band-sq band-sq-sky" aria-hidden="true"></span>Sky <small id="skyBandSub">(teals &amp; blues)</small> <small id="skyKeyed">keyed by name</small></div>
               <label>Hue <input id="skyHue" type="range" min="-60" max="60" step="1" value="0" /></label>
               <label>Saturation <input id="skySat" type="range" min="0" max="2" step="0.01" value="1" /></label>
               <label>Luminance <input id="skyLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
               <p id="skyMaskNote" class="note" hidden>This mask selects by colour, and the Sky band runs before any colour selection exists, so the Sky band cannot follow it. Pick a gradient, radial, brush or sky mask for this.</p>
             </div>
             <div class="band">
-              <div class="band-title"><span class="band-sq band-sq-fol" aria-hidden="true"></span>Foliage <small id="folBandSub">(reds &amp; golds)</small></div>
+              <div class="band-title"><span class="band-sq band-sq-fol" aria-hidden="true"></span>Foliage <small id="folBandSub">(reds &amp; golds)</small> <small id="folKeyed">keyed by name</small></div>
               <label>Hue <input id="folHue" type="range" min="-60" max="60" step="1" value="0" /></label>
               <label>Saturation <input id="folSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
               <label>Luminance <input id="folLum" type="range" min="0.5" max="1.5" step="0.01" value="1" /></label>
@@ -1196,6 +1215,15 @@
             <label>Saturation <input id="hslSat" type="range" min="0" max="2" step="0.01" value="1" /></label>
             <label>Luminance <input id="hslLum" type="range" min="0.3" max="1.7" step="0.01" value="1" /></label>
             <button id="hslReset" type="button">Reset color mixer</button>
+            <hr class="divider" />
+            <div class="sub-title">Strength <span>of the mixer and the color moves</span></div>
+            <label class="lut-strength-row">Strength
+              <input id="panelStrength" type="range" min="0" max="100" step="1" value="100" aria-describedby="panelStrengthNote" />
+              <span id="panelStrengthVal">100 percent</span>
+            </label>
+            <small id="panelStrengthNote" class="note">Scales the Grade tab&rsquo;s mixer and every Sky, Foliage and color-mixer move together: 0 takes all of them off, 100 is the whole of them. It leaves the channel swap alone. A saved look carries it.</small>
+            <button id="panelSaveLook" type="button">Save as a look</button>
+            <small class="note">Opens My looks on the Export tab and puts you on the first free slot&rsquo;s Save button. Tap that Save to keep this look.</small>
           </section>
 
           <!-- ===== TONE ===== -->

@@ -28,10 +28,11 @@
 
 import { linearAt, grayWorldWB, autoExposure, autoRecover, WB_GAIN_LO, WB_GAIN_HI, WB_GAIN_STEPS, type DecodedImage } from "./decode";
 import {
-  compileEdit, cloneParams, sampleBrush, skyBandCentre, bandWeight, rgb2hsv, TONE_DEFAULT, CROP_DEFAULT, MIX3_DEFAULT,
+  compileEdit, cloneParams, sampleBrush, skyBandCentre, panelCentreOf, panelMix3Of, bandWeight, rgb2hsv, TONE_DEFAULT, CROP_DEFAULT, MIX3_DEFAULT,
   type EditParams, type BrushMask, type LensCurve, type SourceFlat,
 } from "./pipeline";
 import { buildSkyMap } from "./skymap";
+import { panelBoxMoved, takePanelSample, keyPanelCentres } from "./panelkey";
 import { lensGains, applyLensFlat, lensPlanStamp, lensCurveForSource, turnOfOrientation } from "./lensflat";
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -392,7 +393,10 @@ export function measureFrame(p: EditParams, img: DecodedImage, divisions: number
       const cr = clamp(px[0], 0, 1), cg = clamp(px[1], 0, 1), cb = clamp(px[2], 0, 1);
       lums.push(0.2126 * cr + 0.7152 * cg + 0.0722 * cb);
       const [h, sat] = rgb2hsv(cr, cg, cb);
-      const wS = bandWeight(h, skyBandCentre(p.swapRB, p.mix3), 55, 105);
+      // The Sky band's centre as the render reads it: the panel's keyed centre where the edit carries one (record 084), today's rule otherwise.
+      // The by-name centre is read from the mixer at the Strength, as compileEdit reads it.
+      const keyedSky = panelCentreOf(p.panelCentres?.sky);
+      const wS = bandWeight(h, keyedSky >= 0 ? keyedSky : skyBandCentre(p.swapRB, panelMix3Of(p)), 55, 105);
       coolW += wS; coolS += sat * wS;
       warmW += 1 - wS; warmS += sat * (1 - wS);
       if (skyMask && sampleBrush(skyMask, u, v) > 0.5) { skyW++; skyS += sat; }
@@ -772,6 +776,8 @@ export function renderTile(img: DecodedImage, inp: TileInputs, skyFor: SkyFor): 
     tone: own ? [...own.tone] : [...TONE_DEFAULT],
     sky: own ? [...own.sky] : [0, 1, 1],
     foliage: own ? [...own.foliage] : [0, 1, 1],
+    // The open photograph's keyed centres are another frame's answer (record 084); the tile keys its own below, only where its boxes move.
+    panelCentres: null,
   };
   // A LOOK NEEDS A WHITE BALANCE TO WORK ON, AND A CAMERA-RENDERED FILE OPENS
   // WITHOUT ONE — and this function is the half of that rule that stopped doing
@@ -859,6 +865,12 @@ export function renderTile(img: DecodedImage, inp: TileInputs, skyFor: SkyFor): 
   // existed carries none, and opening it keeps the fresh open's strength
   // (applySnapshot merges over it), so the tile does the same.
   if (own) bringLensTo(img, inp.lens, { lensFix: own.lensFix ?? inp.lensOpen, lensBypass: own.lensBypass });
+  // THE PANEL'S KEYING, INSIDE THE TILE'S OWN RENDER (record 084), whether the page draws the tile or the decode worker does: where the edit moves a Sky or Foliage box the tile keys the two centres from its own decoded pixels and the sky bitmap at its own turn, as the open photograph is keyed, so a tile and the photograph it opens into read one derivation. An edit that moves no box asks no sky and reads no centre, as before.
+  if (panelBoxMoved(p)) {
+    const keySky = tileSky ?? skyTimed(img, rot);
+    const keyed = keyPanelCentres(takePanelSample(img, keySky, rot), p, img.camMatrix, w / h, srcFlatOf(img));
+    p.panelCentres = { sky: keyed.sky, foliage: keyed.foliage };
+  }
   const tileSample = (x: number, y: number) => linearAt(img, Math.min(img.width - 1, Math.floor(x / s)), Math.min(img.height - 1, Math.floor(y / s)));
   const tileLens = lensForSource(img, inp.lens, inp.orientation);
   const tileMap = tileSky ? buildSkyMap(tileSample, w, h, p, img.camMatrix, w / h, undefined, tileLens, tileSky, srcFlatOf(img)) : null;

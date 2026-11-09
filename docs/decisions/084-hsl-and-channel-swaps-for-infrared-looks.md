@@ -195,6 +195,41 @@ floor on the other two. The figures are in `docs/research/separation/places.md`
 and `docs/research/separation/places.json`, and the labels of
 `docs/research/separation/measure.md` are read with them.
 
+On 9 November 2026 the panel was built as option 1 says, on the Colour tab's
+drawer as it stands, and is on staging for the device pass. The row of three swap
+chips sits at the head of the tab: Swap red and blue is the swap on with the mixer
+at identity, Swap green and blue is the swap off with the mixer at the rows 1 0 0,
+0 0 1, 0 1 0, and Swap red and green is the swap off with the mixer at the rows
+0 1 0, 1 0 0, 0 0 1. Each writes the same swap and mixer the IR and Grade tabs
+show, reads as pressed in its attribute, a check mark and a fill, makes one undo
+step, and promises no colour; pressing the pressed chip takes the swap off and
+sets the mixer to identity. The Sky and Foliage boxes are keyed on the
+photograph: the Sky box's band is centred on the circular mean hue of the pixels
+the sky selection covers, and the Foliage box's on the circular mean hue of the
+pixels it leaves out, each read at or above the saturation floor and with the
+colourless share of one in a hundred that the measure of 8 November used. A box
+that cannot be keyed, because no sky was found or its population is colourless,
+acts as it does today and its heading says it is keyed by name; a keyed one says
+it came from this photograph. The hue is read at the band stage through a probe,
+so the keying and the render share one copy of the stages before it, and the two
+centres ride the edit itself, derived and never saved, to every place a
+photograph is handed to a renderer: the screen, the batch, the exports, and the
+strip's tiles, which key inside the tile's own render on the page and in the
+decode worker alike. The two keyed bands each have the old plateau and edge; a
+pixel between them is moved by neither box and stays with the eight-band mixer.
+One Strength runs from nothing to full over the mixer and the band moves and not
+the swap, because the balance's screen-side gains act only with the swap on and a
+half swap has no reading there; the keying follows the Strength, since it reads
+the mixer the bands meet. A saved look carries the Strength and not the centres,
+which are found again when it is applied. Save as a look opens My looks on the
+Export tab and puts the focus on the first empty slot's Save, because the save is
+per slot and the panel does not choose one for the reader. The test page's
+Separation check (record 106) prints the same two centres from the same two
+functions, so the keying is read on the device and no raw is rendered in the
+container for it. Record 003 moves the drawer's controls as a whole when it
+comes. The picture is judged by the owner on the device pass, and this record
+says nothing about how it looks.
+
 ## Options
 
 1. **One infrared colour panel: a row of swap chips, the colour bands under it,

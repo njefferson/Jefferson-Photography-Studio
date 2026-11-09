@@ -3363,6 +3363,18 @@ button.toggletip {
 .band-title small { color: var(--txt-3); font-weight: 400; }
 #pcReset { margin-top: 8px; }
 
+/* THE COLOUR PANEL (record 084). The three channel-swap chips are the .mix-chip pattern in a .bw-mixes row: a real button with its name in
+   words, 44 px in the box, pressed = aria-pressed + the check mark set in updatePanelUI + the accent fill and weight, never colour alone.
+   Everything below uses tokens the stylesheet already defines, in both themes. */
+.panel-swap { margin: 0 0 2px; }
+.panel-swap .sub-title { margin-top: 0; }
+.panel-swap .note { display: block; margin: 0 0 4px; }
+/* How each box was keyed, on its own line under the box's name, in the second text colour: it is words the reader should be able to read. */
+.band-title #skyKeyed, .band-title #folKeyed { display: block; margin-top: 2px; color: var(--txt-2); font-size: 0.75rem; }
+/* The Strength's value is words ("100 percent, all of it"), so its box is wider than the LUT strength's percent. */
+#panelStrengthVal { min-width: 11ch; text-align: right; white-space: normal; }
+#panelSaveLook { margin-top: 8px; }
+
 .welcome-div { border: none; border-top: 1px solid var(--line); margin: 20px 8px 4px; }
 
 #toneSvg {

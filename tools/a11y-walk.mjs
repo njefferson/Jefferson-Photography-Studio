@@ -46,6 +46,8 @@
 //  11  the line that says the look's sky is still being refined
 //  12  Temperature and Tint, the hold, the standing line and the way out of it
 //  13  the test page with a press running: the progress line, the pressed button, the targets and axe
+//  14  the test page's door and Separation check: at rest, after step 1, after step 3
+//  15  the colour panel (record 084): the swap chips, the keyed boxes' headings, the Strength and Save as a look
 //
 // Feature-specific a11y probes stay in the scratchpad, per release. What makes
 // this one repo-worthy is the coverage assertion: it is the only thing here
@@ -1645,6 +1647,88 @@ try {
         hit = await page.evaluate(HIT);
         if (hit.small.length) fail(`${where} after step 3, under 44: ${hit.small.join(" · ")}`); else ok(`${where} after step 3: every button is 44 or more`);
         await axeLine(page, `debug.html ${where} after step 3`);
+      } finally { await page.close(); }
+    }
+  }
+  // ── 15 ─────────────────────────────────────────────────
+  // THE COLOUR PANEL (record 084). Three channel-swap chips at the head of the Colour tab that write the SAME swap flag and mixer the IR and
+  // Grade tabs show, the Sky and Foliage boxes whose headings say whether each was keyed from the photograph or by name, one Strength, and
+  // Save as a look. Only structure and state are read, in both themes and both shapes: the group has a visible heading; three buttons with
+  // names in words; at most one pressed; pressing an unpressed chip sets it pressed, clears the others and moves the swap flag or the mixer
+  // the IR and Grade tabs show; pressing it again takes the swap off; every chip and the Save button are 44 or more each way; the Strength
+  // has a label and its words follow the slider; and Save as a look puts the focus on a slot's Save button in My looks. No picture is judged.
+  if (want(15)) console.log("\n15 — the colour panel: chips, keyed headings, Strength, Save as a look");
+  if (want(15)) {
+    const CHIPS = ["panelSwapRB", "panelSwapGB", "panelSwapRG"];
+    for (const theme of THEMES) for (const size of SIZES) {
+      const where = `[${theme} ${size.name}]`;
+      const page = await browser.newPage({ ...size.opts, colorScheme: theme, serviceWorkers: "block" });
+      page.on("dialog", (d) => d.accept());
+      const press = (sel) => (size.name === "phone" ? page.tap(sel) : page.click(sel));
+      try {
+        await page.goto(`${BASE}/ir.html`, { waitUntil: "load" });
+        await page.setInputFiles("#file", ONE);
+        await page.waitForFunction(() => document.getElementById("welcome")?.hidden, null, { timeout: 300000 });
+        await page.waitForTimeout(1500);
+        await page.evaluate(() => document.getElementById("ptab-color")?.click());
+        await page.waitForTimeout(300);
+        // What the IR tab's swap button and the Grade tab's mixer show, read off those controls and not off the chips.
+        const shown = () => page.evaluate(() => ({ swap: document.getElementById("swapBtn")?.getAttribute("aria-pressed") ?? "", mix: [...document.querySelectorAll("#mix3Grid input")].map((i) => i.value).join(",") }));
+        const chips = () => page.evaluate((ids) => ids.map((id) => { const b = document.getElementById(id); return { id, text: (b?.textContent ?? "").replace(/\s+/g, " ").trim(), pressed: b?.getAttribute("aria-pressed") }; }), CHIPS);
+        // 1 — the group, its heading and its three named buttons.
+        const grp = await page.evaluate(() => {
+          const g = document.getElementById("panelSwapGroup");
+          const h = g ? document.getElementById(g.getAttribute("aria-labelledby") ?? "") : null;
+          const shownNow = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+          return { role: g?.getAttribute("role") ?? "", heading: (h?.textContent ?? "").trim(), headingShown: shownNow(h), buttons: g ? [...g.querySelectorAll("button")].map((b) => b.id) : [] };
+        });
+        if (grp.role === "group" && grp.heading.length >= 8 && grp.headingShown) ok(`${where} the chips sit in a group with a visible heading: "${grp.heading}"`); else fail(`${where} the chip group lacks a role or a visible heading: ${JSON.stringify(grp)}`);
+        let cs = await chips();
+        if (grp.buttons.length === 3 && cs.every((c) => c.text.replace(/^✓\s*/, "").length >= 12)) ok(`${where} three chips, each named in words: "${cs.map((c) => c.text).join('", "')}"`); else fail(`${where} the chips: ${JSON.stringify({ buttons: grp.buttons, cs })}`);
+        const pressedCount = (list) => list.filter((c) => c.pressed === "true").length;
+        if (pressedCount(cs) <= 1 && cs.every((c) => c.pressed === "true" || c.pressed === "false")) ok(`${where} at most one chip is pressed at rest, and each reports its state`); else fail(`${where} the chips at rest: ${JSON.stringify(cs)}`);
+        // 2 — a chip press writes the shared state, once, and the others let go.
+        const before = await shown();
+        const target = cs.find((c) => c.id === "panelSwapGB" && c.pressed !== "true") ? "panelSwapGB" : "panelSwapRG";
+        await press(`#${target}`);
+        await page.waitForTimeout(400);
+        cs = await chips();
+        const after = await shown();
+        if (cs.find((c) => c.id === target)?.pressed === "true" && pressedCount(cs) === 1) ok(`${where} pressing #${target} sets it pressed and clears the others`); else fail(`${where} after pressing #${target}: ${JSON.stringify(cs)}`);
+        if (before.swap !== after.swap || before.mix !== after.mix) ok(`${where} the press moved what the IR tab's swap and the Grade tab's mixer show (swap ${before.swap} to ${after.swap})`); else fail(`${where} the press moved neither the swap nor the mixer the other tabs show: ${JSON.stringify({ before, after })}`);
+        if (/^✓/.test(cs.find((c) => c.id === target)?.text ?? "")) ok(`${where} the pressed chip carries a check mark in its text, so the state is not colour alone`); else fail(`${where} the pressed chip has no check mark in its text`);
+        // Pressing the pressed chip takes the swap off with the mixer at identity.
+        await press(`#${target}`);
+        await page.waitForTimeout(400);
+        cs = await chips();
+        const off = await shown();
+        if (pressedCount(cs) === 0 && off.swap === "false" && off.mix.split(",").map(Number).every((v, k) => Math.abs(v - [1, 0, 0, 0, 1, 0, 0, 0, 1][k]) < 1e-6)) ok(`${where} pressing the pressed chip again takes the swap off with the mixer at identity`); else fail(`${where} after pressing the pressed chip again: ${JSON.stringify({ cs, off })}`);
+        // 3 — targets, 44 CSS pixels each way, the chips and the Save button; the reach measure the walk uses everywhere for buttons.
+        const box = await page.evaluate((ids) => ids.map((id) => { const r = document.getElementById(id).getBoundingClientRect(); return [id, Math.round(r.width), Math.round(r.height)]; }), [...CHIPS, "panelSaveLook"]);
+        const smallBox = box.filter(([, w, h]) => w < 44 || h < 44);
+        if (smallBox.length === 0) ok(`${where} each chip and Save as a look is 44 or more each way`); else fail(`${where} under 44: ${smallBox.map(([id, w, h]) => `#${id} ${w}x${h}`).join(" · ")}`);
+        const hit = await page.evaluate(HIT);
+        const smallHit = hit.small.filter((s) => /^(panelSwap|panelSaveLook)/.test(s));
+        if (smallHit.length === 0) ok(`${where} the reachable area of the chips and the Save button is 44 or more`); else fail(`${where} reachable area under 44: ${smallHit.join(" · ")}`);
+        // 4 — the Strength: a label, a range, and words beside it that follow the slider.
+        const st0 = await page.evaluate(() => { const i = document.getElementById("panelStrength"); const l = i?.closest("label"); const r = i?.getBoundingClientRect(); return { type: i?.type ?? "", name: (l?.textContent ?? "").replace(/\s+/g, " ").trim(), w: Math.round(r?.width ?? 0), h: Math.round(r?.height ?? 0), words: document.getElementById("panelStrengthVal")?.textContent ?? "" }; });
+        if (st0.type === "range" && /^Strength/.test(st0.name) && st0.w >= 44 && st0.h >= 28) ok(`${where} the Strength is a range with a label, ${st0.w}x${st0.h} (the app's own track; the thumb is what a finger takes)`); else fail(`${where} the Strength control: ${JSON.stringify(st0)}`);
+        await page.evaluate(() => { const i = document.getElementById("panelStrength"); i.value = "40"; i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true })); });
+        await page.waitForTimeout(300);
+        const st1 = await page.evaluate(() => document.getElementById("panelStrengthVal")?.textContent ?? "");
+        if (st1 !== st0.words && /40/.test(st1)) ok(`${where} the Strength's words follow the slider: "${st0.words}" then "${st1}"`); else fail(`${where} the Strength's words did not follow the slider: "${st0.words}" then "${st1}"`);
+        // 5 — the two boxes' headings carry the keying words.
+        const heads = await page.evaluate(() => ["skyKeyed", "folKeyed"].map((id) => (document.getElementById(id)?.textContent ?? "").trim()));
+        if (heads.every((h) => /keyed (by name|from this photograph)/.test(h))) ok(`${where} the Sky and Foliage boxes say how each was keyed: "${heads.join('", "')}"`); else fail(`${where} the boxes' headings carry no keying words: ${JSON.stringify(heads)}`);
+        // 6 — the live region is present from parse, polite, and a press has been said in it.
+        const live = await page.evaluate(() => { const el = document.getElementById("panelLive"); return { role: el?.getAttribute("role"), live: el?.getAttribute("aria-live"), text: el?.textContent ?? "", hiddenAncestor: !!el?.closest("[hidden]") }; });
+        if (live.role === "status" && live.live === "polite" && !live.hiddenAncestor) ok(`${where} the panel's live region is a polite status region outside anything hidden`); else fail(`${where} the panel's live region: ${JSON.stringify(live)}`);
+        // 7 — Save as a look takes the reader to My looks and puts the focus on a slot's Save button.
+        await press("#panelSaveLook");
+        await page.waitForTimeout(500);
+        const landed = await page.evaluate(() => { const a = document.activeElement; return { inExport: !!a?.closest("#sec-export"), cls: a?.className ?? "", text: (a?.textContent ?? "").trim(), shown: !!a && a.getClientRects().length > 0 }; });
+        if (landed.inExport && /slot-save/.test(String(landed.cls)) && landed.text === "Save" && landed.shown) ok(`${where} Save as a look opens My looks on the Export tab with the focus on a slot's Save button`); else fail(`${where} after Save as a look: ${JSON.stringify(landed)}`);
+        await axeLine(page, `ir.html ${where} with the colour panel`);
       } finally { await page.close(); }
     }
   }

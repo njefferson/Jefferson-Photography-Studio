@@ -1,17 +1,25 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=c808119ebbea54b7
-diffhash=2c98f91b2d70e657
-verdict=IN-SCOPE: every staged file is named by the plan's Files line and does what its step's Do says, the sync marker is back at its committed content and out of the commit, and the one modified file left out is the pre-commit hook the plan names as left as it stands
-# IN-SCOPE: every staged file is named by the plan's Files line and does what its step's Do says, the sync marker is back at its committed content and out of the commit, and the one modified file left out is the pre-commit hook the plan names as left as it stands
-# tools/owner-images.json: Files line, step 340; adds the owner's marina folder and six file entries (three raws, three camera JPEGs), nothing else changed.
-# docs/research/separation/places.md (new): Files line, step 342; the digest of counts by place, pairs, polygons and the gather's rule against the places, with two wording slips corrected by step 343 (stage 5a).
-# docs/research/separation/places.json (new): Files line, step 342; the same figures as data, counts of at most six digits and decimals of at most four places.
-# IR-SCIENCE.md: Files line, step 343 stage 2; one paragraph in section 6 after the paragraph of 8 November, naming the caveat and copying figures from places.md.
-# docs/research/separation/measure.md: Files line, step 343 stage 3; one paragraph after the title, naming no frame, pointing at places.md.
-# docs/decisions/084-hsl-and-channel-swaps-for-infrared-looks.md: Files line, step 343 stage 4; one dated paragraph at the end of the Built part, naming no frame and no bare file name.
-# NOTES.md: Files line, step 343 stage 5 and step 344 second send; eight Found queue lines, Q-JPS-247 to Q-JPS-254, and one more, Q-JPS-255, on the sync marker and the hub pin, at the end of the queue.
-# .plan-scope: Files line, step 344; the recorded verdict for this staged diff.
-# .doctrine-sync: not part of the commit; restored to its committed content by step 344's second send, the adoption being outside the Files line's workflow reach.
-# .githooks/pre-commit: not staged; modified by no step of any plan and left out, as step 344's Facts and the Files line state (Q-JPS-226).
-# docs/ARCHITECTURE.md: unchanged by the module map write, so not part of the commit.
+planhash=4a77c8dabb024edf
+diffhash=307fa81c75fd4e31
+verdict=IN-SCOPE: every staged file is named by the plan's Files line for steps 367, 359, 360, 362 and 364 or stands from step 358, and each change is record 084's panel as the Design states it
+# IN-SCOPE: every staged file is named by the plan's Files line for steps 367, 359, 360, 362 and 364 or stands from step 358, and each change is record 084's panel as the Design states it
+# .scope-allow: Files, standing from step 358; adds one line each for the strength and centres fields as the scope check asks.
+# NOTES.md: Files, steps 362 and 364; the 084 roadmap closing sentence and the Found queue lines Q-JPS-256 to Q-JPS-265.
+# VERSION: Files, step 364; moves 2.75 to 2.76 for the capability release.
+# docs/ARCHITECTURE.md: Files, step 364; the generated module map gains the new module.
+# docs/decisions/084-hsl-and-channel-swaps-for-infrared-looks.md: Files, step 362; one Built already paragraph, no frame named.
+# ir.html: Files, step 359; the chips, the keyed words in the box titles, the Strength, Save as a look, the panel's live region.
+# src/debug.ts: Files, step 360; the Separation check's keying row, the sweep rows' pair and two time rows.
+# src/gl.ts: Files, step 367 and standing from 358; the keyed centre uniforms, the strength scaled uploads and the shader's band branches.
+# src/look.ts: Files, standing from step 358; the saved look carries the Strength.
+# src/main.ts: Files, step 359; chip handlers, Strength words, Save as a look, the keying of the open photograph, batch and export, stored edit free of the centres.
+# src/panelkey.ts: Files, step 367; the keying module, new.
+# src/pipeline.ts: Files, step 367 and standing from 358; the two fields, the probe, the strength and the band branches.
+# src/previewcache.ts: Files, standing from step 358; PREVIEW_PIPELINE raised to 103.
+# src/style.css: Files, step 359; the panel's styles from the tokens.
+# src/tile.ts: Files, step 367; keying inside the tile's own render and the by-name centre at strength.
+# tools/.preview-pipeline: Files, step 364; the preview-version check's own record run.
+# tools/a11y-walk.mjs: Files, step 362; section 15 and the header lines, not run.
+# .githooks/commit-msg: left out by this step's Facts, modified by no step, not staged.
+# .githooks/pre-commit: left out by this step's Facts, modified by no step, not staged.
