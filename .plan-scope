@@ -1,17 +1,10 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=6df8051af79ceee9
-diffhash=b7039b3b2298cb2e
-verdict=IN-SCOPE: the staged change is the separation instrument's arithmetic module, its places module, the test page's wiring, the science passage, the record's addition, the queued findings, the version and the module map, each named by the plan's steps 373 to 376
-# IN-SCOPE: the staged change is the separation instrument's arithmetic module, its places module, the test page's wiring, the science passage, the record's addition, the queued findings, the version and the module map, each named by the plan's steps 373 to 376
-# src/placecues.ts (new): Steps 373 and the Rules of this plan, ONE INTERFACE; pure functions that read the eight cues, the histograms, distances, thresholds, fitted selections, reads and masks, with a contract above each export and an opening comment; no page code and no file read.
-# src/placesdata.ts (new): Step 374 and the Rules of this plan, ONE INTERFACE; the nine names, the four targets, the three pictures' polygons copied from the places data, the file-name match and the pixel labelling.
-# src/debug.ts: Step 375 Do stage 2; imports of the two modules, the clearing of the pictures' container at the start of the press, one call in the first press after the opening balance row, and the helpers for kept selections, the pictures and the places part, with the time rows; no existing row changed.
-# debug.html: Step 375 Do stage 3; one empty container under the check's report for the pictures, headings made in the script.
-# IR-SCIENCE.md: Step 376 Do stage 2; one dated passage after the places passage in two parts, the field's pages with their addresses and read state, and what the check now counts; it holds no figure and describes no photograph.
-# docs/decisions/050-the-mask-system-is-short-of-standard-convention.md: Step 376 Do stage 3; a dated addition to its Looked up section only, naming each newly read source and what it says a selection is keyed on and how selections are joined; it cites no decision and names no frame.
-# NOTES.md: Step 376 Do stage 4; three lines at the end of the Found queue under the next free keys for findings of steps 372 and 374 about the app; the roadmap is untouched.
-# VERSION: Step 376 Do stage 4 and Facts; moved from 2.76 to 2.77 for a capability.
-# docs/ARCHITECTURE.md: Step 376 Do stage 5; the generated module map now carries the two new modules and the new count and line counts, written by the architecture check.
-# .githooks/commit-msg and .githooks/pre-commit: not staged and not part of this commit; step 376 Facts leave them out (Q-JPS-226).
-# .plan-scope: written by the record command after this verdict and staged last, as the Rules of this plan, THE LANDING'S ORDER, say.
+planhash=20f633cd21788db9
+diffhash=9a9562b6997c47d6
+verdict=IN-SCOPE: three documents staged, each covered by a line of the plan and step 381, nothing built, no source file, tool, page or version touched.
+# IN-SCOPE: three documents staged, each covered by a line of the plan and step 381, nothing built, no source file, tool, page or version touched.
+# IR-SCIENCE.md: covered by the plan's Design line on the landing and by step 381 Do 2; one further passage after the passage of 9 November, saying how each newly read source was reached and read, and what stays unread with every route; it describes no photograph, ranks nothing and chooses nothing.
+# docs/decisions/050-the-mask-system-is-short-of-standard-convention.md: covered by the plan's Design line on the landing and by step 381 Do 3; one further dated addition in Looked up before Weighed against, naming no frame and citing no decision, carrying no number of three digits and ranking nothing.
+# NOTES.md: covered by step 381 Do 4 and the plan's Design line on the answers to the two Found queue lines; sentences at the end of the lines of Q-JPS-272 and Q-JPS-273 and two new queue lines Q-JPS-275 and Q-JPS-276 for the Found and Uncertain lines of steps 379 and 380 about the research the app's record rests on; no roadmap bullet touched, no queue line removed.
+# .githooks/commit-msg and .githooks/pre-commit: not in the staged diff; they stand modified by no step, left out by step 381 Facts (Q-JPS-226), and .doctrine-sync is untouched (Q-JPS-255).

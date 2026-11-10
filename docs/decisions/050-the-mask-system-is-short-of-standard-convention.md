@@ -142,6 +142,53 @@ between two shapes, and invert of a whole selection. The union is the row the
 survey already holds. A browser segmentation model was read as an address only;
 its classes are people and body parts.
 
+**Added 9 November 2026, after reading further by the routes that answered.** Each
+item says what a source says a selection is keyed on and how selections are
+joined, and marks how it was read. Read whole from disk means the page's own text
+was on disk and was read to its end. Told by the fetch tool means the web fetch
+tool answered through a model of its own and gave a summary instead of the page,
+so the item is that tool's account and not the page.
+
+- Adobe's own account of its masking tools, the Camera Raw team's article of 28
+  September 2021 (told by the fetch tool, a summary): keyed on a luminance range
+  with a falloff control, on range masks generally, and on selections the program
+  makes, the subject and the sky being the two it names; vector masks (brush,
+  gradient, range) and bitmap-backed program-made masks work together; joined in
+  mask groups that combine, subtract and invert. Intersect is not named in the
+  return, a colour range is not named as such and a depth range is not named; the
+  summary may leave out kinds the article names.
+- darktable's colour equalizer, the documentation source (told by the fetch tool,
+  a summary): keyed on the pixel's current hue, with separate hue, saturation and
+  brightness curves over fixed equally spaced nodes, on linear RGB, and a guided
+  filter that smooths the changes by the hue and overall saturation of
+  neighbouring pixels; it is an adjustment and joins nothing.
+- The segmenter's documentation of Google AI Edge (read whole from disk): keyed on
+  predefined classes, giving a category mask or a confidence mask per class. Its
+  models are for people and their features, background, hair, skin, face and
+  clothes, with one general-purpose model whose classes the page lists only in part,
+  background, person, cat, dog and potted plant. No class the page lists is sky,
+  water, vegetation, a tree, a building or a boat. It states no size and runs in a
+  browser. It is an address for a later plan and no method tried.
+- An infrared processing article by Chris Wright (read whole from disk): keyed on
+  nothing selective; it separates sky from foliage by a global white balance picked
+  on a chosen area, mentions a mask once without saying how it is made, and
+  describes no join.
+
+What these add to the survey, from these pages and ranking nothing: Adobe's own
+article adds that its masks of the two kinds, vector and program-made, are held in
+one mask group and combined, subtracted and inverted together, which the earlier
+second-hand accounts already described; the colour equalizer adds a selection-free
+adjustment keyed on hue with a neighbour-aware filter; and the segmenter's page
+adds that the browser models it documents label people and their features, not
+the scene's sky, water, trees or buildings. None of this changes a row.
+
+What stays unread, in words: Adobe's help pages and Capture One's support pages,
+which each host refused to every route tried, and the archived copies of both, which
+no route could ask; RawPedia's local adjustments page and Adobe's release notes,
+whose hosts the session's network does not reach; and one infrared guide, which
+answered a challenge page. The science file's passage of the same date names every
+route and what it answered.
+
 ## Weighed against
 
 **048 — the union join.** One item in this survey, already recorded and ranked,

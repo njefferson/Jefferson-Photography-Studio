@@ -4268,6 +4268,115 @@ target and the others equally whatever their sizes. The figures themselves come
 from the device's reports and are not in this passage, which describes no
 photograph and chooses nothing.
 
+**THE FURTHER READING OF 9 NOVEMBER 2026, BY THE ROUTES THAT ANSWERED, AND WHAT
+STAYS UNREAD.** The passage above lists Adobe's own pages and the darktable colour
+equalizer page among the unread. A second round tried the other routes the session
+had, and this passage says, for each source, how it was reached and how it was
+read. Two states are used and kept apart. Read whole from disk: the page's own
+text stood on disk, written by a fetcher, and was read to its end. Told by the web
+fetch tool: that tool answers through a model of its own, and here both of its
+returns said they could not give the page's text and gave a summary, so what is
+set down is the tool's account of the page, not the page.
+
+First, what was newly read.
+
+- Adobe, From the ACR Team: Masking Reimagined, 28 September 2021
+  (blog.adobe.com/en/publish/2021/09/28/from-the-acr-team-masking-reimagined).
+  Route: the web fetch tool. State: told by the fetch tool, a summary, with no
+  position given where it stopped, so it is Adobe's own page as that tool
+  accounted for it and not the page read whole. It says Adobe redesigned masking
+  for Camera Raw, Lightroom and Lightroom Classic, available 26 October 2021;
+  vector-based masks (brush, gradient, range) and AI-based masks with bitmap
+  support now work together; mask groups combine, subtract and invert any tools;
+  range masks work globally and gain a luminance falloff control; Select Subject
+  and Sky Replacement are named as the Photoshop tools that led to the engine.
+  Keyed on, as told: a luminance range, named; a colour range, not named as such
+  (the return says range masks); a depth range, not named; selections the program
+  makes, named as AI-based masks with the subject and the sky as examples and no
+  other class listed. Joined, as told: combine, subtract and invert within mask
+  groups; intersect is not named as a word in the return. Whether the summary
+  leaves out range kinds the full article names is not known.
+- darktable, colour equalizer, the documentation source file
+  (raw.githubusercontent.com/darktable-org/dtdocs/master/content/module-reference/processing-modules/color-equalizer.md).
+  Route: the web fetch tool. State: told by the fetch tool, a summary with no
+  stopping position, not the file read whole. It says the module changes
+  saturation, hue and brightness according to each pixel's current hue, on linear
+  RGB, so its curves run over hue; there are separate hue, saturation and
+  brightness tabs with a fixed set of equally spaced nodes; a picker shows where a
+  sampled pixel's hue sits; a white level limits how bright corrections go; and a
+  guided filter smooths the changes by looking at the hue and overall saturation
+  of neighbouring pixels, with a hue analysis radius (default 1.5 pixels), a
+  saturation threshold, a contrast and an effect radius, and two buttons that
+  show which pixels the saturation weighting affects and where an adjustment
+  raises or lowers a value. The page is said to advise modest changes because
+  artefacts can still appear, and to describe the module as recreating part of
+  the colour zones module with less noise. It is an adjustment keyed on hue, and
+  it joins nothing.
+- The segmenter's documentation, Google AI Edge, MediaPipe Image Segmenter
+  (ai.google.dev/edge/mediapipe/solutions/vision/image_segmenter and
+  developers.google.com/mediapipe/solutions/vision/image_segmenter). Route: the
+  container's fetcher, to disk. State: read whole from disk, both files to their
+  end, the second with the same text as the first; an earlier report said the
+  first address was served after a redirect to the second host, and the saved
+  file does not show that, so it stands as that report's claim only. The task
+  outputs a category mask, one byte per pixel naming the winning class, or a
+  confidence mask per class, or both, aligned with the input. The models it names:
+  two selfie models (classes background and person); a hair model (background and
+  hair); a multi-class selfie model (background, hair, body-skin, face-skin,
+  clothes and others); and DeepLab-v3, described as general purpose, whose classes
+  the page gives only as "including" background, person, cat, dog and potted plant,
+  so the page does not settle what else that model labels. No class the page
+  lists is sky, water, vegetation or a tree, a building or a boat; the nearest to
+  vegetation is potted plant, in the partial list. It states no file size for any
+  model, only input shapes, precision and latency. It runs in a browser through the
+  tasks-vision package, with a GPU option. It is read as an address for a later
+  plan and as no method tried; the model's own label file would be needed to know
+  its full classes.
+- Chris Wright, Infrared Photography Processing, 16 June 2020, updated 7 June 2025
+  (chriswright.photography/?p=350). Route: the container's fetcher, to disk. State:
+  read whole from disk, the article to its end. It names three routes, channel
+  swapping, faux colour and monochrome, in Lightroom with Photoshop. It describes
+  no selective mask method and no keying: its one mention is a sentence saying a
+  mask for a bandstand could carry a monochrome layer, without saying how the mask
+  is made. The separation between sky and foliage it describes comes from a white
+  balance picked with the dropper on a chosen area, which is a global setting and
+  not a selection. Joins: none described.
+- The two last addresses of the round, RawPedia's local adjustments page
+  (rawpedia.pixls.us/local_adjustments/) and Adobe's Lightroom release notes
+  (lightroom.adobe.com/news), were each tried once through the web fetch tool and
+  neither host resolved from the session. Nothing is said here of what either
+  page says; both stay unread, below.
+
+Second, what stays unread, each with every route tried and what it answered.
+
+- Adobe's help pages on masking in Lightroom, Lightroom Classic and Camera Raw and
+  its learn page on masking for landscapes: the container's fetcher was answered
+  Access Denied; the web fetch tool was answered forbidden. The Internet Archive's
+  copies were not read: the web fetch tool refuses that host, and the container's
+  fetch of them was refused by the session's permission check. Adobe's account of
+  its masks above is the blog article only, as the fetch tool told it.
+- Capture One's support pages on the luma range: the container's fetcher was
+  answered a challenge page; the web fetch tool was answered forbidden; the
+  Internet Archive's copies were not read, for the reason above. The luma range of
+  Capture One is not described by anything read.
+- RawPedia's local adjustments page: its two old addresses answered not found to
+  the fetcher and to the web fetch tool; a search places the page at a newer host,
+  rawpedia.pixls.us, which the session's network declined for the fetcher and which
+  did not resolve for the web fetch tool. What a spot is keyed on, what its scope
+  and its excluding spot do and how spots are joined are not read.
+- Adobe's Lightroom release notes at lightroom.adobe.com: the host did not resolve
+  for the web fetch tool. The release in which each masking feature arrived, and
+  the classes a landscape selection lists, are not read from that source.
+- Envato Tuts+, an in-depth guide to infrared photography processing: the
+  container's fetcher saved a challenge page asking for scripts and cookies, with
+  the article absent, so it is not read.
+- The pages of Wikipedia, NASA and the USGS, and the darktable manual pages, are
+  unchanged from the passage above and were read whole there.
+
+Two hosts can be opened only by a change to the session's allowed network:
+rawpedia.pixls.us and lightroom.adobe.com. This passage describes no photograph,
+ranks nothing and chooses nothing.
+
 ---
 
 ## 7. What the files in this repository actually are
