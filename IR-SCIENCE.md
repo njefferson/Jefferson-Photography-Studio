@@ -4377,6 +4377,1299 @@ Two hosts can be opened only by a change to the session's allowed network:
 rawpedia.pixls.us and lightroom.adobe.com. This passage describes no photograph,
 ranks nothing and chooses nothing.
 
+**THE PAGES BROUGHT INTO THE SESSION BY HAND WERE READ FIRST-HAND, AND FIVE OF THE
+SOURCES THE PASSAGE ABOVE LISTS AS UNREAD OR TOLD ARE NOW READ — read 9 November
+2026.** The passage
+above lists Adobe's own pages, Capture One's support pages and the darktable colour
+equalizer page among the unread or the told. After it, copies of these pages were
+brought into the session by hand: a browser's print of each of four pages, and the
+source text of one. Each was read by an agent to its last page. Two states are used
+here and kept apart. Read whole from a returned copy: the copy was read to its end
+and nothing of the page's text was missing from it. Read in part: the copy was read
+to its end and the passage says what the print left out. This passage describes no
+photograph, ranks nothing and chooses nothing.
+
+First, what was read, for each page its publisher, its route and its state, and then
+what it says a selection is keyed on, how selections are joined and how an area of
+the picture is sampled.
+
+- Apply Masking for local adjustments, Adobe's help page for Lightroom (on Adobe's
+  help site; the print shows no date for the page). Route: a printed copy brought in
+  by hand on 9 November 2026. State: read whole from a returned copy, all 18 printed
+  pages. Keyed on: the automatic kinds are keyed on what an analysis takes to be the
+  subject, the sky or the background, with nothing for the person to set; Select
+  Landscape finds up to eight classes the person ticks, Sky, Mountains,
+  Architecture, Vegetation, Water, Snow, Natural Ground and Artificial Ground; Select
+  People offers each person apart with parts such as skin, hair, clothes and teeth;
+  three range masks, a colour range keyed on colour sampled from the picture, a
+  luminance range keyed on brightness with a Select Luminance slider for its two
+  endpoints, and a depth range keyed on distance from the camera, enabled only for
+  photographs that carry depth information; a brush, a linear gradient and a radial
+  gradient keyed on where they are drawn. The page names no falloff for the range
+  masks. Joined: a mask is a parent holding one tool's selection, with Add and
+  Subtract as child masks beneath it, Intersect with Mask using from the mask's
+  menu, an invert of a selection, an invert of a mask that inverts all the masks in
+  a group, and Duplicate and Invert; the page does not define a group further.
+  Sampled: a colour range is sampled by a click or by dragging an area around the
+  colours, with up to five samples added by Shift and a click and removed by Option
+  or Alt and a click on a sample, and a Refine slider after; luminance and depth are
+  sampled at a point or by dragging an area, a small area recommended to narrow the
+  range; the selection shows as a red overlay and as a luminance or depth map; the
+  page names no confirm step, no fixed size or shape for a sample and nothing for a
+  touch screen.
+- From the ACR Team: Masking Reimagined, the Camera Raw team's article on Adobe's
+  blog, 28 September 2021. Route: a printed copy brought in by hand on 9 November
+  2026. State: read in part, all 15 printed pages. The print leaves out a video and
+  the stretch of text after it, cuts the text near the passage on inverting a
+  selection, and cuts the in-app help section at its end. Keyed on: Select Subject
+  and Select Sky are machine-learning selections that give bitmap masks; the brush,
+  the gradients and the range masks are vector based; a luminance range is pictured
+  with two endpoints and a falloff, captioned as now giving control over how
+  quickly the selection moves from the selected tones to the rest; a colour range is
+  named in words and pictured on a phone with a Select color button and a Refine
+  slider; a depth range appears only as a greyed label in a menu picture. Joined:
+  mask groups combine any tool with any other, any mask can be added to or
+  subtracted from any other, any selection can be inverted, and range masks work
+  across the whole photograph and can be applied within a gradient by add and
+  subtract; intersect is not named in the text read. Sampled: a panel prompt says a
+  click anywhere samples luminance; the page says every tool works on mobile devices
+  and tablets as on the desktop; it says nothing of a sample's size, shape or count.
+  This reading replaces the web fetch tool's account of the same article in the
+  passage above, which named a luminance range and no colour range and no depth
+  range; the article names a colour range in words and picture and a depth range as
+  a label only, and that account was right that intersect is not named.
+- Combine Masks, Capture One's support page (names Capture One 16.7.0 as the
+  release that introduced the feature; the print shows no date for the page). Route:
+  a printed copy brought in by hand on 9 November 2026. State: read whole from a
+  returned copy, all seven printed pages. Keyed on: the page does not say what
+  Subject, Background, People or AI Select are keyed on; it names the masks Subject,
+  Background, People, Brush, Magic Brush, Linear Gradient, Radial Gradient, AI Select
+  and Luma Range, with Clothes once in an example, no landscape class and no mask made
+  from a colour. Joined: Add, Subtract and Intersect, on a single layer only, a
+  combined group counting as one layer; the linear gradient, the radial gradient and
+  the luma range stay live afterwards; an Invert Mask entry appears in a screenshot's
+  menu and is not described. Sampled: the page says nothing of sampling an area, and
+  nothing for a touch screen.
+- Luma Range Overview, Capture One's support page (the print shows no date). Route:
+  a printed copy brought in by hand on 9 November 2026. State: read whole from a
+  returned copy, all five printed pages. Keyed on: luminosity, set by two range points
+  and two falloff points on a graph whose scale runs from 0 to 255, the falloff said
+  to avoid an abrupt transition and artifacts. It acts on top of a mask that already
+  exists on the layer, stays live, updates when a gradient under it is moved, and is
+  recalculated for each image when saved in a Style; since 16.7.0 it can be added,
+  intersected or subtracted. Sampled: the range is set on a graph by moving points,
+  and no sample is taken from the picture. This reading replaces the passage above's
+  sentence that the luma range of Capture One is described by nothing read.
+- color equalizer, the darktable documentation's page for the module, from its
+  source text (the text carries no date). Route: the page's source text brought in by
+  hand on 9 November 2026. State: read whole from a returned copy; its pictures were
+  not seen. Keyed on: each pixel's current hue, the horizontal axis of three curves
+  for hue, saturation and brightness over fixed equally spaced nodes, in linear RGB;
+  a node placement slider moves all the nodes together; a white level bounds the
+  brightness corrections; a hue curve setting shapes the blend between nodes; a
+  guided filter smooths by the hue and saturation of neighbouring pixels, with a hue
+  analysis radius of 1.5 pixels by default, a saturation threshold, a contrast and an
+  effect radius, and two view buttons. Joined: nothing; it is an adjustment that
+  acts on every pixel by its hue and offers nothing that adds, subtracts or
+  intersects. Sampled: its picker takes a point or an area and shows the hue on the
+  curve, and can set the white level the same way; over the picture the pointer shows
+  the colour under it, marks the matching hue in the open tab, carries cross-hairs, a
+  label with the change's value and an arc for its size, and the wheel changes the
+  matching band; the page says nothing of a touch screen. This reading replaces the
+  web fetch tool's account of the page in the passage above: the two agree on the
+  axis, the tabs, the nodes, the picker, the white level, the filter and its options
+  and the view buttons; the reading adds that the picker takes a point or an area and
+  can set the white level, that a hue curve setting under 1 sharpens the targeting at
+  a greater risk of noise, and the colours of the two views; the account's advice of
+  modest changes is not in the notes of the reading.
+
+Second, what stays unread, each with every route tried and what it answered. The
+passage above names the routes that failed for the others and they are not repeated.
+
+- RawPedia's local adjustments page. Two routes answered this time. Its file was
+  placed in a Drive folder linked for it, and the folder was found by its title,
+  where the listing of that folder was refused by the Drive guard; then the file was
+  found by its exact name, the one file of that name, a 280-page print, and the
+  guard refused the read of its metadata as returned by no listing. A refusal by that
+  guard ends the route. The page therefore stays unread, and what a spot is keyed on,
+  the reference it takes from the picture and the size of that area, what its scope
+  and its excluding spot do, how spots are joined and how a spot is placed on a touch
+  screen are not known from this evidence.
+- Adobe's help pages for Lightroom Classic and for Camera Raw, and its learn page on
+  masking for landscapes: unread by any route; the Lightroom help page is the one
+  now read, and it may differ from the others.
+- Adobe's Lightroom release notes: unread, the host not resolving from the session;
+  the release in which each feature arrived is not known.
+- Envato Tuts+, the guide to infrared photography processing: unread, the challenge
+  page.
+- The Photoshop pages that record 050 cites for Color Range and Localized Color
+  Clusters: not read by this plan.
+
+**THE SEPARATION CHECK'S FIRST FIGURES FROM THE DEVICE, AND WHAT THEY LIMIT TO —
+measured 9 November 2026.** The passage on the cues above says the figures come
+from the device's reports and are not in it. They are here. The Separation check of
+the test page was pressed five times on a desktop, a Windows machine with Firefox,
+an NVIDIA GeForce GTX 980 and no touch screen, on the staging build 2.77, at 18:43,
+18:48, 18:50, 18:52 and 18:58 California time. The photographs are the three of the
+marina, each 2,800 by 1,864 pixels, of which the check counts 579,393, one in nine:
+A, NIR_3742 at 77 mm; B, NIR_3736 at 70 mm; C, NIR_3733 at 64 mm. The first press
+was on A, the second on B, the third on C, the fourth on A and the fifth on B. The
+cues are named as the check prints them: lightness, saturation, red against green,
+red against blue, green against blue, texture at 5, texture at 15 and height. Below,
+texture at 15 is the wider texture, texture at 5 the finer texture and height is
+position up the frame. The reports of the first four presses were each compared
+figure by figure with the figures below: 442 were compared and none differs. The
+report of the fifth press was checked on 10 November 2026 against its own report,
+which stands in a file: the 24 figures below marked as the fifth press were each
+compared and none differs, and the two times agree. The marking is kept so that
+each figure's press stays visible. A triple of numbers is for A, B and C
+in that order, a pair figure is the Hellinger distance between two places'
+histograms on one cue, nought where they are the same and one where they share no
+bin, and a direction written A to B is a selection fitted on A and read on B.
+
+Counted pixels by place:
+- A: water 62,907; conifers 141,215; sky 26,975; boats 9,444; docks 3,773; shore
+  6,031; broadleaf 7,194; snags 3,530; the rest 318,324.
+- B: water 60,398; conifers 134,162; sky 81,617; boats 5,851; docks 3,793; shore
+  9,742; broadleaf 5,958; snags 3,927; the rest 273,945.
+- C: water 80,543; conifers 130,738; sky 68,844; boats 5,703; docks 3,276; shore
+  9,664; broadleaf 4,442; snags 2,183; the rest 274,000.
+
+Planted checks, at every press: the planted colour read exactly, and the measure's
+planted counts read 0.0000, 1.0000 and 0.7071 as known. The hue distance of the
+sky against the foliage by the check's first labels read 1.0000, 0.9961 and 0.9994.
+
+The pair figures, by cue, for each pair of places:
+- The sky against the conifers: wider texture 0.997, 0.992, 0.995; finer texture
+  0.985, 0.977, 0.982; red against blue 0.974, 0.970, 0.973; green against blue
+  0.937, 0.934, 0.937; red against green 0.725, 0.716, 0.718; lightness 0.706,
+  0.705, 0.723; saturation 0.645, 0.589, 0.589; position 1.000, 0.972, 1.000.
+- The sky against the broadleaf trees, read from the reports: saturation 0.691,
+  0.619, 0.637 and red against green 0.659, 0.655, 0.668.
+- Water against the docks: lightness 0.624, 0.642, 0.704; saturation 0.387, 0.423,
+  0.522; red against blue 0.428, 0.443, 0.550; green against blue 0.400, 0.420,
+  0.517; red against green 0.267, 0.279, 0.345; finer texture 0.470, 0.413, 0.393;
+  wider texture 0.704, 0.697, 0.618; position 0.863, 0.694, 0.843; the best pair of
+  cues 0.948, 0.880, 0.890.
+- Water against the boats: lightness 0.508, 0.577, 0.638; saturation 0.344, 0.255,
+  0.401; red against blue 0.351, 0.242, 0.367; finer texture 0.569, 0.600, 0.614;
+  wider texture 0.715, 0.770, 0.764; position 0.674, 0.695, 0.814; the best pair
+  0.805, 0.826, 0.875.
+- Water against the conifers: lightness 0.570, 0.612, 0.624; red against blue 0.561,
+  0.562, 0.533; finer texture 0.610, 0.605, 0.590; wider texture 0.732, 0.733,
+  0.696; position 1.000 on all three.
+- Water against the pale places and the sky: against broadleaf, lightness 0.859,
+  0.857, 0.867 and wider texture 0.938, 0.941, 0.902; against snags, lightness
+  0.967, 0.979, 0.964 and wider texture 0.809, 0.940, 0.928; against shore,
+  lightness 0.902, 0.704, 0.749 and wider texture 0.863, 0.697, 0.712, with
+  saturation and the three colour differences at most 0.181; against sky, wider
+  texture 1.000 on all three and lightness 0.883, 0.866, 0.789.
+- The conifers against the docks: lightness 0.470, 0.437, 0.473; saturation 0.236,
+  0.258, 0.298; red against green 0.153, 0.176, 0.135; red against blue 0.322,
+  0.329, 0.306; green against blue 0.252, 0.248, 0.244; finer texture 0.441, 0.409,
+  0.427; wider texture 0.463, 0.425, 0.389; position 1.000 on all three.
+- The conifers against the boats: lightness 0.255, 0.272, 0.262; saturation 0.150,
+  0.165, 0.193; red against green 0.225, 0.297, 0.215; red against blue 0.370,
+  0.418, 0.365; green against blue 0.280, 0.323, 0.290; finer texture 0.275, 0.275,
+  0.298; wider texture 0.283, 0.334, 0.362; position 1.000 on all three.
+- The docks against the boats: lightness 0.379, 0.446, 0.406; position 0.712, 0.865,
+  0.715; the best pair 0.579, 0.748, 0.656; every other cue at most 0.346.
+- The broadleaf trees against the docks: lightness 0.67 to 0.80, and against the
+  boats 0.52 to 0.60, read from the reports.
+- The best pair of cues together, read from the reports: for water against the docks,
+  the wider texture with position on A, lightness with the wider texture on B and
+  lightness with position on C; for water against the boats, the wider texture with
+  position on A and C and lightness with the wider texture on B; for the docks
+  against the boats, lightness with position on all three.
+
+The ranges fitted, which move with the framing:
+- Water's position range starts at 0.656 of the frame's height on A and C and at
+  0.719 on B, and runs to the foot.
+- Built things' position range runs 0.703 to 0.922 on A, 0.766 to 0.953 on B and
+  0.703 to 0.875 on C. Foliage's runs 0.156 to 0.578 on A, 0.234 to 0.656 on B and
+  0.219 to 0.594 on C.
+- Sky's is the top 0.109 of the frame on A and the top 0.219 on C; on B it is a
+  wider-texture range of 0.002 to 0.005.
+
+What a selection fitted on one photograph takes on another. Where a selection is read
+on the photograph it was fitted on it is as fitted and is no result; the lists say
+which. Percents are of the places named.
+
+- Water, position kept only where a wider-texture range agrees, as percents of water,
+  docks, boats and shore taken. Read where fitted, no result: A 97.0, 20.2, 18.9,
+  none; B 97.1, 22.1, 15.4, none; C 95.2, 27.5, 12.2, none. Carried: A to B 90.8,
+  18.0, 11.5, 15.6; A to C 93.0, 25.8, 11.3, none; B to C 83.6, 30.9, 11.9, none;
+  B to A 77.3, 24.0, 20.2, none; C to A 97.8, 20.9, 21.2, none. Fifth press: C to B
+  92.8, 18.2, 13.3, 19.3.
+- Water, position with a wider-texture range taken away, the same four percents. A
+  to B 99.1, 26.3, 19.6, 39.5; A to C 98.7, 35.8, 20.7, none; B to C 84.5, 46.9,
+  20.4, none; B to A 77.6, 39.5, 31.5, none; C to A all of it, 48.9, 41.9, none.
+  Fifth press: C to B all of it, 49.2, 32.0, 56.9.
+- Water, the position range alone, as percents of water, docks and boats. A to B
+  all three whole and the whole shore with them; A to C all three whole; B to C 84.9,
+  the whole, 87.0; B to A 77.6, the whole, 93.6; C to A all three whole. Fifth
+  press: C to B all three whole and the whole shore.
+- Built things, position kept only where a wider-texture range agrees, as percents of
+  docks, boats and water taken, then the share of what it took that is built. Read
+  where fitted, no result: A 79.0, 75.2, 0.7, share 96.0; B 81.7, 84.2, 2.0, share
+  86.8; C 68.3, 82.3, 0.8, share 91.5. Carried: A to B 81.7, 77.1, 5.2, share 69.0,
+  with 2.7 of the shore; A to C 71.6, 84.3, 2.4, share 78.4; B to C 64.0, 25.5, 1.8,
+  share 71.6; B to A 79.0, 44.3, 0.7, share 94.1; C to A 74.7, 65.0, 0.1, share
+  99.1. Fifth press: C to B 36.2, 75.4, 2.2, share 78.6, with 2.3 of the shore.
+- Built things, the position range alone, read on another photograph: it takes
+  between 30.6 and 62.3 percent of the water with them, and built things are between
+  8.7 and 38.0 percent of what it takes.
+- Sky. B's wider-texture range read on C takes the whole sky and 0.1 percent of the
+  boats; read on A, the whole sky and 3.5 percent of the snags. A's position range
+  takes 56.7 percent of the sky on B and 66.4 on C. C's position range takes the
+  whole sky on A with 13.3 percent of the conifers and all the snags; fifth press,
+  94.8 percent of the sky on B. With the app's own sky selection removed first,
+  every Sky selection takes none of the place labelled sky, on every photograph.
+- Foliage by its position range, as percents of conifers and broadleaf taken, then
+  what else. A to B 95.0 and 16.4, with all the snags and 21.7 of the sky before the
+  app's sky selection is removed; A to C all and 87.8, with all the snags and 12.7 of
+  the sky; B to C 98.2 and all, with 89.8 of the snags and the whole shore; B to A 82.0
+  and all, with the whole shore; C to A 86.7 and all. Fifth press: C to B 98.5 and
+  22.8, with all the snags and 5.2 of the sky.
+
+Time. The five presses took 53.2, 51.9, 51.1, 49.8 and 50.5 seconds. Of each, the
+picture code's build took 46.0, 45.2, 44.0, 44.2 and 44.6 seconds, and the places
+part, its labelling, cues, report, keeping and drawing together, took between 0.8
+and 1.2 seconds. The fifth press's two times, 50.5 and 44.6 seconds, were checked
+against its report on 10 November and agree; its places part sums to 1,095
+milliseconds, inside that range.
+
+What the figures show, with their limits:
+- Between the sky and the conifers every cue but saturation passes 0.7, lightness
+  only just, at 0.705 to 0.723; against the broadleaf trees saturation and red
+  against green fall under 0.7 on all three photographs. The 0.7 is a marker for
+  reading the lists and not a threshold that the check sets.
+- Between the conifers and the built things no cue but position passes 0.48, the
+  largest other being 0.473; between the broadleaf trees and the docks lightness
+  reaches 0.67 to 0.80 and against the boats 0.52 to 0.60.
+- For water the best cue that is not position is the wider texture against the docks
+  on A and B and against the boats and the conifers on all three photographs; against
+  the docks on C lightness, at 0.704, passes the wider texture's 0.618. Lightness
+  tells water from the pale places, the broadleaf trees, the snags, the shore and the
+  sky at 0.70 to 0.98, and from the conifers, the docks and the boats at 0.51 to 0.70
+  only. Docks and boats barely differ from each other.
+- A position range alone does not carry from one photograph to the next as the
+  framing moves from 77 to 70 to 64 mm. Two selections joined do carry: position
+  kept only where the wider texture agrees held 77 to 98 percent of the water on a
+  photograph it was not fitted on while taking 18 to 31 percent of the docks and 11
+  to 21 of the boats.
+- The measure repeats from press to press on A, whose two presses agree in every
+  pair figure the check compared and differ only in their times. B's two presses, the
+  second and the fifth, were compared on 10 November row against row, 28 pair rows
+  in each: they agree in every pair figure, in the counted pixels, the planted
+  checks and the fitted rows, and differ only in the time rows and in the fifth
+  press's added rows of C's selections read on B.
+- The limits: three photographs of one scene; one device; the places are polygons
+  read off pictures by eye and not drawn on the device; a selection read on the
+  photograph it was fitted on is no result; and the pair rows of B were compared
+  by reading each against the other, with no program. The smallest place, the snags on C, held 2,183 counted
+  pixels. These figures describe no photograph's appearance and choose nothing.
+
+**WHAT THE READINGS AND THE FIGURES SAY TOGETHER — the joined account, 9 November
+2026.** The pages of the passages above and the device's figures were gathered to
+answer whether water, built things, the sky and the trees can be told apart on these
+photographs and by what, and what the field's editors offer for it. Set down source
+by source they leave the judging to the next reader; this account judges it once,
+by question and not by source. It says what the evidence shows, how firmly and on
+what, and what it bears on. It ranks no item of the roadmap and no row of record 050
+against another, picks nothing to build and designs no control; those stay the
+owner's. It describes no photograph's appearance.
+
+**The sources and how each was read.**
+
+Read whole from a returned copy, brought in by hand on 9 November 2026:
+- Adobe, Apply Masking for local adjustments, its help page for Lightroom (18
+  printed pages, all read).
+- Capture One, Combine Masks, its support page (7 printed pages, all read).
+- Capture One, Luma Range Overview, its support page (5 printed pages, all read).
+- darktable documentation, color equalizer, from the page's source text; its
+  pictures were not seen.
+
+Read in part from a returned copy:
+- Adobe, From the ACR Team: Masking Reimagined, the Camera Raw team's article of 28
+  September 2021 (15 printed pages, all read; the print leaves out a video and a
+  stretch of text after it, cuts the text near the passage on inverting, and cuts
+  the in-app help section at its end).
+
+Read whole from disk on 9 November 2026, fetched by the container's fetcher:
+- The darktable user manual 4.6 pages on parametric masks, drawn masks, combining
+  drawn and parametric masks, mask refinement and colour zones.
+- Wikipedia on the normalized difference water index and vegetation index; NASA
+  Earth Observatory on measuring vegetation; USGS on the Landsat vegetation index.
+- Kolari Vision, advanced infrared processing with luminosity masks; Kept Light,
+  red-blue channel swap in Lightroom.
+- The TensorFlow.js body segmentation README; Google AI Edge, MediaPipe Image
+  Segmenter at two addresses; Chris Wright, Infrared Photography Processing.
+
+Second-hand accounts, each page read whole but each telling of another program's
+tools: Fstoppers on Lightroom's masking (24 June 2026 and 21 December 2021), on
+luminosity masks (14 August 2021) and on infrared emulation in Lightroom (27 May
+2024).
+
+Replaced and used nowhere below except in part four: the web fetch tool's summaries
+of Adobe's article and of darktable's colour equalizer, now read first-hand.
+
+Not read, so nothing below rests on them: RawPedia's local adjustments page (the
+routes that answered are in the passage above: the folder found by its title and its
+listing refused, then the file found by its name and its read refused); Adobe's
+help pages for Lightroom Classic and Camera Raw, its learn page on masking for
+landscapes and its Lightroom release notes; Envato Tuts+; the USGS page on Landsat
+bands, not read to its end, and the transformers.js README; and the Photoshop pages
+that record 050 cites for Color Range and Localized Color Clusters, which this work
+did not read, what record 050 says of them standing on its own earlier reading.
+
+The device's figures are those of the passage above: three photographs of one marina
+on one desktop, the places polygons read off pictures by eye. 442 figures of the
+first four presses were compared with the test page's own reports and none differs.
+The fifth press, C's selections read on B, was checked on 10 November 2026 against
+its own report: its 24 marked figures agree with it, none differs. Its figures are
+still marked fifth press wherever they appear below, and the marking now says where
+a figure comes from and not that it is unchecked. A pair figure is the Hellinger distance between two
+places' histograms on one cue. The 0.7 is used only as a marker for reading the
+lists. A selection is a range of whole bins of one cue, joined as the app's two
+joins are; a selection read on the photograph it was fitted on is no result, and
+only selections fitted on one photograph and read on another are taken as results.
+A triple is for A, B and C in that order.
+
+**Part one: what a selection can be keyed on.**
+
+1.1 Lightness or luminance.
+
+Offered by:
+- Adobe, Luminance Range (help page, whole): a Select Luminance slider sets two
+  endpoints; a point or an area is sampled from the picture, a small area
+  recommended to narrow the range; Show Luminance Map shows the masked area in red
+  on a black and white view. The help page names no falloff for it.
+- Adobe's article (in part): a picture of the luminance range control with two
+  endpoints and a falloff, captioned as now giving control over how quickly the
+  selection moves from the chosen tones to the rest.
+- Capture One, Luma Range (whole): two range points and two falloff points on a
+  graph whose scale runs from 0 to 255; some falloff avoids an abrupt transition and
+  artifacts. It acts only on top of a mask that already exists on the layer, stays
+  live, updates when a gradient under it is moved, and is recalculated for each
+  image when saved in a Style.
+- darktable parametric masks (whole): the lightness, grey or L channel, each a
+  trapezoid with a ramp at each end and a polarity. darktable colour zones (whole):
+  lightness as the axis of an adjustment.
+- Kolari Vision (whole): luminosity masks made from one colour channel at a time.
+- Fstoppers (second-hand): a luminance range with an outer line for the range and
+  arrows for the feather.
+
+What the device's figures say (lightness, the largest of the drawn pixel's three
+channels):
+- Water against the broadleaf trees 0.859, 0.857, 0.867; against the snags 0.967,
+  0.979, 0.964; against the shore 0.902, 0.704, 0.749; against the sky 0.883, 0.866,
+  0.789.
+- Water against the conifers 0.570, 0.612, 0.624; against the docks 0.624, 0.642,
+  0.704; against the boats 0.508, 0.577, 0.638.
+- The sky against the conifers 0.706, 0.705, 0.723.
+- The conifers against the docks 0.470, 0.437, 0.473; against the boats 0.255, 0.272,
+  0.262.
+- The broadleaf trees against the docks 0.67 to 0.80, and against the boats 0.52 to
+  0.60, read from the device's reports.
+- The docks against the boats 0.379, 0.446, 0.406.
+
+Conclusion 1.1. On these photographs a lightness range tells water from the
+broadleaf trees, the snags, the shore and the sky (0.704 to 0.979), tells water from
+the conifers, the docks and the boats less well (0.508 to 0.704), and does not tell
+the conifers from the docks or the boats (at most 0.473). Between the sky and the
+conifers it is just over the marker. All three programs read first-hand offer a
+lightness range; Capture One and darktable give it a falloff in words, and Adobe's
+two pages differ on that (part four).
+
+1.2 Colour: hue, chroma, saturation, one channel, a difference of two channels.
+
+Offered by:
+- Adobe, Color Range (help page, whole): keyed on colour sampled from the picture, up
+  to five samples, with a Refine slider that narrows or broadens the range. Adobe's
+  Brush has an Auto Mask choice that confines a stroke to areas of similar colour.
+  The article (in part) shows the colour range on a phone with a Select color button
+  and a Refine slider.
+- darktable parametric masks (whole): hue, chroma, saturation, the red, green and
+  blue channels, and the Lab and JzCzhz components, each its own trapezoid, the
+  channels joined by multiplying. Colour zones (whole): hue or chroma as the axis of
+  an adjustment. Colour equalizer (whole): an adjustment, not a mask, keyed on each
+  pixel's hue, with a saturation threshold below which a pixel is not changed.
+- Capture One: neither page read names a mask made from a colour.
+- Kolari Vision (whole): the light in one colour channel, the page saying that on a
+  720 nm photograph with only a channel swap a red-channel mask is aimed at foliage
+  and skin and a blue-channel mask at sky, clouds, water and ground.
+- The index pages (whole): a normalised difference of two bands, green against near
+  infrared for open water and near infrared against red for vegetation, with ranges
+  given for satellite bands, not for a converted camera.
+- Fstoppers on infrared emulation (second-hand): a colour range for the sky and one
+  for the foliage. Its title calls it emulation.
+
+What the device's figures say (saturation of the drawn pixel; red against green, red
+against blue and green against blue, each a normalised difference of two linear
+channels at the opening gains):
+- The sky against the conifers: red against blue 0.974, 0.970, 0.973; green against
+  blue 0.937, 0.934, 0.937; red against green 0.725, 0.716, 0.718; saturation 0.645,
+  0.589, 0.589.
+- The sky against the broadleaf trees, read from the device's reports: saturation
+  0.691, 0.619, 0.637 and red against green 0.659, 0.655, 0.668, both under 0.7 on
+  all three photographs.
+- Water against the docks: saturation 0.387, 0.423, 0.522; red against blue 0.428,
+  0.443, 0.550; green against blue 0.400, 0.420, 0.517; red against green 0.267,
+  0.279, 0.345.
+- Water against the boats: saturation 0.344, 0.255, 0.401; red against blue 0.351,
+  0.242, 0.367.
+- Water against the conifers: red against blue 0.561, 0.562, 0.533.
+- Water against the shore: saturation and the three colour differences at most 0.181.
+- The conifers against the docks: saturation 0.236, 0.258, 0.298; red against green
+  0.153, 0.176, 0.135; red against blue 0.322, 0.329, 0.306; green against blue
+  0.252, 0.248, 0.244.
+- The conifers against the boats: saturation 0.150, 0.165, 0.193; red against green
+  0.225, 0.297, 0.215; red against blue 0.370, 0.418, 0.365; green against blue
+  0.280, 0.323, 0.290.
+- The docks against the boats: every cue but lightness and position at most 0.346.
+- Hue, the sky against the foliage by the check's first labels: 1.0000, 0.9961,
+  0.9994. This is a figure of the check's own labels and not of the places, so it is
+  not set beside the place figures here.
+
+Conclusion 1.2. Colour, as the check counts it, tells the sky from the conifers (red
+against blue 0.970 to 0.974). Among water, the conifers, the docks and the boats, no
+colour figure given passes 0.562; for water against the conifers the figures give
+red against blue only, and for water against the boats saturation and red against
+blue only. Between water and the shore colour reads at most 0.181. On the figures
+given, a selection keyed on colour alone would not separate water, the conifers and
+the built things on these photographs, and would separate the sky from the
+conifers. Of the programs read first-hand, Adobe and darktable key a mask on colour,
+and Capture One's two pages name none.
+
+1.3 Depth.
+
+Offered by:
+- Adobe, Depth Range (help page, whole): enabled only for photographs that carry
+  depth information; a Select Depth slider for the two endpoints; a point or an area
+  sampled, a small area recommended; Show Depth Map. The article (in part) names it
+  only as a greyed label in a menu picture.
+- No other page read names a depth key.
+
+What the device's figures say: nothing. The check counts no depth cue, and its height
+cue is position up the frame, not distance from the camera.
+
+Conclusion 1.3. Depth is offered by one program, for photographs that carry depth
+information. Nothing in the evidence says whether these camera files carry it, and
+the figures say nothing of it.
+
+1.4 Texture, detail or structure.
+
+Offered by:
+- darktable's mask refinement (whole): a details threshold keyed on the amount of
+  detail at the pixel, positive for detailed areas and negative for flat ones, taken
+  from the demosaic stage and so available for raw images only; and a feathering
+  guide that pulls a mask onto the image's own edges. Both refine one finished mask.
+- No Adobe or Capture One page read names a mask keyed on texture or detail.
+
+What the device's figures say (the textures at 15 and at 5, the standard deviation of
+the drawn lightness in a square window of that many pixels; here the wider and the
+finer texture):
+- The sky against the conifers: wider 0.997, 0.992, 0.995; finer 0.985, 0.977, 0.982.
+- Water against the sky: wider 1.000 on all three.
+- Water against the broadleaf trees: wider 0.938, 0.941, 0.902. Against the snags:
+  wider 0.809, 0.940, 0.928. Against the shore: wider 0.863, 0.697, 0.712.
+- Water against the conifers: wider 0.732, 0.733, 0.696; finer 0.610, 0.605, 0.590.
+- Water against the docks: wider 0.704, 0.697, 0.618; finer 0.470, 0.413, 0.393.
+- Water against the boats: wider 0.715, 0.770, 0.764; finer 0.569, 0.600, 0.614.
+- The conifers against the docks: wider 0.463, 0.425, 0.389; finer 0.441, 0.409,
+  0.427. Against the boats: wider 0.283, 0.334, 0.362; finer 0.275, 0.275, 0.298.
+
+Conclusion 1.4. Read from the device's reports with every cue compared, the wider
+texture is water's best cue that is not position against the conifers (0.732, 0.733,
+0.696, the next being the finer texture at 0.610, 0.605, 0.590) and against the boats
+(0.715, 0.770, 0.764, the next the finer texture or lightness at most 0.638) on all
+three photographs, and against the docks on A and B (0.704 and 0.697, lightness next
+at 0.624 and 0.642); on C, against the docks, lightness at 0.704 passes it at 0.618.
+Of the two cues given for water against the broadleaf trees and the sky, it is the
+higher; against the snags and the shore lightness is. It tells the sky from the
+conifers at 0.992 or more. It does not tell the conifers from the built things (at
+most 0.463). The one page read that keys a selection on structure, darktable's
+details threshold, does so as a refinement from raw data with a definition different
+from the check's window. So the cue that does most for water on these figures is the
+one the editors whose pages were read offer least.
+
+1.5 Position or shape.
+
+Offered by:
+- Drawn shapes in every program read first-hand: Adobe's brush, linear and radial
+  gradients; Capture One's brush, magic brush, linear and radial gradients;
+  darktable's circle, ellipse, path of three or more nodes, brush and gradient,
+  stored as vectors in the original image's coordinates.
+- A rectangle: Adobe's help page names a Rectangle Select tool only as one way of
+  choosing an object for Select Objects; darktable's drawn shapes name none; Capture
+  One's pages name none.
+- Carried between photographs: Capture One copies a linear gradient, a radial
+  gradient, an AI Select mask or a brush mask between images at its original
+  position relative to the aspect ratio, and recalculates every other mask from the
+  target image's content; it warns that large changes of crop or aspect ratio may
+  change the result. Adobe copies Subject and Sky masks to many photographs through
+  Copy Edit Settings.
+
+What the device's figures say (height, the pixel's row over the last row):
+- Measured where it stands: the conifers against the water, the docks and the boats
+  1.000 on all three; the sky against the conifers 1.000, 0.972, 1.000; water against
+  the docks 0.863, 0.694, 0.843; water against the boats 0.674, 0.695, 0.814; the
+  docks against the boats 0.712, 0.865, 0.715.
+- The ranges fitted move with the framing. Water's starts at 0.656 of the height on A
+  and C and at 0.719 on B, and runs to the foot. Built things': 0.703 to 0.922 on A,
+  0.766 to 0.953 on B, 0.703 to 0.875 on C. Foliage's: 0.156 to 0.578 on A, 0.234 to
+  0.656 on B, 0.219 to 0.594 on C. Sky's: the top 0.109 on A and the top 0.219 on C.
+- Water's position range alone, read on another photograph: water, docks and boats
+  all taken whole on A to B, A to C and C to A, with the whole shore on A to B; on B
+  to C 84.9 percent of the water, the whole of the docks and 87.0 of the boats; on B
+  to A 77.6, the whole and 93.6.
+- Built things' position range alone, read on another photograph: it takes 30.6 to
+  62.3 percent of the water with them, and built things are 8.7 to 38.0 percent of
+  what it takes.
+- The sky's: A's range takes 56.7 percent of the sky on B and 66.4 on C; C's takes
+  the whole sky on A with 13.3 percent of the conifers and all the snags (and 94.8
+  percent of the sky on B, fifth press, checked on 10 November).
+- Foliage's, as percents of conifers and broadleaf taken: A to B 95.0 and 16.4, with
+  all the snags and 21.7 of the sky before the app's sky selection is removed; A to C
+  all and 87.8, with all the snags and 12.7 of the sky; B to C 98.2 and all, with 89.8
+  of the snags and the whole shore; B to A 82.0 and all, with the whole shore; C to A
+  86.7 and all.
+
+Conclusion 1.5. Position separates several pairs most strongly where it is measured
+(the conifers against the water and the built things at 1.000 on all three
+photographs), though not every pair: water against the boats reads 0.674 and 0.695
+on A and B. A fixed position range does not carry from one photograph to the next as
+the framing moves from 77 to 70 to 64 mm: carried alone, water's range takes the
+docks whole and 87.0 percent to all of the boats with the water; built things are at
+most 38.0 percent of what built things' range takes; A's sky range keeps 56.7 and
+66.4 percent of the sky on B and C, and C's takes 13.3 percent of the conifers and
+all the snags with the sky on A; foliage's takes the snags or the shore with the
+trees on four of the five carries. This is in kind what Capture One describes when
+it copies a drawn mask at its position relative to the aspect ratio. A shape drawn
+again by hand on each photograph is not what the check measures.
+
+1.6 A class the program finds by itself.
+
+Offered by:
+- Adobe (help page, whole): Select Subject, Select Sky, Select Background, Select
+  Objects, Select People (each person offered apart, with parts such as skin, hair,
+  clothes and teeth) and Select Landscape, which finds up to eight classes the
+  person ticks: Sky, Mountains, Architecture, Vegetation, Water, Snow, Natural
+  Ground and Artificial Ground. Nothing is set by the person before the analysis
+  runs. The article (in part) says Select Subject and Select Sky come from machine
+  learning and give bitmap masks.
+- Capture One (whole): Subject, Background, People and AI Select, with Clothes in
+  one example; no landscape class; what each is keyed on is not said.
+- Google's MediaPipe Image Segmenter (whole from disk): people, hair, body skin, face
+  skin, clothes and accessories, and a general model whose list is given only in
+  part (background, person, cat, dog, potted plant); no class the page lists is sky,
+  water, a tree, a building or a boat. It runs in a browser. The TensorFlow.js body
+  segmentation README (whole): people and body parts only.
+
+What the device's figures say: the one program-made class the check reads is the
+app's own sky selection, used for removal. With it removed first, every Sky selection
+takes none of the place labelled sky, on every photograph; before it is removed, B's
+wider-texture range takes the whole sky on C and on A.
+
+Conclusion 1.6. Of the programs whose pages were read first-hand, only Adobe offers
+program-made classes for the scene's own kinds, and its Landscape list holds Sky,
+Vegetation, Water, Architecture and Artificial Ground. No page says which class a
+dock or a boat falls under, and no page says how any program-made class behaves on
+an infrared photograph. The browser models whose pages were read label people and
+their parts, not these kinds. The removal figures read as the app's sky selection
+holding every counted pixel of the labelled sky at a weight of 0.5 or more on A and
+C, where a carried selection took the whole sky before the removal and none after.
+That is an inference from the figures, not a figure of its own.
+
+1.7 A reference sampled from the picture.
+
+Offered by:
+- Adobe (help page, whole): colour, luminance and depth ranges are each set from a
+  sample taken on the picture, and each is a mask of its own; part three gives how.
+- darktable parametric masks (whole): a colour picker reads a point or an area, and
+  another sets the sliders from a dragged rectangle. The notes do not say whether
+  that rectangle sets one channel's range or several at once. The colour equalizer
+  (whole): its picker shows the hue of a point or an area on the curve.
+- Capture One, Luma Range (whole): set on a graph by moving points; no sample is
+  taken from the picture.
+
+What the device's figures say: the check takes no sample. Its places are polygons
+read off pictures by eye, and every cue is compared as a spread of values over each
+place.
+
+Conclusion 1.7. Where a program read first-hand takes a reference from the picture,
+the sample sets the range of one key: Adobe ties each sample to one range mask, and
+darktable's notes leave open whether its dragged rectangle sets several channels
+together. No page read says that one sample keeps several keys from it.
+
+1.8 Across the keys.
+
+Conclusion 1.8. On these photographs no single cue tells every pair of places apart:
+lightness and both textures fail the conifers against the built things, colour fails
+among water, the conifers and the built things, and position, the strongest where it
+is measured, reads 0.674 for water against the boats on A and does not carry between
+photographs. The cue that does most differs by pair: colour and texture for the sky
+against the conifers; the wider texture for water against the conifers, the boats
+and on A and B the docks; lightness for water against the snags and the shore. The
+conifers against the built things, and the docks against the boats, are told apart by
+no counted cue but position: the conifers' largest other figure is 0.473 against the
+docks and 0.418 against the boats, and the docks against the boats read 0.379 to
+0.446 on lightness and at most 0.346 on every other cue but position, with their best
+pair of cues at 0.579, 0.748 and 0.656. Read from the device's reports, the best pair
+of cues together for water against the docks is the wider texture with position on A
+(0.948), lightness with the wider texture on B (0.880) and lightness with position
+on C (0.890); for water against the boats, the wider texture with position on A
+(0.805) and C (0.875) and lightness with the wider texture on B (0.826); and for the
+docks against the boats, lightness with position on all three (0.579, 0.748,
+0.656).
+
+**Part two: how selections are joined.**
+
+What each source names:
+- Adobe (help page, whole): Add, which adds a further tool's selection to a parent
+  mask; Subtract, a child mask whose selection is removed; Intersect with Mask using,
+  from a mask's menu; invert a selection; invert a mask, which inverts all the masks
+  in a group; and Duplicate and Invert, which makes an inverse copy. A mask is a
+  parent with child masks beneath it.
+- Adobe's article (in part): mask groups let any mask tool combine with any other;
+  any mask added to or subtracted from any other; any selection inverted; the worked
+  example selects the sky, inverts it and subtracts the subject. Range masks work
+  across the whole photograph and can be applied within a gradient by add and
+  subtract. Intersect is not named in the text read.
+- Capture One, Combine Masks (whole): Add, Subtract and Intersect, from Capture One
+  16.7.0, on a single layer only; a combined group counts as one layer; linear
+  gradient, radial gradient and luma range stay live afterwards. Invert Mask appears
+  in a screenshot's menu and is not described. The luma range acts on top of a mask
+  that already exists, and since 16.7.0 can be added, intersected or subtracted.
+- darktable (whole from disk): a parametric mask's channels multiplied pixel by
+  pixel; drawn and parametric components joined exclusively (multiply, so any
+  component can exclude) or inclusively (invert, multiply, invert, so any component
+  can include), each with a variant that inverts the result; a polarity on each
+  component; drawn shapes joined in the mask manager by union, intersection,
+  difference and exclusion; a shape shared between modules by reference or copied as
+  a group. The refinements join nothing, and the colour equalizer joins nothing.
+- Kolari Vision (whole): a selection multiplied by itself, level after level, each
+  narrower than the one before.
+- Fstoppers (second-hand): add, subtract and intersect on the components of one mask;
+  duplicate and invert.
+
+The app's own joins, by record 050: On its own, Subtract from it and Only where
+both; invert on each mask; every shape its own mask, its relation set by the join on
+the one below. The union is record 048, not yet in the app.
+
+What the figures show a join buys, from selections read on a photograph they were not
+fitted on:
+- Water. Position alone takes the docks and the boats whole with the water on three
+  of the five carried pairs checked (1.5). Position kept only where a wider-texture
+  range agrees, the app's Only where both, holds 77.3 to 97.8 percent of the water
+  (A to B 90.8, A to C 93.0, B to C 83.6, B to A 77.3, C to A 97.8) while taking 18.0
+  to 30.9 percent of the docks and 11.3 to 21.2 percent of the boats, and none of the
+  shore but 15.6 percent on A to B. Position with a wider-texture range taken away,
+  the app's Subtract from it, holds 77.6 percent to all of the water while taking
+  26.3 to 48.9 percent of the docks and 19.6 to 41.9 percent of the boats, and 39.5
+  percent of the shore on A to B. (Fifth press, checked on 10 November: C to B kept 92.8 of the
+  water, 18.2 of the docks and 13.3 of the boats with Only where both.)
+- Built things. Position alone carried takes 30.6 to 62.3 percent of the water, and
+  built things are 8.7 to 38.0 percent of what it takes. Position kept only where a
+  wider-texture range agrees takes 64.0 to 81.7 percent of the docks, 25.5 to 84.3
+  percent of the boats and 0.1 to 5.2 percent of the water, and built things are 69.0
+  to 99.1 percent of what it takes. B to C is the weakest carry, with 25.5 percent of
+  the boats.
+- The sky. No join is reported. One wider-texture range fitted on B takes the whole
+  sky on C with 0.1 percent of the boats, and on A with 3.5 percent of the snags.
+- Read where fitted, as no result: water 97.0, 97.1 and 95.2 percent, and built
+  things' share 96.0, 86.8 and 91.5 percent.
+
+Conclusion 2.1. Every program read first-hand offers add, subtract and a join that
+keeps only where two selections agree (Adobe's Intersect, Capture One's Intersect
+and its luma range acting on an existing mask, darktable's exclusive combine and its
+intersection). Adobe and darktable invert a whole mask in words, Capture One only in
+a screenshot's menu. One component inside a mask is inverted by Adobe's invert of a
+selection and by darktable's polarity on each component. darktable alone names
+exclusion, and Kolari alone a selection multiplied by itself. Against these the app
+has subtract and keep-where-both, and invert on each mask; it lacks add (record 048),
+exclusion and a selection multiplied by itself. Since every shape in the app is its
+own mask, its invert on each mask inverts one component; whether that does what a
+polarity inside darktable's combine does is not settled by the pages or the record.
+
+Conclusion 2.2. All three programs read first-hand scope a range by a drawn shape as
+an ordinary route: Capture One by construction, since its luma range needs a mask on
+the layer first and updates when the gradient beneath it is moved; Adobe by Intersect
+in its help page and by add and subtract within a gradient in its article; darktable
+by the combine setting between drawn and parametric components.
+
+Conclusion 2.3. All three programs read first-hand hold several components under one
+mask or layer with one adjustment: Adobe's parent and child masks, Capture One's
+combined group counted as one layer, darktable's mask manager groups and its combine
+setting.
+
+Conclusion 2.4. On these photographs, a position range joined with a wider-texture
+range by Only where both carries from one photograph to another where position alone
+does not, for water and for built things: built things go from 8.7 to 38.0 percent of
+what is taken to 69.0 to 99.1 percent, and water keeps 77.3 to 97.8 percent while the
+docks taken fall from the whole to 18.0 to 30.9 percent. Subtract from it keeps more
+of the water and takes more of its neighbours. What a union, an exclusion, a polarity
+on each component or a third range would buy is not measured: the check fits only the
+app's two joins and two ranges.
+
+**Part three: how an area of the picture is sampled.**
+
+What each program has the person do on the picture:
+- Adobe (help page, whole). Color Range: a click, or a drag of an area around the
+  colours; Shift and a click add samples, up to five; Option on a Mac or Alt on
+  Windows and a click on a sample remove it; the Refine slider then narrows or
+  broadens the range. Luminance Range and Depth Range: a point or an area, by a drag,
+  a small area recommended to narrow the range; the endpoints can also be set by
+  slider. Select Objects: a brush or the Rectangle Select tool chooses the object. The
+  brush's size is a slider in pixels. Shown meanwhile: the selected area as a red
+  overlay by default, whose colour, opacity and mode can be changed, an Unaffected
+  Areas view, and the luminance or depth map with the masked area in red. The page
+  names no confirm step, no fixed size or shape for a colour sample, and nothing for
+  a touch screen.
+- Adobe's article (in part): a panel prompt says a click anywhere samples luminance;
+  the page says every tool works on mobile devices and tablets as on the desktop and
+  shows the colour range controls on a phone, with a Select color button. It says
+  nothing of a sample's size, shape or count.
+- darktable parametric masks (whole from disk): a picker reads a point or an area, and
+  another sets the sliders from a dragged rectangle; a key press shows the mask; the
+  refinement page shows the mask as a yellow overlay on a black and white version.
+- darktable colour equalizer (whole): the picker takes a point or an area and shows
+  its hue on the curve, and can set the white level the same way. With the module
+  open, the pointer over the picture shows the colour under it, highlights the
+  matching hue in the open tab, and carries cross-hairs at the pixel, a label with the
+  value of the change and an arc whose length shows its size; the mouse wheel there
+  changes the matching band.
+- Capture One (both pages, whole): no sample is taken from the picture; the luma range
+  is set on a graph, with a Display Mask option the prose does not explain.
+
+Conclusion 3.1. Where the programs read first-hand agree, which is the convention: a
+sample is a click for a point or a drag for an area, and its size is whatever the
+drag covers, with no fixed size and no size control named. Adobe recommends a small
+area when narrowing a luminance or depth range.
+
+Conclusion 3.2. Several samples for one selection are named only by Adobe, for the
+colour range: up to five, added by a modifier and a click and removed by another
+modifier and a click on the sample. darktable's notes name no several samples, and
+Capture One takes none.
+
+Conclusion 3.3. What is shown while a selection is made is either the mask over the
+picture (Adobe's red overlay and maps, darktable's yellow overlay on a black and
+white version) or a reading of the value under the pointer (darktable's colour
+equalizer). No page read names a step that confirms a sample.
+
+Conclusion 3.4. No page read says what is done on a touch screen to take a sample:
+Adobe's article says only that the tools work on phones and tablets. No page read
+names a magnified view, a sample that says not this, several samples sharing one
+name, or the shape of the area Adobe's drag takes.
+
+**Part four: where sources disagree or were wrong.**
+
+First-hand readings that correct the web fetch tool's accounts:
+- Adobe's article. The fetch tool's account named a luminance range with a falloff,
+  said a colour range was not named as such, and named no depth range and no
+  intersect. Read first-hand (in part), the article names a colour range in words and
+  in a picture, with a Select color button and a Refine slider, brought to Lightroom
+  on the desktop and on mobile; it names a depth range only as a greyed label in a
+  menu picture, with no text on it; it does not name intersect in the text read, so
+  the account was right on that; and it pictures the luminance falloff with a
+  caption. The sentence of the passage above that Adobe's account of its masks is
+  the blog article only, as the fetch tool told it, no longer holds: Adobe's help
+  page is now read whole. The account's statements that mask groups combine,
+  subtract and invert any tools, and that vector masks and bitmap-backed masks work
+  together, stand in the article read.
+- darktable's colour equalizer. The fetch tool's account and the first-hand reading
+  agree on the axis of hue, the three tabs, the fixed equally spaced nodes, the
+  slider that moves them together, the picker, the white level, the guided filter's
+  options with a hue analysis radius of 1.5 pixels by default, the two view buttons,
+  the pointer's readout and the wheel, and that the module joins nothing. The
+  first-hand reading adds that the picker takes a point or an area and can set the
+  white level, that a hue curve setting under 1 sharpens the targeting at a greater
+  risk of noise, and the colours of the two views. The account's advice of modest
+  changes does not stand in the first-hand notes, which do not say whether the page
+  carries it.
+
+First-hand readings that correct second-hand accounts:
+- Adobe's landscape classes. Fstoppers, and the first addition of 9 November to
+  record 050 built from it, name vegetation, buildings, sky and architecture. Adobe's
+  help page names eight: Sky, Mountains, Architecture, Vegetation, Water, Snow,
+  Natural Ground and Artificial Ground. Water is among them, and no class is named
+  buildings.
+- Capture One's luma range. A search summary of 9 November, used nowhere, said it
+  refines an existing mask and can be added, intersected or subtracted. The page read
+  whole bears that out. The sentence of the passage above that the luma range is
+  described by nothing read no longer holds.
+
+Two first-hand sources that differ:
+- Adobe's luminance falloff. The help page (whole) names a Select Luminance slider
+  with two endpoints and no falloff. The article (in part) pictures a falloff with a
+  caption saying the tool now gives one. Neither page's date settles which is
+  current: the help page shows no date.
+
+Record 050 against the pages read first-hand:
+- The rectangle row says a box is in every comparable tool. None of the three
+  programs' pages read first-hand names a rectangle as a mask: Adobe's names a
+  Rectangle Select only for pointing Select Objects at an object, darktable's drawn
+  shapes are a circle, an ellipse, a path, a brush and a gradient, and Capture One's
+  pages name none. The record lists Adobe's help page among its sources, and that
+  page, now read whole, names no rectangle mask; the Photoshop pages it also lists
+  were not read by this work.
+- The record's first addition of 9 November counts a polarity on each component among
+  the joins beyond the app's. The app inverts each mask and every shape there is its
+  own mask, so the gap is narrower than that line says; whether the two do the same
+  is open (conclusion 2.1). This is this account's reading of the record, not a
+  page's.
+- The record's Looked up says Lightroom has Intersect on a mask, and that a drawn
+  shape restricting where a parametric mask acts is darktable's documented standard
+  workflow. Adobe's help page bears out the first; conclusion 2.2 bears out the
+  second for all three programs.
+
+The first reading of the figures against the reports, as the check of the figures
+found:
+- That between the sky and the trees every cue but lightness and saturation passes
+  0.7 holds only in part: against the conifers lightness passes just (0.705 to 0.723)
+  and only saturation falls under; against the broadleaf trees red against green
+  falls under on all three photographs.
+- That between the trees and the built things no cue but position passes 0.48 holds
+  for the conifers and fails for the broadleaf trees, whose lightness against the
+  docks reaches 0.67 to 0.80 and against the boats 0.52 to 0.60.
+- That water's best cue that is not position is the wider texture fails against the
+  docks on C, where lightness at 0.704 passes the wider texture's 0.618.
+- That B gave the same pair figures at both its presses could not be checked on 9
+  November, its second press being the fifth; on 10 November the fifth press's report
+  was checked and B's two presses agree in every pair figure. A's two presses agree in
+  every pair figure compared and differ only in their times.
+
+The day's list of open questions against the evidence:
+- That a selection keyed on colour alone would fail on these photographs is borne out
+  for water, the conifers and the built things, and not for the sky against the
+  conifers (conclusion 1.2).
+- That the sample is moved and confirmed with a magnified view above the finger on a
+  touch screen, as convention has it, rests on no page read: no page read says
+  anything of sampling on a touch screen, names a magnified view or names a confirm
+  step (conclusions 3.3 and 3.4).
+- That the smallest place measured on the device held about 2,200 counted pixels
+  agrees with the counts: the snags on C, 2,183.
+
+**Part five: how firmly each conclusion stands.** The grounds named below: a page
+read whole from a returned copy or from disk; a page read in part; a second-hand
+account; and figures from three photographs of one scene on one device, at one
+render, with places drawn by eye, a selection read where fitted counted as no result,
+and the fifth press checked against its report on 10 November.
+
+- 1.1, lightness. Rests on: Adobe's help page, Capture One's luma range page and
+  darktable's parametric page, each read whole; Adobe's article in part; the figures.
+  Firm for what the programs offer. For the figures, firm on these three photographs,
+  where every triple agrees in direction; the shore and the docks on some photographs
+  sit at the marker. Overturned by: another scene, device or render on which
+  lightness tells water from the conifers or the built things, or fails to tell it
+  from the broadleaf trees, the snags, the shore or the sky.
+- 1.2, colour. Rests on: Adobe's help page, the darktable pages and the two Capture
+  One pages, read whole; Kolari, the index pages and an infrared second-hand account
+  for what the field claims on infrared; the figures. Firm for what the programs
+  offer, with Capture One's absence firm only for the two pages read. The figures are
+  of the opening gains, and for some pairs give only one or two of the colour cues:
+  the science file's measure of 8 November found its hue distance between the sky and
+  the conifers lower at its far balance than at the opening balance, so a balance
+  moves such figures. The infrared second-hand account calls itself emulation and
+  does not show its colour ranges on infrared captures. Overturned by: a press at
+  another balance, on another scene or device, in which a colour difference tells
+  water from the conifers or the built things, or the sky no longer from the
+  conifers.
+- 1.3, depth. Rests on: Adobe's help page read whole and the article in part. Firm
+  that one program offers it for depth-carrying photographs. Overturned by: a page
+  saying another program keys on depth, or a reading showing these camera files carry
+  depth information.
+- 1.4, texture. Rests on: the figures, read from the device's reports with every cue
+  compared, and darktable's refinement page read whole, with Adobe's and Capture
+  One's pages read whole for the absence. Moderately firm: three photographs of one
+  scene, where water's texture belongs to one day's water; the wider texture for
+  water sits just under the marker against the shore on B (0.697), the docks on B and
+  C (0.697 and 0.618) and the conifers on C (0.696). Overturned by: a scene where
+  water's wider texture overlaps the docks, the boats or the conifers, or a page of
+  Adobe's or Capture One's that keys a mask on texture.
+- 1.5, position. Rests on: the figures, and the drawn shapes of the pages read whole,
+  with Capture One's statement on copying. Firm that a fixed range does not carry
+  across these three framings: every carried water and built-things reading takes its
+  neighbours with it. Overturned by: photographs framed alike, on which a fixed range
+  would carry; that would not change what these framings show.
+- 1.6, program-made classes. Rests on: Adobe's help page, Capture One's pages and the
+  segmenter's documentation, read whole; the article in part; the removal figures,
+  with an inference. Firm for what the pages list. Nothing read bears on how the
+  classes behave on infrared. The inference about the app's sky selection is firmest
+  on A and C. Overturned by: a page listing landscape classes for Capture One or a
+  browser model, a page placing docks and boats in Adobe's list, or a press showing a
+  labelled-sky pixel outside the app's sky selection.
+- 1.7, samples. Rests on: Adobe's help page, darktable's parametric and colour
+  equalizer pages and Capture One's luma range page, read whole. Firm for Adobe and
+  Capture One; open for darktable's dragged rectangle. Overturned by: a page in which
+  one sample sets several keys at once, darktable's among them.
+- 1.8, across the keys. Rests on: the figures alone. Firm on these three photographs:
+  the conifers against the docks and the boats read at most 0.473 on every cue but
+  position on all three, and the docks against the boats at most 0.446. The best pairs
+  of cues are read from the device's reports. Overturned by: a cue the check does not
+  count yet, or another scene, that tells the conifers from the built things or the
+  docks from the boats.
+- 2.1, the joins offered. Rests on: Adobe's help page, both Capture One pages and the
+  darktable pages, read whole; Adobe's article in part; Kolari read whole. Firm.
+  Overturned by: a page of one of these programs naming a join this account says that
+  program lacks; RawPedia's page, unread, may name joins of its own.
+- 2.2, scoping a range by a shape. Rests on: the same pages read whole. Firm.
+  Overturned by: nothing read; it is what each page says.
+- 2.3, several components in one mask. Rests on: the same pages read whole. Firm.
+  Overturned by: nothing read.
+- 2.4, what a join buys. Rests on: the figures, from five carried pairs checked, and
+  one more, the fifth press's, checked on 10 November. Moderately firm: the five carries agree, the weakest
+  being B to C on the boats; one scene, one cue pair, two joins. Overturned by:
+  another scene on which position kept only where the wider texture agrees loses the
+  water or takes the built things' neighbours as position alone does.
+- 3.1, the convention of a click or a drag. Rests on: Adobe's help page and darktable's
+  pages, read whole, with Adobe's article in part. Firm for those two programs;
+  Capture One takes no sample. Overturned by: a page of either that sets a sample's
+  size by a control.
+- 3.2, several samples. Rests on: Adobe's help page read whole, and darktable's and
+  Capture One's pages read whole for the absence. Firm for Adobe. Overturned by: a
+  page naming several samples elsewhere, or more than five in Adobe's.
+- 3.3, what is shown and the absence of a confirm step. Rests on: the same pages read
+  whole. Firm for the absence in the pages read, not for the programs. Overturned by:
+  a page of one of these programs naming a confirm step.
+- 3.4, what no source says. Rests on: every page read; it is an absence. Firm only as
+  a statement about these pages; RawPedia's page and Adobe's other help pages are
+  unread. Overturned by: a page read whole that says how a sample is taken on a touch
+  screen.
+
+**Part six: what each finding bears on.**
+
+Record 050's survey, row by row in the record's own names:
+- A rectangle. The pages read first-hand do not bear out the record's statement that a
+  box is in every comparable tool; Adobe names a rectangle only for pointing its
+  object selection, and darktable and Capture One name none (part four). The figures
+  bear on it only so far as a range of height is a band across the frame: where it is
+  measured, height reads 1.000 for the conifers against the water and the built
+  things, and a fixed band carried to another framing takes neighbours whole
+  (conclusion 1.5). A shape drawn again on each photograph is outside what the check
+  measures.
+- A luminance-range selection. All three programs read first-hand carry one, two with
+  a falloff in words (conclusion 1.1). On these photographs lightness tells water from
+  the broadleaf trees, the snags, the shore and the sky, and does not tell the
+  conifers from the built things. Firm for what the programs offer; one scene for the
+  figures.
+- A proximity limit on a colour selection. The Photoshop pages behind this row were
+  not read by this work. Adobe's brush, with Auto Mask, confines a colour match to
+  where the stroke goes, and the composition the record calls reachable today, a
+  shape and a colour mask joined Only where both, is the kind of join the figures show
+  carrying (conclusion 2.4). The figures also say that colour, limited or not, tells
+  the sky from the conifers and little else among these places (conclusion 1.2).
+- The union join. All three programs read first-hand offer it (Adobe's Add, Capture
+  One's Add, darktable's inclusive combine and union). The figures do not measure it.
+- Several shapes inside ONE mask. All three programs read first-hand hold several
+  components under one mask or layer with one adjustment (conclusion 2.3). Whether the
+  app's mask-by-mask join is equivalent is touched by neither the pages nor the
+  figures; the record's own word, that it needs measuring against a real edit,
+  stands.
+- Duplicating a mask, and naming one. Adobe names masks, renames them and makes an
+  inverse copy by Duplicate and Invert; Capture One renames sub-masks like layers and
+  saves combined masks in a Style; darktable reuses a shape across modules, linked or
+  as a copied group. The figures do not bear on it.
+- Beside the rows, record 040's finding that the join control is not found: nothing in
+  the pages or the figures bears on it.
+
+The tap labelling:
+- Its gesture. The convention read is a click for a point or a drag for an area, the
+  size set by the drag; several samples only in Adobe's colour range, added and
+  removed by a modifier and a click; no confirm step; the mask shown over the picture
+  or a value read under the pointer (conclusions 3.1 to 3.3). Nothing read says how
+  any of this is done by finger, and no page names a sample that says not this or
+  several samples sharing one name (conclusion 3.4).
+- The cues a sample has to carry. No single cue but position parts every pair, and
+  the cue that does most differs by pair (conclusion 1.8): colour and texture for the
+  sky against the conifers, the wider texture or lightness for water depending on its
+  neighbour, and no counted cue but position for the conifers against the built things
+  or the docks against the boats. A sample that carries one cue leaves some of these
+  pairs unparted. Adobe ties each sample to one key, and darktable's notes leave open
+  whether its dragged rectangle sets several channels at once (conclusion 1.7), so a
+  sample keeping several cues at once has no clear model in the pages read.
+- How small a sample can be. The smallest place measured was the snags on C, 2,183
+  counted pixels, and the passage of 8 November says the snags and the docks rest on
+  small counts. The check compares spreads of values per place, and its textures are
+  taken over windows; a point gives one value and no spread. Nothing measured says
+  how small an area can be and still give stable figures.
+- The press. Each press took 49.8 to 53.2 seconds, of which building the picture code
+  took 44.0 to 46.0 and the places part 0.8 to 1.2 seconds; that bears on any check
+  run once for each set of samples.
+
+The measure itself, the cues it does not count yet:
+- Depth (conclusion 1.3); hue and chroma as place cues, where it counts saturation and
+  three channel differences; horizontal position, where it counts height only; the
+  image's own edges, which darktable's feathering guide follows; the straightness and
+  alignment of edges and the flatness between them, which the day's list of open
+  questions names; a program-made class beyond the app's sky selection used for
+  removal; and nearness to a sample.
+- The joins it does not fit: the union, exclusion, a polarity on each component, a
+  selection multiplied by itself, and more than two ranges together (conclusion 2.4).
+
+The questions the evidence cannot answer, and what would answer each:
+- Whether these separations hold beyond one marina, one device and one render: the
+  check pressed on other scenes, on other devices and at other balances.
+- Whether built things share a signature across scenes: the tap labelling on more
+  scenes.
+- How small a sample can be: the check run on samples of falling size against the
+  places measured.
+- Whether the fifth press's figures stand and B repeats: answered on 10 November, the
+  report having been checked as the first four were; all 24 marked figures agree and
+  B repeats in every pair figure.
+- What RawPedia says a spot is keyed on, the reference area it takes and its size,
+  what its scope and its excluding spot do, how spots are joined and how a spot is
+  placed on a touch screen: the page read.
+- Whether Adobe's luminance range now has a falloff, where a dock or a boat falls in
+  its landscape classes, and in which release each tool arrived: Adobe's help pages
+  for Lightroom Classic and Camera Raw, its learn page on landscapes and its release
+  notes read.
+- How a program-made class behaves on an infrared photograph: a page that says so, or
+  such a class run on these photographs.
+- How a sample is taken on a touch screen by convention: a touch editor's own help
+  page read whole.
+- Whether darktable's dragged rectangle sets several channel ranges at once: its
+  parametric page read again for that sentence.
+
+**THE PAGES READ ON 10 NOVEMBER 2026, AND WHAT THEY CHANGE IN THE ACCOUNT OF 9
+NOVEMBER.** On 10 November the host that had been declined the day before answered the
+container's own fetcher, and the pages below were each asked once at their
+publisher's own site, written to disk and read to their last line. No archive copy, no
+code host and no search summary was used. The second joined account, which judges them
+once by question, stands in the working notes of the session; the choices it leaves are
+set out in the decision record for labelling by samples (record 109). This passage
+states the readings, the changes and the structure measures, and describes no
+photograph's appearance, ranks nothing and proposes nothing for the editor.
+
+Pages read whole from disk:
+- RawPedia, Local Adjustments, the manual of RawTherapee, at rawpedia.pixls.us under
+  local_adjustments, the address the site's front page gives for it; the page shows
+  April 1, 2026 under its heading and Last modified: October 25, 2026 at its foot;
+  5,242 lines of text with the markup taken out. The path asked on 9 November and not
+  found was not asked again. Its account: a spot is an ellipse or a rectangle with a
+  circle at its centre and four delimiting points, and cannot be rotated; its
+  selection is keyed on colour difference, the change in perceived colour between a
+  pixel and a reference, the reference being the average hue, chroma and lightness
+  inside the centre circle; a scope slider, 30 by default where the page names a
+  figure, sets how far the difference may reach, and at its top the colour test is off;
+  the effect falls off from the centre by a transition value and a decay; the page
+  names four spot kinds, Normal, Excluding, Full image and Global, the Excluding spot
+  resetting its area to the state before the spots before it; spots are joined by
+  order, each Normal spot acting on the work before it, and by a Merge file blend, not
+  by add, subtract or intersect; a spot carries masks keyed on chroma, lightness and
+  hue by curves, on structure, and on blur; the circle and the four points are placed,
+  moved and sized by the mouse or by sliders, with lockable colour pickers and a
+  Preview of the colour difference painted over the picture. The page says nothing of
+  a touch screen, a keyboard, a magnified view or a confirm step, and gives no default
+  or bounds for the reference circle, only that a small one picks out one colour and a
+  large one averages away stray data. It gives two minimum sizes for one tool, 32 by
+  32 and 64 by 64, and says 21 blend modes while naming nineteen.
+- The GIMP 2.10 manual, Color Picker, at docs.gimp.org: a click takes the colour under
+  the pointer; its Sample Average option has a Radius slider setting the size of a
+  square; the pointer shows the square's size; no default, no bounds, nothing for a
+  touch screen.
+- The Krita Manual 5.3.0, Color Sampler Tool, at docs.krita.org: a click takes the
+  colour; a Radius property averages around the cursor; the result can go to the
+  foreground colour or a palette; nothing for a touch screen, no default, no bounds.
+- The darktable development manual, version 5.6, global color picker, at
+  docs.darktable.org: a point or a drawn rectangle is sampled, giving a mean, a
+  minimum and a maximum for each channel; an add step stores a live sample with a
+  swatch, several are kept, a click on the swatch locks it, and a checkbox shows their
+  places on the picture; nothing for a touch screen or a keyboard.
+- Adobe, Lightroom on the web, What's New, at lightroom.adobe.com under news: a page
+  of release notes whose entries run from 27 January 2016 to August 2026. It dates
+  Color Range and Luminance Range to August 2023, Linear and Radial Gradients to June
+  2023, Brush Masking to April 2024, Select Landscape to April 2025 and Feather and
+  Edge sliders for selections to August 2026. It says nothing of a sample's size, shape
+  or what is shown at the pointer, and nothing for touch.
+- Wikipedia, Structure tensor (last edited 6 October 2026), Histogram of oriented
+  gradients (7 October 2026), and the scikit-image manual 0.26.0, skimage.feature, at
+  scikit-image.org. Their definitions are set out below.
+
+Pages asked that did not answer with their page:
+- Procreate's handbook page on the eyedropper, at help.procreate.com: status 404,
+  "We've drawn a blank"; its text links no new address for the page, so no second
+  address was asked. Nothing is said of what Procreate does.
+- The W3C's pages understanding success criteria 2.5.7, Dragging Movements, and 2.5.8,
+  Target Size (Minimum), at www.w3.org: status 403, a challenge page whose whole text
+  asks for scripts and cookies. What either criterion requires in its own words, its
+  level and its exceptions are not known from this evidence; where the record needs
+  a drag's alternative and a target's size it rests on the app's own accessibility
+  rule for targets of 44 pixels and on the hub doctrine's section on tremor, which
+  cites those criteria by number.
+- OpenCV's line segment detector page, at docs.opencv.org: redirected to a path under
+  4.13.0, then status 403 with the same challenge page. How it defines a line segment
+  is not known from this evidence.
+- Adobe's learn page on masking for landscapes: the passage that lists it as unread
+  gives no address for it, so it was not asked.
+
+What changes in the account of 9 November, conclusion by conclusion; the rest of its
+conclusions stand, 1.1 to 1.3, 1.5, 1.6, 1.8, 2.2, 2.4 and 3.2 with RawTherapee set
+beside them:
+- Where the account said RawPedia's page was unread, it is read. It answers what a spot
+  is keyed on, the reference area and how it is set, what scope and the Excluding spot
+  do, how spots are joined, and how a spot is placed and sized, and does not answer
+  anything for a touch screen or a default size.
+- 1.4 changed in its sentence on the programs. Two of the four programs whose own
+  pages were read key a selection on structure, darktable by its details threshold as
+  a refinement from raw data and RawTherapee by its structure mask and by structure
+  added to a spot's colour test. Neither defines its key as the check's window does,
+  and the one page that names buildings for a structure key sets them with hilly
+  terrain against skies, so it keys on the amount of local contrast. The figures part
+  of 1.4 stands.
+- 1.7 changed. On 9 November no page read said one sample keeps several keys.
+  RawPedia's does: one centre circle gives one reference of hue, chroma and lightness
+  and the selection is one distance from it. So the pages now hold two models of what
+  a sample keys: a range of one key set from the sample (Adobe), and a distance in
+  several keys from one averaged reference (RawTherapee). Neither keeps a spread of
+  values for each cue, as the check's places give.
+- 2.1 changed. Adobe, Capture One and darktable each offer add, subtract and a join
+  that keeps only where two selections agree; RawTherapee names none of the three and
+  joins by order and by the Excluding spot. So the statement that every program read
+  offers all three holds for three of the four.
+- 2.3 changed. Three of the four hold several components under one mask or layer with
+  one adjustment; RawTherapee holds one shape to a spot and one mask to a tool.
+- 3.1 changed, with the statement that no size control is named withdrawn. A point is
+  set by a click, and an area by a drag's extent (Adobe, darktable) or by a size
+  control around the point (GIMP, Krita, RawTherapee). No page read gives a default or
+  bounds for a sampled area, and the shapes named are a square, a circle and a
+  rectangle.
+- 3.3 changed, with the statement that no page names a confirming step withdrawn in
+  part. darktable's add keeps a sample after it is read, and GIMP and Krita send a
+  picked colour to a palette; no page read names a step that confirms or cancels the
+  placing of a sample.
+- 3.4 stands: no page read says what is done on a touch screen to take a sample, none
+  names a magnified view at the pointer, and none names several samples sharing one
+  name. The nearest thing read to a sample that says not this is RawTherapee's
+  Excluding spot.
+- Record 050's rectangle row says a box is in every comparable tool. RawTherapee
+  offers a rectangle as the area of a spot, and the first-hand pages of Adobe,
+  Capture One and darktable name none as a mask, Adobe naming a rectangle only to
+  point its object selection at an object. The word every is not borne out by three of
+  the four programs; the Photoshop pages the record also lists were not read.
+- The mark on the fifth press is withdrawn: its report was checked on 10 November and
+  its 24 marked figures agree, and B's two presses agree in every pair figure.
+- Still open: how a sample is taken on a touch screen by convention; whether darktable's
+  dragged rectangle sets several channel ranges; where a dock or a boat falls in
+  Adobe's landscape classes; and whether Adobe's luminance range now has a falloff.
+
+**The structure measures, from the second account's seventh part.** The account of 9
+November named the straightness and alignment of edges and the flatness between them
+as cues the check does not count, and found the conifers against the built things, and
+the docks against the boats, told apart by no counted cue but position. The pages read
+define measures of image structure; this sets out each, what it would be counted from
+on the test page and at which windows, and what the device's figures suggest it could
+and could not tell apart.
+
+What each page defines:
+- The structure tensor (Wikipedia). Inputs: a lightness over the frame, its
+  derivatives along the two axes, which the page says may be estimated by finite
+  differences, and a window about the pixel whose weights sum to 1, which the page says
+  may be a Gaussian. The tensor at a pixel is the 2 by 2 matrix of the window-weighted
+  sums of the squared first derivative along each axis and of their product. Its
+  eigenvalues, the larger first, sum up the gradient in the window: the larger above 0
+  with the smaller at 0 where the lightness varies along one direction only; the two
+  equal where no direction predominates; both at 0 if and only if the lightness is
+  constant in the window.
+- Coherence (Wikipedia): the square of the difference of the eigenvalues over their
+  sum. It is 1 where the gradient is totally aligned and 0 where it has no preferred
+  direction; it is undefined where the window is constant, and the page says some
+  authors set it to 0 there. The page's complex form gives the difference and sum of the
+  eigenvalues as averages with no eigenvalue taken. This passage's own algebra from
+  that form, not a statement of the page: the eigenvalues' difference is the square
+  root of the square of the difference of the two squared-derivative sums plus four
+  times the square of the product sum, so coherence is made from three window sums.
+- Scale (Wikipedia): widening the window makes the tensor more robust to noise at the
+  cost of spatial resolution; for the multi-scale form the page says a box filter can
+  bring unwanted artifacts and that both kernels should be Gaussian. Its limit: the
+  plain average of the gradient is no measure of direction, since opposite gradients
+  cancel, which is why the outer product is averaged.
+- scikit-image: the same matrix from a sum of squared differences weighted by a
+  Gaussian of standard deviation sigma, 1 by default. Foerstner's roundness is four
+  times the determinant over the square of the trace, with no range given by the page.
+  This passage's algebra, not the page's: that is one less the coherence, so the two
+  carry the same information, and runs from 0 to 1. The Harris and Shi-Tomasi
+  responses grow with the square of lightness differences and have no fixed range.
+  The shape index runs from minus 1 to 1 and is undefined in flat regions. The page's
+  note on its histogram of oriented gradients disagrees with its own parameter list on
+  the default block normalisation, and is not reconciled here.
+- The histogram of oriented gradients (Wikipedia): each pixel of a cell votes, weighted
+  by its gradient's magnitude, into orientation bins over 0 to 180 degrees or 0 to 360;
+  nine unsigned bins did best for people; cells of 8 by 8 pixels in blocks of 16 by 16,
+  normalised within each block. It gives a histogram for each cell, so one value for
+  each pixel would need a reduction no page read defines. Built and tested for people,
+  then cars, buses, bicycles and animals, with a classifier; it says nothing of
+  landscapes.
+- RawPedia's structure mask and spot structure: an amount of structure that tells
+  uniform areas such as skies from high-contrast areas such as buildings and hilly
+  terrain, with a Sobel-Canny step added to the colour test; the lines read give no
+  formula.
+- Straightness along an edge is defined by no page read, the one page asked for it, the
+  line segment detector's, having answered a challenge page.
+
+What each would be counted from on the test page and at which windows, in this
+reading of the definitions and of the test page's code:
+- The frame's lightness is one byte for each pixel of the whole frame, the largest of
+  the three drawn channels. The counted pixels are every third column of every third
+  row of the 2,800 by 1,864 frame, each with its place in the whole frame. The
+  textures are made from running sums over the whole frame at windows of 5 and 15
+  pixels, clipped at the frame's edge.
+- A tensor measure at a counted pixel needs the two derivatives over the frame by a
+  finite difference, then the window sums of the squared first derivative along each
+  axis and of their product, made by running sums as the textures' are; coherence, or
+  Foerstner's roundness, then comes from the three sums with no eigenvalue taken.
+  Windows the pages give: the textures' 5 and 15 on the test page; a histogram's cells
+  of 8 and blocks of 16; scikit-image's sigma of 1 by default and 0.5 to 16 for its
+  multi-scale features. A square window made by running sums is a box; the evidence for
+  a box is the textures' precedent and the cost, and for a Gaussian the page's caution.
+- Coherence and roundness lie from 0 to 1 by definition and so can be binned on a fixed
+  scale in 64 bins, as the cues are; the eigenvalues and the Harris and Shi-Tomasi
+  responses have no fixed range until one is set. The undefined case, a constant
+  window, needs a rule, since the plan's interface asks for a value from 0 to 1 at
+  every counted pixel; lightness here is one byte, so a window is constant wherever its
+  bytes are all equal.
+- Cost: the eight cues took 144 and 148 milliseconds at B's two presses. A tensor
+  measure needs two derivative passes and three window sums beside the textures' sums;
+  its cost on the device is not measured.
+
+What the device's figures suggest each could and could not tell apart:
+- The textures count how much the lightness varies in a window; the tensor measures
+  count whether that variation has one direction. Two windows of the same standard
+  deviation can have any coherence, so the textures' figures do not stand in for a
+  measure of direction.
+- The conifers against the built things: every counted cue but position reads at most
+  0.473 against the docks and 0.418 against the boats, the textures at most 0.463 and
+  0.362. The amount of local variation does not part them; whether its direction does
+  is not measured. Alignment within a window is what coherence counts; flatness between
+  edges is near what the textures already count, and they fail this pair; straightness
+  along an edge longer than a window is defined by no page read, and a window of 15
+  pixels holds a piece of an edge and cannot say whether it runs straight beyond the
+  window.
+- The docks against the boats: lightness reads 0.379 to 0.446, position 0.712 to 0.865
+  and every other cue at most 0.346. Nothing read or measured says whether a measure of
+  direction parts them.
+- The sky: B's sky range fitted on the wider texture is 0.002 to 0.005, a standard
+  deviation of about 0.5 to 1.3 of the byte's 255 steps, so a gradient there rests on
+  differences of a step or so, and coherence is undefined wherever a window's bytes
+  are all equal. The sky is already parted from the conifers by the textures and by
+  colour at 0.970 or more.
+- Water: its wider texture parts it from the conifers and the built things at 0.618 to
+  0.770; nothing read or measured says what a measure of direction would add.
+- No page read says any structure measure tells a built thing from a natural one.
+  Nothing is known of any structure measure on these photographs until the device
+  counts it at the places; the pair figures for the conifers against the docks and the
+  boats, and the docks against the boats, are the ones that would say.
+
+How firmly: firm for what the pages define; unknown for what any measure tells apart on
+these photographs. Overturned by: the device's count at the places; the line segment
+detector's page, or another read whole, defining straightness; a page tying a direction
+measure to built things against natural ones. The algebra joining coherence and
+roundness, and the reasoning on windows and edges, are this passage's and not the
+pages'. The choices that remain, for the sample's shape, size, bounds, magnified
+view, confirm step, naming and counting, and for which of these measures to count and
+how, stand in record 109.
+
 ---
 
 ## 7. What the files in this repository actually are

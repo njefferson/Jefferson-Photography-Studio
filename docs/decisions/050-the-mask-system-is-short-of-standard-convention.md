@@ -33,7 +33,12 @@ both** is that, and it works. What is wrong with it is not the capability.
    A box is the shape asked for, it is in every comparable tool, and nothing in
    this app approximates it — an ellipse inscribed in the area you want leaves
    the corners out, and one that covers the corners takes in what is beside
-   them.
+   them. Put right on 10 November 2026: of the four programs whose own pages
+   were read first-hand, RawTherapee offers a rectangle, as the area of a spot,
+   and Adobe, Capture One and darktable name none as a mask, Adobe naming a
+   rectangle only to point its object selection at an object. So the clause
+   that a box is in every comparable tool is not borne out; the Photoshop pages
+   this record also cites were not read.
 2. **A luminance-range selection.** Absent entirely. Lightroom carries Luminance
    Range beside Color Range; darktable's parametric masks work on lightness,
    chroma and hue channels independently. This app's only parametric selection
@@ -188,6 +193,107 @@ no route could ask; RawPedia's local adjustments page and Adobe's release notes,
 whose hosts the session's network does not reach; and one infrared guide, which
 answered a challenge page. The science file's passage of the same date names every
 route and what it answered.
+
+**Added 9 November 2026, after pages brought into the session by hand were read
+first-hand.** Each item says what a selection is keyed on, how selections are joined
+and how an area of the picture is sampled, and marks how the page was read: read
+whole from a returned copy, or read in part with what the print left out.
+
+- Adobe, Apply Masking for local adjustments, the Lightroom help page (read whole
+  from a returned copy): keyed on a colour sampled from the picture, a brightness
+  range and a distance range for photographs that carry depth information, on
+  what an analysis takes to be the subject, the sky or the background, on up to eight
+  landscape classes the person ticks (sky, mountains, architecture, vegetation,
+  water, snow, natural ground and artificial ground) and on drawn shapes. Joined by
+  parent and child masks that add and subtract, by intersect from a mask's menu, by
+  inverting a selection or a whole mask and by an inverse copy. Sampled by a click or
+  a dragged area, up to five samples for a colour, a small area recommended to narrow a
+  brightness or distance range; the mask is shown as a red overlay; no confirm step,
+  no fixed sample size and nothing for a touch screen.
+- Adobe, the Camera Raw team's article of 28 September 2021 (read in part: the print
+  leaves out a video and the text after it, cuts the text near inverting and cuts the
+  in-app help at its end): a brightness range now with a falloff, a colour range in
+  words and picture, a distance range only as a greyed label, and program-made subject
+  and sky masks as bitmaps; joined in groups that add, subtract and invert any
+  tool; intersect not named in the text read; a click anywhere samples brightness;
+  every tool said to work on phones and tablets. This replaces the earlier fetch
+  tool's account of the same article, which named a brightness range and no colour
+  range.
+- Capture One, Combine Masks (read whole from a returned copy): add, subtract and
+  intersect on a single layer, a combined group counting as one layer, gradients and
+  the luma range staying live; the page does not say what its masks are keyed on,
+  names no landscape class and no colour mask; nothing is sampled and nothing is said
+  for touch.
+- Capture One, Luma Range Overview (read whole from a returned copy): keyed on
+  brightness, set by two range points and two falloff points on a graph, acting on
+  top of a mask that already exists, live, and addable, intersectable or subtractable
+  since release 16.7.0; no sample is taken from the picture.
+- darktable, the colour equalizer (read whole from its source text): an adjustment
+  keyed on each pixel's hue that joins nothing; a picker takes a point or an area and
+  shows its hue on the curve; over the picture the pointer shows the colour under it
+  and the wheel changes the matching band. This replaces the earlier fetch tool's
+  account of the page.
+- RawPedia, Local Adjustments, the manual of RawTherapee (read whole from disk,
+  fetched from the publisher's own site on 10 November 2026; the page shows April
+  1, 2026 under its heading and Last modified: October 25, 2026 at its foot): keyed
+  on colour difference, the change in perceived colour between a pixel and a
+  reference, the reference being the average hue, chroma and lightness inside the
+  circle at a spot's centre, with a scope slider setting how far the difference may
+  reach, and on masks a spot carries, keyed by curves on chroma, lightness and hue,
+  on structure and on blur. A spot is an ellipse or a rectangle that cannot be
+  rotated. Joined by order and not by add, subtract or intersect: each Normal spot
+  acts on the work before it, an Excluding spot resets its area to the state before
+  the earlier spots, and a Merge file blend sets a spot against the original or the
+  previous spot. Sampled by the centre circle, which the mouse or sliders place and
+  size; a small circle picks out one colour and a large one averages away stray
+  data; lockable colour pickers read points, and a Preview paints the selection over
+  the picture; no default size or bounds, no confirm step, and nothing for a touch
+  screen, a keyboard or a magnified view. This page is read, and the paragraph
+  below that lists RawPedia's page as unread was written the day before.
+
+What the pages and the device's figures say of each row of the survey, from the joined
+account in the science file, and how firmly:
+
+- A rectangle. The pages read first-hand do not bear out that a box is in every
+  comparable tool: Adobe names a rectangle only to point its object selection, and
+  darktable and Capture One name none. Firm for the pages read. The figures bear on it
+  only so far as a band across the frame is a range of height, which did not carry from
+  one framing to the next. RawPedia, read whole on 10 November, offers a rectangle as
+  one of a spot's two shapes, the other an ellipse, so one of the four programs does.
+- A luminance-range selection. All three programs read first-hand carry one, two of
+  them with a falloff in words. On the device's figures lightness tells water from
+  the broadleaf trees, the snags, the shore and the sky, and does not tell the
+  conifers from the built things. Firm for what the programs offer; one scene for the
+  figures. RawPedia carries a mask keyed on lightness by a curve, and a recovery with a
+  dark and a light threshold and a decay, so the fourth program keys on lightness too.
+- A proximity limit on a colour selection. The Photoshop pages behind this row were
+  not read by this work. Adobe's brush confines a colour match to where the stroke
+  goes; the figures say colour, limited or not, tells the sky from the conifers and
+  little else among the places measured, and that a shape joined with a texture range
+  by Only where both carried from one photograph to another where the shape alone did
+  not. Moderately firm: one scene, one device. RawPedia bounds its colour test by place:
+  the reference is taken inside the circle at a spot's centre, the test acts inside the
+  spot's shape, and the effect falls off from the centre, so the selection moves when the
+  circle moves.
+- The union join. All three programs read first-hand offer it. The figures do not
+  measure it. RawPedia names no add, subtract or intersect; it joins by order, by an
+  Excluding spot and by a Merge file blend, so it holds for three of the four.
+- Several shapes inside ONE mask. All three programs read first-hand hold several
+  components under one mask or layer with one adjustment. Neither the pages nor the
+  figures settle whether the app's mask-by-mask join is equivalent; the row's own word
+  that it needs measuring against a real edit stands. RawPedia holds one shape to a
+  spot and one mask to a tool, and a second mask is had by duplicating the spot.
+- Duplicating a mask, and naming one. Adobe names masks and makes an inverse copy,
+  Capture One renames sub-masks and saves combined masks in a Style, and darktable
+  reuses a shape across modules. The figures do not bear on it. RawPedia adds,
+  deletes, duplicates, renames, shows and hides spots.
+
+The separation measure's first figures from the device and the joined account of the
+readings and the figures stand in the science file. What still stays unread, in words:
+RawPedia's local adjustments page, whose file was found in a Drive folder and whose
+read the Drive guard refused; Adobe's help pages for Lightroom Classic and Camera Raw,
+its learn page on landscapes and its release notes; one infrared guide; and the
+Photoshop pages this record cites.
 
 ## Weighed against
 

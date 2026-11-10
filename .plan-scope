@@ -1,10 +1,15 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=20f633cd21788db9
-diffhash=9a9562b6997c47d6
-verdict=IN-SCOPE: three documents staged, each covered by a line of the plan and step 381, nothing built, no source file, tool, page or version touched.
-# IN-SCOPE: three documents staged, each covered by a line of the plan and step 381, nothing built, no source file, tool, page or version touched.
-# IR-SCIENCE.md: covered by the plan's Design line on the landing and by step 381 Do 2; one further passage after the passage of 9 November, saying how each newly read source was reached and read, and what stays unread with every route; it describes no photograph, ranks nothing and chooses nothing.
-# docs/decisions/050-the-mask-system-is-short-of-standard-convention.md: covered by the plan's Design line on the landing and by step 381 Do 3; one further dated addition in Looked up before Weighed against, naming no frame and citing no decision, carrying no number of three digits and ranking nothing.
-# NOTES.md: covered by step 381 Do 4 and the plan's Design line on the answers to the two Found queue lines; sentences at the end of the lines of Q-JPS-272 and Q-JPS-273 and two new queue lines Q-JPS-275 and Q-JPS-276 for the Found and Uncertain lines of steps 379 and 380 about the research the app's record rests on; no roadmap bullet touched, no queue line removed.
-# .githooks/commit-msg and .githooks/pre-commit: not in the staged diff; they stand modified by no step, left out by step 381 Facts (Q-JPS-226), and .doctrine-sync is untouched (Q-JPS-255).
+planhash=7ef63b9c213ca94f
+diffhash=8ee6e9fd1d0eb27b
+difflines=1579
+linesread=1652
+verdict=IN-SCOPE: the documents of the second wall (science file, record 050, the new record, the notes) and nothing outside them, the two hooks left as they stand
+# IN-SCOPE: the documents of the second wall (science file, record 050, the new record, the notes) and nothing outside them, the two hooks left as they stand
+# IR-SCIENCE.md: covered by the plan's Files line for step 400 and by step 400's Do parts 2 and 5; the three passages staged on 9 November, the sentences on the fifth press put right where step 397 names them (and one further sentence on B's repeat found in the same pass), and the new passage dated 10 November 2026 with the pages read, the pages that did not answer, the changes to the account and the structure measures; it describes no photograph, ranks nothing and proposes nothing for the editor.
+# docs/decisions/050-the-mask-system-is-short-of-standard-convention.md: covered by the Files line for step 400 and Do part 3; the addition staged on 9 November, plus the dated sentence on the rectangle row, one item for RawPedia's page and one sentence under each row of the survey it bears on; no frame, no decision cited, no number of three digits.
+# docs/decisions/109-the-test-page-names-regions-by-samples-placed-on-the-photograph.md (new): covered by the Files lines for steps 399 and 400; the record written by step 399 with its six sections and its Depends, landed here unchanged.
+# NOTES.md: covered by the Files lines for steps 399 and 400 and Do part 4; the bullet of 109 below 108's, the sentences at the end of the lines of Q-JPS-273, Q-JPS-278 and Q-JPS-279, the lines Q-JPS-277 to Q-JPS-280 staged on 9 November, and the new lines Q-JPS-281 to Q-JPS-288 from the reports of steps 393 to 399; no other bullet and no earlier line of the queue removed.
+# .githooks/commit-msg and .githooks/pre-commit: changes standing in the working tree that no step of any plan made; step 400's Facts and the Files line (read only) leave them as they stand and out of the staging, and they are counted in the diff only because the working tree holds them.
+# .plan-scope: written by the record command that follows this verdict, named in the Files line for step 400.
+# No source file, tool, page, VERSION or roadmap bullet other than 109's is changed; nothing is ranked or proposed for the editor.
