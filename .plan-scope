@@ -1,14 +1,12 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=bbd61a17ee0cb9a6
-diffhash=9be892a6207d98c8
-difflines=397
-linesread=397
-verdict=IN-SCOPE: the four staged documents are the files step 417 names in the plan's Files, each change is what steps 415 and 416 were asked to write, and nothing else is staged; the two hooks are left out as step 417's Facts say.
-# IN-SCOPE: the four staged documents are the files step 417 names in the plan's Files, each change is what steps 415 and 416 were asked to write, and nothing else is staged; the two hooks are left out as step 417's Facts say.
-# IR-SCIENCE.md: covered by the plan's Files line for steps 416 and 417 and by step 416's Do (second part); the change adds the one passage dated 10 November 2026 on the seven presses, the pages read and what they show together, in four parts, and points to record 110.
-# NOTES.md: covered by the Files lines for steps 415, 416 and 417; the change adds the roadmap bullet for decision 110 under Next capability release (step 415), a sentence at the end of the Q-JPS-277 line and six new Found queue lines under keys 295 to 300 (step 416), and changes no other bullet.
-# docs/decisions/109-the-test-page-names-regions-by-samples-placed-on-the-photograph.md: covered by the Files lines for steps 416 and 417 and by step 416's Do (third part); the change adds one dated paragraph to its Built section on the device pass.
-# docs/decisions/110-a-mask-is-made-from-samples-placed-on-the-photograph.md: covered by the Files lines for steps 415 and 417 (new file); the change is the whole new record with its six sections and its Depends, which step 415's Do asks for.
-# .githooks/commit-msg and .githooks/pre-commit: not staged and not part of this commit; the plan's Files lists them as read only and step 417's Facts say no step modified them and they stay as they stand.
-# .plan-scope: covered by the Files line for step 417; it is written by the scope check's record and staged after this verdict.
+planhash=d2bad8331c5589d3
+diffhash=6bef1b056e9e1ba4
+difflines=850
+linesread=850
+verdict=IN-SCOPE: the staged change is the test page's mask release and nothing beyond it, every path is one step 420 names, and no editor file is touched.
+# IN-SCOPE: the staged change is the test page's mask release and nothing beyond it, every path is one step 420 names, and no editor file is touched.
+# Read in full: the staged diff (935 lines, the superset of the 850 the scope check counts against the remote's staging) and the unstaged diff (the two hooks, 56 lines, left unstaged and untouched by this step).
+# Staged paths, each against the plan's Files for step 420: VERSION (2.78 to 2.79); src/samplemask.ts (new, the mask module of step 418); src/debug.ts and debug.html (the page wiring of step 419); docs/ARCHITECTURE.md (the module map, 93 to 94 modules, written by the architecture check); docs/decisions/110-a-mask-is-made-from-samples-placed-on-the-photograph.md (a Built section only, before Depends, no other section changed); NOTES.md (five new Found queue lines Q-JPS-301 to Q-JPS-305, no existing line and no roadmap bullet changed).
+# The editor, the pipeline, the shader, the looks, the service worker, the surface and its stylesheet, and the build are untouched. The hooks and the doctrine sync marker are not staged. The page keeps recipes only in browser storage inside try blocks and reads the mask module through one cast, as the Built section and Q-JPS-301 say.
+# Against the plan's Asked and Rules of this plan and steps 418 to 420: the release raises the middle number, carries the module map and the record's Built section, and queues the app's unresolved findings; nothing is added beyond them.

@@ -58,6 +58,7 @@ import { PLACE_CUES, placeCueValues, placeReport } from "./placecues";
 import { placeSampleNames, placeSampleLabels, placeSampleTargets, placeSampleShrink, placeSamplesToText, placeSamplesFromText, type PlaceSample } from "./placesamples";
 import { PLACE_STRUCTURE_CUES, placeStructureValues } from "./placestructure";
 import { placeSurface } from "./placesurface";
+import * as sampleMaskModule from "./samplemask";
 
 declare const __APP_VERSION__: string;
 
@@ -3958,7 +3959,7 @@ async function placesPart(tally: PressTally, subject: Subject, frame: { data: Ui
     books(tally);
     const structure = placeStructureValues(light, frame.width, frame.height, cols, rows);
     lap(tally, "separation: the structure cues");
-    placeHeld = { name: subject.name, t, cols, rows, cues: [...cues, ...structure], cueNames: [...PLACE_CUES, ...PLACE_STRUCTURE_CUES], sky };
+    placeHeld = { name: subject.name, t, cols, rows, cues: [...cues, ...structure], cueNames: [...PLACE_CUES, ...PLACE_STRUCTURE_CUES], sky, light, frameW: frame.width, frameH: frame.height };
     if (!picture) {
       const kept = samplesRead(subject.name).length;
       row("The places and the regions", kept
@@ -4025,7 +4026,7 @@ const SAMPLE_HINT_NONE = "Not available yet: the count needs a photograph drawn 
 
 /** What a press keeps for the count of the samples. `cues` are the eight cues and then the structure cues, one array for each, a value for
  *  each counted pixel, named in `cueNames` in the same order. */
-interface PlaceHeld { name: string; t: ReturnType<typeof thin>; cols: Int32Array; rows: Int32Array; cues: Float32Array[]; cueNames: string[]; sky: Uint8Array }
+interface PlaceHeld { name: string; t: ReturnType<typeof thin>; cols: Int32Array; rows: Int32Array; cues: Float32Array[]; cueNames: string[]; sky: Uint8Array; light: Uint8Array; frameW: number; frameH: number }
 let placeHeld: PlaceHeld | null = null;
 let sampleSurface: { set(samples: PlaceSample[]): void; destroy(): void } | null = null;
 let samplesNow: PlaceSample[] = [];
@@ -4069,6 +4070,9 @@ function dropSampler(): void {
   samplesNow = [];
   $("dSampleSurface").replaceChildren();
   $("dSamplePics").replaceChildren();
+  $("dMaskPics").replaceChildren();
+  $("dMaskList").replaceChildren();
+  $("dMaskTry").replaceChildren();
   sampleBtn.disabled = true;
   sampleHint.textContent = SAMPLE_HINT_NONE;
 }
@@ -4104,6 +4108,7 @@ function showSampler(): void {
     sampleHint.textContent = start.length
       ? `${start.length} ${start.length === 1 ? "sample" : "samples"} kept from before ${start.length === 1 ? "is" : "are"} on the picture. Place and confirm more, then press Count the samples.`
       : "Place a sample on the picture and confirm it with a name, then press Count the samples.";
+    maskListShow();
   } catch (err) {
     row("The sample surface", "not shown", `${(err as Error).message}. The rows above stand as the check printed them.`);
   }
@@ -4197,8 +4202,395 @@ async function sampleCount(tally: PressTally): Promise<void> {
     row(`Picture: ${m.title}`, `takes ${took} of ${t.w * t.h} counted pixels`, "The count of the pixels the selection takes, drawn under the report at full strength with an outline. It is the same selection the report's rows read.");
   }
   lap(tally, "samples: drawing the selections");
-  progress("The samples are counted. The rows are in the picture checks' list, ready to copy.", true);
-  sampleHint.textContent = `Counted ${samples.length} ${samples.length === 1 ? "sample" : "samples"}. The rows are in the picture checks' list and the pictures are under the samples.`;
+  await maskStages(tally, h, names, got.labels);
+  progress("The samples are counted and a mask is fitted for each name. The rows are in the picture checks' list, ready to copy.", true);
+  sampleHint.textContent = `Counted ${samples.length} ${samples.length === 1 ? "sample" : "samples"}. The rows are in the picture checks' list, the selections' pictures are under the samples, and each mask's pictures are under Masks made from the samples.`;
+}
+
+// --- THE MASKS (record 110; plan of 11 November 2026) ----------------------------------------------------------------------------
+// For every placed name but rest the count fits a recipe against the other names (the mask module), weighs every counted pixel by it, and
+// draws the weights in each rendering the module lists over the photograph, with the share of each name the mask takes. Recipes fitted
+// here are kept on the device under the photograph's name; a recipe kept from another photograph is listed, tried here with what it takes
+// shown first, and only then kept for this photograph or redone by samples. The editor holds none of this.
+
+/** What the page assumes of the mask module `src/samplemask.ts`, written once so a difference of shape between the two is in one place. */
+interface MaskApi {
+  sampleMaskRenderings: readonly string[] | (() => readonly string[]);
+  sampleMaskFit(cues: ArrayLike<number>[], cueNames: readonly string[], labels: Uint8Array, names: readonly string[], subject: string, photograph: string, leaveOut: readonly string[]): unknown;
+  sampleMaskWeights(recipe: unknown, cues: ArrayLike<number>[], cueNames: readonly string[]): unknown;
+  sampleMaskRender(weights: ArrayLike<number>, rendering: string, light: Uint8Array, width: number, height: number, cols: ArrayLike<number>, rows: ArrayLike<number>): unknown;
+  sampleMaskCoverage(weights: ArrayLike<number>, labels: Uint8Array, names: readonly string[]): unknown;
+  sampleMaskToText(recipe: unknown): string;
+  sampleMaskFromText(text: string): unknown;
+}
+const maskApi = sampleMaskModule as unknown as MaskApi;
+
+/** The key of the browser's local storage under which each photograph's mask recipes are kept, as text, by the photograph's name. */
+const MASKS_KEY = "ips-debug-separation-recipes";
+/** The cues a mask is told to leave out while the labels come from samples, as the pair rows and the fits leave it out. */
+const MASK_LEAVE_OUT = ["height"];
+/** A recipe as kept: the subject's name, the photograph it was fitted on, and the module's text form of it. */
+interface MaskKept { subject: string; from: string; text: string }
+
+/** The renderings the mask module lists. Takes nothing. Returns their names in the module's order, an empty list where the module gives none. */
+function maskRenderingNames(): string[] {
+  try {
+    const r = typeof maskApi.sampleMaskRenderings === "function" ? maskApi.sampleMaskRenderings() : maskApi.sampleMaskRenderings;
+    return Array.from(r as ArrayLike<unknown>).filter((x): x is string => typeof x === "string");
+  } catch {
+    return [];
+  }
+}
+
+/** Reads the kept recipes. Takes nothing. Returns whether storage answered and every photograph's kept recipes by name. What it must satisfy:
+ *  every access to storage is inside a try; text that is not an object, and entries lacking a subject, a source or a text, are left out. */
+function masksRead(): { ok: boolean; all: Record<string, MaskKept[]> } {
+  try {
+    const raw = window.localStorage.getItem(MASKS_KEY);
+    const o: unknown = raw ? JSON.parse(raw) : {};
+    const all: Record<string, MaskKept[]> = {};
+    if (o && typeof o === "object" && !Array.isArray(o)) {
+      for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+        if (!Array.isArray(v)) continue;
+        const list: MaskKept[] = [];
+        for (const e of v) {
+          if (!e || typeof e !== "object") continue;
+          const x = e as Record<string, unknown>;
+          if (typeof x.subject === "string" && typeof x.from === "string" && typeof x.text === "string") list.push({ subject: x.subject, from: x.from, text: x.text });
+        }
+        all[k] = list;
+      }
+    }
+    return { ok: true, all };
+  } catch {
+    return { ok: false, all: {} };
+  }
+}
+
+/** Keeps the recipes. Takes the set `masksRead` gave, changed. Returns whether the write was accepted. What it must satisfy: the write is inside a try. */
+function masksWrite(all: Record<string, MaskKept[]>): boolean {
+  try {
+    window.localStorage.setItem(MASKS_KEY, JSON.stringify(all));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The recipes to list on a photograph. Takes the set read and the photograph's name. Returns each distinct recipe once, by the photograph
+ *  it was fitted on and its subject: first those kept for this photograph, then those fitted on other photographs, each with where it is kept. */
+function maskEntries(all: Record<string, MaskKept[]>, here: string): { entry: MaskKept; kept: boolean }[] {
+  const seen = new Map<string, { entry: MaskKept; kept: boolean }>();
+  for (const e of all[here] ?? []) if (e.from !== here) seen.set(`${e.from}\u0000${e.subject}`, { entry: e, kept: true });
+  for (const [k, list] of Object.entries(all)) {
+    if (k === here) continue;
+    for (const e of list) if (e.from === k && !seen.has(`${e.from}\u0000${e.subject}`)) seen.set(`${e.from}\u0000${e.subject}`, { entry: e, kept: false });
+  }
+  return [...seen.values()];
+}
+
+/** Reads what the module's coverage gives. Takes what it gave, the number of names and the rendered values. Returns the share of each name
+ *  taken and the count of counted pixels taken, or null where the shape is not one that can be read. What it must satisfy: the count is the
+ *  module's where it gives one and otherwise the number of values at a half or more. */
+function maskCoverageOf(c: unknown, nNames: number, values: ArrayLike<number>): { shares: number[]; taken: number } | null {
+  let shares: unknown = null;
+  let taken: unknown = null;
+  if (Array.isArray(c) || ArrayBuffer.isView(c)) shares = c;
+  else if (c && typeof c === "object") {
+    const o = c as Record<string, unknown>;
+    shares = o.shares ?? o.share ?? o.byName ?? o.names;
+    taken = o.takenAll ?? o.count ?? o.all;
+  }
+  if (!shares || typeof (shares as ArrayLike<number>).length !== "number") return null;
+  const list = Array.from(shares as ArrayLike<unknown>).map((x) => Number(x));
+  if (list.length < nNames || list.some((x) => !Number.isFinite(x))) return null;
+  let count = 0;
+  if (typeof taken === "number" && Number.isFinite(taken)) count = taken;
+  else for (let i = 0; i < values.length; i++) if (values[i] >= 0.5) count++;
+  return { shares: list.slice(0, nNames), taken: count };
+}
+
+/** Draws one mask rendering over the photograph. Takes the host, the title, the thinned drawn picture and one value from 0 to 1 for each
+ *  counted pixel. Returns how many counted pixels the mask takes, those at a half or more. What it must satisfy: the picture is the thinned
+ *  drawn picture in grey, each pixel at a third of its strength where the value is 0 rising to full strength where it is 1, with a one-pixel
+ *  outline in the page's text colour on every taken pixel that has an untaken neighbour, so what is taken reads by strength and by outline
+ *  and not by colour; it is an image with the same words as its name (`sepFigure`). */
+function maskPicture(host: HTMLElement, title: string, t: ReturnType<typeof thin>, values: ArrayLike<number>): number {
+  const { w, h } = t;
+  const m = /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/.exec(getComputedStyle(document.body).color);
+  const ink = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+  const out = new Uint8ClampedArray(w * h * 4);
+  const on = (i: number): boolean => i >= 0 && i < w * h && values[i] >= 0.5;
+  let count = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x, o = 4 * i;
+      const grey = 0.299 * t.data[o] + 0.587 * t.data[o + 1] + 0.114 * t.data[o + 2];
+      const vv = values[i];
+      const v = Number.isFinite(vv) ? Math.min(1, Math.max(0, vv)) : 0;
+      const taken = on(i);
+      if (taken) count++;
+      const edge = taken && ((x > 0 && !on(i - 1)) || (x < w - 1 && !on(i + 1)) || (y > 0 && !on(i - w)) || (y < h - 1 && !on(i + w)));
+      const g = Math.round(grey * (1 / 3 + (2 / 3) * v));
+      out[o] = edge ? ink[0] : g; out[o + 1] = edge ? ink[1] : g; out[o + 2] = edge ? ink[2] : g; out[o + 3] = 255;
+    }
+  }
+  const sec = document.createElement("section");
+  sec.style.cssText = "margin:14px 0";
+  const hd = document.createElement("h5");
+  hd.style.cssText = "font-size:0.875rem;margin:0 0 6px";
+  hd.textContent = title;
+  sec.appendChild(hd);
+  const box = document.createElement("div");
+  box.style.cssText = "display:flex;flex-wrap:wrap;gap:10px";
+  sec.appendChild(box);
+  host.appendChild(sec);
+  sepFigure(box, `${title}. The thinned drawn picture in grey, shown at ${w} by ${h} pixels. Where the mask's value is 0 a pixel is dimmed to a third and it rises to full strength at 1; a pixel at a half or more has a one-pixel outline in the page's text colour where it meets one below a half. The mask takes ${count} of the ${w * h} counted pixels.`, out, w, h);
+  return count;
+}
+
+/** Draws a mask's weights in every rendering and writes a row for each. Takes the host, the mask's title, what the press kept, the names and
+ *  the labels of the counted pixels, and the weights. Returns nothing. What it must satisfy: each rendering is drawn once over the photograph
+ *  already held, with nothing decoded or drawn again; each row gives the count of counted pixels taken and the share of each name taken; a
+ *  rendering the module does not give is one row saying it was not drawn. */
+function maskShow(host: HTMLElement, title: string, h: PlaceHeld, names: string[], labels: Uint8Array, weights: ArrayLike<number>): void {
+  const n = h.t.w * h.t.h;
+  for (const r of maskRenderingNames()) {
+    const v = maskApi.sampleMaskRender(weights, r, h.light, h.frameW, h.frameH, h.cols, h.rows);
+    if (!v || typeof v === "string" || typeof (v as ArrayLike<number>).length !== "number") {
+      row(`Mask picture: ${title} · ${r}`, "did not draw", typeof v === "string" ? v : "The mask module gave no values for this rendering.");
+      continue;
+    }
+    const vals = v as ArrayLike<number>;
+    const took = maskPicture(host, `${title} · ${r}`, h.t, vals);
+    const cov = maskCoverageOf(maskApi.sampleMaskCoverage(vals, labels, names), names.length, vals);
+    row(`Mask picture: ${title} · ${r}`,
+      `takes ${(cov ? cov.taken : took).toLocaleString("en-US")} of ${n.toLocaleString("en-US")} counted pixels${cov ? ` · ${names.map((nm, i) => `${nm} ${cov.shares[i].toFixed(3)}`).join(" · ")}` : " · the shares could not be read from the mask module's answer"}`,
+      "The mask's weights as this rendering draws them, over the photograph held from the press. The first number is the count of counted pixels at a half or more. Each name's number is the share of that name's own pixels the mask takes, among the pixels the samples name; rest is every counted pixel in no sample. A share is of sampled pixels on this photograph, never of the photograph.");
+  }
+}
+
+/** The fits, weights and pictures of a count. Takes the count's tally, what the press kept, the names the samples gave (rest last) and the
+ *  labels. Returns nothing; writes rows, pictures into `#dMaskPics`, and the recipes fitted here into storage under the photograph's name. What
+ *  it must satisfy: for every name but rest a recipe is fitted against the other names, the weights are made from it and each rendering is
+ *  drawn; a name the module cannot fit says why in one row; recipes kept for this photograph from another are kept as they were; each stage
+ *  is timed under its own name; a fault writes one row and lets the count go on; storage is inside a try. Consumer: the count. */
+async function maskStages(tally: PressTally, h: PlaceHeld, names: string[], labels: Uint8Array): Promise<void> {
+  const pics = $("dMaskPics");
+  pics.replaceChildren();
+  try {
+    const subjects = names.slice(0, names.length - 1);
+    const counts = names.map(() => 0);
+    for (let i = 0; i < labels.length; i++) counts[labels[i]]++;
+    progress("Fitting a mask for each placed name");
+    await pause(tally);
+    books(tally);
+    const fresh: { subject: string; recipe: unknown; text: string }[] = [];
+    for (let l = 0; l < subjects.length; l++) {
+      const subject = subjects[l];
+      const against = subjects.filter((_nm, j) => j !== l && counts[j] >= SAMPLE_MIN_PIXELS);
+      const r = maskApi.sampleMaskFit(h.cues, h.cueNames, labels, names, subject, h.name, MASK_LEAVE_OUT);
+      if (typeof r === "string" || !r) {
+        row(`Mask recipe: ${subject}`, `no recipe: ${typeof r === "string" ? r : "the mask module gave none"}`, "A recipe needs the name and the others each to hold at least 50 counted pixels. Nothing is drawn for this name.");
+        continue;
+      }
+      const text = maskApi.sampleMaskToText(r);
+      fresh.push({ subject, recipe: r, text });
+      row(`Mask recipe: ${subject}`, `fitted on ${h.name} · weighed against ${against.length ? against.join(", ") : "no other name"} · cues ${h.cueNames.filter((c) => !MASK_LEAVE_OUT.includes(c)).join(", ")} · kept as ${text.length.toLocaleString("en-US")} characters`,
+        "The subject's counts on each cue, held against the counts of the other placed names pooled, each side balanced to the same total, with the weight of a counted pixel the sum over the cues of the log of the subject's share over the other's, through a logistic. Only the subject, the photograph, the names weighed against and the cues are in the copy; the counts are kept in this browser.");
+    }
+    lap(tally, "masks: the fits");
+
+    progress("Weighing every counted pixel by each mask");
+    await pause(tally);
+    books(tally);
+    const weighed: { subject: string; weights: ArrayLike<number> }[] = [];
+    for (const f of fresh) {
+      const w = maskApi.sampleMaskWeights(f.recipe, h.cues, h.cueNames);
+      if (typeof w === "string" || !w) {
+        row(`Mask weights: ${f.subject}`, `not available: ${typeof w === "string" ? w : "the mask module gave none"}`, "The weights could not be made from the recipe fitted here, so nothing is drawn for this name.");
+        continue;
+      }
+      weighed.push({ subject: f.subject, weights: w as ArrayLike<number> });
+    }
+    lap(tally, "masks: the weights");
+
+    progress("Keeping the masks fitted here");
+    await pause(tally);
+    books(tally);
+    const store = masksRead();
+    const mine = (store.all[h.name] ?? []).filter((e) => e.from !== h.name);
+    const next: Record<string, MaskKept[]> = { ...store.all, [h.name]: [...fresh.map((f) => ({ subject: f.subject, from: h.name, text: f.text })), ...mine] };
+    const stored = masksWrite(next);
+    row("Masks kept on this device", store.ok && stored
+      ? `${fresh.length} ${fresh.length === 1 ? "recipe" : "recipes"} fitted here are kept under ${h.name} · ${mine.length} kept for this photograph from other photographs`
+      : "cannot be kept on this device",
+    store.ok && stored
+      ? "The recipes are kept in this browser's local storage, as text, under the photograph's name, and the next photograph opened here can try them. A recipe kept for this photograph from another stays as it was."
+      : "This browser refused local storage, so the recipes fitted here are not kept and no other photograph's are listed. The rest of the page works.");
+    lap(tally, "masks: keeping the recipes");
+
+    progress("Drawing each mask over the photograph");
+    await pause(tally);
+    books(tally);
+    const head = document.createElement("h4");
+    head.style.cssText = "font-size:0.9375rem;margin:18px 0 6px";
+    head.textContent = "What each mask fitted here takes";
+    pics.appendChild(head);
+    for (const m of weighed) maskShow(pics, `${m.subject}, fitted on this photograph`, h, names, labels, m.weights);
+    lap(tally, "masks: the renderings drawn");
+
+    maskListShow();
+    lap(tally, "masks: listing the kept recipes");
+  } catch (err) {
+    row("The masks", "not run", `${(err as Error).message}. The rows above stand as they were.`);
+  }
+}
+
+/** Lists the recipes kept from other photographs, each with a button that tries it here. Takes nothing; reads `placeHeld` and storage. Returns
+ *  nothing; replaces `#dMaskList`. What it must satisfy: every recipe fitted on another photograph is listed whether or not its name is placed
+ *  here; each button is a real button with a label naming the subject and the photograph; storage is read inside a try. */
+function maskListShow(): void {
+  const host = $("dMaskList");
+  host.replaceChildren();
+  const h = placeHeld;
+  if (!h) return;
+  const store = masksRead();
+  const entries = maskEntries(store.all, h.name);
+  const note = document.createElement("p");
+  note.className = "dbg-note";
+  note.textContent = !store.ok
+    ? "This browser refused local storage, so no recipe kept from another photograph is listed."
+    : entries.length
+      ? `${entries.length} ${entries.length === 1 ? "recipe is" : "recipes are"} kept from other photographs or for this one. Trying one draws what it would take here and prints its shares against the names placed here; it changes nothing until it is kept.`
+      : "No recipe is kept from another photograph yet. Count the samples on a photograph and its recipes are kept; open another photograph and they are listed here.";
+  host.appendChild(note);
+  for (const { entry, kept } of entries) {
+    const box = document.createElement("div");
+    box.style.cssText = "margin:8px 0";
+    const p = document.createElement("p");
+    p.className = "dbg-note";
+    p.textContent = `${entry.subject}, fitted on ${entry.from}${kept ? ", kept for this photograph" : ""}.`;
+    const acts = document.createElement("div");
+    acts.className = "dbg-actions";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "dbg-btn";
+    btn.style.minHeight = "44px";
+    btn.textContent = `Try ${entry.subject} from ${entry.from} on this photograph`;
+    btn.addEventListener("click", () => {
+      void sepPress(btn, false, async (tally) => {
+        try {
+          await maskTry(tally, entry);
+        } catch (err) {
+          row("Mask tried here", "not run", `${(err as Error).message}. The rows above stand as they were.`);
+        } finally {
+          lap(tally, TAIL_STAGE);
+          sepTimeRows(tally, performance.now() - pressStart);
+        }
+      });
+    });
+    acts.appendChild(btn);
+    box.append(p, acts);
+    host.appendChild(box);
+  }
+}
+
+/** Tries a kept recipe on this photograph. Takes the press's tally and the kept recipe. Returns nothing; writes rows and pictures into
+ *  `#dMaskTry` (replacing the last try's) and offers the button that keeps it. What it must satisfy: the recipe is read here against the
+ *  cues the press kept, with nothing decoded or drawn again; a recipe that cannot be read, or reads a cue this page does not count, says so
+ *  in one row and draws nothing; the shares are against the names the samples placed now give; where the recipe's name is placed here the mask
+ *  fitted afresh from those samples alone is drawn beside it, never in place of it; nothing is kept until the keep button is pressed. */
+async function maskTry(tally: PressTally, entry: MaskKept): Promise<void> {
+  const h = placeHeld;
+  const host = $("dMaskTry");
+  host.replaceChildren();
+  if (!h) { row("Mask tried here", "not run", "No photograph is drawn, so there is nothing to try a mask on."); return; }
+  const what = `${entry.subject} from ${entry.from}`;
+  progress(`Trying ${what} on this photograph`);
+  await pause(tally);
+  books(tally);
+  const recipe = maskApi.sampleMaskFromText(entry.text);
+  if (!recipe) {
+    row(`Mask tried here: ${what}`, "not available: the kept text cannot be read", "The text kept for this recipe could not be read, so nothing is drawn.");
+    progress(`${what} cannot be read here: the kept text is not readable.`, true);
+    sampleHint.textContent = `${what} cannot be read here: the kept text is not readable. Nothing is drawn.`;
+    return;
+  }
+  const samples = samplesNow.slice();
+  const names = placeSampleNames(samples);
+  const got = placeSampleLabels(samples, h.t.fromW, h.t.fromH, h.cols, h.rows);
+  const w = maskApi.sampleMaskWeights(recipe, h.cues, h.cueNames);
+  lap(tally, "masks tried: the weights");
+  if (typeof w === "string" || !w) {
+    const why = typeof w === "string" ? w : "the mask module gave no weights";
+    row(`Mask tried here: ${what}`, `not available here: ${why}`, "A recipe that reads a cue this page does not count says so in one row and draws nothing.");
+    progress(`${what} cannot be read on this photograph: ${why}`, true);
+    sampleHint.textContent = `${what} cannot be read on this photograph: ${why} Nothing is drawn.`;
+    return;
+  }
+  books(tally);
+  const head = document.createElement("h4");
+  head.style.cssText = "font-size:0.9375rem;margin:18px 0 6px";
+  head.textContent = `What ${what} would take on this photograph`;
+  host.appendChild(head);
+  maskShow(host, `${what}, tried here`, h, names, got.labels, w as ArrayLike<number>);
+  lap(tally, "masks tried: the renderings drawn");
+
+  const at = names.indexOf(entry.subject);
+  const sameName = at >= 0 && at < names.length - 1;
+  let redo = `No sample named ${entry.subject} is placed here. To redo it by samples, place and confirm a sample with that name on the picture and press Count the samples; the mask fitted from the samples alone is then drawn beside this one.`;
+  if (sameName) {
+    books(tally);
+    const r = maskApi.sampleMaskFit(h.cues, h.cueNames, got.labels, names, entry.subject, h.name, MASK_LEAVE_OUT);
+    if (typeof r === "string" || !r) {
+      redo = `${entry.subject} is placed here but no mask is fitted from its samples: ${typeof r === "string" ? r : "the mask module gave none"}`;
+    } else {
+      const w2 = maskApi.sampleMaskWeights(r, h.cues, h.cueNames);
+      if (typeof w2 === "string" || !w2) redo = `${entry.subject} is placed here but its mask cannot be weighed: ${typeof w2 === "string" ? w2 : "the mask module gave none"}`;
+      else {
+        const h2 = document.createElement("h4");
+        h2.style.cssText = "font-size:0.9375rem;margin:18px 0 6px";
+        h2.textContent = `${entry.subject} fitted afresh from the samples placed here, beside it`;
+        host.appendChild(h2);
+        maskShow(host, `${entry.subject}, fitted afresh from the samples placed here`, h, names, got.labels, w2 as ArrayLike<number>);
+        redo = `${entry.subject} is placed here, so the mask fitted afresh from its samples alone is drawn beside the kept one. The kept one is not changed.`;
+      }
+    }
+    lap(tally, "masks tried: the fit made afresh beside it");
+  }
+  row(`Mask tried here: ${what}`, sameName ? "tried, and fitted afresh beside" : "tried", `${redo} Nothing is kept until the button under the pictures is pressed.`);
+  const note = document.createElement("p");
+  note.className = "dbg-note";
+  note.textContent = redo;
+  host.appendChild(note);
+  const acts = document.createElement("div");
+  acts.className = "dbg-actions";
+  const keep = document.createElement("button");
+  keep.type = "button";
+  keep.className = "dbg-btn primary";
+  keep.style.minHeight = "44px";
+  const store = masksRead();
+  const already = (store.all[h.name] ?? []).some((e) => e.from === entry.from && e.subject === entry.subject);
+  keep.textContent = already ? `${what} is kept for this photograph` : `Keep ${what} for this photograph`;
+  keep.disabled = already;
+  keep.addEventListener("click", () => {
+    const s = masksRead();
+    const list = s.all[h.name] ?? [];
+    if (!list.some((e) => e.from === entry.from && e.subject === entry.subject)) list.push({ subject: entry.subject, from: entry.from, text: entry.text });
+    const ok = s.ok && masksWrite({ ...s.all, [h.name]: list });
+    const said = ok ? `${what} is kept for this photograph, unchanged, still naming ${entry.from} as the photograph it was fitted on.` : `${what} could not be kept: this browser refused local storage.`;
+    keep.textContent = ok ? `${what} is kept for this photograph` : keep.textContent;
+    keep.disabled = ok;
+    progress(said, true);
+    sampleHint.textContent = said;
+    if (ok) maskListShow();
+  });
+  acts.appendChild(keep);
+  host.appendChild(acts);
+  const said = `${what} tried on this photograph. The pictures are under Masks made from the samples. Press Keep to keep it for this photograph.`;
+  progress(said, true);
+  sampleHint.textContent = said;
 }
 
 sampleBtn.addEventListener("click", (e) => {

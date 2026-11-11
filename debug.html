@@ -84,7 +84,7 @@
           <button id="dPictures" type="button" class="dbg-btn primary">Run the picture checks</button>
           <button id="dPicCopy" type="button" class="dbg-btn">Copy the picture checks</button>
         </div>
-        <p class="dbg-note" id="dPicCopyNote">The copy carries the picked file's name and camera when a photograph was picked, and the names and places of any samples placed on it.</p>
+        <p class="dbg-note" id="dPicCopyNote">The copy carries the picked file's name and camera when a photograph was picked, and the names and places of any samples placed on it, and, for each mask fitted from them, its subject, the photograph it was fitted on, the names it was weighed against and its cues.</p>
         <p id="dPicProgress" class="dbg-progress" role="status" aria-live="polite" aria-label="Picture checks progress">Not running. Press the button and this line says where the checks have got to.</p>
         <div id="dPicResults" class="dbg-results" role="status" aria-live="polite"></div>
 
@@ -141,6 +141,16 @@
           </div>
           <p id="dSampleHint" class="dbg-progress" role="status" aria-live="polite" aria-label="Samples, what the count is waiting on">Not available yet: the count needs a photograph drawn by step 1 above. Press step 1, then place and confirm samples on the picture.</p>
           <div id="dSamplePics"></div>
+          <h4 id="dMaskHead" style="font-size:0.9375rem;margin:18px 0 6px">Masks made from the samples</h4>
+          <p class="dbg-note">
+            The count also fits a mask for every placed name, weighs every counted pixel by it, and draws it over the photograph in each of
+            its renderings with the share of each name it takes. Masks fitted on other photographs and kept in this browser are listed here
+            whether or not their name is placed on this one: try one to see what it would take here, then keep it for this photograph, or
+            place samples of that name here and count again to fit it afresh from them alone.
+          </p>
+          <div id="dMaskPics"></div>
+          <div id="dMaskList"></div>
+          <div id="dMaskTry"></div>
         </div>
       </section>
 
