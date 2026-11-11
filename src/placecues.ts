@@ -30,9 +30,31 @@ export interface PlaceMask { title: string; data: Uint8Array; mask: Uint8Array; 
 /** What a selection takes: for each label the pixels taken and the label's total, the share, and the target's share of the labelled pixels taken. */
 export interface PlaceReading { taken: number[]; totals: number[]; shares: number[]; takenLabelled: number; targetShare: number }
 
-/** The value of a bin edge in a cue's own units (edge 0 of a logarithmic cue is 0, since what falls under the scale sits in the first bin). Takes the cue number and the edge from 0 to 64. Returns a number. */
-function edgeValue(cue: number, edge: number): number {
-  const k = KIND[cue];
+/** The cues of one run: their names in the order of the arrays, each one's scale kind, and the numbers of the cues that take part in the pair rows and the fits. */
+interface CueSet { names: string[]; kinds: number[]; fit: number[] }
+
+/** The scale kind of a cue by its name: that of the same name among the eight, else 0 (from 0 to 1, the scale every structure cue has). Takes the name and returns 0, 1 or 2. */
+function kindOfName(name: string): number {
+  const i = PLACE_CUES.indexOf(name);
+  return i >= 0 ? KIND[i] : 0;
+}
+
+/** The cue set of a run. Takes the number of cue arrays, the cues' names in the order of the arrays (the eight standing where none is given, and `cue N` for an array past the names), and the names of cues to leave out of the pair rows and the fits. Returns the set. */
+function cueSetOf(count: number, cueNames?: ArrayLike<string> | null, leaveOut?: ArrayLike<string> | null): CueSet {
+  const names: string[] = [];
+  for (let c = 0; c < count; c++) {
+    if (cueNames && c < cueNames.length && typeof cueNames[c] === "string") names.push(cueNames[c]);
+    else names.push(c < PLACE_CUES.length ? PLACE_CUES[c] : `cue ${c + 1}`);
+  }
+  const out = new Set<string>();
+  if (leaveOut) for (let i = 0; i < leaveOut.length; i++) out.add(leaveOut[i]);
+  const fit: number[] = [];
+  for (let c = 0; c < count; c++) if (!out.has(names[c])) fit.push(c);
+  return { names, kinds: names.map(kindOfName), fit };
+}
+
+/** The value of a bin edge in a cue's own units (edge 0 of a logarithmic cue is 0, since what falls under the scale sits in the first bin). Takes the scale kind and the edge from 0 to 64. Returns a number. */
+function edgeOfKind(k: number, edge: number): number {
   if (k === 0) return edge / NB;
   if (k === 1) return -1 + (2 * edge) / NB;
   return edge === 0 ? 0 : Math.pow(2, 10 * (edge / NB - 1));
@@ -51,8 +73,12 @@ function fmt(v: number): string {
  * @returns a whole number from 0 to 63; a value off either end of the scale gives the nearest bin, and a value that is not a number gives 0. Every histogram, threshold and range in this module counts in these bins.
  */
 export function placeBinOf(cue: number, v: number): number {
+  return binOfKind(KIND[cue], v);
+}
+
+/** The bin of a value on a scale kind. Takes the kind (0 from 0 to 1, 1 from minus one to one, 2 logarithmic) and the value, and returns a whole number from 0 to 63; a value that is not a number gives 0. */
+function binOfKind(k: number, v: number): number {
   if (!(v === v)) return 0;
-  const k = KIND[cue];
   let t: number;
   if (k === 0) t = v;
   else if (k === 1) t = (v + 1) / 2;
@@ -171,11 +197,11 @@ export function placeCueValues(drawn: ArrayLike<number>, lin: ArrayLike<number>,
   return out;
 }
 
-/** The bin of every value of every cue. Takes the eight cue arrays and returns eight Uint8Arrays of bins. */
-function binsOf(cues: ArrayLike<number>[]): Uint8Array[] {
+/** The bin of every value of every cue. Takes the cue arrays and the cue set, and returns one Uint8Array of bins for each array, each on its cue's own scale. */
+function binsOf(cues: ArrayLike<number>[], cs: CueSet): Uint8Array[] {
   return cues.map((v, c) => {
     const b = new Uint8Array(v.length);
-    for (let i = 0; i < v.length; i++) b[i] = placeBinOf(c, v[i]);
+    for (let i = 0; i < v.length; i++) b[i] = binOfKind(cs.kinds[c], v[i]);
     return b;
   });
 }
@@ -230,10 +256,10 @@ function scan(t: Float64Array, o: Float64Array, dT: number, dO: number, baseT: n
   return best;
 }
 
-/** The best range over all eight cues within a subset. Takes the bins, the roles, the subset or null, the denominators and base counts of scan and whether the range is removed, and returns the range with its cue and score, or null. */
-function bestOver(bins: Uint8Array[], role: Uint8Array, sub: Uint8Array | null, dT: number, dO: number, baseT: number, baseO: number, subtract: boolean): (Range & { score: number }) | null {
+/** The best range over the cues that take part within a subset. Takes the bins, the roles, the subset or null, the denominators and base counts of scan, whether the range is removed and the cue set, and returns the range with its cue and score, or null. */
+function bestOver(bins: Uint8Array[], role: Uint8Array, sub: Uint8Array | null, dT: number, dO: number, baseT: number, baseO: number, subtract: boolean, cs: CueSet): (Range & { score: number }) | null {
   let best: (Range & { score: number }) | null = null;
-  for (let c = 0; c < bins.length; c++) {
+  for (const c of cs.fit) {
     const [t, o] = roleHist(bins[c], role, sub);
     const r = scan(t, o, dT, dO, baseT, baseO, subtract);
     if (r && (!best || r.score > best.score)) best = { ci: c, lo: r.lo, hi: r.hi, score: r.score };
@@ -248,40 +274,47 @@ function balancedOf(mask: Uint8Array, role: Uint8Array, T: number, O: number): n
   return 0.5 * ((T > 0 ? tIn / T : 0) + (O > 0 ? (O - oIn) / O : 1));
 }
 
-/** A range as plain data. Takes the range and returns the part with the cue's name and the range in the cue's own units. */
-function partOf(r: Range): PlacePart {
-  return { cue: PLACE_CUES[r.ci], lo: r.lo, hi: r.hi, from: edgeValue(r.ci, r.lo), to: edgeValue(r.ci, r.hi) };
+/** A range as plain data. Takes the range and the cue set, and returns the part with the cue's name and the range in the cue's own units. */
+function partOf(r: Range, cs: CueSet): PlacePart {
+  return { cue: cs.names[r.ci], lo: r.lo, hi: r.hi, from: edgeOfKind(cs.kinds[r.ci], r.lo), to: edgeOfKind(cs.kinds[r.ci], r.hi) };
 }
 
-/** A part back to a range. Takes the part and returns the range, or null where the cue's name is not one of the eight. */
-function rangeOf(p: PlacePart): Range | null {
-  const ci = PLACE_CUES.indexOf(p.cue);
+/** The name a part carries: its cue's name, or, for a part kept in the old form that carries a cue by its place among the eight, the name of that one of the eight. Takes the part and returns the name, empty where it carries neither. */
+function nameOfPart(p: PlacePart): string {
+  const c: unknown = p.cue;
+  if (typeof c === "number") return c >= 0 && c < PLACE_CUES.length ? PLACE_CUES[c] : "";
+  return typeof c === "string" ? c : "";
+}
+
+/** A part back to a range. Takes the part and the cue set, and returns the range at the place of the part's cue among this run's cues, or null where the run does not count that cue or the range has no width. */
+function rangeOf(p: PlacePart, cs: CueSet): Range | null {
+  const ci = cs.names.indexOf(nameOfPart(p));
   if (ci < 0 || !(p.hi > p.lo)) return null;
   return { ci, lo: p.lo, hi: p.hi };
 }
 
-/** The selections fitted for one target over binned cues. Takes the bins and the roles (1 target, 2 other, 0 left out) and returns the single range, the range joined Only where both and the range joined Subtract, as plain data with the kind that fitted better, or null where the target or the others have under 50 pixels. */
-function fitBins(bins: Uint8Array[], role: Uint8Array): { selections: PlaceSelection[]; bestJoined: string } | null {
+/** The selections fitted for one target over binned cues. Takes the bins, the roles (1 target, 2 other, 0 left out) and the cue set, and returns the single range, the range joined Only where both and the range joined Subtract, as plain data with the kind that fitted better, or null where the target or the others have under 50 pixels. */
+function fitBins(bins: Uint8Array[], role: Uint8Array, cs: CueSet): { selections: PlaceSelection[]; bestJoined: string } | null {
   let T = 0, O = 0;
   for (let i = 0; i < role.length; i++) { if (role[i] === 1) T++; else if (role[i] === 2) O++; }
   if (T < MIN_PIXELS || O < MIN_PIXELS) return null;
-  const first = bestOver(bins, role, null, T, O, 0, 0, false);
+  const first = bestOver(bins, role, null, T, O, 0, 0, false, cs);
   if (!first) return null;
   const r1: Range = { ci: first.ci, lo: first.lo, hi: first.hi };
   const m1 = applyBins(bins, [r1], KIND_SINGLE);
-  const selections: PlaceSelection[] = [{ kind: KIND_SINGLE, parts: [partOf(r1)], balanced: balancedOf(m1, role, T, O) }];
+  const selections: PlaceSelection[] = [{ kind: KIND_SINGLE, parts: [partOf(r1, cs)], balanced: balancedOf(m1, role, T, O) }];
   let T1 = 0, O1 = 0;
   for (let i = 0; i < m1.length; i++) if (m1[i]) { if (role[i] === 1) T1++; else if (role[i] === 2) O1++; }
   if (T1 > 0) {
-    const both = bestOver(bins, role, m1, T1, O1, 0, 0, false);
+    const both = bestOver(bins, role, m1, T1, O1, 0, 0, false, cs);
     if (both) {
       const r2: Range = { ci: both.ci, lo: both.lo, hi: both.hi };
-      selections.push({ kind: KIND_BOTH, parts: [partOf(r1), partOf(r2)], balanced: balancedOf(applyBins(bins, [r1, r2], KIND_BOTH), role, T, O) });
+      selections.push({ kind: KIND_BOTH, parts: [partOf(r1, cs), partOf(r2, cs)], balanced: balancedOf(applyBins(bins, [r1, r2], KIND_BOTH), role, T, O) });
     }
-    const sub = bestOver(bins, role, m1, T, O, T1, O1, true);
+    const sub = bestOver(bins, role, m1, T, O, T1, O1, true, cs);
     if (sub) {
       const r2: Range = { ci: sub.ci, lo: sub.lo, hi: sub.hi };
-      selections.push({ kind: KIND_SUBTRACT, parts: [partOf(r1), partOf(r2)], balanced: balancedOf(applyBins(bins, [r1, r2], KIND_SUBTRACT), role, T, O) });
+      selections.push({ kind: KIND_SUBTRACT, parts: [partOf(r1, cs), partOf(r2, cs)], balanced: balancedOf(applyBins(bins, [r1, r2], KIND_SUBTRACT), role, T, O) });
     }
   }
   let bestJoined = "";
@@ -308,28 +341,33 @@ function rolesOf(labels: Uint8Array, places: number[], takesPart: ArrayLike<numb
  * @param labels one byte for each counted pixel holding its label.
  * @param takesPart for each label, 1 where it has 50 pixels or more and is not the rest, else 0; a label that does not take part is left out of the fit.
  * @param places the labels the target joins.
+ * @param cueNames optional, the cues' names in the order of the arrays; the eight standing where none is given.
+ * @param leaveOut optional, the names of cues to leave out of the fit.
  * @returns null where the target or the other labelled pixels number under 50; otherwise `selections`, the fitted selections as plain data (the single range first, then the join that keeps the pixels both ranges hold, then the join that removes the second range from the first), each with its ranges in bins and in the cue's own units and its balanced share on this photograph, and `bestJoined`, the kind of join with the larger balanced share. The data turns to text and back unchanged, and placeApply reads it.
  */
-export function placeFitTarget(cues: ArrayLike<number>[], labels: Uint8Array, takesPart: ArrayLike<number>, places: number[]): { selections: PlaceSelection[]; bestJoined: string } | null {
-  return fitBins(binsOf(cues), rolesOf(labels, places, takesPart));
+export function placeFitTarget(cues: ArrayLike<number>[], labels: Uint8Array, takesPart: ArrayLike<number>, places: number[], cueNames?: ArrayLike<string> | null, leaveOut?: ArrayLike<string> | null): { selections: PlaceSelection[]; bestJoined: string } | null {
+  const cs = cueSetOf(cues.length, cueNames, leaveOut);
+  return fitBins(binsOf(cues, cs), rolesOf(labels, places, takesPart), cs);
 }
 
 /**
  * Applies a fitted selection to a photograph's cues.
  * @param cues the eight cue arrays of placeCueValues for the photograph.
  * @param selection a fitted selection, as plain data or as read back from text.
- * @returns one byte for each counted pixel, 1 where the selection takes it: for a single range, the pixels in the range; for Only where both, those in both ranges; for Subtract, those in the first and not in the second; all 0 where a range names a cue that is not one of the eight.
+ * @param cueNames optional, the cues' names in the order of the arrays; the eight standing where none is given. Each range finds its cue by name, so the arrays may come in any order.
+ * @returns one byte for each counted pixel, 1 where the selection takes it: for a single range, the pixels in the range; for Only where both, those in both ranges; for Subtract, those in the first and not in the second; all 0 where a range names a cue that is not among the arrays.
  */
-export function placeApply(cues: ArrayLike<number>[], selection: PlaceSelection): Uint8Array {
+export function placeApply(cues: ArrayLike<number>[], selection: PlaceSelection, cueNames?: ArrayLike<string> | null): Uint8Array {
   const n = cues.length ? cues[0].length : 0;
+  const cs = cueSetOf(cues.length, cueNames);
   const ranges: Range[] = [];
-  for (const p of selection.parts) { const r = rangeOf(p); if (!r) return new Uint8Array(n); ranges.push(r); }
+  for (const p of selection.parts) { const r = rangeOf(p, cs); if (!r) return new Uint8Array(n); ranges.push(r); }
   const bins: Uint8Array[] = cues.map(() => new Uint8Array(0));
-  // placeBinOf takes the cue number, so each used cue is binned under its own number.
+  // Each used cue is binned on its own scale.
   for (const r of ranges) {
     const b = new Uint8Array(n);
     const v = cues[r.ci];
-    for (let i = 0; i < n; i++) b[i] = placeBinOf(r.ci, v[i]);
+    for (let i = 0; i < n; i++) b[i] = binOfKind(cs.kinds[r.ci], v[i]);
     bins[r.ci] = b;
   }
   return applyBins(bins, ranges, selection.kind);
@@ -364,7 +402,7 @@ export function placeRead(mask: Uint8Array, labels: Uint8Array, sky: Uint8Array 
 
 /** The words for a selection's ranges. Takes the parts and the kind and returns the text with each range in the cue's own units. */
 function partsText(parts: PlacePart[], kind: string): string {
-  const r = (p: PlacePart): string => `${p.cue} ${fmt(p.from)} to ${fmt(p.to)}`;
+  const r = (p: PlacePart): string => `${nameOfPart(p) || String(p.cue)} ${fmt(p.from)} to ${fmt(p.to)}`;
   if (parts.length === 0) return "no range";
   if (parts.length === 1) return r(parts[0]);
   return `${r(parts[0])}, ${kind === KIND_SUBTRACT ? "subtract" : "only where both"} ${r(parts[1])}`;
@@ -386,13 +424,16 @@ function readSegments(rd: PlaceReading, names: string[], takesPart: ArrayLike<nu
  * @param sky one byte for each counted pixel, 1 where the app's sky selection holds the pixel at a weight of 0.5 or more.
  * @param photograph the photograph's name.
  * @param kept the selections kept from other photographs, each a PlaceFit as read back from text.
- * @returns `rows`, the finished text rows in order (the counted pixels by label; one row for each pair of labels with every cue's distance, threshold and balanced share and the best two cues together; for each target the selections fitted here, each with its read and its read with the sky selection removed; for each selection kept from another photograph one row naming it with its read here); `fits`, this photograph's fitted selections as plain data; and `masks`, titled byte arrays for the water and the built things where those targets are given and otherwise for the first two targets, the best single range and the best joined selection, kept from another photograph where one holds that target and fitted here otherwise. A label of under 50 pixels is printed as too few to count and takes no part in a distance or a fit.
+ * @param cueNames optional, the cues' names in the order of the cue arrays, which may be any number; the eight stand where none is given. A cue named among the eight keeps that one's scale, any other name is binned from 0 to 1.
+ * @param leaveOut optional, the names of cues to leave out of the pair rows and the fits; a cue left out is still read when a kept selection names it.
+ * @returns `rows`, the finished text rows in order (the counted pixels by label; one row for each pair of labels with the distance, threshold and balanced share of each cue that takes part and the best two cues together; for each target the selections fitted here, each with its read and its read with the sky selection removed; for each selection kept from another photograph one row naming it with its read here, or, where it names a cue this run does not count, one row saying it is not read here with that cue's name, and taking nothing); `fits`, this photograph's fitted selections as plain data; and `masks`, titled byte arrays for the water and the built things where those targets are given and otherwise for the first two targets, the best single range and the best joined selection, kept from another photograph where one holds that target and fitted here otherwise. A label of under 50 pixels is printed as too few to count and takes no part in a distance or a fit.
  */
-export function placeReport(cues: ArrayLike<number>[], labels: Uint8Array, names: string[], targets: PlaceTargetLike[], sky: Uint8Array, photograph: string, kept: PlaceFit[]): { rows: string[]; fits: PlaceFit; masks: PlaceMask[] } {
+export function placeReport(cues: ArrayLike<number>[], labels: Uint8Array, names: string[], targets: PlaceTargetLike[], sky: Uint8Array, photograph: string, kept: PlaceFit[], cueNames?: ArrayLike<string> | null, leaveOut?: ArrayLike<string> | null): { rows: string[]; fits: PlaceFit; masks: PlaceMask[] } {
   const rows: string[] = [];
   const n = labels.length;
   const nl = names.length;
-  const bins = binsOf(cues);
+  const cs = cueSetOf(cues.length, cueNames, leaveOut);
+  const bins = binsOf(cues, cs);
   const counts = new Array<number>(nl).fill(0);
   for (let i = 0; i < n; i++) if (labels[i] < nl) counts[labels[i]]++;
   const takesPart = new Array<number>(nl).fill(0);
@@ -403,18 +444,18 @@ export function placeReport(cues: ArrayLike<number>[], labels: Uint8Array, names
 
   // Histograms of each label on each cue, and the joint histograms of each pair of cues.
   const pairs: [number, number][] = [];
-  for (let a = 0; a < PLACE_CUES.length; a++) for (let b = a + 1; b < PLACE_CUES.length; b++) pairs.push([a, b]);
+  for (let i = 0; i < cs.fit.length; i++) for (let j = i + 1; j < cs.fit.length; j++) pairs.push([cs.fit[i], cs.fit[j]]);
   const hist: Float64Array[][] = [];
   const joint: Float64Array[][] = [];
   for (let l = 0; l < nl; l++) {
-    hist.push(PLACE_CUES.map(() => new Float64Array(NB)));
+    hist.push(cues.map(() => new Float64Array(NB)));
     joint.push(pairs.map(() => new Float64Array(NJ * NJ)));
   }
   const step = NB / NJ;
   for (let i = 0; i < n; i++) {
     const l = labels[i];
     if (l >= nl || !takesPart[l]) continue;
-    for (let c = 0; c < bins.length; c++) hist[l][c][bins[c][i]]++;
+    for (const c of cs.fit) hist[l][c][bins[c][i]]++;
     for (let p = 0; p < pairs.length; p++) joint[l][p][Math.floor(bins[pairs[p][0]][i] / step) * NJ + Math.floor(bins[pairs[p][1]][i] / step)]++;
   }
   for (let a = 0; a < nl; a++) {
@@ -422,17 +463,17 @@ export function placeReport(cues: ArrayLike<number>[], labels: Uint8Array, names
     for (let b = a + 1; b < nl; b++) {
       if (!takesPart[b]) continue;
       const segs: string[] = [];
-      for (let c = 0; c < PLACE_CUES.length; c++) {
+      for (const c of cs.fit) {
         const d = placeHellinger(hist[a][c], hist[b][c]);
         const th = placeThreshold(hist[a][c], hist[b][c]);
-        segs.push(`${PLACE_CUES[c]} distance ${fmt(d)}, threshold ${fmt(edgeValue(c, th.edge))} with ${th.firstBelow ? names[a] : names[b]} below, balanced share ${fmt(th.balanced)}`);
+        segs.push(`${cs.names[c]} distance ${fmt(d)}, threshold ${fmt(edgeOfKind(cs.kinds[c], th.edge))} with ${th.firstBelow ? names[a] : names[b]} below, balanced share ${fmt(th.balanced)}`);
       }
       let bestD = -1, bestP = 0;
       for (let p = 0; p < pairs.length; p++) {
         const d = placeHellinger(joint[a][p], joint[b][p]);
         if (d > bestD) { bestD = d; bestP = p; }
       }
-      segs.push(`best two cues together ${PLACE_CUES[pairs[bestP][0]]} with ${PLACE_CUES[pairs[bestP][1]]}, distance ${fmt(bestD)} on ${NJ} by ${NJ} bins`);
+      if (pairs.length) segs.push(`best two cues together ${cs.names[pairs[bestP][0]]} with ${cs.names[pairs[bestP][1]]}, distance ${fmt(bestD)} on ${NJ} by ${NJ} bins`);
       rows.push(`${names[a]} against ${names[b]}: ${segs.join(" · ")}`);
     }
   }
@@ -445,7 +486,7 @@ export function placeReport(cues: ArrayLike<number>[], labels: Uint8Array, names
     const tg = targets[t];
     const role = rolesOf(labels, tg.places, takesPart);
     roleOfTarget.push(role);
-    const f = fitBins(bins, role);
+    const f = fitBins(bins, role, cs);
     if (!f) {
       fits.targets.push({ title: tg.title, selections: [], bestJoined: "" });
       rows.push(`${tg.title}, fitted here: too few pixels to fit, the target or the other labelled pixels number under ${MIN_PIXELS}`);
@@ -453,8 +494,8 @@ export function placeReport(cues: ArrayLike<number>[], labels: Uint8Array, names
     }
     fits.targets.push({ title: tg.title, selections: f.selections, bestJoined: f.bestJoined });
     for (const s of f.selections) {
-      const rd = placeRead(applyParts(bins, s), labels, null, tg.places, takesPart);
-      const rs = placeRead(applyParts(bins, s), labels, sky, tg.places, takesPart);
+      const rd = placeRead(applyParts(bins, s, cs), labels, null, tg.places, takesPart);
+      const rs = placeRead(applyParts(bins, s, cs), labels, sky, tg.places, takesPart);
       rows.push(`${tg.title}, ${s.kind}, fitted here: ${[partsText(s.parts, s.kind), `balanced share ${fmt(s.balanced)}`, ...readSegments(rd, names, takesPart, ""), ...readSegments(rs, names, takesPart, "with the sky selection removed, ")].join(" · ")}`);
     }
   }
@@ -465,10 +506,14 @@ export function placeReport(cues: ArrayLike<number>[], labels: Uint8Array, names
       const ti = targets.findIndex((x) => x.title === kt.title);
       if (ti < 0) { rows.push(`${kt.title}, kept from ${k.photograph}: no target of that title here`); continue; }
       for (const s of kt.selections) {
-        const ranges = s.parts.map(rangeOf);
-        if (ranges.some((r) => r === null)) { rows.push(`${kt.title}, ${s.kind}, kept from ${k.photograph}: a range names a cue this page does not have`); continue; }
-        const rd = placeRead(applyParts(bins, s), labels, null, targets[ti].places, takesPart);
-        const rs = placeRead(applyParts(bins, s), labels, sky, targets[ti].places, takesPart);
+        const ranges = s.parts.map((p) => rangeOf(p, cs));
+        if (ranges.some((r) => r === null)) {
+          const missing = s.parts.filter((p) => !cs.names.includes(nameOfPart(p))).map((p) => nameOfPart(p) || "a cue with no name");
+          rows.push(`${kt.title}, ${s.kind}, kept from ${k.photograph}: not read here, ${missing.length ? `it names ${missing.join(" and ")}, which this run does not count` : "a range of it has no width"}, and it takes nothing`);
+          continue;
+        }
+        const rd = placeRead(applyParts(bins, s, cs), labels, null, targets[ti].places, takesPart);
+        const rs = placeRead(applyParts(bins, s, cs), labels, sky, targets[ti].places, takesPart);
         rows.push(`${kt.title}, ${s.kind}, kept from ${k.photograph}, read here: ${[partsText(s.parts, s.kind), `balanced share there ${fmt(s.balanced)}`, ...readSegments(rd, names, takesPart, ""), ...readSegments(rs, names, takesPart, "with the sky selection removed, ")].join(" · ")}`);
       }
     }
@@ -493,15 +538,15 @@ export function placeReport(cues: ArrayLike<number>[], labels: Uint8Array, names
     const where = usingKept ? `kept from ${from}` : "fitted on this photograph";
     const single = src.selections.find((s) => s.kind === KIND_SINGLE);
     const joined = src.selections.find((s) => s.kind === src.bestJoined);
-    if (single) push(`${targets[t].title}: best single range, ${where}`, applyParts(bins, single));
-    if (joined) push(`${targets[t].title}: best joined selection (${joined.kind}), ${where}`, applyParts(bins, joined));
+    if (single) push(`${targets[t].title}: best single range, ${where}`, applyParts(bins, single, cs));
+    if (joined) push(`${targets[t].title}: best joined selection (${joined.kind}), ${where}`, applyParts(bins, joined, cs));
   }
   return { rows, fits, masks };
 }
 
-/** A fitted selection over binned cues. Takes the bins and the selection and returns its mask; all 0 where a range names a cue that is not one of the eight. */
-function applyParts(bins: Uint8Array[], s: PlaceSelection): Uint8Array {
+/** A fitted selection over binned cues. Takes the bins, the selection and the cue set, and returns its mask; all 0 where a range names a cue this run does not count. */
+function applyParts(bins: Uint8Array[], s: PlaceSelection, cs: CueSet): Uint8Array {
   const ranges: Range[] = [];
-  for (const p of s.parts) { const r = rangeOf(p); if (!r) return new Uint8Array(bins.length ? bins[0].length : 0); ranges.push(r); }
+  for (const p of s.parts) { const r = rangeOf(p, cs); if (!r) return new Uint8Array(bins.length ? bins[0].length : 0); ranges.push(r); }
   return applyBins(bins, ranges, s.kind);
 }

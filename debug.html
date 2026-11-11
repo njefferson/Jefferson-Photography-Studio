@@ -79,12 +79,12 @@
           <label for="dPicFile">A photograph of yours to run the checks on, instead of the practice photograph (optional):</label>
         </p>
         <input id="dPicFile" type="file" accept=".nef,.dng,.jpg,.jpeg,.png,.heic,.tif,.tiff,image/*" style="display:block;box-sizing:border-box;width:100%;min-height:44px;padding:8px;margin:0 0 6px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface-2);color:var(--txt);font:inherit">
-        <p id="dPicFileNote" class="dbg-note" role="status" aria-live="polite" aria-label="The photograph picked">No photograph picked, so the practice photograph is used. A photograph you pick is read here and goes nowhere: nothing is uploaded or saved. The copied result carries its file name, its camera and its lens, and nothing else of it.</p>
+        <p id="dPicFileNote" class="dbg-note" role="status" aria-live="polite" aria-label="The photograph picked">No photograph picked, so the practice photograph is used. A photograph you pick is read here and goes nowhere: nothing is uploaded or saved. The copied result carries its file name, its camera and its lens, and, if you place samples on it, their names and places, and nothing else of it.</p>
         <div class="dbg-actions">
           <button id="dPictures" type="button" class="dbg-btn primary">Run the picture checks</button>
           <button id="dPicCopy" type="button" class="dbg-btn">Copy the picture checks</button>
         </div>
-        <p class="dbg-note" id="dPicCopyNote">The copy carries the picked file's name and camera when a photograph was picked.</p>
+        <p class="dbg-note" id="dPicCopyNote">The copy carries the picked file's name and camera when a photograph was picked, and the names and places of any samples placed on it.</p>
         <p id="dPicProgress" class="dbg-progress" role="status" aria-live="polite" aria-label="Picture checks progress">Not running. Press the button and this line says where the checks have got to.</p>
         <div id="dPicResults" class="dbg-results" role="status" aria-live="polite"></div>
 
@@ -126,6 +126,22 @@
         <p id="dSepHint" class="dbg-progress" role="status" aria-live="polite" aria-label="Separation check, the points">Not started. Press step 1 and the picture appears here to be tapped.</p>
         <div id="dSepPics"></div>
         <div id="dPlacePics"></div>
+        <div id="dSampleBox">
+          <h4 id="dSampleHead" style="font-size:0.9375rem;margin:18px 0 6px">Name regions by samples</h4>
+          <p class="dbg-note">
+            After step 1 has drawn the photograph it stands here with a sample on it to place. A sample is a circle: place it on the picture, move it,
+            set its size, give it a name and confirm it. Several samples can share a name, and a region nobody marks is left out. Then press the
+            count: it measures what tells the named regions apart, on every cue and every pair of names, tries what it finds on the photographs kept
+            before, and says when a sample is too small to measure. It draws nothing again and decodes nothing again. The samples are kept in this
+            browser under the photograph's name, their names and places are in the copied result, and nothing is uploaded or written to the photograph.
+          </p>
+          <div id="dSampleSurface"></div>
+          <div class="dbg-actions">
+            <button id="dSampleCount" type="button" class="dbg-btn primary" disabled>Count the samples</button>
+          </div>
+          <p id="dSampleHint" class="dbg-progress" role="status" aria-live="polite" aria-label="Samples, what the count is waiting on">Not available yet: the count needs a photograph drawn by step 1 above. Press step 1, then place and confirm samples on the picture.</p>
+          <div id="dSamplePics"></div>
+        </div>
       </section>
 
       <section class="dbg-sec">

@@ -55,6 +55,9 @@ import { drawFrame, canDrawFrame, buildLinearSource, openDrawing, type Drawing, 
 import { Renderer, VERT, FRAG, MASK_LOOP, dropMaskLoops } from "./gl";
 import { PLACE_NAMES, PLACE_TARGETS, placesPicture, placeLabels, type PlaceTarget } from "./placesdata";
 import { PLACE_CUES, placeCueValues, placeReport } from "./placecues";
+import { placeSampleNames, placeSampleLabels, placeSampleTargets, placeSampleShrink, placeSamplesToText, placeSamplesFromText, type PlaceSample } from "./placesamples";
+import { PLACE_STRUCTURE_CUES, placeStructureValues } from "./placestructure";
+import { placeSurface } from "./placesurface";
 
 declare const __APP_VERSION__: string;
 
@@ -3652,14 +3655,39 @@ let sep: SepState | null = null;
 const sepGo = $("dSepGo") as HTMLButtonElement;
 const sepSweepBtn = $("dSepSweep") as HTMLButtonElement;
 
-/** Gives the first press's drawing surface back and disables the second button and the sweep's. Takes nothing; returns nothing. */
+/** The picture code a press built, kept for the next press of this loading of the page. Null when none is kept. */
+let heldDrawing: Drawing | null = null;
+
+/** Keeps a drawing surface for the next press. Takes the surface. Returns nothing. What it must satisfy: at most one surface is kept, the
+ *  one kept before is given back, and a surface whose graphics context is lost is given back and not kept, so a press never meets a dead one. */
+function holdDrawing(d: Drawing): void {
+  if (heldDrawing && heldDrawing !== d) heldDrawing.close();
+  heldDrawing = null;
+  let dead = true;
+  try { dead = d.probe().lost; } catch { dead = true; }
+  if (dead) d.close(); else heldDrawing = d;
+}
+
+/** Hands the kept drawing surface to a press. Takes nothing. Returns the surface, or null when none is kept; the page no longer holds it. */
+function takeHeldDrawing(): Drawing | null {
+  const d = heldDrawing;
+  heldDrawing = null;
+  return d;
+}
+
+/** Gives the first press's drawing surface to be kept for the next press, and disables the second button and the sweep's. Takes nothing;
+ *  returns nothing. What it must satisfy: the surface is given back for good only at the page hide. */
 function closeSep(): void {
-  sep?.drawing.close();
+  if (sep) holdDrawing(sep.drawing);
   sep = null;
   sepGo.disabled = true;
   sepSweepBtn.disabled = true;
 }
-window.addEventListener("pagehide", closeSep);
+window.addEventListener("pagehide", () => {
+  closeSep();
+  heldDrawing?.close();
+  heldDrawing = null;
+});
 
 /** The edit of a white point: the swap on, no look, every control at its neutral, the balance and exposure given. Takes the gains and the
  *  exposure. Returns the edit, and throws when the drawn path does not cover it. */
@@ -3896,11 +3924,10 @@ async function placesPart(tally: PressTally, subject: Subject, frame: { data: Ui
       row("The places the counted pixels are labelled by", `picture ${picture} of 3 · ${names.join(", ")} · ${targets.map((x) => x.title).join(" · ")}`,
         "This photograph is one of the three the places file holds, so each counted pixel is labelled by the polygons drawn on it, by place, and the targets are the places joined as the file's targets name them. The polygons were read off the three pictures on 8 November 2026 and are an agent's reading, not a measurement of the photograph.");
     } else {
+      // No places are held for this photograph: no region is named until a sample is placed, so nothing is labelled here.
       lab = labels.lab;
-      names = [...SEP_LABELS];
-      targets = [{ title: "Sky", places: [0] }, { title: "Foliage", places: [2] }];
-      row("The places the counted pixels are labelled by", `none held for this photograph · the check's own four labels, ${names.join(", ")} · two targets, ${targets.map((x) => x.title).join(" and ")}`,
-        "Places are held for three photographs only, the three marina raws NIR_3742.NEF, NIR_3736.NEF and NIR_3733.NEF. Any other photograph is labelled by the check's own four labels, sky by the app's sky selection, neutral by saturation, foliage by the vegetation axis and the rest other, and the cue module's targets are the sky and the foliage.");
+      names = [];
+      targets = [];
     }
     lap(tally, "separation: the places, the labelling");
 
@@ -3927,6 +3954,19 @@ async function placesPart(tally: PressTally, subject: Subject, frame: { data: Ui
     if (mask) for (let i = 0; i < n; i++) sky[i] = sampleBrush(mask, (cols[i] + 0.5) / t.fromW, (rows[i] + 0.5) / t.fromH) >= SEP_SKY_WEIGHT ? 1 : 0;
     const cues = placeCueValues(t.data, linear, light, t.fromW, t.fromH, cols, rows);
     lap(tally, "separation: the eight cues");
+    // The structure cues are counted once for the photograph and kept beside the eight, with what the count of the samples needs.
+    books(tally);
+    const structure = placeStructureValues(light, frame.width, frame.height, cols, rows);
+    lap(tally, "separation: the structure cues");
+    placeHeld = { name: subject.name, t, cols, rows, cues: [...cues, ...structure], cueNames: [...PLACE_CUES, ...PLACE_STRUCTURE_CUES], sky };
+    if (!picture) {
+      const kept = samplesRead(subject.name).length;
+      row("The places and the regions", kept
+        ? `no region is named until the samples are counted · ${kept} ${kept === 1 ? "sample" : "samples"} kept from before ${kept === 1 ? "is" : "are"} on the picture below`
+        : "no region is named until a sample is placed on the picture below",
+      "Places are held for three photographs only. On any other photograph a region is named by a sample placed on the picture and confirmed, and the check measures what tells the named regions apart when the samples are counted. Nothing is labelled until then.");
+      return;
+    }
     row("The eight cues counted", PLACE_CUES.join(" · "),
       `Each is one value for each counted pixel. Lightness is the largest of the drawn pixel's three channels over 255. Saturation is the largest less the smallest over the largest. Red against green, red against blue and green against blue are each the difference of two linear channels over their sum, taken ${lin ? "on the photograph's linear copy at the opening gains" : "on the drawn pixel's own channels over 255, because this photograph has no linear camera copy at the drawn size"}. Texture at 5 and at 15 is the standard deviation of the drawn lightness in a square window of that many pixels centred on the pixel's place in the whole frame, over 255. Height is the pixel's row over the last row.`);
 
@@ -3968,12 +4008,219 @@ async function placesPart(tally: PressTally, subject: Subject, frame: { data: Ui
   }
 }
 
+// --- THE SAMPLES (record 109; plan of 10 November 2026) --------------------------------------------------------------------------
+// After a press has drawn a photograph it is shown here with the sample surface on it. A sample is a named circle placed, moved, sized and
+// confirmed by the person; the second control counts the samples from what the press kept (the counted pixels' places, the cues, the sky
+// selection), so a count after a sample moves draws and decodes nothing again. The samples are kept in this browser under the
+// photograph's name and are in the copy as names and places. Nothing here is the editor's, and nothing is written to the photograph.
+
+/** The key of the browser's local storage under which each photograph's samples are kept, as text, by the photograph's name. */
+const SAMPLES_KEY = "ips-debug-separation-samples";
+/** The names the surface offers for a sample. */
+const SAMPLE_NAMES = ["Sky", "Foliage", "Water", "Built things"];
+/** The fewest counted pixels a name or a sample can hold and still be measured, the cue module's own floor. */
+const SAMPLE_MIN_PIXELS = 50;
+/** The words beside the count control while it is of no use. */
+const SAMPLE_HINT_NONE = "Not available yet: the count needs a photograph drawn by step 1 above. Press step 1, then place and confirm samples on the picture.";
+
+/** What a press keeps for the count of the samples. `cues` are the eight cues and then the structure cues, one array for each, a value for
+ *  each counted pixel, named in `cueNames` in the same order. */
+interface PlaceHeld { name: string; t: ReturnType<typeof thin>; cols: Int32Array; rows: Int32Array; cues: Float32Array[]; cueNames: string[]; sky: Uint8Array }
+let placeHeld: PlaceHeld | null = null;
+let sampleSurface: { set(samples: PlaceSample[]): void; destroy(): void } | null = null;
+let samplesNow: PlaceSample[] = [];
+const sampleBtn = $("dSampleCount") as HTMLButtonElement;
+const sampleHint = $("dSampleHint");
+
+/** Reads the samples kept for one photograph. Takes the photograph's name. Returns its samples, an empty list where none are kept, storage
+ *  is refused or the text cannot be read. What it must satisfy: every access to storage is inside a try. */
+function samplesRead(name: string): PlaceSample[] {
+  try {
+    const raw = window.localStorage.getItem(SAMPLES_KEY);
+    const o: unknown = raw ? JSON.parse(raw) : {};
+    if (!o || typeof o !== "object" || Array.isArray(o)) return [];
+    const text = (o as Record<string, unknown>)[name];
+    return typeof text === "string" ? placeSamplesFromText(text) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Keeps one photograph's samples. Takes the photograph's name and its samples. Returns whether the write was accepted. What it must satisfy:
+ *  the write is inside a try, other photographs' samples are kept as they were, and the page works whether or not it is accepted. */
+function samplesWrite(name: string, samples: PlaceSample[]): boolean {
+  try {
+    const raw = window.localStorage.getItem(SAMPLES_KEY);
+    const o: unknown = raw ? JSON.parse(raw) : {};
+    const all = o && typeof o === "object" && !Array.isArray(o) ? (o as Record<string, unknown>) : {};
+    window.localStorage.setItem(SAMPLES_KEY, JSON.stringify({ ...all, [name]: placeSamplesToText(samples) }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Takes the sample surface and what was kept away and disables the count. Takes nothing; returns nothing. Called when a press begins, so
+ *  a photograph's samples never stand beside another photograph's picture. */
+function dropSampler(): void {
+  try { sampleSurface?.destroy(); } catch { /* the surface is gone either way */ }
+  sampleSurface = null;
+  placeHeld = null;
+  samplesNow = [];
+  $("dSampleSurface").replaceChildren();
+  $("dSamplePics").replaceChildren();
+  sampleBtn.disabled = true;
+  sampleHint.textContent = SAMPLE_HINT_NONE;
+}
+
+/** Shows the drawn photograph with the sample surface on it, starting from the samples kept for it. Takes nothing; reads `placeHeld`.
+ *  Returns nothing; where the surface cannot be built it writes one row saying so and leaves the count off. What it must satisfy: the
+ *  picture is the thinned drawn picture the press counted; every change of the samples is kept under the photograph's name at once, inside
+ *  a try; the count control is enabled once the picture stands. */
+function showSampler(): void {
+  const h = placeHeld;
+  if (!h) return;
+  try {
+    const host = $("dSampleSurface");
+    host.replaceChildren();
+    const start = samplesRead(h.name);
+    samplesNow = start.slice();
+    const frame = document.createElement("div");
+    host.appendChild(frame);
+    const cv = sepFigure(frame, `The drawn photograph, shown at ${h.t.w} by ${h.t.h} pixels, to place named samples on. A sample is a circle: place it, move it, set its size and confirm it with a name.`, h.t.data, h.t.w, h.t.h);
+    const fig = cv.parentElement;
+    if (fig) { fig.style.maxWidth = "48rem"; fig.style.flex = "none"; }
+    const ui = document.createElement("div");
+    host.appendChild(ui);
+    sampleSurface = placeSurface(ui, cv, {
+      samples: start,
+      names: SAMPLE_NAMES,
+      onChange: (samples: PlaceSample[]) => {
+        samplesNow = samples.slice();
+        samplesWrite(h.name, samplesNow);
+      },
+    });
+    sampleBtn.disabled = false;
+    sampleHint.textContent = start.length
+      ? `${start.length} ${start.length === 1 ? "sample" : "samples"} kept from before ${start.length === 1 ? "is" : "are"} on the picture. Place and confirm more, then press Count the samples.`
+      : "Place a sample on the picture and confirm it with a name, then press Count the samples.";
+  } catch (err) {
+    row("The sample surface", "not shown", `${(err as Error).message}. The rows above stand as the check printed them.`);
+  }
+}
+
+/** The percentage of a fraction, to one decimal. Takes the fraction. Returns text. */
+const samplePct = (v: number): string => `${(v * 100).toFixed(1)} percent`;
+
+/** Counts the samples. Takes the press's tally. Returns nothing; writes rows into the report and pictures into `#dSamplePics` (replacing the
+ *  last count's). What it must satisfy: nothing is decoded or drawn again, since the arrays are the ones the press kept; the samples' names
+ *  and places are in the rows and so in the copy; height is left out of the pair rows and the fits; the pair figures are read again with
+ *  every sample at half and at a quarter of its radius; the selections kept from other photographs are read here, and this count's are kept
+ *  under the photograph's name followed by "(samples)", inside a try. Consumer: the count control. */
+async function sampleCount(tally: PressTally): Promise<void> {
+  const h = placeHeld;
+  if (!h) { row("Count of the samples", "not run", "No photograph is drawn, so there is nothing to count the samples on."); return; }
+  const samples = samplesNow.slice();
+  const pics = $("dSamplePics");
+  pics.replaceChildren();
+  row("Count of the samples", `${h.name} · ${samples.length} ${samples.length === 1 ? "sample" : "samples"}`, "Counted from what the press kept: the counted pixels' places, the cues and the sky selection. Nothing is decoded or drawn again.");
+  if (!samples.length) {
+    row("The samples", "none placed", "No region is named, so there is nothing to measure. Place a sample on the picture and confirm it with a name.");
+    progress("No sample is placed, so nothing was counted.", true);
+    sampleHint.textContent = "No sample is placed. Place one on the picture, confirm it with a name, then press Count the samples.";
+    return;
+  }
+  const { t, cols, rows } = h;
+  progress("Labelling the counted pixels by the samples");
+  await pause(tally);
+  books(tally);
+  const names = placeSampleNames(samples);
+  const got = placeSampleLabels(samples, t.fromW, t.fromH, cols, rows);
+  const own = samples.map((s) => placeSampleLabels([s], t.fromW, t.fromH, cols, rows).counts[0]);
+  const targets = placeSampleTargets(names);
+  lap(tally, "samples: the labelling");
+  row("The samples", samples.map((s, i) => `${i + 1}. ${s.name} at ${samplePct(s.x)} across and ${samplePct(s.y)} down, radius ${samplePct(s.r)} of the shorter side, ${own[i].toLocaleString("en-US")} counted pixels${own[i] < SAMPLE_MIN_PIXELS ? ", too small to measure alone" : ""}`).join(" · "),
+    "Each sample as placed: its name, its centre as percentages of the frame's width and height, its radius as a percentage of the frame's shorter side, and how many of the counted pixels it holds by itself. A sample holding under 50 is too small to measure alone. The names and places are in the copy.");
+  row("The names and the overlap", `${names.map((nm, l) => `${nm} ${got.counts[l].toLocaleString("en-US")}`).join(" · ")} · overlap ${got.overlap.toLocaleString("en-US")}`,
+    "A name's pixels are those in any of its samples, each counted once. A pixel that samples of two different names both hold takes no name: it is left with rest and counted as overlap. Rest is every counted pixel in no sample.");
+  row("Height", "left out of the pair rows and the fits", "With samples, a name's pixels are where its samples were put, so a figure of height between two names would measure the placing. The drawn places of the three marina photographs keep it.");
+  row("The structure cues counted", PLACE_STRUCTURE_CUES.join(" · "),
+    "Each is the coherence of the lightness gradient: the centred differences of the drawn lightness over a square window of 15 pixels or of 45 pixels centred on the pixel's place in the whole frame, the squared difference of the two squared-derivative sums plus four times the square of their product sum, over the square of the sum, from 0 where the window holds no gradient or gradients in every direction to 1 where every gradient lies along one line. They count how aligned the edges are, not how straight one edge is.");
+
+  progress("Fitting and reading the selections");
+  await pause(tally);
+  books(tally);
+  const store = keptRead();
+  const key = `${h.name} (samples)`;
+  const kept = Object.entries(store.all).filter(([k]) => k !== key && k !== h.name).map(([, v]) => v);
+  const rep = placeReport(h.cues, got.labels, names, targets, h.sky, key, kept as Parameters<typeof placeReport>[6], h.cueNames, ["height"]);
+  lap(tally, "samples: the report");
+  for (const text of rep.rows) {
+    const at = text.indexOf(": ");
+    row(at > 0 ? text.slice(0, at) : "The samples' report", at > 0 ? text.slice(at + 2) : text,
+      "Counted by the cue module on this photograph's counted pixels, labelled by the samples. A selection fitted here is printed as fitted here and is no result; a selection kept from another photograph is read on this one as it was fitted.");
+  }
+  const stored = keptWrite(store.all, key, rep.fits);
+  row("Selections kept on this device", store.ok && stored
+    ? `${kept.length} kept from other photographs · this count's ${rep.masks.length} selections are kept under ${key}`
+    : "cannot be kept on this device",
+  store.ok && stored
+    ? "The fitted selections are kept in this browser's local storage, as text, under the photograph's name with (samples) after it, and the next photograph opened here is read through them."
+    : "This browser refused local storage, so the selections fitted here are not kept and no other photograph's are read here. The rest of the page works.");
+  lap(tally, "samples: keeping the selections");
+
+  for (const [f, words] of [[0.5, "half"], [0.25, "a quarter"]] as const) {
+    progress(`Reading the pair figures again at ${words} of each sample's radius`);
+    await pause(tally);
+    books(tally);
+    const small = placeSampleShrink(samples, f);
+    const g2 = placeSampleLabels(small, t.fromW, t.fromH, cols, rows);
+    const rep2 = placeReport(h.cues, g2.labels, placeSampleNames(small), targets, h.sky, key, [], h.cueNames, ["height"]);
+    lap(tally, `samples: the pair figures at ${words} of each radius`);
+    for (const text of rep2.rows) {
+      const at = text.indexOf(": ");
+      const head = at > 0 ? text.slice(0, at) : text;
+      if (!(text.startsWith("Counted pixels by label") || head.includes(" against ") || text.includes("too few to count, "))) continue;
+      row(`At ${words} of each sample's radius: ${head}`, at > 0 ? text.slice(at + 2) : "", `The same counts and pair figures with every sample's radius multiplied by ${f}. A name that falls under ${SAMPLE_MIN_PIXELS} counted pixels there is printed as too few to count, which is how a sample too small for steady figures is seen.`);
+    }
+  }
+
+  progress("Drawing what the selections take");
+  await pause(tally);
+  books(tally);
+  const head = document.createElement("h4");
+  head.style.cssText = "font-size:0.9375rem;margin:18px 0 6px";
+  head.textContent = "What each selection takes";
+  pics.appendChild(head);
+  for (const m of rep.masks) {
+    const took = placePicture(pics, m.title, t, m.taken);
+    row(`Picture: ${m.title}`, `takes ${took} of ${t.w * t.h} counted pixels`, "The count of the pixels the selection takes, drawn under the report at full strength with an outline. It is the same selection the report's rows read.");
+  }
+  lap(tally, "samples: drawing the selections");
+  progress("The samples are counted. The rows are in the picture checks' list, ready to copy.", true);
+  sampleHint.textContent = `Counted ${samples.length} ${samples.length === 1 ? "sample" : "samples"}. The rows are in the picture checks' list and the pictures are under the samples.`;
+}
+
+sampleBtn.addEventListener("click", (e) => {
+  if (!placeHeld) { sampleHint.textContent = SAMPLE_HINT_NONE; return; }
+  void sepPress(e.currentTarget as HTMLButtonElement, false, async (tally) => {
+    try {
+      await sampleCount(tally);
+    } catch (err) {
+      row("Count of the samples", "not run", `${(err as Error).message}. The rows above stand as they were.`);
+    } finally {
+      lap(tally, TAIL_STAGE);
+      sepTimeRows(tally, performance.now() - pressStart);
+    }
+  });
+});
+
 /** Takes the two buttons' common wrapper: runs `body` as a press of the Separation check with the page's other tests held off, the rows
  *  written into the picture checks' own list and copy block, and the press counted in `running` until `body` ends. Returns nothing. */
 async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: PressTally) => Promise<void>): Promise<void> {
   const list = $("dPicResults");
   if (running) { $("dSepHint").textContent = "Another test on this page is still running. Press this again when it has finished."; return; }
-  const others = ["dRun", "dBigRead", "dSlowBuild", "dPictures", "dSepStart", "dSepGo", "dSepSweep"].map((id) => $(id) as HTMLButtonElement);
+  const others = ["dRun", "dBigRead", "dSlowBuild", "dPictures", "dSepStart", "dSepGo", "dSepSweep", "dSampleCount"].map((id) => $(id) as HTMLButtonElement);
   const was = others.map((b) => b.disabled);
   others.forEach((b) => { b.disabled = true; });
   const label = btn.textContent;
@@ -3995,12 +4242,14 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
     others.forEach((b, i) => { b.disabled = was[i]; });
     sepGo.disabled = !sep;
     sepSweepBtn.disabled = !sep;
+    sampleBtn.disabled = !placeHeld;
   }
 }
 
 ($("dSepStart") as HTMLButtonElement).addEventListener("click", (e) => {
   void sepPress(e.currentTarget as HTMLButtonElement, true, async (tally) => {
     closeSep();
+    dropSampler();
     $("dSepPics").replaceChildren();
     $("dPlacePics").replaceChildren();
     await refreshReport();
@@ -4012,13 +4261,34 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       : "The renderer string the browser gives for this page's drawing. The figures are of this chip.");
     let drawing: Drawing | null = null;
     try {
-      progress("Building the picture code, once");
+      // THE PICTURE CODE IS BUILT ONCE IN A LOADING OF THE PAGE: a press takes the surface the press before it kept, and builds only when none is kept.
+      let reused = false;
       books(tally);
-      tally.builds++;
-      drawing = await openDrawing();
+      drawing = takeHeldDrawing();
+      if (drawing) {
+        reused = true;
+        progress("Using the picture code built by the press before");
+      } else {
+        progress("Building the picture code, once");
+        tally.builds++;
+        drawing = await openDrawing();
+      }
       lap(tally, "the picture code's build");
+      row("The picture code", reused ? "kept from the press before, not built again" : "built for this press", reused
+        ? "Within one loading of this page the picture code is built once and kept for the presses after it, so a second press does not spend the build again. A kept surface that fails its planted colour is given back and built anew."
+        : "The first press in this loading of the page builds the picture code, or a press after a lost graphics context or a page hide does.");
       await pause(tally);
-      const plant = await plantedColour(drawing, tally);
+      let plant = await plantedColour(drawing, tally);
+      if (!plant.exact && reused) {
+        drawing.close();
+        books(tally);
+        progress("The kept picture code failed its planted colour, so it is built anew");
+        tally.builds++;
+        drawing = await openDrawing();
+        lap(tally, "the picture code's build, anew after a kept one failed");
+        row("The picture code", "built anew", "The surface kept from the press before did not read the planted colour back exactly, so it was given back and a new one built.");
+        plant = await plantedColour(drawing, tally);
+      }
       row("A planted colour, drawn and read back", plant.value, plant.meaning);
       if (!plant.exact) { row("The Separation check", "not run", "The planted colour did not read back exactly, so a picture read on this page cannot be trusted."); progress("Stopped: the planted colour did not read back exactly.", true); return; }
       books(tally);
@@ -4103,6 +4373,9 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       row("The opening balance, the first white point", `gains ${base.wb.map((g) => g.toFixed(4)).join(", ")} · exposure ${base.exposure.toFixed(4)} · ${rd ? `reads as ${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read: the file has no matrix to read it through"}`,
         `What the editor opens this photograph at, by the app's one copy of the at-open ruling (freshBaseline): for a raw opened from its sensor data, the balance found from the data (gray-world) and the automatic exposure. The drawn picture has the red and blue swap on and no look, every control at its neutral${subject.img.isRaw ? "" : "; this file opened as an 8-bit picture (a camera-rendered file, or a raw shown by its embedded preview, as the row above says), so it opens with no balance and exposure 1, and the swap is switched on here all the same for the check"}.`);
       await placesPart(tally, subject, frame, t, labels, skyBuilt.mask, base.wb);
+      books(tally);
+      showSampler();
+      lap(tally, "samples: the surface on the photograph");
       progress("The photograph is drawn. Now tap a neutral spot and a sunlit leaf, or type their points, then press step 3.", true);
       $("dSepHint").textContent = "The picture is drawn above. Choose what a tap sets, then tap the picture or type the two numbers of a spot: the picture is redrawn at that spot's balance and this line says whether the spot is usable. Set both spots, then press step 3.";
       sepMarks();

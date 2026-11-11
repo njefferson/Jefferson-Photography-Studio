@@ -1,15 +1,19 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
 planhash=7ef63b9c213ca94f
-diffhash=8ee6e9fd1d0eb27b
-difflines=1579
-linesread=1652
-verdict=IN-SCOPE: the documents of the second wall (science file, record 050, the new record, the notes) and nothing outside them, the two hooks left as they stand
-# IN-SCOPE: the documents of the second wall (science file, record 050, the new record, the notes) and nothing outside them, the two hooks left as they stand
-# IR-SCIENCE.md: covered by the plan's Files line for step 400 and by step 400's Do parts 2 and 5; the three passages staged on 9 November, the sentences on the fifth press put right where step 397 names them (and one further sentence on B's repeat found in the same pass), and the new passage dated 10 November 2026 with the pages read, the pages that did not answer, the changes to the account and the structure measures; it describes no photograph, ranks nothing and proposes nothing for the editor.
-# docs/decisions/050-the-mask-system-is-short-of-standard-convention.md: covered by the Files line for step 400 and Do part 3; the addition staged on 9 November, plus the dated sentence on the rectangle row, one item for RawPedia's page and one sentence under each row of the survey it bears on; no frame, no decision cited, no number of three digits.
-# docs/decisions/109-the-test-page-names-regions-by-samples-placed-on-the-photograph.md (new): covered by the Files lines for steps 399 and 400; the record written by step 399 with its six sections and its Depends, landed here unchanged.
-# NOTES.md: covered by the Files lines for steps 399 and 400 and Do part 4; the bullet of 109 below 108's, the sentences at the end of the lines of Q-JPS-273, Q-JPS-278 and Q-JPS-279, the lines Q-JPS-277 to Q-JPS-280 staged on 9 November, and the new lines Q-JPS-281 to Q-JPS-288 from the reports of steps 393 to 399; no other bullet and no earlier line of the queue removed.
-# .githooks/commit-msg and .githooks/pre-commit: changes standing in the working tree that no step of any plan made; step 400's Facts and the Files line (read only) leave them as they stand and out of the staging, and they are counted in the diff only because the working tree holds them.
-# .plan-scope: written by the record command that follows this verdict, named in the Files line for step 400.
-# No source file, tool, page, VERSION or roadmap bullet other than 109's is changed; nothing is ranked or proposed for the editor.
+diffhash=90d403f4c95945f8
+difflines=1408
+linesread=1723
+verdict=IN-SCOPE: the staged diff is the release of 2.78, the seven build files of steps 401 to 405, VERSION, the module map, the decision record's Built section and NOTES.md, with the two hooks left as they stand.
+# IN-SCOPE: the staged diff is the release of 2.78, the seven build files of steps 401 to 405, VERSION, the module map, the decision record's Built section and NOTES.md, with the two hooks left as they stand.
+# Judged against the plan's Files line for step 406, its Asked, the Rules of this plan and steps 401 to 406; the whole staged diff of 1,723 lines was read from a file, and the hooks' unstaged diff, which step 406's Facts leave out.
+# VERSION: the middle number from 2.77 to 2.78, the Files line for step 406 and the Facts' rule for a capability release.
+# docs/ARCHITECTURE.md: three modules added to the generated map and two line counts moved, written by the architecture check's write flag, named in step 406's Files.
+# docs/decisions/109-the-test-page-names-regions-by-samples-placed-on-the-photograph.md: one Built section above Depends, dated, naming the steps, saying what was built and what only the device shows; no frame, no decision cited beyond those Depends declares.
+# NOTES.md: one sentence at the end of Q-JPS-277 saying what step 405 did, and six new queue lines under the next free keys from the Found and Uncertain lines of steps 401 to 405; no roadmap bullet changed and no line removed.
+# debug.html: a samples box with a heading, a surface host, a real count button disabled at rest, a polite status line and a pictures host, and two copy notes gaining words; no id of a walked element changed; step 405's Files.
+# src/debug.ts: the imports, the kept picture code, the structure cues counted once and held, the samples part and its count, and the new button held off during other presses; step 405's Files.
+# src/placecues.ts: optional trailing cue names and left-out cues, the scale travelling with the name, the old number form still read; step 404's Files; no change beyond that in this step.
+# src/placesamples.ts, src/placestructure.ts, src/placesurface.ts, src/placesurface.css: the four new modules of steps 401 to 403, each as the Rules' interface gives; no file of the editor, the pipeline, the looks, the service worker or the build is touched.
+# .githooks/commit-msg and .githooks/pre-commit: modified by no step, left unstaged as step 406's Facts say.
+# Nothing in the diff is outside a line of the plan; no walk, browser or decode was run.
