@@ -1,12 +1,13 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=d2bad8331c5589d3
-diffhash=6bef1b056e9e1ba4
-difflines=850
-linesread=850
-verdict=IN-SCOPE: the staged change is the test page's mask release and nothing beyond it, every path is one step 420 names, and no editor file is touched.
-# IN-SCOPE: the staged change is the test page's mask release and nothing beyond it, every path is one step 420 names, and no editor file is touched.
-# Read in full: the staged diff (935 lines, the superset of the 850 the scope check counts against the remote's staging) and the unstaged diff (the two hooks, 56 lines, left unstaged and untouched by this step).
-# Staged paths, each against the plan's Files for step 420: VERSION (2.78 to 2.79); src/samplemask.ts (new, the mask module of step 418); src/debug.ts and debug.html (the page wiring of step 419); docs/ARCHITECTURE.md (the module map, 93 to 94 modules, written by the architecture check); docs/decisions/110-a-mask-is-made-from-samples-placed-on-the-photograph.md (a Built section only, before Depends, no other section changed); NOTES.md (five new Found queue lines Q-JPS-301 to Q-JPS-305, no existing line and no roadmap bullet changed).
-# The editor, the pipeline, the shader, the looks, the service worker, the surface and its stylesheet, and the build are untouched. The hooks and the doctrine sync marker are not staged. The page keeps recipes only in browser storage inside try blocks and reads the mask module through one cast, as the Built section and Q-JPS-301 say.
-# Against the plan's Asked and Rules of this plan and steps 418 to 420: the release raises the middle number, carries the module map and the record's Built section, and queues the app's unresolved findings; nothing is added beyond them.
+planhash=a6d07598519d55cd
+diffhash=e54f82db3137012c
+difflines=484
+linesread=504
+verdict=IN-SCOPE: five documents changed, all named in the plan's Files for steps 444, 445 and 446, no file of the app's source, no hook and no doctrine marker staged, and the Found queue gains lines and loses none.
+# IN-SCOPE: five documents changed, all named in the plan's Files for steps 444, 445 and 446, no file of the app's source, no hook and no doctrine marker staged, and the Found queue gains lines and loses none.
+# IR-SCIENCE.md: covered by the Files line for step 445 and step 446; adds the dated section of 11 November 2026 (step 445's six parts, no table, no chosen method) and, by step 446, the one sentence on the rule the comparison used with the paragraph rewrapped from there to its end.
+# NOTES.md: covered by the Files lines for steps 444 and 446; adds the roadmap bullet of key 111 directly under 110's (step 444, internal, no other bullet touched) and Q-JPS-306 to Q-JPS-338 after Q-JPS-305 (step 446, one line each, none removed).
+# docs/decisions/111-a-mask-is-judged-over-the-whole-photograph.md: covered by the Files line for step 444 (new); the record that settles how a mask is judged and chooses no method, with Looked at, Depends and Rank.
+# docs/decisions/110-a-mask-is-made-from-samples-placed-on-the-photograph.md: covered by the Files line for step 444; adds the dated paragraph on whole photographs at the end of its Built section.
+# docs/decisions/006-mask-by-subject.md: covered by the Files line for step 444; replaces the paragraph that read Owed with the reading of 11 November 2026 under Looked up only.

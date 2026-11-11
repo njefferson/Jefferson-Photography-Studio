@@ -5890,6 +5890,253 @@ the default sample size, a mark for what a mask must leave out, what a copy carr
 shows, how a wrong copy is redone, and the editor's stage, stand in the decision record
 numbered 110.
 
+**A MASK MADE FROM SAMPLES, JUDGED OVER WHOLE PHOTOGRAPHS: THE PAGES READ, THE
+INSTRUMENT, THE EDGE STAGE ALONE, AND WHAT EACH KIND OF MASK TOOK AND LEFT, 11 NOVEMBER
+2026.** Every page below was fetched to disk by a script of its own step and read there
+with the Read tool; a page that was not reached or read in part says so. Every mask was
+made from the samples placed on eight photographs and on seven planted pictures, and
+every mask of a photograph was judged in a picture that an agent opened, the agent not
+being one that built any of the maps. This passage describes no photograph's look beyond
+what a mask takes and leaves, holds no table, names no chosen method and proposes
+nothing. Times are the container's processor, never a tablet's.
+
+Part one, what was read for the reading record 006 owed and for the fitted classifier.
+- The runtime's own pages (onnxruntime.ai, eight pages, read whole). It is MIT licensed
+  and its latest version on the registry is 1.31.1. Its two support tables, the web
+  get-started page and the js/web readme on the main branch, give Safari on iOS as
+  WebAssembly yes, WebGPU no. WebKit's post of 9 June 2025, read whole, says Safari 26
+  adds WebGPU on macOS, iOS, iPadOS and visionOS, and the caniuse data, read at its
+  publisher's repository, gives WebGPU yes for iOS Safari 26.0 through 27.2, WebAssembly
+  SIMD yes from 16.4 and SharedArrayBuffer yes from 15.2 with a note that it needs
+  cross-origin isolation. Threads in the runtime need that isolation as well. The two
+  accounts disagree and no page settles which holds on the owner's tablet. The size of
+  each 1.31.1 WebAssembly binary was not read; the 14.2, 28.3 and 26.8 megabyte figures
+  of 25 September were not read again.
+- Models prompted by points. Sizes are from listings, and the host's limit for one file
+  is 26,214,400 bytes. SlimSAM (Apache 2.0 on its card): encoder 23,276,014 and decoder
+  16,557,892 bytes at full precision, both under the limit. MobileSAM (Apache 2.0 file
+  in its repository, MIT on the card of the copy that holds the ONNX files): decoder
+  16,501,323 bytes, encoder 28,157,093, which is 1,942,693 over the limit. EfficientViT-SAM
+  (Apache 2.0): decoders about 16,470,362 bytes, smallest encoder 123,112,917. SAM 2 tiny
+  as ONNX: the copy has no model card and states no licence; its encoder is 28,532,736
+  bytes at the smallest precision, over the limit.
+- Models that label the scene by class. BiSeNet V2 for ADE20K (MIT): the release file
+  read in step 427 is 18,385,109 bytes, not the 22.4 megabytes of 25 September. A small
+  sky model of 2 megabytes (MIT) says in its readme that building detail is sometimes
+  taken as sky. SegFormer's licence reads "other" and was not asked.
+- The fitted classifier's pages (16 reached, read whole except two). DINOv2 small is
+  ViT-S/14, 384 wide, 21 million parameters, Apache 2.0 on its base card and its
+  repository file. The paper fits a linear layer on frozen patch tokens, and fits it on
+  whole data sets, not on a few marks; no page read measures a fit from a few marks. It
+  brings the coarse logits up by plain upsampling and says that cannot easily give fine
+  edges. No page read says anything of a patch unlike every mark. Convpaint (BSD 3-Clause,
+  Python and napari) fits a classifier to drawn scribbles on DINOv2 features; its readme
+  does not name the classifier and its two method pages were not reached. Two ONNX copies
+  of the small model exist (onnx-community and Xenova); the Xenova copy's smallest file is
+  12,917,198 bytes; neither copy's card states a licence of its own. The model search was
+  read for ids only, and lines 2261 to 3360 of the paper's page, its reference list, were
+  not read.
+
+Part two, what the editors' pages and the paper say.
+- Adobe's and Capture One's pages were not reached, so nothing is known from these
+  pages of what either selects by a model, of what happens to such a mask when settings
+  are copied, or of what is shown before a copy applies.
+- darktable's manual (development version 5.6, read whole): one selection made by a model,
+  the AI object, from clicks on the subject; a click adds a point, shift-click excludes
+  an area. The mask is vectorised once into path shapes and kept in that form, carried
+  as geometry and never made again from the clicks. The image encoder runs once on the
+  first click and is cached; a crop or a lens correction discards the cache. Its models
+  are ONNX files run by one library, on the processor in the bundled Linux build. No
+  page names sky, water, plants or built things as kinds it takes, none shows what a
+  copied mask would take before it applies, and none gives a time for a mask.
+- The Segment Anything paper (30 pages, each opened): scores a mask by intersection over
+  union against a whole truth mask, thresholding logits at zero, with the point placed
+  at the truth's interior distance maximum; it says of edges that the model does not
+  produce boundaries as crisply as costlier methods, and nothing in it scores sampled
+  pixels. The Jaccard and Dice pages give J = S / (2 - S) between the two measures. The
+  overlap in the figures below is that intersection over union counted over every pixel
+  of the frame, with a graded mask cut at a half.
+
+Part three, the instrument, the planted pictures and the bar.
+- Eight photographs (NIR_3461, NIR_3466, NIR_1827, NIR_1651, NIR_3742, NIR_3705,
+  NIR_3710 and NIR_1873) with their samples, and seven planted pictures (plant-straight,
+  plant-stepped, plant-curved, plant-three, plant-shore, plant-built-foliage and
+  plant-island) with 16 planted regions, whose truth was set before any mask was made. A
+  mask is one 8-bit grey value for each pixel of the 2,800 by 1,864 picture. The scorer
+  gives overlap over union at a half and the widest band of wrong pixels along the truth's
+  boundary; its plant read 0.8750 and 6 on every run. A picture is read as it opens, as
+  its natural-hue picture and as its bright-only picture.
+- The bar. On a photograph, the thing sampled is taken to its edges, no region of another
+  kind larger than one hundredth of the frame is taken, and no band of the wrong kind
+  along an edge is wider than four pixels at the frame's own size. On a planted picture,
+  overlap over union of 0.9 or more and a widest band of four pixels or less.
+- The entries each kind sent to the pictures were fixed by the mean overlap at a half over
+  the 16 planted regions in coarse form, a figure that picks a variant and measures no
+  mask on a photograph: the 2.79 recipe refined to edges, open, 0.9752; MobileSAM joint
+  with every sample's centre in one prompt, open 0.9746 and natural 0.9732; the fitted
+  linear classifier, natural 0.9135 and bright 0.9090; the scene-class model with each
+  class given to the one name holding most sample pixels in it, natural 0.8344 and open
+  0.6915. SlimSAM's best was joint on natural, 0.8262. Giving each sample its own prompt
+  scored lower than the joint prompt for both models on every input. Each learned entry
+  went through one edge stage; the recipe went in as it stands.
+- Three agents judged 22 frame-subjects in 22 comparison pictures and 22 crops pictures,
+  the comparison at about a quarter of the frame and the crops at full size at two
+  windows with a mark four pixels wide. Region sizes and band widths are read by eye.
+- What the planted pictures hold and do not hold. The recipe's own widest band on a
+  straight planted edge is 13 to 14 pixels when refined, and 6 to 7 for its plain
+  weight and cut, and smooth carrying of its grid did not remove it, so that band is the
+  recipe's own edge on its grid. The planted pictures have no soft edge, wire, lattice or
+  gap between leaves, no textured built thing among foliage, no beach beside water, no
+  layer of one kind in front of another, and no region of a kind that holds no sample; in
+  plant-island the island carries its own sample.
+
+Part four, the edge stage measured alone (16 right coarse maps made from the truth in
+cells of 28 pixels, and 16 misplaced by half a cell).
+- The plain guided filter, the same filter fitted on the sure pixels only, and the app's
+  cue recipe deciding the band again were each tried at three settings. The rule, the
+  lowest median widest band from the right maps, fixed the plain filter at radius 16 and
+  regularisation 0.001: median band 10 pixels, mean overlap 0.9991, meeting the bar on 1
+  of 16. The coarse map as it is, with no stage, has median band 10 pixels, mean overlap
+  0.9982 and meets the bar on 6 of 16. The weighted filter at radius 48 has median 23
+  pixels and meets it on 6 of 16; the cue stage at radius 8 has median 28 pixels and
+  meets it on 2.
+- From the misplaced maps the plain filter at radius 16 has median 22 pixels and meets the
+  bar on none, as the misplaced coarse map's own median is 22; it keeps the misplacement
+  and makes it ragged. The cue stage is the only one that moved a misplaced line back
+  toward the boundary (met on plant-straight from both maps at 3 pixels), and it leaves
+  or takes whole patches where a region's texture varies. No stage lowers the median
+  widest band below the coarse map's own, from either kind of map.
+- On two real tree lines (the scene-class model's sky for NIR_3705 and NIR_3710) the
+  model's sky confidence reaches 0.9 on 9,151 of 5,219,200 pixels of NIR_3705 and on
+  59,056 of NIR_3710, so the two stages that read sure regions had almost no sky to fit
+  from. The plain filter keeps the model's line, 20 to 70 pixels off crowns in places,
+  and follows a tower's dark head within 5 to 10; the weighted filter draws boxes with
+  straight sides and leaves out sky in blocks of 100 to 260 pixels; the cue stage follows
+  shrub tops and plumes within about 5 to 10 pixels at most places on NIR_3710 and on
+  the left of NIR_3705, and on NIR_3705 leaves out most of the sky in two of four crops.
+- Time on one frame here: the plain filter 0.70 second (0.93 second with reading and
+  writing), the weighted 1.40, the cue stage 1.11 and 1.25.
+
+Part five, what each kind's masks showed, frame by frame, the recipe first. Over the 22
+frame-subjects, 8 judged in the first set of pictures, 9 in the second and 5 in the
+third, no entry met the result on any one: the count is 0 of 22 for every entry.
+- The 2.79 recipe, refined to edges, open. It has the highest planted mean and the only
+  planted region meeting the bar (plant-three Water, overlap 0.9934, band 2 pixels; 1 of
+  16, with its worst band 227 pixels on plant-island Sky); its earlier scoring over both
+  inputs and three renderings gave 2 of 96. On photographs its faults are of kind: it
+  takes a whole region of another kind that shares a tone with the samples. On NIR_3461
+  Built things it takes swaths of sky, about a fifth of the frame, and on Sky it takes
+  the steel of every pylon. On NIR_3466 it takes the road, about six hundredths of the
+  frame, with Built things and with Foliage, and a cloud band across the top, about four
+  hundredths, and for Sky it leaves that band out. On NIR_3742 Built things it takes
+  about fifteen hundredths of the frame that is not built (the beach, the shore, water
+  and the forest's lower edge); its counted share of that frame reads 24 to 28.5 percent
+  for samples holding about 1.7 percent of counted pixels. On NIR_3742 Foliage it takes
+  the beach and patches of the lake, the largest about one and a half hundredths. On
+  NIR_3705 Sky it leaves a hole of about seven hundredths between the towers, and over
+  the towers it leaves a speckle of taken and left in both Built things and Foliage. On
+  NIR_3710 Foliage it takes the pale rock across the bottom, about a fifth of the frame,
+  and for Sky it leaves the space between the towers, about one twentieth. On NIR_1873
+  Foliage it takes the boulder shore, the scree and the dark upright at the left edge.
+  Where the kind is right its edges are the closest of any entry on several frames.
+- MobileSAM, joint, open and natural. Its planted overlaps are near 0.99 on most regions;
+  after the edge stage it meets the bar on 0 of 16 (open: narrowest band 6 pixels on
+  plant-curved Sky, widest 996 on plant-stepped Built things at overlap 0.8576; natural:
+  narrowest 5, widest 996 at 0.8409). On photographs its edges were the nearest of any
+  entry in several crops, and its faults are of fill and of reach. It takes a subject as
+  a smooth filled outline, so a lattice is filled or left whole (the sky inside a pylon's
+  lattice on NIR_3461 is taken with the pylon) and the notches of a tree line and a roof's
+  boxes are rounded over, leaving bands of 20 to 100 pixels. It leaves whole regions
+  of its subject that hold no sample or lie far from one: a strip of trees down the right
+  border of NIR_3742, about six hundredths; the far boat and dock fingers there; the pale
+  annex and far left buildings of NIR_3466; the leafless tree at the left border of
+  NIR_3705; the low shrubs standing on the rock of NIR_3710, the round one alone about two
+  hundredths; and the foreground branches of NIR_1873 for Foliage with the water seen
+  between them for Water. The nearest it came was NIR_3466 Foliage, where it held the
+  road edge within a few pixels and failed narrowly on the lower parts of fence posts about
+  as wide as the mark. Encoding took 1.75 second here for MobileSAM and 2.56 for SlimSAM;
+  nothing is carried between photographs because the points do not travel. SlimSAM scored
+  0.62 to 0.83 on the planted pictures and no frame of it was composed or opened.
+- The fitted linear classifier on DINOv2 small features, natural and bright. Coarse
+  planted means 0.9135 and 0.9090; after the edge stage 0 of 16, with narrowest band 22
+  and 26 pixels, worst band 542 and 681, and lowest overlap 0.5773 and 0.6253 on
+  plant-island Foliage. On photographs the edges keep the coarse grid's blob shape: halos
+  of 40 to 120 pixels round pylons and towers, bands of tens to two hundred pixels along
+  horizons, roofs and tree lines, and parts of a subject left where they look unlike the
+  samples (the bright cloud over the tree line of NIR_1827 Sky, about a sixth of the
+  frame; the bright cloud at the top edge of NIR_3710, two to three hundredths). It
+  takes the road for Foliage on NIR_3466 and the water between branches for Foliage on
+  NIR_1873. On NIR_3705 it was the only entry that kept the towers' false needles out of
+  Foliage and took the towers as Built things, though inside rounded blobs. Narrow strips
+  are left along the frame's own border on several frame-subjects, 14 to 150 pixels
+  wide; whether the tiling, the frames' darkening at the edges or the model makes them
+  was not measured. The share of patches given no subject by the plan's rule was 1.9 to
+  20.8 percent on the planted pictures (over one tenth on every input for plant-curved and
+  plant-island) and 1.5 to 18.4 percent on the photographs. The model file used, the
+  smallest of the Xenova copy, was exported at 224 by 224, so each picture ran as 96
+  lapping tiles at half size; features for one picture took 3.6 to 37.4 seconds here
+  with other steps running beside.
+- The fitted classifier carried from one photograph to another, with nothing carried but
+  its fit. NIR_3705 to NIR_3710 (one scene): Sky and Built things took what the second
+  photograph's own fit took (Sky 41.6 to 43.4 percent of the frame against 42.7 to 43.4,
+  by the pictures' printed shares); Foliage took 22.1 to 22.8 against 33.9 to 36.2, leaving
+  the upper crowns of the shrub band, about an eighth of the frame, to no subject.
+  NIR_3461 to NIR_3466: Sky took more than the own, the whole sky to the roofline (57.0
+  to 57.2 against 50.2 to 50.6); Foliage took 16.5 to 16.7 against 24.8 to 25.1, stopping
+  120 to 140 pixels above the frame's foot; Built things took nothing, the building
+  going to no subject. NIR_3742 to NIR_1873: Water took 2.3 to 5.2 against 17.3 to 17.8
+  and Foliage 16.9 to 19.5 against 73.3 to 74.0, with 75.0 to 80.6 percent of the frame
+  given no subject. What travels: the sample patches at 1,536 bytes a patch (NIR_3705's
+  fit, 699 patches, 1,073,664 bytes), and for the linear fit 7,692 bytes more for three
+  names. These are coarse masks before the edge stage, judged beside the second
+  photograph's own, not against the bar, and the printed shares were not counted again.
+- The scene-class model, BiSeNet V2 on ADE20K, natural and open. It decides on a grid of
+  96 by 64 cells of about 29 pixels. It was run from a NumPy rewrite of its forward pass
+  because the CPU PyTorch wheel's host was refused; the rewrite was checked on the
+  publisher's daylight picture only, not value by value. Planted: 0 of 16 on both inputs
+  after the edge stage; natural lowest overlap 0.4831, open 0.0000 on plant-shore Water
+  and plant-built-foliage Foliage, worst band 1,535 pixels. On photographs it takes or
+  leaves whole regions by class: the road with the field on NIR_3466, the shrub tops as
+  sky on NIR_3705 and NIR_3710, the towers dressed as trees as Foliage, the beach as water
+  on NIR_3742, half of NIR_1651's branch left, and nothing at all for NIR_3705 Built
+  things. Under its first rule, which barred a class when any sample of another name fell
+  in it, 7 of 44 photograph cases and 4 of 32 planted ones chose nothing. Under the rule
+  the comparison used, which gives each class to the one name whose samples hold most of
+  its sample pixels, 2 of 44 photograph cases and 1 of 32 planted ones chose nothing. The
+  planted order, natural well above open, did not hold frame by frame. The guided filter
+  at radius 32 brought an edge the model had placed near the right place to within 10 to
+  40 pixels along foliage and a few along a roofline, and moved no boundary lying inside a
+  uniform region.
+- Where the planted figures and the photographs pull apart: the recipe's planted mean is
+  the highest and its photograph faults the largest of the kinds that take a whole region,
+  and the pictures it was scored on hold none of the cases that broke the entries on
+  photographs (a region with no sample on it, a layer in front of another, a textured
+  surface of one kind with another kind's tone).
+
+Part six, what none of it shows.
+- The speed and memory of a tablet's browser for any of these: every time above is the
+  container's processor. Whether the tablet's browser, reported as version 26, runs the
+  runtime's WebGPU build on a model of this size is not settled by the sources, which
+  disagree; only the test page, on the device, would settle it.
+- A band under about 8 to 12 pixels outside the two crop windows of a frame-subject: the
+  comparisons are about a quarter of the frame, and the crop windows were chosen where
+  the entries differ most, not where one mask fails most. Sizes and widths are read by
+  eye and a figure near the bar could be read the other way by a count.
+- A mask on a photograph is judged without a truth; the judgement rests on what an opened
+  picture shows. A region of unsettled kind (the cloud between loose twigs on NIR_1651,
+  the shaded trunks on NIR_3742, the leafless tree on NIR_3705) was read as the pictures
+  allow.
+- Whether any other setting, edge stage, class rule, model of a kind, input or number of
+  samples would meet the result: only the entries drawn were judged. SlimSAM's frames,
+  and the first photographs of the three carried pairs, were not opened.
+- A fit carried by the points kind or the scene-class kind, and the fitted kind's carried
+  masks after the edge stage.
+- Hosts that did not answer: github.com (the session's access notice), www.npmjs.com and
+  support.captureone.com (challenge pages), data.jsdelivr.com, cdn.jsdelivr.net,
+  unpkg.com, caniuse.com, helpx.adobe.com, guiwitz.github.io and download-r2.pytorch.org
+  (403), developer.apple.com (a page that needs script), and the ChaoningZhang model
+  listing on huggingface.co (401).
+
 ---
 
 ## 7. What the files in this repository actually are
