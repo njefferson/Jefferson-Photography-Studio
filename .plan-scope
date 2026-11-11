@@ -1,19 +1,14 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=7ef63b9c213ca94f
-diffhash=90d403f4c95945f8
-difflines=1408
-linesread=1723
-verdict=IN-SCOPE: the staged diff is the release of 2.78, the seven build files of steps 401 to 405, VERSION, the module map, the decision record's Built section and NOTES.md, with the two hooks left as they stand.
-# IN-SCOPE: the staged diff is the release of 2.78, the seven build files of steps 401 to 405, VERSION, the module map, the decision record's Built section and NOTES.md, with the two hooks left as they stand.
-# Judged against the plan's Files line for step 406, its Asked, the Rules of this plan and steps 401 to 406; the whole staged diff of 1,723 lines was read from a file, and the hooks' unstaged diff, which step 406's Facts leave out.
-# VERSION: the middle number from 2.77 to 2.78, the Files line for step 406 and the Facts' rule for a capability release.
-# docs/ARCHITECTURE.md: three modules added to the generated map and two line counts moved, written by the architecture check's write flag, named in step 406's Files.
-# docs/decisions/109-the-test-page-names-regions-by-samples-placed-on-the-photograph.md: one Built section above Depends, dated, naming the steps, saying what was built and what only the device shows; no frame, no decision cited beyond those Depends declares.
-# NOTES.md: one sentence at the end of Q-JPS-277 saying what step 405 did, and six new queue lines under the next free keys from the Found and Uncertain lines of steps 401 to 405; no roadmap bullet changed and no line removed.
-# debug.html: a samples box with a heading, a surface host, a real count button disabled at rest, a polite status line and a pictures host, and two copy notes gaining words; no id of a walked element changed; step 405's Files.
-# src/debug.ts: the imports, the kept picture code, the structure cues counted once and held, the samples part and its count, and the new button held off during other presses; step 405's Files.
-# src/placecues.ts: optional trailing cue names and left-out cues, the scale travelling with the name, the old number form still read; step 404's Files; no change beyond that in this step.
-# src/placesamples.ts, src/placestructure.ts, src/placesurface.ts, src/placesurface.css: the four new modules of steps 401 to 403, each as the Rules' interface gives; no file of the editor, the pipeline, the looks, the service worker or the build is touched.
-# .githooks/commit-msg and .githooks/pre-commit: modified by no step, left unstaged as step 406's Facts say.
-# Nothing in the diff is outside a line of the plan; no walk, browser or decode was run.
+planhash=bbd61a17ee0cb9a6
+diffhash=9be892a6207d98c8
+difflines=397
+linesread=397
+verdict=IN-SCOPE: the four staged documents are the files step 417 names in the plan's Files, each change is what steps 415 and 416 were asked to write, and nothing else is staged; the two hooks are left out as step 417's Facts say.
+# IN-SCOPE: the four staged documents are the files step 417 names in the plan's Files, each change is what steps 415 and 416 were asked to write, and nothing else is staged; the two hooks are left out as step 417's Facts say.
+# IR-SCIENCE.md: covered by the plan's Files line for steps 416 and 417 and by step 416's Do (second part); the change adds the one passage dated 10 November 2026 on the seven presses, the pages read and what they show together, in four parts, and points to record 110.
+# NOTES.md: covered by the Files lines for steps 415, 416 and 417; the change adds the roadmap bullet for decision 110 under Next capability release (step 415), a sentence at the end of the Q-JPS-277 line and six new Found queue lines under keys 295 to 300 (step 416), and changes no other bullet.
+# docs/decisions/109-the-test-page-names-regions-by-samples-placed-on-the-photograph.md: covered by the Files lines for steps 416 and 417 and by step 416's Do (third part); the change adds one dated paragraph to its Built section on the device pass.
+# docs/decisions/110-a-mask-is-made-from-samples-placed-on-the-photograph.md: covered by the Files lines for steps 415 and 417 (new file); the change is the whole new record with its six sections and its Depends, which step 415's Do asks for.
+# .githooks/commit-msg and .githooks/pre-commit: not staged and not part of this commit; the plan's Files lists them as read only and step 417's Facts say no step modified them and they stay as they stand.
+# .plan-scope: covered by the Files line for step 417; it is written by the scope check's record and staged after this verdict.

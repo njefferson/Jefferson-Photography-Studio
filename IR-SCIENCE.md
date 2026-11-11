@@ -5670,6 +5670,226 @@ pages'. The choices that remain, for the sample's shape, size, bounds, magnified
 view, confirm step, naming and counting, and for which of these measures to count and
 how, stand in record 109.
 
+**THE SEVEN PRESSES OF THE TEST PAGE AT 2.78, AND THE PAGES READ FOR A MASK MADE FROM
+SAMPLES, 10 NOVEMBER 2026.** Between 18:21 and 19:44 California time on 10 November
+the test page at 2.78 was pressed on seven photographs on one iPad (five touch points,
+reporting itself as a Mac, the Apple graphics chip, largest texture 16,384 pixels,
+float buffers present), all made with the same camera and lens. The first three
+presses are one loading of the page and the last four a second. Each press placed
+named samples, counted them, and printed the pair figures, the fitted ranges, the
+ranges kept from other photographs and read here, and the times. This passage sets
+down those figures with their limits, the pages read for this work, and what the two
+show together. It describes no photograph's appearance, ranks nothing and proposes
+nothing for the editor. Every share below is a share of the sampled pixels on one
+photograph and never of the photograph; the frame counted 579,393 pixels in each
+press, one in every third column of every third row. The pairing of photographs by
+scene rests on file numbers alone, since no report says which photographs are of one
+scene.
+
+Part one, the presses photograph by photograph. For each: the time, the file, the
+focal length, the samples with their counted pixels, and the single range each fit
+chose, with the share of its own name it takes (own) and the part of everything it
+takes that belongs to its name (target).
+- Press 1, 18:21, NIR_3742.NEF, 77 mm. 22 samples at 4.0 percent of the shorter side.
+  Sky 4 samples, 7,739 counted pixels; water 5, 9,693; built things 5, 9,708; foliage
+  8, 15,518; rest 536,735. Sky: texture at 15, .002 to .005, own .999, target .980,
+  and 0.000 with the app's own sky selection taken out. Water: texture at 15, .009 to
+  .031, own .966, target .638; joined by only-where-both with red against blue it is
+  own .815, target .884. Built things: edge alignment at 45, own .762, target .793.
+  Foliage: red against blue, own .853, target .645.
+- Press 2, 18:49, NIR_3729.NEF, 250 mm. 21 samples at 4.0 percent. Water 9 samples,
+  17,278 counted pixels; built things 12, 23,301; rest 538,814. Water: texture at 15,
+  .009 to .031, own .775, target .730, and with the sky selection taken out own .216,
+  target .448. Built things: lightness .406 to 1.000, own .539, target .903.
+- Press 3, 18:52, NIR_4095.NEF, 50 mm. 27 samples at 4.0, 3.1 and 2.2 percent. Sky 8
+  samples, 15,523 counted pixels; foliage 9, 17,455; built things 10, 14,094; rest
+  532,321. Sky: texture at 15, 0 to .006, own .991, target 1.000. Foliage: texture at
+  15, .025 to .142, own .972, target .798. Built things: texture at 15, .006 to .035,
+  own .733, target .859.
+- Press 4, 19:18, NIR_4079.NEF, 50 mm. 13 samples at 8.7, 2.0 and 1.0 percent.
+  Foliage 8 samples, 72,662 counted pixels; sky 5, 28,243; rest 478,488. Foliage:
+  texture at 5, .009 to .245, own .998, target .998. Sky: texture at 5, 0 to .009, own
+  .995, target .994, and with the sky selection taken out own .018, target .744.
+- Press 5, 19:22, NIR_4045.NEF, 50 mm. 27 samples at 4.0, 1.8, 1.2 and 4.4 percent.
+  Built things 18 samples, 36,156 counted pixels; foliage 6, 11,474; sky 3, 754; rest
+  531,009. Built things: lightness 0 to .469, own .740, target .948. Foliage:
+  lightness .469 to .953, own .886, target .513. Sky: red against blue, .031 to .125,
+  own .932, target .086.
+- Press 6, 19:42, NIR_3705.NEF, 110 mm. 12 samples at 4.0, 8.7 and 4.4 percent. Sky 3
+  samples, 5,822 counted pixels; foliage 5, 46,162; built things 4, 8,725; rest
+  518,684. Sky: texture at 15, 0 to .025, own 1.000, target .937. Foliage: lightness
+  .547 to 1.000, own .933, target .966. Built things: lightness 0 to .578, own .861,
+  target .425, the same range taking the sky at 1.000.
+- Press 7, 19:44, NIR_3710.NEF, 67 mm. 8 samples at 10.4 and 2.8 percent. Foliage 5
+  samples, 64,986 counted pixels; sky 1, 12,382; built things 2, 1,944; rest 500,081.
+  Foliage: lightness .578 to 1.000, own .942, target .987. Sky: texture at 5, 0 to
+  .012, own .998, target .960. Built things: lightness 0 to .578, own .917, target
+  .103, and .319 with the sky selection taken out, the same range taking the sky at
+  .949.
+
+Part one, by question.
+- What held on the photograph a range was fitted on. A sky range took .991 to 1.000 of
+  the sampled sky in presses 1, 3, 4, 6 and 7 with a target share of .937 to 1.000;
+  press 5 took .932 with a target share of .086, its 754 sky pixels set against 36,156
+  of built things. With the sky selection taken out the sky range took 0.000 in
+  presses 1, 3, 6 and 7 and .018 in press 4, so those rows say little about the sky
+  beyond what that selection already holds. Foliage ranges took .853 to .998; built
+  things ranges took .539 to .917 with a target share from .103 to .948, the two
+  lowest (press 6, .425, and press 7, .103) being lightness ranges that also took the
+  sky. Water took .966 and .775. Of twenty single ranges three held a target share
+  under .45. Joining a second range by only-where-both raised the target share in most
+  rows at a cost to the own share (press 1 foliage .853 to .646). The cue a fit chose
+  for one name changed from photograph to photograph: sky chose texture at 15, texture
+  at 5 or red against blue, foliage red against blue, texture at 15, texture at 5 or
+  lightness.
+- What held between two photographs of one scene, by file number. From NIR_3705 to
+  NIR_3710 (five frames apart) the sky range read .997 with target .949 against that
+  photograph's own fit of .998 and .960, and the foliage range .964 against .942. From
+  NIR_4095 to NIR_4079 (sixteen apart) sky .971 against .995 and foliage .984 against
+  .998. From NIR_3742 to NIR_3729 (thirteen apart) water .755, target .741, against
+  .775 and .730, and built things .811 with target .642 against an own fit of .539 and
+  .903. 4079 to 4095 was not read.
+- What held between scenes. The sky range from NIR_3742 read .615, .097, .007, .005
+  and .140 on five others; the foliage range from NIR_3742 took foliage .676 to .928
+  and built things .349 to .641 on four of the five. The built things range from
+  NIR_3729 (lightness .406 to 1.000) took the sky .482 to .888 and the foliage .785 to
+  1.000 on the four it was read on, with target .224, .544, .072 and .012. Resting on:
+  the rows kept from other photographs, read once each. Overturned by: presses with the
+  scene recorded, or a built things range that held between scenes.
+- What the smaller samples changed. Counted pixels fall to about a quarter at half of
+  each sample's radius and about a sixteenth at a quarter (press 1 sky 7,739, 1,936,
+  482; press 5 sky 754, 185, 44, too few to count at the quarter). Where the best pair
+  of cues stood under .95 at the full radius it rose at the quarter by .029 to .148
+  (press 1 built things against foliage +.143, press 3 foliage against built things
+  +.136, press 6 +.148); where it stood at .95 or over it stayed within .05 or reached
+  1.000; one cue fell (press 5, texture at 5, .537, .514, .488). The report fitted no
+  range at the smaller radii, so none of this says a fit made on a smaller sample
+  holds better, and the sample sizes were not a parameter of the press (1.0 to 10.4
+  percent across them).
+- What the times were. A press took 3,830 to 6,243 ms, the first with the picture code
+  built and drawn for the first time (871 ms) and the other six 3,830 to 4,306 ms;
+  the picture code was built in presses 1 and 4, the first of each loading, and kept
+  in the other five. The count took 1,016 to 1,423 ms (press 2's second pass 869);
+  decode 1,183 to 1,672 ms; the sky selection's build 529 to 770 ms; the labelling 62
+  to 168 ms; the pair figures at half and at a quarter of each radius 184 to 332 ms
+  each. Holds of over a quarter second were put to no stage in any press: 5, 8, 3, 9
+  and 13 holds in presses 2, 3, 5, 6 and 7, none in presses 1 and 4. The channel
+  alignment left press 3's blue corners alone as over the largest offset believed
+  (corners from -1.88 to +1.70 photosites across) and moved red and blue in presses 5,
+  6 and 7.
+
+Part two, the pages read for this work, each asked once at its publisher's own site,
+fetched to disk by the step's own fetcher and read to its last line, on 10 November
+2026. The ilastik pages and the ImageJ page were refused by the container's network
+on the first ask (403 on connect) and answered on one further ask after their hosts
+were added.
+- ilastik, Pixel Classification, by the ilastik developers, at www.ilastik.org under
+  documentation/pixelclassification/pixelclassification; read whole; no page date, a
+  copyright line of 2010 to 2026. The user draws scribbles by class; features of
+  colour or intensity, edge and texture are computed at several scales; a random
+  forest is fitted; a probability for each class comes back, or the most probable
+  class; wrong results are put right by more scribbles, guided by an uncertainty map.
+  The page says the out-of-bag error estimate is overly optimistic and gives no cost.
+- ilastik, Batch Processing, same publisher, under documentation/basics/batch; read
+  whole; same dating. A trained classifier is applied to unseen images after training
+  on a representative set; no figure for how well it holds is given.
+- Trainable Weka Segmentation, the ImageJ wiki, at imagej.net under plugins/tws; read
+  whole; no page date, a banner saying its content has not been vetted since the move
+  from MediaWiki. Traces by class; about twenty filters at sigma from 1 to 16 by
+  doubling; a FastRandomForest of 200 trees and 2 random features per node by default,
+  or another classifier; a probability map or a class index; a balance option for
+  small classes; the classifier, or the marks' feature vectors, can be saved and
+  loaded on another image.
+- Foreground Select, the GIMP 2.10 manual, the GIMP documentation team, at docs.gimp.org
+  under 2.10/en; read whole; no date. An outline, then strokes through the foreground
+  with background and unknown modes, two matting engines. The page does not say whether
+  its mask holds partial values.
+- GrabCut, Wikipedia, last edited 22 December 2025; read whole. A box, a Gaussian
+  mixture for the colours of the object and of the background, a graph cut repeated
+  until it converges (a statement the page flags as needing a citation), a hard label.
+- Random walker algorithm, Wikipedia, last edited 12 September 2025; read whole. Seeds
+  of several labels on a graph of neighbouring pixels with weights such as exp of
+  minus beta times the squared intensity difference; for each pixel the probability
+  that a walker first reaches each seed, from a sparse linear system; a half as the cut
+  for two labels.
+- Guided filter, Wikipedia, last edited 18 November 2024; read whole; banners say it
+  is too technical and needs more citations. Inputs a filtering input p, a guide I, a
+  window radius r and a regularisation epsilon; in each window the output is a linear
+  function of the guide; Algorithm 1 takes box means of I, p, I times I and I times p,
+  forms a as the covariance over the variance plus epsilon and b as the mean of p less
+  a times the mean of I, and gives the mean of a times I plus the mean of b; cost
+  linear in the pixel count. The page gives no figure for r or epsilon and no range
+  for the output, and its printed equation for a is written in a different form from
+  Algorithm 1.
+- Naive Bayes classifier, Wikipedia, last edited 8 November 2026; read whole. A prior
+  and, for each feature on its own, a distribution given the class; the posterior is
+  the prior times the product of the likelihoods; a closed-form fit with no iteration
+  and a pseudocount of one; features assumed independent given the class, which the
+  page calls unrealistic; probabilities often wildly overconfident.
+- Random forest, Wikipedia, last edited 7 September 2026; read whole. Many trees each
+  on a bootstrap sample with a random subset of features at each split, a vote; more
+  accurate than one tree and less interpretable; no timing.
+- darktable user manual, masking and blending, a contents page, the darktable project,
+  at docs.darktable.org under usermanual/development/en/darkroom/masking-and-blending;
+  read whole; no date, development version 5.6. It holds no statement on refining a
+  mask and names the page below.
+- darktable user manual, mask refinement and additional controls, same publisher and
+  manual, under masks/refinement-controls; read whole; no date. Feathering aligns a
+  mask's edges with edges in a guide image, works best when the mask already roughly
+  matches an edge, and overshoots when its radius is too large; a Gaussian blur is
+  applied after it; mask opacity and mask contrast are two further controls. The page
+  does not name the guided filter, and any link between the two is an inference.
+- darktable user manual, copy and paste, and history stack, same manual, under
+  module-reference/utility-modules/shared/copy-paste and lighttable/history-stack,
+  found from the manual's contents page; each read whole; no date. A copy takes the
+  history stack, all or items chosen in a dialog; the page says mask management is
+  unsafe to copy automatically and is not included in a plain copy; selective paste
+  offers append or overwrite, where append keeps the target's earlier history and
+  overwrite loses it; the page describes no preview on the target and says nothing of
+  a mask fitted to one photograph and not the next.
+- RawPedia, Local Adjustments, the manual of RawTherapee, at rawpedia.pixls.us under
+  local_adjustments, fetched on 10 November and read whole then; read again in part
+  for what it says of copying. A duplicated spot has the same shape; placed elsewhere,
+  its colour selection follows the reference at the new centre; the page says nothing
+  of a second photograph.
+- Pages asked that did not answer. Adobe, Lightroom Classic help on masking, at
+  helpx.adobe.com under lightroom-classic/help/masking.html: status 403, title Access
+  Denied; not read, and so no page on copying or synchronising settings was asked.
+  Capture One's help front page, at support.captureone.com under hc/en-us: status 403,
+  a challenge page that needs a script to show its text; not read, and no page on
+  copying was asked. What this passage says of Adobe's and Capture One's copying rests
+  on the returned copies brought in on 9 November, above, and on no page fetched for
+  this work.
+
+Part three, what the pages and the figures show together. The test page's range is the
+form Adobe and darktable set from a sample; the two segmentation programs fit a
+classifier to marks on many features and give a probability, where a range reads one or
+two of nine cues and gives 0 or 1, and the device showed it taking most of its own name
+and holding a target share under .45 in three of twenty fits. Naive Bayes with binned
+likelihoods is fitted by counting each name's histogram on each cue, which the test
+page already counts on the same 64 bins; its page names its independence assumption
+and overconfidence, and three of the nine cues are bound together, since red against
+blue follows from the other two ratios, which is this passage's algebra and not the
+page's. Whether a fitted range holds on another photograph was not known until it was
+read there: close to the photograph's own fit within the three pairs taken as one
+scene for the sky and foliage, and not between scenes. The pages agree in kind with
+that, since the programs that carry a fitted thing make the mask again from the
+photograph it lands on, and no page read gives a figure for how well a fitted
+classifier or range holds on another picture. Nothing read shows what a copy would take
+before it applies, so that part of the work follows no convention read. For edges the
+guided filter is the one refinement a page read defines closely enough to code from,
+and the page does not hold its output to 0 to 1. How firmly: firm for what the pages
+define and what the device printed on these seven photographs; unknown for how any
+form but the range behaves here, for what any mask takes in rest, and for how far a
+small count moves a pair figure. Overturned by: a press in which a range kept the
+others out on every name or a cue was chosen every time; presses with the scene
+recorded; Adobe's and Capture One's pages on copying, read whole.
+
+Part four. The choices these readings leave, for the form of a recipe, the renderings,
+the default sample size, a mark for what a mask must leave out, what a copy carries and
+shows, how a wrong copy is redone, and the editor's stage, stand in the decision record
+numbered 110.
+
 ---
 
 ## 7. What the files in this repository actually are
