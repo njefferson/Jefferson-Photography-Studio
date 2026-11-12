@@ -1,0 +1,57 @@
+REFUSED
+The step still serves goal 1 (a mask from samples seen over whole photographs and planted truths) and that goal still serves the program's thesis, but the call that would make the first masks was refused, so nothing seen moved either answer and no mask stands.
+
+Step 426, first send. The maps of a model prompted by points. Stopped at the start of stage 3 by a refusal.
+
+The refusal (label maps1, the first run of the mapping script, about 11:28 California): the Bash call
+node <scratchpad>/scratch/step426-runner.mjs maps1
+which would have run scratch/step426-sam.py in Python (PyTorch on the CPU, Segment Anything's published model code, MobileSAM's TinyViT file and its downloaded weights) over the eight frames, was refused by the harness with these words:
+"Permission for this action was denied by the Claude Code auto mode classifier. Reason: The server-side auto mode classifier judged this action dangerous (it gave no explanation)."
+No other route to the same end was tried. Nothing ran: no mask, score or sheet was written.
+
+Stage 1 (read the inputs note, open two frames and two planted pictures): done.
+- Read research/whole/inputs.md whole.
+- Opened frames/NIR_3742-open.png (lake, pines, marina; sky top band), frames/NIR_3461-natural.png (pylons over grassland, cloud sky), planted/plant-three-open.png (sky, stepped built things, water), planted/plant-shore-natural.png (foliage over water, curved boundary).
+- A slip in this stage: one Bash call listed the research folder with ls, a read outside the step's Commands; every later listing was made with Glob.
+
+Stage 2 (runner, fetcher, model files, runtime): done as far as one model.
+- Read step 424's research/whole/notes-device.md whole and the listings it fetched for SlimSAM (pages-device/hf2-01.txt), Acly's MobileSAM (hf3-02.txt), Acly's card (hf4-01.txt) and the SlimSAM card (hf1-01.txt), so each model's file names and sizes came from a page.
+- Models asked for, smallest first, three in all: SlimSAM-77, MobileSAM, Segment Anything ViT-B.
+- Wrote scratch/step426-runner.mjs, scratch/step426-fetch.mjs and scratch/step426-sam.py; node --check clean on the two .mjs files after each edit; the Python script compiled clean (label pycheck1, 11:27).
+- Label meta1 (11:09): six text pages asked once, all status 200 with no redirect: Xenova/slimsam-77-uniform preprocessor_config.json (466 bytes) and config.json (379), Acly/MobileSAM's encoder folder listing (267), czg1225/SlimSAM LICENSE (11,357) and ChaoningZhang/MobileSAM LICENSE (11,357) at raw.githubusercontent.com, and nielsr/slimsam-77-uniform README.md (6,540). Kept under research/whole/maps-points/pages.
+- Read whole: the preprocessor config (longest edge 1024, resample 2, rescale 1/255, mean 0.485, 0.456, 0.406, spread 0.229, 0.224, 0.225, pad to 1024 by 1024), the config (SamModel, vision hidden size 168), the encoder folder listing, the nielsr card (licence apache-2.0 in its front matter) and the SlimSAM LICENSE (the Apache License, Version 2.0, lines 1 to 202). The MobileSAM LICENSE: lines 1 to 8 and 86 to 202 read, Apache License Version 2.0; lines 9 to 85 (definitions and the two grants) not read; same byte count as the SlimSAM one.
+- Label meta2 (11:09): a defect of this step's own runner, which stripped the number from the label to name the group, so meta2 asked the same six addresses a second time (same statuses and sizes). Put right in the runner and fetcher before any further fetch: the group was renamed and the fetcher no longer asks for a file already on disk.
+- Label scripts1 (11:10): three scripts asked once, status 200, read whole: Acly's onnx_image_encoder.py and export_image_encoder.py, and MobileSAM's scripts/export_onnx_model.py.
+- Label slim1 (11:10): SlimSAM's two ONNX files at huggingface.co/Xenova/slimsam-77-uniform/resolve/main/onnx/ each redirected once to us.aws.cdn.hf.co, which the session's network refused (curl exit 56, "CONNECT tunnel failed, response 403"). SlimSAM not had.
+- Label mobile1 (11:11): Acly's MobileSAM ONNX encoder and single-mask decoder: the same redirect and the same refusal. MobileSAM's ONNX copy not had.
+- Label pt1 (11:13): MobileSAM's weights/mobile_sam.pt at raw.githubusercontent.com/ChaoningZhang/MobileSAM/master: status 200, no redirect, kept in the scratchpad's models426/mobilesam. Its mobile_sam/build_sam.py (4,695 bytes) read whole; its mobile_sam/modeling/tiny_vit_sam.py (24,809 bytes) read in part, its imports, class names and constructor head by Grep, the layers' bodies not read. Segment Anything's ViT-B checkpoint at dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth (the address from pages-device/samr-01.txt line 117): refused by the session's network, curl exit 56, nothing written. SAM 2's checkpoints sit on the same host and were not asked.
+- Label pyinstall1 (11:14), a red check: pip pointed at PyTorch's CPU index read the index at download.pytorch.org, then was refused by the session's network at download-r2.pytorch.org ("Tunnel connection failed: 403 Forbidden"); exit 1, nothing installed. Python is 3.13.18. The one repair, in this step's own runner: wheels from PyPI alone, downloaded first and installed from disk.
+- Label pydl1 (11:16): pip download from PyPI exited 0 after 529.6 seconds into the scratchpad's wheels426: torch 2.15.0 (539.2 MB) with its CUDA wheels (cudnn 519.2 MB, cublas 404.9 MB and others), torchvision 0.29.2, timm 1.0.31, segment_anything 1.0, pillow 13.0.0, numpy 2.5.4, triton 3.9.0 and their pure dependencies.
+- Label pyinstall2 (11:25): pip install from that folder alone into the scratchpad's py426 exited 0 in 48.8 seconds; torch, torchvision, timm, segment_anything, PIL and numpy present. Nothing was installed into the app's folder. The scratchpad disk went from 27,027 to 14,302 free megabytes across the step.
+
+Where the work stands for a resend:
+- Had and installed: MobileSAM's weights (models426/mobilesam/mobile_sam.pt), PyTorch and the model code (py426), the wheels (wheels426).
+- Written and checked, not yet run: scratch/step426-sam.py, which builds MobileSAM as build_sam.py builds vit_t, encodes each picture once at a longest side of 1024, takes each subject's sample centres as points inside and every other name's as points outside, keeps the single-mask output, brings it to the picture's size by the model's own postprocess and writes round(255 x sigmoid) as the mask file of inputs.md under research/whole/maps-points; and the runner's stages maps1 (frames), maps2 (planted), score1 (every planted mask through score.mjs into maps-points/scores.md) and sheets1 and sheets2 (every frame mask through sheet.mjs into maps-points/sheets).
+- Not done: stages 3 to 6 (the masks, the scores, the sheets opened and read, and maps-points/notes.md).
+- A resend of this step meets the same refusal on the same call unless the harness's permission for running the mapping script is changed; that is not this step's to change.
+- What none of it could show even had it run: how fast a tablet runs the model.
+
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3742-open.png (opened, written by step 423)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3461-natural.png (opened, written by step 423)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-three-open.png (opened, written by step 423)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-shore-natural.png (opened, written by step 423)
+
+Hosts that did not answer (refused by the session's network: curl's "CONNECT tunnel failed, response 403", or pip's "Tunnel connection failed: 403 Forbidden"):
+us.aws.cdn.hf.co
+dl.fbaipublicfiles.com
+download-r2.pytorch.org
+
+The reply guard refused no call in this send, so its release command was not run.
+
+Found: the harness's auto mode classifier refused the Bash call that runs the mapping script (step426-runner.mjs maps1, which runs Python with PyTorch, the downloaded MobileSAM weights and its TinyViT file), so no mask of a model prompted by points was made; a resend meets the same refusal unless that permission changes.
+Found: Hugging Face's file downloads redirect to us.aws.cdn.hf.co, which the session's network refuses, so no model file kept on Hugging Face (SlimSAM, Acly's MobileSAM ONNX, SAM 2's ONNX copies) can be had in this container.
+Found: Meta's file host dl.fbaipublicfiles.com is refused by the session's network, so Segment Anything's and SAM 2's checkpoints cannot be had here.
+Found: PyTorch's own CPU index lists its wheels but keeps them on download-r2.pytorch.org, which the session's network refuses; PyPI's torch brought about 2.7 GB of CUDA wheels in their place.
+Found: one Bash call of this step ran ls on the research folder, outside the step's Commands; no write followed from it.
+Found: the runner's label meta2 asked six addresses a second time, against each address being asked once; put right before any further fetch.
+Uncertain: whether the refusal is about running downloaded model code and weights in Python or about some other part of the call; the classifier gave no explanation.

@@ -1,0 +1,48 @@
+DONE
+The step still serves goal 1 (it puts every learned entry through the one edge stage and scores the planted masks, judging no mask), the goal still serves the asks as the plan states them, and what was seen moved neither answer.
+
+Step 440, the comparison run. R is /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole. Runner: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/scratch/step440-runner.mjs (MADE TO FAIL block, plant child exit 7 read as 7 on every label; node --check on it exited 0, run once directly before its first label; every label's summary is progress/step-440-<label>.txt).
+
+Stage 1, reading: the run note (R/compare/how-to-run.md), R/edge/chosen.txt (plain radius 16, regularisation 0.001), the reports of steps 435, 436, 437 (second send) and 438, compare/entries.mjs, index-md.mjs and planted-scores.mjs, and R/inputs.md, all read whole.
+
+Stage 2, entries (label entries1, 14:20 California time): entries.mjs trial run again now the maps stand; entries.md read whole. Entries fixed by figures, the mean overlap over union at a half over 16 planted masks in coarse form:
+- recipe (2.79, Refined to edges, open): 0.9752, 38 masks, goes in as it stands.
+- features (the fitted classifier, dinov2-small): first linear on natural 0.9135; second linear on bright 0.9090.
+- points (the clicked models): first mobilesam joint on open 0.9746; second mobilesam joint on natural 0.9732 (slimsam's best 0.8262).
+- scene-class: its two inputs, open 0.6915 and natural 0.8344.
+The carried variants of the fitted classifier hold no planted mask and are listed at 0 and never weighed.
+
+Stage 3, the edge stage on every entry (label refine1, 14:21): trial index 266 rows, 228 learned rows put through refine.mjs (plain 16, 0.001, guided by the picture as it opens), 38 recipe rows carried as they stand; ran 228, failed 0; each child's output in progress/step-440-refine1-refine-<k>.txt. R/final/index.json holds 266 rows, 0 without a file: 38 for each of features-first, features-second, points-first, points-second, classes-open, classes-natural and recipe. Masks under R/final.
+
+Stage 4, scores (label scores1, 14:22): the scorer on 112 planted masks, four at a time; the script's plant read 1.0000 and 0 px and its parse read 0.9904 and 71. R/compare/planted-scores.md written; the count meeting the bar (overlap over union 0.9 or more and a widest band of 4 px or less):
+- features-first 0 of 16; features-second 0 of 16; points-first 0 of 16; points-second 0 of 16; classes-open 0 of 16; classes-natural 0 of 16; recipe 1 of 16 (plant-three Water, 0.9934, 2 px).
+- Overlap over union is 0.9 or more on most masks of the clicked entries (14 or more of 16 on each); the band is what fails: the clicked entries' narrowest widest band is 5 px (plant-curved Sky, points-second) and the widest 996 px (plant-stepped Built things); the fitted entries' bands run 22 to 542 px; the recipe's run from 2 to 227 px.
+Second count (label agree1, count.mjs, separate from the scorer): features-first plant-straight Sky, taken right 2,645,016, left wrongly 173,353, overlap over union 0.9385, and the scorer's line holds 0.9385: agree. points-second plant-straight Sky, taken right 2,814,746, taken wrongly 14, left wrongly 3,623, overlap over union 0.9987, and the scorer's line holds 0.9987: agree.
+
+Stage 5, pictures (labels compose1, indexmd1, 14:22): 44 pictures, a comparison picture and a crops picture for each of 22 frame-subjects, under R/final/pictures; ran 44, failed 0. R/compare/index.md written, 0 missing: 16 pictures under step 441, 20 under 442, 10 under 443. Four opened to see every panel is drawn and titled; in each, the eight panels stand in the order frame, recipe, fitted (natural, bright), clicked (open, natural), scene-class (open, natural), each titled with kind, model, input and share at a half; the crops pictures hold sixteen crops each with a badge and the 4 px white bar:
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/final/pictures/comparison-NIR_3705-sky.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/final/pictures/crops-NIR_3705-sky.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/final/pictures/comparison-NIR_3461-foliage.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/final/pictures/crops-NIR_3461-foliage.png (opened)
+(Only that every panel is drawn and titled is claimed from these four; what each mask takes and leaves is the judging steps'.)
+
+Picture, not opened: the other 40 are the pictures of R/compare/index.md; each is /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/final/pictures/ followed by the name, opened by the step named:
+Picture, not opened: comparison-NIR_3461-sky.png and crops-NIR_3461-sky.png, step 441
+Picture, not opened: comparison-NIR_3461-built-things.png and crops-NIR_3461-built-things.png, step 441
+Picture, not opened: comparison-NIR_3466-sky.png, crops-NIR_3466-sky.png, comparison-NIR_3466-built-things.png, crops-NIR_3466-built-things.png, comparison-NIR_3466-foliage.png and crops-NIR_3466-foliage.png, step 441
+Picture, not opened: comparison-NIR_1827-sky.png, crops-NIR_1827-sky.png, comparison-NIR_1827-foliage.png and crops-NIR_1827-foliage.png, step 441
+Picture, not opened: comparison-NIR_1651-foliage.png, crops-NIR_1651-foliage.png, comparison-NIR_1651-sky.png and crops-NIR_1651-sky.png, step 442
+Picture, not opened: comparison-NIR_3742-sky.png, crops-NIR_3742-sky.png, comparison-NIR_3742-water.png, crops-NIR_3742-water.png, comparison-NIR_3742-built-things.png, crops-NIR_3742-built-things.png, comparison-NIR_3742-foliage.png and crops-NIR_3742-foliage.png, step 442
+Picture, not opened: comparison-NIR_3705-foliage.png, crops-NIR_3705-foliage.png, comparison-NIR_3705-built-things.png and crops-NIR_3705-built-things.png, step 442
+Picture, not opened: comparison-NIR_3710-sky.png, crops-NIR_3710-sky.png, comparison-NIR_3710-foliage.png, crops-NIR_3710-foliage.png, comparison-NIR_3710-built-things.png and crops-NIR_3710-built-things.png, step 443
+Picture, not opened: comparison-NIR_1873-foliage.png, crops-NIR_1873-foliage.png, comparison-NIR_1873-water.png and crops-NIR_1873-water.png, step 443
+(Step 442 also opens the two NIR_3705 pictures of Sky opened here; step 441 also opens comparison-NIR_3461-foliage.png and crops-NIR_3461-foliage.png.)
+
+What the checks cannot show: the planted scores are over mirror-tiled pictures with drawn boundaries and say nothing of a mask on a photograph; the band is read by the scorer's definition, which on a slanted or stepped boundary may count a whole displaced region (bands of 700 to 1,500 px appear on scene-class and one clicked row); the counting script does not measure a band; the edge stage here is the one step 436 fixed by its rule, which ties the coarse map's own median band and does not bring a coarse map to the edges, so the final masks are close to their coarse forms; the tablet's speed.
+
+Files written: R/compare/entries.json, entries.md, index.md, planted-scores.md, trial/index-trial.json (rewritten), R/final/*.png, R/final/index.json, R/final/pictures/*.png, scratch/step440-runner.mjs, progress/step-440-*. No file outside the scratchpad was written; no file of the app written; no script of step 438 changed; no Python; no background run; no commit or push. Hosts: none asked. The reply guard refused no call. Time: runs stamped 14:20 to 14:23 California time; estimated 25 min.
+
+Found: no learned entry meets the bar on any planted mask (0 of 16 for each of the six) and the recipe meets it on 1 of 16; after the one edge stage the clicked entries hold overlap over union of 0.9 or more on most planted masks but their widest bands are 5 to 996 px.
+Found: the edge stage (plain radius 16) leaves each entry's band as the coarse map's own (step 436's finding), so the final masks stand at the models' own edges; the fitted classifier's planted bands (22 to 542 px) are the cells it works on, and plant-island Foliage stays at 0.5773 and 0.6253 because patches given no subject are subject left wrongly.
+Found: the comparison picture's crops place A (where the entries' masks differ most) lands inside open sky on NIR_3705 Sky and inside meadow on NIR_3461 Foliage, with no boundary in it; place B holds the boundary; the judging steps read A as a place where masks differ and not as an edge.
+Uncertain: whether the planted band figures of 700 to 1,500 px on the scene-class and clicked rows are the model's wrong region or the scorer's band definition on a slanted boundary; not investigated here.

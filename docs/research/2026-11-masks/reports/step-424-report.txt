@@ -1,0 +1,8 @@
+REFUSED
+Wall line: the step stopped early, so it has not yet served goal 1 beyond fetching the runtime pages; the goal still serves the thesis, and a refusal of the reply guard moved nothing else.
+Stages done: stage one (record 006, science file 4b-x, pattern fetcher read); fetcher written at scratch/step424-fetch.mjs, node --check clean; labels ort1 and ort2 run. Pages written under research/whole/pages-device (text copies ort1-01..06.txt, ort2-05.txt, ort2-06.txt).
+Reached: onnxruntime.ai tutorials web, env flags, large models, deploy, WebGPU, performance diagnosis, build-web-app, get-started web (all 200, read not yet done).
+Not reached: github.com/microsoft/onnxruntime releases and two readmes (403, a body saying GitHub access to the repository is not enabled for this session and naming add_repo); www.npmjs.com (403, challenge page "Just a moment").
+Refusal: the reply guard's release command for github.com, run once as the plan's rule spells it, was refused: "reply-guard: nothing from github.com is on record as declined, so there is nothing to read." Ending REFUSED per the rules; the other labels (safari, sam, sam2, scene, hf) were not run; no notes written.
+Hosts that did not answer: github.com (403 from the session's GitHub gateway), www.npmjs.com (403 challenge).
+Found: the GitHub gateway refusal is not a proxy-notice the release command accepts; the main thread needs to decide how github.com pages for steps 424, 425, 426 and 427 are to be read (the add_repo route is outside this step's commands).

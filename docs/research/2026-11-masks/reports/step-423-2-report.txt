@@ -1,0 +1,117 @@
+DONE
+The step still serves goal 1, because the frames as they open and in natural hue, the samples, seven planted pictures whose truths were fixed before any method, and a scorer and sheet maker proved on a hand-built wrong mask now stand for every later step; goal 1 still serves the program's thesis; nothing seen moved either answer.
+
+Send 2 of step 423. The first send's report (progress/step-423-report.txt) was read first: its stages 1 and 2 landed (reading; the runner; the list; seven frames fetched to /root/.cache/jps-owner-images). Nothing it says landed was done again; nothing it fetched was fetched again.
+
+Stage 1, reading.
+- IR-SCIENCE.md section 4b-x read whole (lines 2198 to 2345). The natural-hue input is worded there as the swap render's one colour axis re-mapped so that its foliage side goes green and its sky side goes blue, with the brightness kept; the swap render is the app with no look (sky teal-grey, foliage pale pink).
+- tools/owner-images.mjs: resolve() read (lines 82 to 101).
+- The render path, found with Grep from src/debug.ts: the test page reads a picked file with importFile (src/import.ts), decodes it with decodeOffThread and no lens plan (src/decodeClient.ts line 394), and draws the working copy at its own size at freshBaseline's balance and exposure with the swap on and no look (debug.ts sepEdit, pictureParams, useAtWorkingSize). The editor's open (main.ts establishFreshEdit) applies freshBaseline (src/tile.ts), then the measured denoise, then rounds to the sliders' steps. The CPU route the modules give is compileEdit (src/pipeline.ts, the CPU mirror of the shader) with the denoise laid by makeRowDenoiser (src/raw/denoise.ts), the pair export.ts composes.
+- The pattern build scratch/step418-build.mjs and the pattern script scratch/owner-messages-408.mjs read whole; the first send's runner scratch/step423-runner.mjs read whole as the pattern runner's copy; research/masks/press-figures.md read whole.
+
+Stage 2, the runner and the frames.
+- scratch/step423-2-runner.mjs written; node --check exit 0 (10:40). Its first two result lines are the free space and the California time; its plant read 7 on every run.
+- Label fetch1 (10:43:41): NIR_1873.NEF, a frame the list holds with no sky, through tools/owner-images.mjs --fetch, exit 0, already in the cache. No host was asked in this send and none refused.
+
+Stage 3, the app's render path.
+- scratch/step423-entry.ts re-exports, unchanged, importFile, decode, linearAt, freshBaseline, snapGain, snapExposure, srcFlatOf, measuredStrength, makeRowDenoiser, compileEdit and the neutral defaults; scratch/step423-2-build.mjs bundles it with the app's own esbuild (label build1, 10:40:34, exit 0).
+- scratch/step423-render.mjs: resolve(), importFile, decode with no lens plan, freshBaseline, snapGain and snapExposure, measuredStrength on the slider's 0.01 step, makeRowDenoiser at a tap step of 1, compileEdit on the test page's own neutral edit with those values on top; no look, no lift, no lens curve. Its planted grey read 137 137 137 on every run (the known figure).
+- Labels render0 (10:40:41), render99 (10:41:19), render7 (10:43:49): each of the eight frames rendered once, every child exit 0, 17 to 20 s each. All are 2,800 by 1,864, raw, with a camera matrix, no lens laid, swap on, recovery 0; denoise on the slider 0.26 (NIR_3461), 0.26 (NIR_3466), 0.29 (NIR_1827), 0.30 (NIR_1651), 0.44 (NIR_3742), 0.27 (NIR_3705), 0.29 (NIR_3710), 0.46 (NIR_1873).
+- Every frame opened. The seven held frames all hold sky; NIR_1873 holds none (forest, rocks, a river pool, a near trunk).
+- NIR_1651 decodes with rotate 3: its working copy lies turned (sky at the right) and is written as it stands.
+
+Stage 4, the natural-hue re-mapping.
+- scratch/step423-hue.mjs, label hue99 (10:45:13), every child exit 0; plant read 128 128 128, green and blue. Method in research/whole/inputs.md. On all eight frames the spread along the one axis is seven to twenty times the spread across it; the largest brightness change from clamping is 0.91 to 4.18 bytes.
+- Every natural-hue picture opened: foliage pale green, skies grey-blue; the dark reddish built things (the cell towers' panels on NIR_3705 and NIR_3710, the patrol boat on NIR_3742) go green with the foliage.
+
+Stage 5, the samples.
+- scratch/step423-samples.mjs reads the transcript in place through the hub's transcript-tail.mjs and typedAt, prints figures only and writes no file; plant read 2 counts, 3 and 2, NIR_0001.NEF, 61.5 20.0 4.4.
+- Label samples0 (10:46:46): nine messages of 10 and 11 November carry samples, on NIR_3742, NIR_3729, NIR_4095, NIR_4079, NIR_4045, NIR_3705 and NIR_3710, and on 11 November NIR_3710 and NIR_4079 only, so no photograph the list holds went unfetched (this answers the first send's Uncertain line).
+- Labels samples1, samples6, samples7: the samples of NIR_3742 (22), NIR_3705 (12) and NIR_3710 (14 and 8) written as figures to research/whole/samples.json.
+- Samples placed by this step, marked so: NIR_3461 sky 5, foliage 4, built things 3 (pylon members at a radius of 1 percent, still wider than a member, so each also holds sky); NIR_3466 sky 5, built things 4, foliage 4; NIR_1827 sky 5, foliage 5; NIR_1651 foliage 5, sky 5 (cloud counted as sky); NIR_1873 foliage 5, water 4.
+- scratch/step423-marks.mjs drew every sample over its frame (label marks1, plant read marked at 40 yes, inside unmarked); every check picture opened. The pressed samples land on what their names say, which also shows that the test page's picture and these frames share their orientation for the three pressed photographs. One sample this step placed on NIR_1651 held branch tips and was moved into the cloud (label marks2, opened).
+
+Stage 6, the planted pictures.
+- The one repair of this send. Label plant1 (10:53:12, exit 0): scratch/step423-plant.mjs's own plant read a left sample at 9 where its block named 12 or 13. Cause, read from the run and the script: the planted truth was 40 by 20, so every point from x 9 to x 15 on row 9 tied at the greatest depth and the scan took the first; the planted figure was wrong, not the rule. Repair, in that file alone, written in this send: the planted truth became 40 by 40, where the farthest point inside is at x 12 alone; the assertion is unchanged. Label plant2 (10:54:08): plant read 12; the seven truths written by plant1 read back equal and not written again.
+- Opening the planted pictures (label marks51) showed that the built-things window chosen by eye on NIR_3466 held the roof's edge and a strip of sky, which the mirror tiling spread through three built regions. The window was moved to (1344, 952, 588 by 350) in the planting script; label plant3 (10:56:18) made the pictures and samples again, the truths again read back equal and not written again (the window recorded in three truth sidecars brought up to date); label marks52 redrew the three; opened, the built regions hold wall, pillars and frames only.
+- Seven planted pictures at 2,800 by 1,864, each in its open and natural form with a truth: plant-straight, plant-stepped, plant-curved, plant-three, plant-shore, plant-built-foliage, plant-island (boundaries straight, stepped and curved; regions and windows in research/whole/inputs.md). The truths were written at 10:53, before any picture and before any method; no method ran in this step. Four samples a region, each 160 to 186 pixels or more inside it, radius 4 percent.
+- Every planted picture opened (fourteen), every truth opened (seven; values 1 to 3, so they open nearly black with the boundary faintly visible), every planted samples-check picture opened.
+
+Stage 7, the scorer and the sheet maker.
+- research/whole/score.mjs and research/whole/sheet.mjs, with png.mjs, draw.mjs and edt.mjs beside them; scratch/step423-trial.mjs tries both; node --check on each by labels check7 and check8, every child exit 0.
+- Label trial1 (11:00:07): score.mjs's own plant read 0.8750 and 6, sheet.mjs's 50.0 percent and 200. The hand-built wrong mask on plant-three, Water (the water, plus 12 rows of built things above the water line, plus a 200 by 200 block of sky, less a 100 by 100 block of water): band known 12, read 12; overlap over union known 0.9316, read 0.9316; subject taken 0.9913 and 0.9913; else taken 0.0181 and 0.0181; wrong pixels apart from the boundary 50,000 and 50,000; share at a half 23.2 and 23.2.
+- Opening the sheet showed its title cut off at the right edge; sheet.mjs now sizes its letters to fit (no figure moves). Label trial2 (11:00:59): every figure as in trial1; the sheet and crops redrawn and opened; the block in the sky, the hole in the water and the 12-row band each show tinted and outlined, in the sheet and at full size in the crops.
+- What each cannot show: score.mjs needs a truth, so it scores planted pictures only, and nothing finer than the truth's own boundary; a sheet is a picture to be opened, and its printed share is not a measure of a mask.
+
+Stage 8, the inputs note.
+- research/whole/inputs.md: every file written, the mask form (an 8-bit grey PNG at the picture's size, the byte round(255 times the value)), the two commands' use, the frames' and inputs' limits, and the hosts (none refused).
+
+What these checks cannot show: the planted pictures repeat texture by mirror tiling and have drawn boundaries with no halo, no mixed pixels and nothing thin crossing them, so a method scored on them is scored for regions and bands and not for wires, lattices or soft edges; the frames are the CPU mirror of the device's draw, so a pixel may differ from the device's while a place does not.
+
+No file outside the scratchpad was written in this send. No commit, no push, no run in the background, no package installed.
+
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3461-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3466-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_1827-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_1651-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3742-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3705-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3710-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_1873-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3461-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3466-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_1827-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_1651-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3742-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3705-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_3710-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/frames/NIR_1873-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/NIR_3742-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/NIR_3705-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/NIR_3710-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/NIR_3461-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/NIR_3466-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/NIR_1827-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/NIR_1651-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/NIR_1873-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-straight-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-stepped-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-curved-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-three-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-shore-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-built-foliage-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-island-open.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-straight-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-stepped-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-curved-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-three-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-shore-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-built-foliage-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-island-natural.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-straight-truth.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-stepped-truth.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-curved-truth.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-three-truth.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-shore-truth.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-built-foliage-truth.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/planted/plant-island-truth.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/plant-straight-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/plant-stepped-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/plant-curved-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/plant-three-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/plant-shore-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/plant-built-foliage-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/samples-check/plant-island-samples.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/trial/plant-three-water-handwrong.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/trial/plant-three-water-handwrong-sheet.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/trial/plant-three-water-handwrong-sheet-crops.png
+
+Found: tools/look-sheet.mjs cannot render a frame as it opens with no look: its two fixed candidates both press the Pink IR look, it renders each frame twice, and it writes the display canvas of an 1100 by 900 viewport rather than the frame at its own size. (first send)
+Found: Two of the six frames of IR-SCIENCE.md section 4b-x, NIR_1644 and NIR_0627 (the one frame with no sky), are not in tools/owner-images.json, so that section's trial rests in part on frames the app's list does not hold. (first send)
+Found: Five of the photographs the test-page presses of 10 November read, NIR_3729, NIR_4095, NIR_4079, NIR_4045 and NIR_3205, are not in tools/owner-images.json under any extension. (first send)
+Found: Step 423's Do fetches in its second stage each photograph the test page's reports name, while its fifth stage is the first that reads those reports; the second stage here took the names from the record research/masks/press-figures.md instead. (first send)
+Found: On the natural-hue input of section 4b-x the dark reddish built things of these frames (the cell towers' panels on NIR_3705 and NIR_3710, the patrol boat's hull on NIR_3742) lie on the pink side of the one colour axis and are turned green with the foliage, so on that input a built thing can read as foliage before any model runs.
+Uncertain: The first send's Uncertain line (whether the reports of 11 November name photographs beyond those of 10 November) is answered: they name NIR_3710 and NIR_4079 only.
+Uncertain: These frames carry the editor's measured denoise (0.26 to 0.46); the test page's picture on which the samples were placed is drawn with no denoise and no recovery, and through the device's chip into a wide-gamut space. Places agree; pixel noise and the last value of a colour may not.
+Uncertain: The 25 September natural-hue input's gain on the chroma is not on record; this one keeps the chroma's length, so it may be paler than the input that trial used.
+Uncertain: Two corrections were made on opening a picture and not on a red command: the built-things window moved after the planted pictures were opened, and the sheet's title fitted after the sheet was opened. Neither changed a truth or a figure; they are reported here and not counted as the send's second red check.

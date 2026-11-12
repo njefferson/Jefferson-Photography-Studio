@@ -1,0 +1,76 @@
+DONE
+Step 451 still serves goal 1, since the test page's cues and the lightness a mask's edge follows are now counted from the decode through one function the page and a node harness can both call, goal 1 still serves the asks as the Design states them, and nothing seen moved either answer.
+
+What was read before any edit: docs/ARCHITECTURE.md whole; part four of R/build-ground.md; src/debug.ts at placesPart, PlaceHeld, showSampler, sampleCount, the masks part (MaskKept to maskTry) and the step-1 press; src/placecues.ts placeCueValues; src/placestructure.ts; src/samplemask.ts whole; src/skyfine.ts buildSkyGuide and buildSkySelectionFrom; src/decode.ts DecodedImage, grayWorldWB, grayWorldFromMeans, linearAt; src/tile.ts freshBaseline; record 032 whole; debug.html's masks note; src/main.ts skyGuideFor.
+
+What the record did not hold, read here:
+- What the cues' module takes: placeCueValues(drawn RGBA per counted pixel, lin three per counted pixel, light one byte per frame pixel, width, height, cols, rows). Lightness is the largest byte over 255 and saturation (largest less smallest) over largest, from the four bytes; the three differences are (a less b) over (a plus b) of lin, so any common scale gives the same value; textures are the standard deviation of light in windows of 5 and 15 frame pixels. placeStructureValues reads light in windows of 15 and 45 frame pixels. sampleMaskRender's Refined to edges reads light at the counted pixels.
+- Whether the decode is in hand where the press counts: yes. placesPart is given subject, and subject.img with its linear copy is read after the draw in the same press (labelPixels, buildSepSky).
+- The sky guide cannot be built larger than 1024 pixels on its longer side (SKY_FINE_EDGE, the scale cap inside buildSkyGuide), so it is called at its own size and read between its pixels at the frame's places.
+
+The design note: progress/step-451-design.txt.
+
+What was built.
+- src/placedecode.ts (new, 96 lines): one exported function, placeDecode, and two exported interfaces, PlaceGrid and PlaceDecoded. It calls grayWorldWB(img) for the gains and buildSkyGuide((x, y) => linearAt(img, x, y), img.width, img.height, gains) for the guide, the call main.ts skyGuideFor makes for the editor's Sky mask; nothing of either is copied. It reads the guide bilinearly between pixel centres, each neighbour clamped at the edge, as sampleBrush reads a bitmap. Constants in it: 255 for a byte and the one half of a pixel centre; no number tuned.
+- src/debug.ts: placesPart counts the eight cues with placeCueValues(own.pixels, own.shares, own.light, ...) and the structure cues with placeStructureValues(own.light, ...), and keeps own.light in PlaceHeld for Refined to edges. Its drawn light, its linear copy at the opening gains and its gains parameter are gone, and the call site no longer passes base.wb. The row "The eight cues counted" now prints on every photograph, before the marina-only branch, and says the cues are from the photograph's own data, with the gains and the guide's size. sampleCount's structure row says the lightness is the photograph's own. MaskKept carries data, MASK_DATA ("decode") for a recipe fitted from this build on; masksRead keeps it; maskStages writes it and its recipe row says "from the photograph's own data"; maskKey tells recipes apart by photograph, subject and data, used by maskEntries and the Keep button, so an old recipe kept for this photograph does not hide a new one of the same name; maskListShow lists a recipe with no data as "made from the drawn picture, with its white balance, exposure and swap, before masks were made from the photograph itself, so it cannot be tried here" with no Try button, and its note counts them; maskTry refuses such a recipe in one row and draws nothing, and its Keep carries the recipe's data.
+- debug.html: the masks note now says a mask is made from the photograph itself, its own recorded data, and not from the picture as it is drawn here, so it is the same mask whatever the white balance, the exposure or the red and blue swap are set to, and that a mask kept before was made from the drawn picture, is listed as such and cannot be tried.
+- src/placecues.ts: only the contract lines of placeCueValues that said "drawn" and "at the opening gains" now say what the page gives; same line count, so its module map row did not move.
+- docs/ARCHITECTURE.md: the module map written again by the tool (95 modules; the debug.ts row's line count, 5149 to 5176; a new placedecode.ts row).
+- Left untouched among this step's Files: src/samplemask.ts, whose lightness parameter already reads "the frame's lightness".
+
+What stays on the drawn picture, and why: t, the thinned drawn frame, is the picture a person taps and the picture placePicture and maskPicture draw over, as the Facts require. The sample labels are positions (placeSampleLabels by cols and rows) and the sky labels come from the sky selection built at gray-world from the decode; both untouched. The Separation measure (labelPixels, the hue counts, step 3 and the sweep) measures the drawn picture on purpose and counts no cue of a mask; untouched.
+
+The new function's contract, copied whole from src/placedecode.ts:
+
+/** The grid of counted pixels as the test page takes it: `w` by `h` counted pixels, every `k`-th pixel of every `k`-th row of a frame
+ *  `fromW` by `fromH` laid over the whole photograph at turn zero, so counted pixel (x, y) is frame pixel (x times k, y times k). */
+export interface PlaceGrid { w: number; h: number; k: number; fromW: number; fromH: number }
+
+/** What the cues and the edge are counted on. `shares` is three floats for each counted pixel in grid order (row by row): the red, green
+ *  and blue shares of the gray-world-balanced linear decode, adding to one. `pixels` is four bytes for each counted pixel: each share over
+ *  the largest share, times the lightness, times 255, and 255 for the fourth, so the largest of the three is the lightness in 255ths.
+ *  `light` is one byte for each pixel of the frame, row by row, `fromW` times `fromH` long: the lightness times 255. The lightness is the
+ *  guide's own: gamma luma of the balanced linear decode over the frame's 99.5th percentile of it, from 0 to 1. `gains` are the gray-world
+ *  gains the guide was built at, read from the file, and `guideW` by `guideH` is the guide's size. */
+export interface PlaceDecoded {
+  shares: Float32Array;
+  pixels: Uint8ClampedArray;
+  light: Uint8Array;
+  gains: [number, number, number];
+  guideW: number;
+  guideH: number;
+}
+
+/**
+ * Counts what the test page's cues and a sample mask's edge are read from, from the photograph's own decode.
+ * The gains are `grayWorldWB` of the decode and the guide is `buildSkyGuide` over `linearAt` of the decode at those gains, the call the
+ * editor's Sky mask makes for its own guide; nothing of either is copied here. The guide is at most 1024 pixels on its longer side (the
+ * Sky mask's own working size), so it is read at each place by bilinear interpolation between its pixel centres, each neighbour clamped to
+ * the guide's edge as `sampleBrush` in pipeline.ts reads a bitmap; a place is the centre of a frame pixel as a fraction of the frame's
+ * width and height, so a frame of another size than the decode reads the same places of the photograph.
+ * @param img the decoded photograph with its pixels present (a raw's linear copy, or an 8-bit picture read through `linearAt`), at turn
+ *   zero as the test page draws it.
+ * @param grid the grid of counted pixels (`PlaceGrid`): its size, its stride and the size of the frame it was taken from.
+ * @returns a `PlaceDecoded`: the shares and the bytes of each counted pixel and the lightness of every frame pixel, as that type states.
+ * What the result must satisfy: it reads the decode and nothing else, takes no edit and reads none, so it is the same for one photograph
+ * whatever its white balance, exposure, channel swap, denoise or look; every share is from 0 to 1, the three of a pixel add to one and
+ * none is not a number; the largest byte of a counted pixel equals that pixel's byte in `light`. Consumers: the test page's places part
+ * (`src/debug.ts`), which counts the eight cues on `pixels`, `shares` and `light` (`placeCueValues`), the structure cues on `light`
+ * (`placeStructureValues`) and keeps `light` for the mask's Refined to edges (`sampleMaskRender`); and the node harness that sets the
+ * masks made this way beside the masks made from the drawn picture.
+ */
+export function placeDecode(img: DecodedImage, grid: PlaceGrid): PlaceDecoded
+
+How the page calls it, for step 453: const own = placeDecode(subject.img, t), where t is thin's result ({ data, w, h, k, fromW, fromH }, which satisfies PlaceGrid); then placeCueValues(own.pixels, own.shares, own.light, t.fromW, t.fromH, cols, rows), placeStructureValues(own.light, t.fromW, t.fromH, cols, rows), and sampleMaskRender(weights, rendering, own.light, t.fromW, t.fromH, cols, rows), with cols[y*w+x] = x*k and rows[y*w+x] = y*k. The module imports ./skyfine (buildSkyGuide) and ./decode (grayWorldWB, linearAt).
+
+The checks, under runner label checks1 (scratch/step451-runner.mjs, node --check clean; the plant read 7): architecture-check --write wrote the map (95 modules); typecheck 0, contract-check 0, architecture-check 0, token-check 0, scope-check 0, stamp-check 0. Outputs: progress/step-451-checks1-*.txt.
+What each cannot show: typecheck shows the source compiles under the repository's flags, not that a cue or a mask is right. contract-check lists tracked files only (git ls-files), so it did not judge src/placedecode.ts, which is untracked; it judges it once step 457 stages it (its rules were read: every parameter named and a returns word, which the block above holds). architecture-check shows the map matches the source, nothing of behaviour. token-check shows no undefined colour token; scope-check that EditParams and .scope-allow agree (no field added); stamp-check that the tile stamp's fields are complete (main.ts untouched). No check ran placeDecode on a photograph: nothing here shows a mask made from the decode is better, worse or the same, which is steps 453 to 455's.
+
+git status at the end: modified .githooks/commit-msg and .githooks/pre-commit (as before), debug.html, docs/ARCHITECTURE.md, src/debug.ts, src/placecues.ts; untracked src/placedecode.ts; nothing staged, nothing committed. The diff was read whole with git diff over the four changed tracked files.
+
+No build, walk or browser run was made; nothing was staged, committed or pushed; nothing of the hub was touched.
+
+Found: the Separation check's kept selections (local storage key ips-debug-separation-selections, keptRead and keptWrite in src/debug.ts), fitted before this change on cues counted from the drawn picture, are still read on the cues counted from the decode by placeReport, in placesPart for the three marina photographs and in sampleCount on every photograph, with nothing to say they were fitted on other data; the step's text names only the mask recipes, so they were left as they were.
+Found: src/placestructure.ts's contract for placeStructureValues still calls its first parameter "the drawn lightness of the whole frame", where the test page now gives it the decode's lightness; that file is not in this step's Files.
+Uncertain: the lightness the textures, the structure cues and Refined to edges read is the sky guide's, at most 1024 pixels on its longer side (on a 2800-pixel frame about 2.7 frame pixels to a guide pixel), read between its pixels, where the drawn way read the frame at every pixel; so texture at 5 sees no detail finer than the guide's pixels, and the two ways differ in the resolution of that lightness as well as in its source. Whether that costs a mask anything is for the pictures of steps 454 and 455.
+Uncertain: the step-1 press now builds a guide over every pixel of the decode through linearAt, as the editor's Sky mask guide does once per photograph; its time on the device is unmeasured, and the press laps it under "separation: the photograph's own data for the cues".

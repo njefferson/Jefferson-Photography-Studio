@@ -1,0 +1,22 @@
+DONE
+The step still serves goal 1 because the overlap definitions and the points-and-scoring practice of the field are now on disk for step 423's scorer to be checked against, the program's thesis is unmoved, and what was seen (the two editors' sites not answering) moved neither answer.
+
+Written: research/whole/notes-editors.md (new). Fetcher and runner: scratch/step425-fetch.mjs and scratch/step425-runner.mjs (both checked with node --check). Pages and the paper: research/whole/pages-editors. Run records: progress/step-425-first-a.txt, second-a.txt, third-a.txt, paper-a.txt.
+
+Stages: first, the notes of 10 and 11 November under research/masks and the pattern fetcher were read whole. Second, the fetcher was written and run under four labels (six, five, three and one addresses). Third, every text page was read to its last line; the paper's 30 pages were opened one at a time. Fourth, the notes were written.
+
+Hosts that did not answer with their page, one to a line:
+Host: helpx.adobe.com (status 403, "Access Denied", on four addresses asked once each; the site's own answer, not the proxy's notice)
+Host: support.captureone.com (status 403, a script challenge page, one address asked)
+
+Pages read whole: darktable manual masks, overview, AI masking, drawn masks, AI features overview, how AI features work; arXiv abstract page and the full 30-page paper on Segment Anything; Jaccard index article; Dice-Sørensen article.
+
+Overlap measure: stands in the notes (Jaccard = TP over TP plus FP plus FN; Dice = 2TP over 2TP plus FP plus FN; J = S/(2-S); the weighted and continuous forms for graded masks; the paper's per-mask IoU averaged per dataset then across datasets, masks thresholded at logit zero, point placement by distance transform of the truth and of the error region).
+
+Nothing outside the scratchpad was written; no web fetch tool, search tool or browser used; no commit or push; no reply-guard release needed (no proxy notice appeared on a real address).
+
+Uncertain: pages 29 and 30 of the paper (annotation-guideline screenshots) are in type too small to read at the size given; read by captions and legible words only.
+Uncertain: the Dice page's continuous form (cDC with factor c) and the Jaccard page's weighted form were read as printed and not checked against their cited sources.
+Found: no page of Adobe or Capture One on model masks, kinds or copying could be reached, so the editors' behaviour on copied masks is known only for darktable and RawPedia; the question of whether those two sites would answer a different route is not settled by this step.
+Found: no page read names what kinds of landscape region (sky, foliage, water, built things) darktable's AI object shape selects; its pages speak of one visually distinct object at a time.
+Found: darktable's AI masking page says a mask made by clicks is vectorised once into path shapes and the clicks are not carried; its copy page leaves mask management out of a plain copy. Nothing read shows a preview of a copied mask on the target.

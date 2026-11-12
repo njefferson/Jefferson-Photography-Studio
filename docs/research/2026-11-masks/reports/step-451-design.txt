@@ -1,0 +1,24 @@
+Step 451 design note (written before any edit).
+
+What was read and what it showed.
+- placesPart (src/debug.ts near 3908) counts the cues with placeCueValues(t.data, linear, light, fromW, fromH, cols, rows) and placeStructureValues(light, W, H, cols, rows). t.data is the thinned drawn frame (opening balance, auto exposure, swap on, developed); light is the largest drawn channel at every frame pixel; linear is the linear copy at the opening gains for a raw at the drawn size, else the drawn bytes over 255. PlaceHeld.light is that drawn light, and sampleMaskRender's Refined to edges reads it at the counted pixels.
+- placeCueValues takes: drawn RGBA per counted pixel (lightness = largest/255, saturation = (largest-smallest)/largest), three linear channels per counted pixel (the three differences, each (a-b)/(a+b), so any common scale gives the same value), and the frame's lightness bytes (textures at 5 and 15 frame pixels). placeStructureValues takes the frame's lightness bytes (edge alignment at 15 and 45 frame pixels).
+- The decode is in hand where the press counts: placesPart is given subject, and subject.img (its linear copy) is read after the draw by labelPixels and buildSepSky in the same press.
+- buildSkyGuide(sample, srcW, srcH, wb) gives red share, blue share and gamma luma over the bright end at most 1024 on the long side (SKY_FINE_EDGE); main.ts skyGuideFor calls it with linearAt over the decode and grayWorldWB(img). It cannot give a guide larger than 1024 on the long side.
+
+The function. src/placedecode.ts (new), export function placeDecode(img, grid) -> PlaceDecoded.
+- Takes the decode and the grid of counted pixels { w, h, k, fromW, fromH } (the shape thin gives, counted pixel (x, y) at frame pixel (x*k, y*k)).
+- Calls grayWorldWB(img) (decode.ts) for the gains, the file's own, and buildSkyGuide((x, y) => linearAt(img, x, y), img.width, img.height, gains), the same call the editor's Sky mask guide makes. Copies nothing of it.
+- Reads the guide bilinearly at texel centres (the rule sampleBrush in pipeline.ts states), at each counted pixel's centre and at every frame pixel's centre, by place as a fraction of the frame, so a frame drawn at another size than the decode reads the same places.
+- Gives back: shares (red, green = 1 - red - blue, blue; three per counted pixel), pixels (four bytes per counted pixel: each share over the largest share times the guide lightness times 255, so placeCueValues' lightness is the guide lightness and its saturation is the balanced linear's (largest-smallest)/largest), light (one byte per frame pixel, the guide lightness times 255), the gains and the guide's size.
+- Takes no white balance, exposure, swap, denoise or look and reads none; the only scaling is the guide's own (the frame's 99.5th percentile of gamma luma) and the gray-world gains, both fixed by the file. No number tuned; the constants are 255 for a byte and the texel centre's one half.
+
+Each call of the page that changes (src/debug.ts).
+- placesPart: placeCueValues(d.pixels, d.shares, d.light, ...) and placeStructureValues(d.light, ...); PlaceHeld.light = d.light; its drawn light, linear and the gains parameter go (the call site drops base.wb); the cue rows say what each cue is counted on now.
+- sampleCount's structure row says the lightness is the photograph's own.
+- Masks: MaskKept gains data ("decode" for a recipe fitted from this build on); masksRead keeps it; maskStages writes it; maskListShow lists a recipe without it as made from the drawn picture, cannot be tried here, no Try button; maskTry refuses one without it and its Keep carries the field; the recipe row says it was fitted on the photograph's own data.
+- debug.html: the masks note says a mask is made from the photograph itself and stays the same whatever the white balance, the exposure or the red and blue swap are set to, and that one kept before is listed and cannot be tried.
+- src/placecues.ts: only the two parameter lines of placeCueValues' contract that say "drawn" and "at the opening gains" (same line count, so its map row does not move).
+
+What stays on the drawn picture: t (the thinned drawn frame) is what the person taps and what placePicture and maskPicture draw over; the sample labels are positions (placeSampleLabels by cols and rows) and the sky labels come from the sky selection built at gray-world from the decode; both untouched. The Separation measure (hue counts, labelPixels, the sweep) measures the drawn picture on purpose and is not a cue of a mask.
+- src/samplemask.ts left untouched (its lightness parameter is already "the frame's lightness").

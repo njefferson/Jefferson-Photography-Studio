@@ -1,0 +1,17 @@
+DONE
+Step 456 still serves goal 1, since the documents now say the masks of 11 November were made from the edited picture and the test page's cues from the decode; goal 1 still serves the program's thesis, and nothing seen moved either answer.
+
+What was read: the inputs note, step 451's report, records 110 and 111 whole, record 032's opening (its file is docs/decisions/032-a-mask-keys-the-photograph-not-the-grade.md), the science file's passage headed "A MASK MADE FROM SAMPLES, JUDGED OVER WHOLE PHOTOGRAPHS" (found with Grep by its heading; the Grep for "11 November" matched other sections, this passage's date is on the heading's second line), the app's CLAUDE.md around BEFORE A PLAN GOES UP.
+
+What was written, four files, dated 11 November 2026 (the California date the runner printed):
+- docs/decisions/111-...: a paragraph at the foot of Context, before Looked up, saying every mask was made from the picture as it opens or its hue re-mappings, none from the decode, and that the notes' entry for the decode build holds what the recipe did from the decode (step 457 writes that entry). Record 032 is cited because 111's Depends declares it; no Depends line added.
+- docs/decisions/110-...: a paragraph at the foot of Built saying the cues of 2.77 to 2.79 were counted on the drawn picture, are counted from the decode through placeDecode from the next build, and that a recipe and a Separation selection kept before are listed and not applied. It also says the earlier sentence about counting at the opening balance did not hold for exposure, swap and develop.
+- IR-SCIENCE.md: one paragraph at the head of the 11 November passage, after its opening paragraph, before Part one.
+- CLAUDE.md: new section "A MASK AND EVERY SELECTION READ THE PHOTOGRAPH'S OWN DATA (11 November 2026)" directly after BEFORE A PLAN GOES UP, 10 lines, naming record 032, the order rule and the cost as measured facts.
+
+Checks, runner step456-runner.mjs, label checks1 (plant read 7; node --check clean; an earlier label date1 ran no check and only read the date): decisions-check 0, notes-check 0, roadmap-copy-check 0, hub-surface-gates 0. Outputs: progress/step-456-checks1-*.txt. What they cannot show: that the sentences are true beyond the files they were drawn from, or that the pipeline order the CLAUDE.md section points to (the session brief and docs/ARCHITECTURE.md) is complete.
+
+git status: modified CLAUDE.md, IR-SCIENCE.md, the two docs/decisions files, beside step 451's debug.html, docs/ARCHITECTURE.md, src/debug.ts, src/placecues.ts, untracked src/placedecode.ts, and the two hooks as before; nothing staged or committed.
+
+Found: the 111 record's Looked at and Options still describe the figures without the edited-picture caveat beyond the one new paragraph; the notes entry that paragraph points to does not exist until step 457.
+Uncertain: whether a Grep of the science file for "11 November 2026" alone locates the passage; it sits on the heading's second line as "2026.**", so a search for the heading words finds it.

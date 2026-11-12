@@ -1,0 +1,62 @@
+DONE
+The step still serves goal 1, seeing the masks from the decode beside the masks from the drawn picture over whole photographs by an agent that built none of it, that goal still serves the asks as the plan's design states them, and what was seen, the decode way the same as the drawn way on nine of twelve frame-subjects, better on one, worse on two and broken on none, moves neither.
+
+Stage one: D/index.md read; it lists for this step twelve comparison pictures and three copied-recipe pictures and counts 25 of 25 pictures on disk.
+Stage two: the twelve comparison pictures of NIR_3742, NIR_3705, NIR_3710 and NIR_1873 opened, each before any note or report was read, and each mask marked on both clauses of the bar. No step's note or report was read in this send at all.
+Stage three: the three copied-recipe pictures opened one at a time and each copy marked on the region clause beside the second frame's own mask.
+Stage four: D/judgement-455.md written, at /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/judgement-455.md, holding every line in full (two clause lines for each mask and a word line for each frame-subject and each pair-subject), the counts with the frames and the copies apart, and what the judgement cannot show.
+
+The words, frame by frame (each resting on its two clause lines in the judgement file):
+NIR_3742, Sky: same. 11.2% each, lines within a few pixels of each other at all three places.
+NIR_3742, Water: same. 22.7% against 22.9%, the same water taken and the same reflections under the boats left.
+NIR_3742, Built things: worse. Both take the sand beach (about 10%) and strips of water; the decode way also takes a region at the right edge (about 2.5%), one in the trees at the upper left (about 1.4%) and blobs on the treetops.
+NIR_3742, Foliage: same. 47.6% against 46.5%; the forest's shaded base left by both; their wrong bands on the water trade.
+NIR_3705, Sky: better. The decode way takes the bank of sky between the towers that the drawn way leaves out (about 6%), and meets the region clause the drawn way fails.
+NIR_3705, Foliage: same. 40.8% against 41.3%.
+NIR_3705, Built things: same. 10.5% against 9.9%.
+NIR_3710, Sky: same. Both leave the sky between the towers out (about 3 to 4%).
+NIR_3710, Foliage: same. Both leave the dark band of stems at the shrubs' base (about 3%).
+NIR_3710, Built things: same. Both take that band of stems (about 4 to 5%) as well as the towers.
+NIR_1873, Foliage: same. Both take the rocks of the shore (about 7%); at the boughs over the water they trade.
+NIR_1873, Water: worse, narrowly. The decode way leaves out the water among the boughs (about 1.2%, read off the panel), which the drawn way takes.
+
+The words, copy by copy:
+NIR_3705 to NIR_3710, Sky: better. The drawn way's copy misses about a fifth of the frame of sky; the decode way's about 9 to 10%; the own about 3%.
+NIR_3705 to NIR_3710, Foliage: same.
+NIR_3705 to NIR_3710, Built things: same. Both copies take streaks of cloud the own does not.
+NIR_3461 to NIR_3466, Sky: better. Both copies take the road (about 8 to 10%); the drawn way's also takes parts of the building, the decode way's leaves it out.
+NIR_3461 to NIR_3466, Built things: worse. Neither copy finds the building the own holds; the decode way's takes about a quarter of the frame of cloud against the drawn way's smaller share.
+NIR_3461 to NIR_3466, Foliage: better, narrowly. The drawn way's copy takes a piece of the building's tower near one hundredth; the decode way's only small bits.
+NIR_3742 to NIR_1873, Foliage: better. The decode way's copy finds the boughs over the water the own holds; the drawn way's misses them.
+NIR_3742 to NIR_1873, Water: worse. The decode way's copy misses more of the pond (about 14%) than the drawn way's (about 10%).
+
+The counts. Frames, twelve frame-subjects: better 1, same 9, worse 2, broken 0. Copies, eight pair-subjects: better 4, same 2, worse 2, broken 0.
+On the bar itself: no mask of this step's twelve frame-subjects meets both clauses by either way; the edge clause is met by neither way at any of them; the region clause is met by the drawn way at four and by the decode way at four. Of the sixteen copies, one meets the region clause.
+
+What each check cannot show: the pictures were drawn in the container by the harness of step 453 and not by the test page on the device; region sizes are read by eye off panels 512 or 384 pixels wide and are rough; the panels cannot settle whether close pieces connect; masks are judged at the half cut and a tint under a half is not counted; the edge is judged only at the three places each comparison picture crops, and not at all for a copy; four frames and three pairs only; how a mask serves a look or an edit is not judged.
+
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3742-sky.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3742-water.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3742-built-things.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3742-foliage.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3705-sky.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3705-foliage.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3705-built-things.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3710-sky.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3710-foliage.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3710-built-things.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_1873-foliage.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_1873-water.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/copied-NIR_3705-to-NIR_3710.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/copied-NIR_3461-to-NIR_3466.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/copied-NIR_3742-to-NIR_1873.png
+
+Uncertain: three marks rest on a region read near one hundredth off a small panel, NIR_3742 Water under the boats (both ways), NIR_1873 Water among the boughs (the decode way, and so that frame's word worse) and the NIR_3461 to NIR_3466 Foliage drawn way's copy at the building's tower (and so that pair's word better); each could go the other way.
+Uncertain: the NIR_3461 to NIR_3466 Sky word better rests on reading the drawn way's copy as taking parts of the building's right block, which the panel shows as loops of line over its face rather than as a clear tint.
+Uncertain: the dark stems and shade at the base of shrubs and forest are counted as foliage; the samples do not settle it, and both ways are judged alike on it, so no word rests on it.
+Found: in this step's four frames no mask by either way meets both clauses of the bar, and the edge clause is met at no frame-subject by either way.
+Found: the Built things masks of NIR_3742 take the sand beach across the frame, about 10%, and strips of water, and those of NIR_3710 take the dark band of stems at the shrubs' base, about 4 to 5%, by both ways alike.
+Found: the Sky masks of NIR_3710 leave out the sky between the two towers by both ways, about 3 to 4%, and those of NIR_3742 cross pockets of sky between the spires, about 90 pixels off at the crop at B.
+Found: the Foliage masks of NIR_1873 take the grey rocks of the shore, about 7%, by both ways.
+Found: the copied Built things recipe from NIR_3461 to NIR_3466 misses the building by both ways and takes cloud, the decode way's copy about a quarter of the frame.
+Found: the copied Sky recipe from NIR_3461 to NIR_3466 takes the road along the bottom of the frame by both ways, about 8 to 10%.

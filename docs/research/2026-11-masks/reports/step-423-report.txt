@@ -1,0 +1,36 @@
+EJECT
+The step still serves goal 1 and goal 1 still serves the program's thesis, but what was seen moves the first answer as the step is written: the app's render tool cannot give a frame as it opens with no look, once, at the frame's own size, so the frames every later step rests on cannot be made by the route the step names.
+
+Stage 1, reading, done.
+- IR-SCIENCE.md section 4b-x (lines 2198 to 2345) read whole. Its six frames: NIR_3461, NIR_3466, NIR_1644, NIR_1827, NIR_1651 and NIR_0627 (the last holds no sky), exported then through the app with the lens profile at 1. Its natural-hue input: the swap render's one colour axis re-mapped so that its foliage side goes green and its sky side goes blue, with the brightness kept.
+- tools/owner-images.mjs read whole: --list [text], --fetch NAME..., --summary; resolve() refuses anything under public/examples and any name the index does not hold; files are cached under /root/.cache/jps-owner-images.
+- tools/look-sheet.mjs read whole; tools/fresh-dist.mjs read with Grep as far as requireFreshDist.
+- The pattern runner scratch/step400-runner.mjs and the pattern script scratch/owner-messages-408.mjs read whole.
+- The photographs pressed on the test page on 10 November, from the record research/masks/press-figures.md (not from the transcript): NIR_3742, NIR_3729, NIR_4095, NIR_4079, NIR_4045, NIR_3705 and NIR_3710, with NIR_3205 read in kept rows of presses 6 and 7.
+
+Stage 2, the runner, the list and the fetch, done.
+- scratch/step423-runner.mjs written; node --check exit 0.
+- Label list1 (California 11/11/2026, 10:26:39 AM; free space 27459 megabytes; plant reported 7): owner-images --list exit 0, 450 lines, read whole (progress/step-423-list1-owner-list.txt); tools/fresh-dist.mjs exit 0, "the build is current". What the freshness check cannot show: that the build is the build of the remote's staging head; it compares file times only.
+- Of the six frames of section 4b-x the list holds four: NIR_3461.NEF, NIR_3466.NEF, NIR_1827.NEF, NIR_1651.NEF. NIR_1644 and NIR_0627 are not in the list under any extension.
+- Of the photographs pressed, the list holds three: NIR_3742.NEF, NIR_3705.NEF, NIR_3710.NEF. NIR_3729, NIR_4095, NIR_4079, NIR_4045 and NIR_3205 are not in the list under any extension.
+- Label fetch1 (California 11/11/2026, 10:26:56 AM; plant reported 7): the seven held names fetched through tools/owner-images.mjs --fetch, each exit 0, each at /root/.cache/jps-owner-images/<name>. No host refused. What the fetch cannot show: that a file is the shared original beyond its size matching the index.
+
+Stage 3, the render, not done: EJECT.
+What the render tool's usage gives (tools/look-sheet.mjs, read whole):
+- It needs `python3 -m http.server 8131 --directory dist` running "in another shell" for the whole run, a server process held beside the tool, and a current dist (it is current).
+- Its only flags are --port, --file (taken through resolve()) and --out. It takes no candidate list and no output size.
+- It renders the fixed CANDIDATES list written into the tool, each in a fresh page: "0-pink-ir" presses the IR tab (#ptab-ir) and the look button #lookAero, which ir.html labels "Pink IR" and loads with aria-pressed false; "1-six-frame-solve" presses the same two and then moves nine mixer sliders and two colour bands. Neither candidate is the frame as it opens with no look.
+- So one run renders each frame twice, once per candidate, and the step's Kill names a frame rendered twice.
+- Its picture is a screenshot of the #view canvas inside an 1100 by 900 viewport, written as <out>/<candidate>.png: the display canvas, not the frame at its own size, while the planted pictures and the sheets are to be made at the frames' own size.
+- It exits 1 where two candidates render the same picture.
+So the tool cannot give, in its own run, the picture the step asks for (as it opens, with no look, once, at the frame's size), and the step's text settles no other route: a copy of the tool with its candidates or its readback changed is not the tool's own run, every other tool that opens a frame in the app (52 files hold setInputFiles) is a walk of a page, and rule 25 allows the app's modules bundled under the scratchpad but the step does not name that route. The choice is left to the plan.
+
+Stages 4 to 8 not begun. No picture was written, so no Picture line. No file outside the scratchpad was written. No transcript was read.
+
+Files this report names: /home/user/Jefferson-Photography-Studio/tools/look-sheet.mjs, /home/user/Jefferson-Photography-Studio/tools/fresh-dist.mjs, /home/user/Jefferson-Photography-Studio/tools/owner-images.mjs, /home/user/Jefferson-Photography-Studio/ir.html (line 889, the look button), /home/user/Jefferson-Photography-Studio/IR-SCIENCE.md (section 4b-x), /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/scratch/step423-runner.mjs, /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/progress/step-423-list1-owner-list.txt, /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/progress/step-423-fetch1.txt, /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/masks/press-figures.md.
+
+Found: tools/look-sheet.mjs cannot render a frame as it opens with no look: its two fixed candidates both press the Pink IR look, it renders each frame twice, and it writes the display canvas of an 1100 by 900 viewport rather than the frame at its own size.
+Found: Two of the six frames of IR-SCIENCE.md section 4b-x, NIR_1644 and NIR_0627 (the one frame with no sky), are not in tools/owner-images.json, so that section's trial rests in part on frames the app's list does not hold.
+Found: Five of the photographs the test-page presses of 10 November read, NIR_3729, NIR_4095, NIR_4079, NIR_4045 and NIR_3205, are not in tools/owner-images.json under any extension.
+Found: Step 423's Do fetches in its second stage each photograph the test page's reports name, while its fifth stage is the first that reads those reports; the second stage here took the names from the record research/masks/press-figures.md instead.
+Uncertain: Whether the reports of 11 November name photographs beyond those of 10 November; the transcript was not read, since the step ejected before its fifth stage.

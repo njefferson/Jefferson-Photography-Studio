@@ -1,0 +1,20 @@
+DONE
+Wall line: the step still serves goal 1 because it supplies the device reading that record 006 owes and the choice among methods will weigh, that goal still serves the program's thesis, and what was seen (the runtime's tables and the browser maker's statements disagree on WebGPU for a tablet) moves neither answer but is a finding for the build.
+Send 2 of step 424. Read the first send's report first; fetched nothing the first send fetched; read all eight first-send pages to their last line.
+Written: research/whole/notes-device.md (entries for every page asked, runtimes, point-prompted models, scene-class models, what fits under 26,214,400 bytes, what none of it shows). Fetcher: scratch/step424-fetch.mjs, labels reg, rawort, sizes, safari, caniuse, samr, samr2, scener, hf1, hf2, hf3, hf4, each node --check clean. Progress: progress/step-424.txt.
+Reading states: read whole except these named in the notes: three Apache LICENSE files (sam2, MobileSAM, EfficientSAM, efficientvit, PaddleSeg: five files checked by Grep for their terms, notice and appendix line numbers against the one read whole, not read line by line); developer.apple.com release notes needs script (not read).
+Hosts that did not answer:
+- github.com (the session's own access notice, first line "GitHub access to this repository is not enabled for this session.")
+- www.npmjs.com (challenge page)
+- data.jsdelivr.com
+- cdn.jsdelivr.net
+- unpkg.com
+- caniuse.com (these four: CONNECT tunnel failed, 403)
+- huggingface.co/api/models/ChaoningZhang/MobileSAM (401)
+The reply guard's release command was not run: no call was refused by the guard this send.
+Found: the runtime's two support tables (get-started page and js/web README) give Safari on iOS no WebGPU, while the WebKit blog of 9 June 2025 and the caniuse data give WebGPU on iOS Safari 26 onward; only a run on the test page settles it.
+Found: per-file sizes of the 1.31.1 WebAssembly binaries were not obtainable (jsdelivr, unpkg refused; github releases refused); the 14.2, 28.3 and 26.8 MB figures stay the science file's of 25 September.
+Found: no ONNX scene-class model (BiSeNet) file size was read this send; its 22.4 MB is the science file's.
+Found: the SAM 2 tiny ONNX copy carries no model card, so no licence of its own is stated; the original repository says Apache 2.0.
+Uncertain: SegFormer's licence file was not asked; the model page says "other".
+Uncertain: EfficientSAM's checkpoint sizes (in the github repository's weights folder) were not read.

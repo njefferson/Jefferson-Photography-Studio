@@ -1,0 +1,18 @@
+DONE
+The step still serves goal 1 (the reading for the fitted-classifier kind), that goal still serves the program's thesis, and what was seen moved neither answer.
+
+Written: research/whole/notes-features.md in the scratchpad, with an entry for each of the 18 pages asked, each with publisher, address, date and state, the statements with the pages they rest on, and the last part "What step 437's Facts have wrong".
+
+Read to the last line: DINOv2 readme, licence, model card, arXiv abstract page, Convpaint readme and licence, both ONNX copies' listings and cards, config.json, preprocessor config, base model card. The paper's HTML page: read to its last line except lines 2261 to 3360, the reference list, which were not read. The Hugging Face search json was read by Grep for model ids only.
+
+Host that did not answer:
+guiwitz.github.io (tunnel failure, status 403); Convpaint's two method pages are unread.
+
+Picture lines: none made.
+
+Found: guiwitz.github.io is refused by the session's network; Convpaint's method (its classifier, its use of JAFAR) is unread and rests on the readme alone.
+Found: the reply guard's release command refused for guiwitz.github.io, saying nothing from that host is on record as declined, though the rules direct that command on a proxy notice; the rules and the guard disagree for a notice not recorded as declined.
+Found: no page read gives a count of marked patches a fit needs, a rule for a patch matching no mark, or a nearest-neighbour test on patches; step 437's rules for those are its own and rest on no source.
+Found: neither ONNX copy's card states a licence of its own; the licence is the base model's Apache 2.0, and the copies' terms are unstated.
+Uncertain: whether the ONNX file accepts a 1,400 by 938 input, and whether the q4 files run in the ONNX runtime for node; no page says, step 437 tests it.
+Uncertain: the paper's 112,139-character page was read except its reference list; nothing in the unread part is a method.

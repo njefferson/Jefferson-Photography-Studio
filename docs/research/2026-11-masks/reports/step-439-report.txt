@@ -1,0 +1,13 @@
+DONE
+The step still serves goal 1 (it only surveys the gates and the test page's layout for the build brief), that goal still serves the program's thesis, and nothing seen moved either answer.
+
+Written: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/build-ground.md, five parts (branch-guard checks, package and lockfile, service worker list / host limit / worker loading, the page's script, the page's layout), plus a short collected list.
+git status of the app after the step: only the two hooks modified (as before); nothing else changed, nothing staged.
+
+Found: The build makes no test of a file's size or type: vite.config.ts lines 435 to 465 put every file of dist (outside examples, stickers, screenshots) into the service worker's all-or-nothing install list, so a model or WebAssembly file would be downloaded by every install that lacks the same bytes.
+Found: tools/offline-shell-walk.mjs lines 283 to 294 require exactly one dist/assets chunk named debug-*.js; a new chunk with that prefix breaks the walk (it is not a commit gate).
+Found: architecture-check rows carry line counts (tools/architecture-check.mjs line 85), so any edit of a src file, debug.ts included, needs docs/ARCHITECTURE.md regenerated and staged.
+Found: no WebAssembly, model, importScripts or ?worker use exists anywhere in src today; the five Worker sites all use new Worker(new URL(...), {type: "module"}) and vite.config.ts has no worker key.
+Found: the rows a count prints go to #dPicResults (debug.ts line 4613), above the Separation check heading, far from the count button; the selection pictures sit in #dSamplePics between the count button and the masks heading.
+Uncertain: the panel's and photograph's heights on a device were not measured, so whether the loop needs scrolling is unread; bodies of decisions-check, plan-scope-check, hub-pin-check, palette-spec-check, one-pool, stamp, openable and pool-budget were read only to their headers and cited lines; the generated pre-commit hook was not read.
+Picture: none made.

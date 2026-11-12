@@ -1,0 +1,20 @@
+plain radius 16 regularisation 0.001
+Run as: node /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/refine.mjs <coarse.png> <picture.png> <out.png> plain 16 0.001 <cell>. The plain stage does not read the cell; any whole number may be passed.
+
+The rule (step 436): the stage and setting with the lowest median widest band over the planted tests from the right coarse map, a tie going to the higher mean overlap over union. The median of sixteen is the mean of the eighth and ninth. No other stage setting shares the lowest median, so the tie clause was not read.
+
+The figures the rule read, from research/whole/edge/scores.md (16 right coarse maps each, the scorer's figures, the guide the -open picture):
+- plain radius 32: median widest band 15.5 px, mean overlap over union 0.9980
+- plain radius 16: median 10 px, mean 0.9991 (chosen)
+- plain radius 64: median 27 px, mean 0.9948
+- weighted radius 48: median 23 px, mean 0.9960
+- weighted radius 64: median 28 px, mean 0.9947
+- weighted radius 96: median 36 px, mean 0.9911
+- cues radius 2: median 29 px, mean 0.9887
+- cues radius 4: median 29 px, mean 0.9892
+- cues radius 8: median 28 px, mean 0.9904
+Beside them, taking no part in the rule: the coarse map as it is, median 10 px, mean 0.9982.
+
+How long the stage took on one picture here: 925 ms through refine.mjs in one process on plant-curved (2,800 by 1,864), reading the coarse map and the picture and writing the mask included; 697 and 702 ms for the filter alone on NIR_3710 and NIR_3705. The container's processor, measured once each; not a tablet's.
+
+What the choice does not say: that the stage brings a coarse map to the picture's edges. It ties the right coarse map's own median (10 px), meets the bar on 1 of 16 right maps where the coarse map as it is meets it on 6, and keeps a misplaced map's misplacement (median 22 px, as the misplaced coarse map's own 22). research/whole/edge/notes.md says what each stage did.

@@ -1,0 +1,16 @@
+DONE
+Step 457 still serves goal 1 (the fix stands on staging with main unmoved), goal 1 still serves the program's thesis, and nothing seen moved either answer.
+
+Second send of step 457; the first send's report was read first and its EJECT answered by the amended Facts.
+
+Release rule applied: frames better 5, same 12, worse 5, broken 0; copies better 4, same 2, worse 2, broken 0. No broken, worse not more than better, so the landing went on.
+
+Written in NOTES.md: the entry at the head of "On staging, waiting on a device pass" (build 2.79.1, first sentence says 2.76 to 2.79 stand on staging with no entry here) and queue lines Q-JPS-339 to Q-JPS-352 after Q-JPS-338: 339 no entries for 2.76 to 2.79; 340 placeStructureValues contract; 341 guide resolution and unmeasured press time; 342 old kept selections left in storage; 343 record 111 caveat only at the foot of Context; 344 bar not met by either way; 345 Built things faults; 346 Sky faults; 347 Foliage faults; 348 copied recipe faults NIR_3461 to NIR_3466; 349 overlapping masks; 350 by-eye marks near one hundredth; 351 planted pictures hold no decode; 352 learned selections unmeasured from the decode.
+
+Build exit 0 (label build1). Checks exit 0 (checks1): typecheck, contract-check, architecture-check, token-check, decisions-check, notes-check, roadmap-copy-check, hub-surface-gates. Staged one by one: CLAUDE.md, IR-SCIENCE.md, NOTES.md, debug.html, docs/ARCHITECTURE.md, records 110 and 111, src/debug.ts, src/placecues.ts, src/placedecode.ts; hooks and .doctrine-sync not staged. Scope check: diff holds 360 lines; staged diff (670 lines) and unstaged diff (56 lines) read to their last lines; verdict IN-SCOPE in scope-verdict-10.txt, recorded with 726 lines read, then .plan-scope staged. Commit subject: "Fixed: on the test page a mask from your samples is made from the photograph itself, so it no longer changes with white balance, exposure or the red and blue swap", body one sentence, no trailer. Fetch done; origin/staging head before the push was the Docs commit "masks from samples measured over whole photographs". Push of staging accepted; git rev-parse shows local HEAD and origin/staging equal at d6e05f1a (new commit), origin/main at a different, unmoved head.
+Runs for that commit, read once through the connector and not waited on: Gates run 1136 (id 43151160057) in_progress; Deploy to Cloudflare Pages run 1053 (id 43151159561) in_progress.
+
+What this cannot show: no walk, browser or device ran; the build and checks show the source compiles and the gates agree, not how the page behaves; Gates and Deploy had not finished when read, so green for this commit is not yet seen.
+
+Found: the first send's EJECT is answered; the scope check's own diff count (360 lines) differs from the git diff line count (726 with the hooks), so the judge's "lines read" is an own count.
+Found: filed in NOTES.md as Q-JPS-339 to Q-JPS-352 (above).

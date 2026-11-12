@@ -1,0 +1,77 @@
+DONE
+Step 451's second send still serves goal 1, since a selection the test page reads is now fitted on the cues it counts from the decode or is listed and not applied, goal 1 still serves the asks as the Design states them, and nothing seen moved either answer.
+
+Second send of step 451. The first send's report (progress/step-451-report.txt, DONE) and design note (progress/step-451-design.txt) were read first; nothing they say landed was done again, and the new module src/placedecode.ts was read and is as the first send left it.
+
+Stage one, the selections' code alone, read:
+- src/debug.ts: PLACE_KEPT_KEY ("ips-debug-separation-selections"), keptRead and keptWrite; placesPart's read and write of them; sampleCount's read and write, and its two shrunk reads, which pass no kept selection; MaskKept, MASK_DATA and maskTriable, the shape the mask recipes take since the first send.
+- src/placecues.ts placeReport: its seventh parameter is the kept selections, each a PlaceFit (photograph and targets), read on this photograph's cues as fitted; the first kept one holding a target also gives that target's mask pictures.
+- What a kept selection held: the PlaceFit placeReport gives, stored under the photograph's name (or the name with "(samples)" after it), with nothing saying which cues it was fitted on.
+- debug.html says nothing of kept selections, so it was not touched.
+
+Stage three, the change for the selections alone, in src/debug.ts only:
+- keptWrite keeps a photograph's selections with `data` set to MASK_DATA ("decode"), the field a mask recipe carries; its parameter is typed object, which placeReport's fits is.
+- keptSplit (new, not exported, with its contract): from the set keptRead gives, leaving out this photograph's own names, gives `read`, each kept set whose data is MASK_DATA, and `drawn`, the name of each kept set that is an object without it; an entry that is not an object is in neither.
+- keptDrawnRows (new, not exported, with its contract): one row for each name in `drawn`, headed "Selections kept from <name>", value "not applied: made from the drawn picture", its note saying the selections were fitted on cues counted from the picture as it was drawn, with its white balance, exposure and red and blue swap, would take the wrong pixels read on the cues counted now, are listed and not applied, and are kept on the photograph's own data by fitting them again on that photograph, by step 1 or by counting its samples.
+- placesPart and sampleCount give placeReport only `read`, so a selection kept before is neither read nor used for a mask picture; they write keptDrawnRows(drawn) after the report's rows; their "Selections kept on this device" row says how many were kept from other photographs and read here and, where any, how many were made from the drawn picture and not applied. Their contract blocks say the same.
+- MASK_DATA's comment now names a kept selection beside a recipe; its value and every use of it in the masks' code are as the first send left them.
+- Left untouched: debug.html, src/placecues.ts, src/samplemask.ts, src/placedecode.ts; no line of the masks' code but MASK_DATA's comment.
+
+Stage four, the checks. Runner scratch/step451-2-runner.mjs, written from the pattern scratch/step420-runner.mjs by way of the first send's runner, node --check clean, run once under label checks2 with the app's folder as each child's working folder. Plant read 7. architecture-check --write: exit 0, wrote the module map, 95 modules (the debug.ts row's line count moved to 5207). typecheck 0 (tsc --noEmit clean), contract-check 0, architecture-check 0, token-check 0, scope-check 0, stamp-check 0. Summary progress/step-451-2-checks2.txt; each child's output progress/step-451-2-checks2-<name>.txt.
+What each cannot show: typecheck shows the source compiles under the repository's flags, not that a row reads right or a kept selection is split as meant on a device. contract-check judges exported functions of tracked files; keptSplit and keptDrawnRows are not exported, so it did not judge them, and their blocks were written to the file's own manner. architecture-check shows the map matches the source and nothing of behaviour. token-check shows no undefined colour token; scope-check that EditParams and .scope-allow agree (no field added); stamp-check that the tile stamp's fields are complete (main.ts untouched). No check ran the page: no browser, build or walk ran, so that an old kept selection is listed and not applied is shown by the source read whole and by nothing that ran.
+
+Stage five. git diff of the app read whole (the print saved by the harness, read to its last line). git status at the end: modified .githooks/commit-msg and .githooks/pre-commit (as before), debug.html, docs/ARCHITECTURE.md, src/debug.ts, src/placecues.ts, and CLAUDE.md, IR-SCIENCE.md, docs/decisions/110-a-mask-is-made-from-samples-placed-on-the-photograph.md and docs/decisions/111-a-mask-is-judged-over-the-whole-photograph.md; untracked src/placedecode.ts; nothing staged, nothing committed. The four documents are step 456's, which the plan's Files give that step and which it was writing beside this send; this send wrote none of them. Record 110's new paragraph already says that a selection of the Separation check kept before this build is listed with words that say so and is not applied, which this send's change now makes true.
+
+The new function's contract, unchanged by this send, copied whole from src/placedecode.ts:
+
+/** The grid of counted pixels as the test page takes it: `w` by `h` counted pixels, every `k`-th pixel of every `k`-th row of a frame
+ *  `fromW` by `fromH` laid over the whole photograph at turn zero, so counted pixel (x, y) is frame pixel (x times k, y times k). */
+export interface PlaceGrid { w: number; h: number; k: number; fromW: number; fromH: number }
+
+/** What the cues and the edge are counted on. `shares` is three floats for each counted pixel in grid order (row by row): the red, green
+ *  and blue shares of the gray-world-balanced linear decode, adding to one. `pixels` is four bytes for each counted pixel: each share over
+ *  the largest share, times the lightness, times 255, and 255 for the fourth, so the largest of the three is the lightness in 255ths.
+ *  `light` is one byte for each pixel of the frame, row by row, `fromW` times `fromH` long: the lightness times 255. The lightness is the
+ *  guide's own: gamma luma of the balanced linear decode over the frame's 99.5th percentile of it, from 0 to 1. `gains` are the gray-world
+ *  gains the guide was built at, read from the file, and `guideW` by `guideH` is the guide's size. */
+export interface PlaceDecoded {
+  shares: Float32Array;
+  pixels: Uint8ClampedArray;
+  light: Uint8Array;
+  gains: [number, number, number];
+  guideW: number;
+  guideH: number;
+}
+
+/**
+ * Counts what the test page's cues and a sample mask's edge are read from, from the photograph's own decode.
+ * The gains are `grayWorldWB` of the decode and the guide is `buildSkyGuide` over `linearAt` of the decode at those gains, the call the
+ * editor's Sky mask makes for its own guide; nothing of either is copied here. The guide is at most 1024 pixels on its longer side (the
+ * Sky mask's own working size), so it is read at each place by bilinear interpolation between its pixel centres, each neighbour clamped to
+ * the guide's edge as `sampleBrush` in pipeline.ts reads a bitmap; a place is the centre of a frame pixel as a fraction of the frame's
+ * width and height, so a frame of another size than the decode reads the same places of the photograph.
+ * @param img the decoded photograph with its pixels present (a raw's linear copy, or an 8-bit picture read through `linearAt`), at turn
+ *   zero as the test page draws it.
+ * @param grid the grid of counted pixels (`PlaceGrid`): its size, its stride and the size of the frame it was taken from.
+ * @returns a `PlaceDecoded`: the shares and the bytes of each counted pixel and the lightness of every frame pixel, as that type states.
+ * What the result must satisfy: it reads the decode and nothing else, takes no edit and reads none, so it is the same for one photograph
+ * whatever its white balance, exposure, channel swap, denoise or look; every share is from 0 to 1, the three of a pixel add to one and
+ * none is not a number; the largest byte of a counted pixel equals that pixel's byte in `light`. Consumers: the test page's places part
+ * (`src/debug.ts`), which counts the eight cues on `pixels`, `shares` and `light` (`placeCueValues`), the structure cues on `light`
+ * (`placeStructureValues`) and keeps `light` for the mask's Refined to edges (`sampleMaskRender`); and the node harness that sets the
+ * masks made this way beside the masks made from the drawn picture.
+ */
+export function placeDecode(img: DecodedImage, grid: PlaceGrid): PlaceDecoded
+
+How the page calls it, as the first send gave it and unchanged: const own = placeDecode(subject.img, t); then placeCueValues(own.pixels, own.shares, own.light, t.fromW, t.fromH, cols, rows), placeStructureValues(own.light, t.fromW, t.fromH, cols, rows), and sampleMaskRender(weights, rendering, own.light, t.fromW, t.fromH, cols, rows), with cols[y*w+x] = x*k and rows[y*w+x] = y*k.
+
+No build, walk or browser run was made; nothing was staged, committed or pushed; nothing of the hub was touched.
+
+The first send's Found and Uncertain lines, carried:
+Found: put right by the second send of step 451 and not to be filed: the Separation check's kept selections (local storage key ips-debug-separation-selections, keptRead and keptWrite in src/debug.ts), fitted before this change on cues counted from the drawn picture, were still read on the cues counted from the decode by placeReport, in placesPart for the three marina photographs and in sampleCount on every photograph, with nothing to say they were fitted on other data.
+Found: src/placestructure.ts's contract for placeStructureValues still calls its first parameter "the drawn lightness of the whole frame", where the test page now gives it the decode's lightness; that file is not in this step's Files.
+Uncertain: the lightness the textures, the structure cues and Refined to edges read is the sky guide's, at most 1024 pixels on its longer side (on a 2800-pixel frame about 2.7 frame pixels to a guide pixel), read between its pixels, where the drawn way read the frame at every pixel; so texture at 5 sees no detail finer than the guide's pixels, and the two ways differ in the resolution of that lightness as well as in its source. Whether that costs a mask anything is for the pictures of steps 454 and 455.
+Uncertain: the step-1 press now builds a guide over every pixel of the decode through linearAt, as the editor's Sky mask guide does once per photograph; its time on the device is unmeasured, and the press laps it under "separation: the photograph's own data for the cues".
+
+This send's own:
+Uncertain: a selection kept before this build stays in the browser's storage under its photograph's name until that photograph is fitted again, so every press on a marina photograph and every count of samples lists one row for each such name; how many rows that is on the device depends on what was kept there, which no run here could read.

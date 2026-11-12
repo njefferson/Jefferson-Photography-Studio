@@ -1,0 +1,16 @@
+EJECT
+Step 457 still serves goal 1 and the goal still serves the program's thesis, but one fact the step rests on is false, so the step ends here with nothing written, staged or committed.
+
+Stage 1 (release rule), applied: judgement-454 counts better 4, same 3, worse 3, broken 0 over ten frame-subjects; judgement-455 counts frames better 1, same 9, worse 2, broken 0 and copies better 4, same 2, worse 2, broken 0. Frames together: better 5, same 12, worse 5, broken 0. No mask or copy is broken and the frames marked worse (5) are not more than those marked better (5), so the release rule lets the landing go on.
+
+Stage 2 (reads), and what was seen that the step's text did not name:
+- The Facts say the notes hold an entry for each build put on staging, the newest the one for 2.79, found with Grep. It is not so. NOTES.md section "On staging, waiting on a device pass" (line 55) opens with the entry for 2.75 and holds entries for 2.74, 2.73, 2.72 (twice), 2.71 and 2.70 below it. Grep over the whole file for "Version 2.76", "2.77", "2.78" and "2.79" as an entry heading finds none; "2.79" appears only in Q-JPS-326 (line 2539) and a roadmap line (line 3305). So the builds 2.76 to 2.79 have no entry, and the entry this step writes would not follow the newest one but a gap of four builds.
+- What does hold: VERSION reads 2.79; the commit that last set it is e344815; the one commit after it, a770e9b, is a Docs commit that versionFor filters out; so a commit of this change reckons as 2.79.1 under the Versioning part and vite.config.ts versionFor (base 2.79, one kept commit since e344815). The remote's staging head is a770e9b, whose subject opens "Docs: masks from samples measured over whole photographs", as the Facts say. Found queue newest key is Q-JPS-338 (line 2551), next free Q-JPS-339.
+- git status shows exactly the Facts' files: .githooks/commit-msg and .githooks/pre-commit modified; CLAUDE.md, IR-SCIENCE.md, debug.html, docs/ARCHITECTURE.md, docs/decisions/110-... and 111-..., src/debug.ts, src/placecues.ts modified; src/placedecode.ts untracked; nothing staged.
+
+What is needed to go on: the plan says whether the entry for this build is written at the head of the "On staging" section with no entry for 2.76 to 2.79 (and the entry says the build is 2.79.1), or whether entries for 2.76 to 2.79 are owed first. Nothing else in the step is in doubt. Files named: /home/user/Jefferson-Photography-Studio/NOTES.md (lines 55 to 66 and 2551), /home/user/Jefferson-Photography-Studio/VERSION.
+
+What this cannot show: no build, check, staging, scope verdict, commit or push was made; the Found and Uncertain lines of steps 451 to 456 were read (reports 451, 451-2, 452, 453, 454, 455, 456) and are not yet filed.
+
+Found: NOTES.md "On staging, waiting on a device pass" holds no entry for the builds 2.76, 2.77, 2.78 or 2.79, though records 110 and 111 and the roadmap name them as built on staging.
+Found: src/placestructure.ts's contract for placeStructureValues still calls its first parameter "the drawn lightness of the whole frame" while the test page gives it the decode's lightness (from steps 451 and 451-2; not yet filed).

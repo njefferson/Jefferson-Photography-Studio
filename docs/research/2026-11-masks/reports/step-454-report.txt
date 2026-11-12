@@ -1,0 +1,48 @@
+DONE
+This step still serves goal 1, being the look over whole photographs at the masks from the decode beside the masks from the drawn picture by an agent that built none of them, that goal still serves the asks, and nothing seen moved either: of ten frame-subjects no mask from the decode is broken, and it is better on four, the same on three and worse on three.
+
+Step 454, first send. Judged by an agent that built none of it: NIR_3461, NIR_3466, NIR_1827 and NIR_1651.
+
+What was done
+- Stage 1: read research/decode/index.md under the session scratchpad; it lists ten comparison pictures for this step.
+- Stage 2: opened each of the ten pictures, from the index by its path, before reading any step's note or report; no note or report of another step was read at all. NIR_3466 Sky was opened a second time to settle a reading that pulled both ways. For each frame-subject wrote two lines, one for each mask (the region clause and the edge clause, each marked met or not, with each wrong region's place and size and the edge's distance at A, B and C), and one line with the word.
+- Stage 3: wrote research/decode/judgement-454.md under the session scratchpad: how the bar was read, the thirty lines in full, the count of each word, the clauses' counts, and what this judgement cannot show.
+- The coverage figures printed in the panel titles were not used; every mark rests on what the panels and crops show.
+
+The words, the decode way against the drawn way
+- NIR_3461 Sky: same. The same sky, cloud patch and pylon legs left out; lines at B and C on the same members; they part only at the foot of one pylon leg at A.
+- NIR_3461 Foliage: worse. Matches the drawn way's mask and adds a cloud patch taken (about 0.2 hundredths) and a hole in the grass at C (about 0.1); neither changes a clause's mark.
+- NIR_3461 Built things: worse. Both take overcast sky with the pylons (about a third of the frame drawn, about half decode); the decode way also takes the band across the top, and at C its edge leaves the pylon for open sky.
+- NIR_3466 Sky: worse, by a narrow margin, pulling both ways: it follows the building's right side where the drawn way leaves a wedge, but leaves a band of sky above the horizon, lies about 55 px above the horizon at A against 10 to 20, and takes a longer stretch of road.
+- NIR_3466 Built things: same. Same building, cloud bank, sky and road taken; more of the hangar at C, the lane paint left out at B.
+- NIR_3466 Foliage: same. Same field, wall and corner of sky; road patches in different places at about the same size.
+- NIR_1827 Sky: better. Takes the top right cloud patch the drawn way leaves out (about 0.7 hundredths) and keeps nearer the snag's trunk at C.
+- NIR_1827 Foliage: better, the same boundary as its sky.
+- NIR_1651 Foliage: better. Leaves out the cloud sliver at the bottom the drawn way takes (about 0.6 hundredths) and lies nearer the foliage inside the gap at B.
+- NIR_1651 Sky: better, the same boundary as its foliage.
+
+Counts: better 4, same 3, worse 3, broken 0. The region clause is met by the same six frame-subjects for both ways and not met by the same four; the edge clause is met only by NIR_3461 Sky, for both ways. No frame-subject has a clause met by one way and not the other.
+
+What this cannot show (whole in the judgement file): the device's own drawing, since the pictures were composed in the container from a node harness's masks; that the harness's decode way is the page's own call; that a mask from the decode stays the same under an edit, since each picture is one setting; the tint below a half; sizes and distances closer than the eye reads them from these pictures; faults away from the three crops; the other four frames and the copied recipes. The sky and foliage words of NIR_1827 and of NIR_1651 each rest on one shared boundary. No word here says a mask meets the result; the bar's clauses are marked as above.
+
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3461-sky.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3461-foliage.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3461-built-things.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3466-sky.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3466-built-things.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_3466-foliage.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_1827-sky.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_1827-foliage.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_1651-foliage.png
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/decode/pictures/comparison-NIR_1651-sky.png
+Uncertain: every size is read by eye from panels at about 5.5 frame pixels to a panel pixel; the near pylon's lattice in NIR_3461 Sky and the building wall in NIR_3466 Foliage lie near one hundredth and could fall either side, which could turn the region mark of NIR_3466 Foliage to met for both ways and would leave its word unchanged.
+Uncertain: at NIR_3461 Sky place A the drawn way's line rises about 20 px at the crop's right end; it is read as following a distant pylon's leg, which the crop does not show plainly.
+Uncertain: NIR_3466 Sky is marked worse on differences that pull both ways, a wedge beside the building left out by the drawn way against a band above the horizon left out by the decode way and a longer stretch of road taken; the margin is about one hundredth by eye.
+Uncertain: whether a road counts as a built thing is not settled by the step; no mark of NIR_3466 Built things depends on it, as the cloud bank alone fails its region clause for both ways.
+Uncertain: on feathery needle tips (NIR_1827 at A and B, NIR_1651 at A and C) a line's distance of 4 against 8 px is at the limit of what the crops let the eye read.
+Found: NIR_3461 Built things: both ways take a large connected region of overcast sky with the pylons, about a third of the frame by the drawn way and about half by the decode way; on that frame the recipe does not part pylons from sky.
+Found: NIR_3466 Sky and Built things: both ways leave the bright cloud bank above the building out of the sky, about three hundredths, and take it, with the sky beside the building's upper left, into Built things.
+Found: NIR_3466 Foliage: both ways take part of the big building's lower left wall with the sky at its top left corner, about one to two hundredths by eye, and patches of the road.
+Found: NIR_3466 Sky: both ways take a stretch of the road at the bottom right into the sky, the decode way's longer, about 1.5 to 2 hundredths against about 1.
+Found: NIR_3461 Foliage: both ways cut the crowns of the distant trees that stand above the skyline by about 15 to 25 px.
+Found: where sky shows through a gap in a branch (NIR_1651 at B) or between a snag's thin branches (NIR_1827 at C), both ways put the edge 10 to 60 px inside the gap.

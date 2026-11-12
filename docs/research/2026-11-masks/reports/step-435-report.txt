@@ -1,0 +1,31 @@
+DONE
+The step serves goal 1 (masks from samples seen over whole photographs and planted truths): both point-prompted models ran in node from ONNX files, were scored on the planted truths and the best one's frame masks were opened, and nothing seen moved either answer.
+
+Stage 1: inputs note and step 426's report read whole.
+Stage 2: fetcher step435-fetch.mjs, runner step435-runner.mjs, scripts step435-maps.mjs, step435-probe.mjs, step435-contact.mjs, node --check clean (labels check1, check2). Four ONNX files fetched, each status 200 after one redirect to us.aws.cdn.hf.co (answered): SlimSAM vision_encoder 23,276,014 bytes and prompt_encoder_mask_decoder 16,557,892; MobileSAM (Acly) encoder 28,157,093 (over the 25 MiB limit) and single-mask decoder 16,501,323. onnxruntime-node 1.31.1 installed in rt435 with --ignore-scripts, runs on the plain processor (web build not needed).
+Stage 3: masks for every picture (8 frames, 7 planted), 3 inputs, both models, two ways (joint, each): 192 planted and 264 frame masks, index.json in research/whole/maps-points. The bright-only pictures were not on disk, so this step made all fifteen under maps-points/inputs-bright by the plan's rule.
+Stage 4: scores in research/whole/maps-points/scores.md. Mean overlap over union on the planted pictures: MobileSAM joint 0.9746 open, 0.9732 natural, 0.9718 bright; MobileSAM each 0.8786, 0.8815, 0.8734; SlimSAM joint 0.7917, 0.8262, 0.8124; SlimSAM each 0.6187, 0.6398, 0.6363. No mask of any kind has a widest band of 4 pixels or less (no row under 5 px of 192), so none meets the bar's band on a planted picture. Scorer plant read 0.8750 and 6 each time.
+Stage 5: contact pictures of MobileSAM joint (highest mean) for each of the eight frames, rows subjects, columns open, natural, bright-only, each opened with a reading in notes.md.
+Stage 6: research/whole/maps-points/notes.md written.
+
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/maps-points/contact/mobilesam-joint-NIR_3742.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/maps-points/contact/mobilesam-joint-NIR_3705.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/maps-points/contact/mobilesam-joint-NIR_3710.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/maps-points/contact/mobilesam-joint-NIR_3461.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/maps-points/contact/mobilesam-joint-NIR_3466.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/maps-points/contact/mobilesam-joint-NIR_1827.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/maps-points/contact/mobilesam-joint-NIR_1651.png (opened)
+Picture: /tmp/claude-0/-home-user/830639f0-e507-5bcf-9a55-4c285406c256/scratchpad/research/whole/maps-points/contact/mobilesam-joint-NIR_1873.png (opened)
+
+Hosts that did not answer: none in this step (us.aws.cdn.hf.co answered).
+The reply guard refused no call.
+
+Found: MobileSAM's image encoder file from Acly (28,157,093 bytes) is over the host's 25 MiB limit for one file, so it could not ship as one file without a smaller or split copy; SlimSAM's files all fit.
+Found: no planted mask of SlimSAM or MobileSAM, joint or each, has a widest wrong band of 4 pixels or less (192 masks); the masks come from a 256-cell map brought up by interpolation, so the edge stage (step 436) is what could bring the band down.
+Found: on frames, MobileSAM joint's masks follow tree lines, tower tops and roof lines closely at panel size but take the open air inside pylon lattices as not built, fill lattice gaps, miss thin power lines, take two small cloud wisps on NIR_1827 as foliage, take a patch at the foot of the pale tree on NIR_3742 as built, and leave unstable lattice outlines at some picture edges (NIR_3705 left, NIR_1873 left and right).
+Found: the three inputs gave nearly identical masks for MobileSAM (shares within about 2 points); the hue inputs did not change what it takes.
+Found: the bright-only pictures were not on disk when this step reached them; this step made fifteen under maps-points/inputs-bright, the planted ones from each planted picture's own colour axis, which may differ from step 438's.
+Uncertain: whether Acly's decoder file's output is logits of the same scale as the original export (read from its range of about minus 14 to plus 18 and from its overlap on planted pictures, not from a source).
+Uncertain: SlimSAM's licence for the Xenova copy and Acly's MobileSAM copy were not read as files; the repositories' Apache 2.0 LICENSE files were.
+Uncertain: SlimSAM's contact pictures were not composed, so no frame reading of it exists.
+Uncertain: widest band along plant-built-foliage reads 1,396 to 1,400 px for MobileSAM joint; not investigated whether this is the model or the scorer's band definition on a slanted boundary.

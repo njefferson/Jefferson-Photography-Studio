@@ -1,0 +1,14 @@
+DONE
+The step still serves goal 1 because the science file now sets down the instrument, the edge stage measured alone and each kind's masks over whole photographs, from the judgements and notes only; that goal still serves the program's thesis, and nothing seen moved either answer.
+
+Send 1 of step 445. No earlier report stood.
+
+Read whole: judgements 441, 442 and 443; compare/entries.md and planted-scores.md; edge/notes.md and chosen.txt; notes-device.md, notes-editors.md, notes-features.md; maps-points, maps-features and maps-classes notes; reports of steps 427 (both pages) and 428 (sends 1 and 2, with the manager notes' Done 428 line). The science file was found with Grep by the bold heading of the 10 November passage (THE SEVEN PRESSES ...).
+
+Written: one section in IR-SCIENCE.md, dated 11 November 2026, placed after the passage ending "numbered 110." and before the rule line that follows it, with six parts: pages read; editors and paper; instrument, planted pictures and bar; edge stage alone; each kind frame by frame with the recipe first; what none of it shows with every host that did not answer. No table, no chosen method named, nothing proposed, no look described beyond what a mask takes and leaves.
+
+Observed: git -C status shows IR-SCIENCE.md modified, the two hooks modified as before, nothing staged or committed. A Grep for runs of seven or more hex-set characters and for table rows found none in the new section.
+
+Found: the section's count of 22 frame-subjects (8, 9 and 5) is the three judgements' own; step 438's rule gave an unstated count of empty scene-class subject cases that no note read this send holds, so the section gives the older rule's 7 of 44 and 4 of 32 and says which rule they belong to.
+Found: judgement 443's carried-case shares are the pictures' printed figures and were not counted again; the section says so.
+Uncertain: the 2 of 96 recipe figure (steps 428's three renderings over two inputs) and the 1 of 16 (the comparison's final recipe entry) have different bases; both are given with theirs.

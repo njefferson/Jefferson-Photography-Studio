@@ -1,0 +1,26 @@
+DONE
+The step still serves goal 1 by landing, as one Docs commit on staging, the record that says a mask is judged over whole photographs, the science file's section and the queue; that goal still serves the program's thesis, and nothing seen moved either answer.
+
+Stage 1: read the manager notes' Found lines, the Found and Uncertain lines of the reports of steps 434 to 445, reports 444 and 445 whole, the pattern runner; git status showed the Facts' files and nothing else.
+Stage 2: IR-SCIENCE.md, the one sentence put in after "4 of 32 planted ones chose nothing." (figures checked against step 438's report line 8: 2 of 44 and 1 of 32), the paragraph rewrapped from there to its end. NOTES.md Found queue: Q-JPS-306 to Q-JPS-338 added after Q-JPS-305, one line each, none removed, no roadmap bullet changed.
+Keys beside the lines they came from:
+Q-JPS-306, 307, 308: the test page's parts added one release at a time; results between the two halves; the loop's distance (step 439 and the named findings).
+Q-JPS-309, 310, 311: the desktop and tablet opening balance; 42.5 seconds with no stage marked; the two rows printing the same figures (the named findings).
+Q-JPS-312, 313, 314, 315: step 439's four Found lines.
+Q-JPS-316, 317, 318: steps 437, 435, 434 and 424 (224 file and tiles; MobileSAM encoder over the limit; licences unstated).
+Q-JPS-319, 320, 321, 322: steps 436, 440 and 441 to 443 (edge stage; planted limits; band doubt; crop places).
+Q-JPS-323 to 328: steps 441 to 443, 427, 431, 437 (each kind's faults on frames and the carried case).
+Q-JPS-329, 330: steps 434, 437 (no-subject rule is own); 423, 427 (natural-hue input).
+Q-JPS-331, 332, 333: step 444's Found lines.
+Q-JPS-334, 335, 336: manager notes 415.2/416.3, 410.1, 410.2.
+Q-JPS-337, 338: manager notes 423.2/423.3, 425.1 to 425.3, 434.1.
+Hub-only findings in the manager notes were not filed in the app's queue.
+Stage 3: runner scratch/step446-runner.mjs, node --check clean; label checks1: plant 7, decisions-check, notes-check, roadmap-copy-check and hub-surface-gates each exit 0.
+Stage 4: five files staged one by one; scope check plain: diff 484 lines, base the remote's staging; staged diff (504 lines) and unstaged diff (56 lines, the two hooks) read to their last line.
+Stage 5: scope-verdict-9.txt IN-SCOPE, one line per file; recorded with 504 lines read (label record1, exit 0); .plan-scope staged; hooks and .doctrine-sync not staged.
+Stage 6: commit a770e9b with the subject given and one body sentence, no trailer; log read whole; the commit's own hook run printed plan scope holds, tsc clean and the gates green.
+Stage 7: fetch; origin/staging was e344815 (New: the test page makes a mask from your samples...) as the Facts give; pushed e344815..a770e9b; ls-remote: staging a770e9b, main unchanged at 1b42588.
+Runs read once through the connector: Deploy to Cloudflare Pages for a770e9b was queued (run 43117516517); no Gates run for it was listed yet. Not waited on.
+
+Found: no Gates run for the new head was listed at the one read, only Deploy queued; whether the docs-only push starts Gates is unread.
+Found: the scope check's plain run exits 1 before a verdict is recorded for the current plan hash ("plan file has changed since the recorded verdict"), as designed; recorded after, it passes.

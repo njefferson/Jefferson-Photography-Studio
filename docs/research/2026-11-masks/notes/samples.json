@@ -1,0 +1,1222 @@
+{
+ "form": "Each sample is the app's PlaceSample: name, x and y as fractions of the frame's width and height measured from its top left, r as a fraction of its shorter side. Frames are the pictures under research/whole/frames, 2800 by 1864. A frame may carry more than one set; the first set is the newest. Samples are prompts and never a truth.",
+ "frames": {
+  "NIR_3742": {
+   "file": "NIR_3742.NEF",
+   "sets": [
+    {
+     "from": "the test page's report typed 10 November 2026, 18:30 California",
+     "placedBy": "the person on the test page",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.23,
+       "y": 0.05,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.122,
+       "y": 0.738,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.296,
+       "y": 0.913,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.051,
+       "y": 0.065,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.812,
+       "y": 0.036,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.473,
+       "y": 0.046,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.575,
+       "y": 0.951,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.081,
+       "y": 0.908,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.666,
+       "y": 0.7,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.286,
+       "y": 0.78,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.505,
+       "y": 0.781,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.807,
+       "y": 0.763,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.74,
+       "y": 0.881,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.924,
+       "y": 0.842,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.042,
+       "y": 0.279,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.458,
+       "y": 0.382,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.409,
+       "y": 0.512,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.64,
+       "y": 0.285,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.885,
+       "y": 0.367,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.283,
+       "y": 0.399,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.132,
+       "y": 0.454,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.266,
+       "y": 0.216,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "NIR_3705": {
+   "file": "NIR_3705.NEF",
+   "sets": [
+    {
+     "from": "the test page's report typed 10 November 2026, 19:45 California, its first count",
+     "placedBy": "the person on the test page",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.094,
+       "y": 0.25,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.917,
+       "y": 0.065,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.032,
+       "y": 0.437,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.242,
+       "y": 0.888,
+       "r": 0.087
+      },
+      {
+       "name": "Foliage",
+       "x": 0.501,
+       "y": 0.809,
+       "r": 0.087
+      },
+      {
+       "name": "Foliage",
+       "x": 0.341,
+       "y": 0.721,
+       "r": 0.087
+      },
+      {
+       "name": "Foliage",
+       "x": 0.924,
+       "y": 0.872,
+       "r": 0.087
+      },
+      {
+       "name": "Foliage",
+       "x": 0.735,
+       "y": 0.893,
+       "r": 0.087
+      },
+      {
+       "name": "Built things",
+       "x": 0.783,
+       "y": 0.419,
+       "r": 0.044
+      },
+      {
+       "name": "Built things",
+       "x": 0.775,
+       "y": 0.598,
+       "r": 0.044
+      },
+      {
+       "name": "Built things",
+       "x": 0.308,
+       "y": 0.484,
+       "r": 0.044
+      },
+      {
+       "name": "Built things",
+       "x": 0.281,
+       "y": 0.443,
+       "r": 0.044
+      }
+     ]
+    }
+   ]
+  },
+  "NIR_3710": {
+   "file": "NIR_3710.NEF",
+   "sets": [
+    {
+     "from": "the test page's report typed 11 November 2026, 07:07 California",
+     "placedBy": "the person on the test page",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.072,
+       "y": 0.449,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.753,
+       "y": 0.074,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.955,
+       "y": 0.328,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.073,
+       "y": 0.232,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.951,
+       "y": 0.101,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.1,
+       "y": 0.681,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.46,
+       "y": 0.551,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.925,
+       "y": 0.512,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.88,
+       "y": 0.694,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.35,
+       "y": 0.708,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.355,
+       "y": 0.436,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.659,
+       "y": 0.375,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.662,
+       "y": 0.483,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.352,
+       "y": 0.464,
+       "r": 0.04
+      }
+     ]
+    },
+    {
+     "from": "the test page's report typed 10 November 2026, 19:45 California, its second count",
+     "placedBy": "the person on the test page",
+     "samples": [
+      {
+       "name": "Foliage",
+       "x": 0.365,
+       "y": 0.693,
+       "r": 0.104
+      },
+      {
+       "name": "Foliage",
+       "x": 0.794,
+       "y": 0.702,
+       "r": 0.104
+      },
+      {
+       "name": "Foliage",
+       "x": 0.938,
+       "y": 0.58,
+       "r": 0.104
+      },
+      {
+       "name": "Foliage",
+       "x": 0.523,
+       "y": 0.596,
+       "r": 0.104
+      },
+      {
+       "name": "Foliage",
+       "x": 0.124,
+       "y": 0.7,
+       "r": 0.104
+      },
+      {
+       "name": "Sky",
+       "x": 0.79,
+       "y": 0.082,
+       "r": 0.104
+      },
+      {
+       "name": "Built things",
+       "x": 0.349,
+       "y": 0.454,
+       "r": 0.028
+      },
+      {
+       "name": "Built things",
+       "x": 0.656,
+       "y": 0.389,
+       "r": 0.028
+      }
+     ]
+    }
+   ]
+  },
+  "NIR_3461": {
+   "file": "NIR_3461.NEF",
+   "sets": [
+    {
+     "from": "placed by step 423 on the opened frame",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.55,
+       "y": 0.12,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.85,
+       "y": 0.1,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.45,
+       "y": 0.54,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.25,
+       "y": 0.25,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.92,
+       "y": 0.6,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.2,
+       "y": 0.88,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.5,
+       "y": 0.85,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.8,
+       "y": 0.9,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.65,
+       "y": 0.8,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.085,
+       "y": 0.427,
+       "r": 0.01
+      },
+      {
+       "name": "Built things",
+       "x": 0.388,
+       "y": 0.676,
+       "r": 0.01
+      },
+      {
+       "name": "Built things",
+       "x": 0.795,
+       "y": 0.601,
+       "r": 0.01
+      }
+     ]
+    }
+   ]
+  },
+  "NIR_3466": {
+   "file": "NIR_3466.NEF",
+   "sets": [
+    {
+     "from": "placed by step 423 on the opened frame",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.25,
+       "y": 0.15,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.75,
+       "y": 0.2,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.2,
+       "y": 0.5,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.85,
+       "y": 0.55,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.5,
+       "y": 0.08,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.5,
+       "y": 0.526,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.65,
+       "y": 0.563,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.225,
+       "y": 0.684,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.435,
+       "y": 0.488,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.25,
+       "y": 0.759,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.75,
+       "y": 0.751,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.5,
+       "y": 0.887,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.15,
+       "y": 0.902,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "NIR_1827": {
+   "file": "NIR_1827.NEF",
+   "sets": [
+    {
+     "from": "placed by step 423 on the opened frame",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.25,
+       "y": 0.25,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.6,
+       "y": 0.2,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.85,
+       "y": 0.3,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.15,
+       "y": 0.6,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.4,
+       "y": 0.55,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.13,
+       "y": 0.92,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.47,
+       "y": 0.88,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.68,
+       "y": 0.82,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.88,
+       "y": 0.85,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.32,
+       "y": 0.93,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "NIR_1651": {
+   "file": "NIR_1651.NEF",
+   "sets": [
+    {
+     "from": "placed by step 423 on the opened frame, as the working copy stands (turned; rotate 3)",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Foliage",
+       "x": 0.2,
+       "y": 0.4,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.45,
+       "y": 0.35,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.3,
+       "y": 0.6,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.65,
+       "y": 0.45,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.1,
+       "y": 0.2,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.55,
+       "y": 0.1,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.4,
+       "y": 0.85,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.55,
+       "y": 0.75,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.88,
+       "y": 0.62,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.8,
+       "y": 0.15,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "NIR_1873": {
+   "file": "NIR_1873.NEF",
+   "sets": [
+    {
+     "from": "placed by step 423 on the opened frame; the frame holds no sky",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Foliage",
+       "x": 0.3,
+       "y": 0.15,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.55,
+       "y": 0.2,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.8,
+       "y": 0.3,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.2,
+       "y": 0.3,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.45,
+       "y": 0.4,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.35,
+       "y": 0.8,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.25,
+       "y": 0.9,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.45,
+       "y": 0.7,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.2,
+       "y": 0.85,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "planted": {
+  "plant-straight": {
+   "file": "plant-straight",
+   "sets": [
+    {
+     "from": "placed by step 423 inside the planted regions, after the truth was written",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.811,
+       "y": 0.283,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.069,
+       "y": 0.103,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.417,
+       "y": 0.429,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.571,
+       "y": 0.103,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.166,
+       "y": 0.755,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.931,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.56,
+       "y": 0.652,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.383,
+       "y": 0.893,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "plant-stepped": {
+   "file": "plant-stepped",
+   "sets": [
+    {
+     "from": "placed by step 423 inside the planted regions, after the truth was written",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.731,
+       "y": 0.223,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.069,
+       "y": 0.103,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.389,
+       "y": 0.318,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.931,
+       "y": 0.395,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.166,
+       "y": 0.747,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.931,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.566,
+       "y": 0.618,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.394,
+       "y": 0.893,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "plant-curved": {
+   "file": "plant-curved",
+   "sets": [
+    {
+     "from": "placed by step 423 inside the planted regions, after the truth was written",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.806,
+       "y": 0.292,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.069,
+       "y": 0.103,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.423,
+       "y": 0.3,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.166,
+       "y": 0.515,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.497,
+       "y": 0.695,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.931,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.069,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.737,
+       "y": 0.687,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "plant-three": {
+   "file": "plant-three",
+   "sets": [
+    {
+     "from": "placed by step 423 inside the planted regions, after the truth was written",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.709,
+       "y": 0.189,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.069,
+       "y": 0.103,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.383,
+       "y": 0.24,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.931,
+       "y": 0.292,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.823,
+       "y": 0.584,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.069,
+       "y": 0.455,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.434,
+       "y": 0.678,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.223,
+       "y": 0.678,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.074,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.943,
+       "y": 0.867,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.509,
+       "y": 0.91,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.291,
+       "y": 0.867,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "plant-shore": {
+   "file": "plant-shore",
+   "sets": [
+    {
+     "from": "placed by step 423 inside the planted regions, after the truth was written",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Foliage",
+       "x": 0.2,
+       "y": 0.3,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.931,
+       "y": 0.103,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.583,
+       "y": 0.335,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.4,
+       "y": 0.103,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.571,
+       "y": 0.73,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.069,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.931,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.303,
+       "y": 0.712,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "plant-built-foliage": {
+   "file": "plant-built-foliage",
+   "sets": [
+    {
+     "from": "placed by step 423 inside the planted regions, after the truth was written",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Built things",
+       "x": 0.24,
+       "y": 0.627,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.069,
+       "y": 0.103,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.389,
+       "y": 0.189,
+       "r": 0.04
+      },
+      {
+       "name": "Built things",
+       "x": 0.423,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.737,
+       "y": 0.395,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.931,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.566,
+       "y": 0.884,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.526,
+       "y": 0.103,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  },
+  "plant-island": {
+   "file": "plant-island",
+   "sets": [
+    {
+     "from": "placed by step 423 inside the planted regions, after the truth was written",
+     "placedBy": "step 423",
+     "samples": [
+      {
+       "name": "Sky",
+       "x": 0.097,
+       "y": 0.146,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.931,
+       "y": 0.197,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.514,
+       "y": 0.103,
+       "r": 0.04
+      },
+      {
+       "name": "Sky",
+       "x": 0.309,
+       "y": 0.197,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.623,
+       "y": 0.532,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.069,
+       "y": 0.403,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.931,
+       "y": 0.403,
+       "r": 0.04
+      },
+      {
+       "name": "Foliage",
+       "x": 0.354,
+       "y": 0.403,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.366,
+       "y": 0.798,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.931,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.069,
+       "y": 0.893,
+       "r": 0.04
+      },
+      {
+       "name": "Water",
+       "x": 0.646,
+       "y": 0.884,
+       "r": 0.04
+      }
+     ]
+    }
+   ]
+  }
+ }
+}
