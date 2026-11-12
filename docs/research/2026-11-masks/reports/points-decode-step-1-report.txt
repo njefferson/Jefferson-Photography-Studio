@@ -1,0 +1,32 @@
+DONE (step 1, ground and the recipe's masks)
+
+Done: npm ci in APP; eight photographs fetched only by tools/owner-images.mjs --fetch; kept scripts copied into S with the old scratch path re-pointed; two bundles built; each frame rendered once and all eight opened; 22 recipe masks from the decode; onnxruntime-node 1.31.1 installed with --ignore-scripts; four ONNX files fetched. No tracked file in APP changed; nothing staged, committed or pushed; the two .githooks files left alone.
+
+Seen:
+- Plant lines, render: planted: 137 137 137 on all eight (known 137).
+- Plant lines, harness: weight read 0.995049 reported failing as it must; overlap over union read 0.5000 reported failing as it must. Runner plant exit code 7.
+- Recipe remake NIR_3461 by the decode way, shares at a half: Sky 73.6, Foliage 25.6, Built things 35.4. Equals the record.
+- The 22 masks' shares at a half (percent): NIR_3461 Sky 73.6, Foliage 25.6, Built things 35.4; NIR_3466 Sky 54.1, Built things 19.2, Foliage 23.5; NIR_1827 Sky 80.9, Foliage 19.1; NIR_1651 Foliage 47.6, Sky 52.4; NIR_3742 Sky 11.2, Water 22.9, Built things 25.5, Foliage 46.5; NIR_3705 Sky 49.7, Foliage 41.3, Built things 9.9; NIR_3710 Sky 45.8, Foliage 40.6, Built things 15.1; NIR_1873 Foliage 79.0, Water 21.0.
+- Guide: the harness prints no byte size. It prints 2800 by 1864, k 3, counted 579393 (grid 933 by 621), 10 cues, for every frame.
+- Model files (bytes, each equal to maps-points-notes.md): SlimSAM vision_encoder.onnx 23,276,014; prompt_encoder_mask_decoder.onnx 16,557,892; MobileSAM mobile_sam_image_encoder.onnx 28,157,093; sam_mask_decoder_single.onnx 16,501,323. Each fetched status 200 after one redirect to us.aws.cdn.hf.co. Fetcher plant read 5 and plant address failed (curl exit 56).
+- onnxruntime-node version read from its package file: 1.31.1. It was not loaded in this step.
+- Render time of one frame (four side by side): decode 1.5 to 2.0 s, develop 11.3 to 11.9 s, about 14 s in all.
+- All eight frames opened with Read: NIR_3461 pylons over a pale grass field, grey sky; NIR_3466 tall building, sheds, fence and road, streaky sky; NIR_1827 conifers at the foot under a cloudy sky; NIR_1651 turned, a tree crown at the left and sky at the right; NIR_3742 forest, shore, lake and a dock with boats (odd curved bands at the top corners and a pale smudge at the right edge); NIR_3705 two cell towers among bushes, grey sky; NIR_3710 the same towers with a pine at right and rocks below; NIR_1873 forest, rocky bank, pool, pine branches at right, dark trunk at left.
+
+Paths for the next step:
+- S: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode
+- Decode bundle (recipe modules, placeDecode, importFile, decode): S/scratch/step452-bundle.mjs; its entry S/scratch/step452-entry.ts; build S/scratch/step452-build.mjs.
+- Render bundle: S/scratch/step423-bundle.mjs; entry S/scratch/step423-entry.ts; build S/scratch/step423-2-build.mjs; render S/scratch/step423-render.mjs.
+- Harness: S/scratch/step452-harness.mjs (countDecode is the pattern for the models' script). Also copied: S/scratch/step435-maps.mjs, step435-fetch.mjs.
+- Frames folder: S/research/whole/frames (NIR_xxxx-open.png and -open.json, 2800 by 1864). Helpers png.mjs, draw.mjs, edt.mjs and samples.json are in S/research/whole.
+- Recipe masks folder: S/research/decode/masks (decode-<frame>-<subject slug>.png, 22 files, plus index-decode-<frame>.json).
+- Runtime folder: S/rt435 (node_modules/onnxruntime-node).
+- Models folder: S/models435/slimsam and S/models435/mobilesam.
+- Runner and how a job is run: write the list of { name, script, args } with the Write tool to S/scratch/step452-job.json, then run node S/scratch/step452-runner.mjs <new label>. Up to four children side by side; each child's output goes to S/progress/step-452-<label>-<name>.txt, read with Read; the runner summary is S/progress/step-452-run-<label>.txt. The job file now holds the eight recipe-mask jobs; overwrite it.
+
+Files changed: none tracked in APP (node_modules is untracked). Everything made is under S. This report is S/reports/step-1-report.txt.
+
+Found: the file step452-job.json and the runner are the only ones the runner reads; the runner's hard-coded progress names say step-452 even in this run.
+Found: I wrote one job list through a shell command by mistake, then rewrote it with the Write tool before running; nothing ran on the shell-written one.
+Found: the 22 masks' dimensions were not separately re-read; the harness writes each at the frame's own 2,800 by 1,864 by construction (carry to W by H), and the next step's judges will open them.
+Found: no photograph shows the Drive wall; every fetch answered.

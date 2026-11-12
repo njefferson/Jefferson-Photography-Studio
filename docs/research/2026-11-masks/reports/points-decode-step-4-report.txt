@@ -1,0 +1,22 @@
+DONE (step 4, the record and the commit), written before the commit.
+
+What was done: on the branch staging, which the remote's staging equals, the judgement files, the four step reports and the four scripts of the measurement of the click-prompted models on the photograph's own decode were copied into this folder with their content unchanged; a note on how to run it again was written from the reports of steps 1 and 2; HANDOFF.md gained the entry of 12 November, the changed first and second items of what comes next and one line for each new file; record 111 gained one dated paragraph at the foot of its Context; the notes gained a closing sentence on Q-JPS-352 and the findings Q-JPS-353 onward. No picture, mask, bundle or model file is committed. The two hook files under .githooks were left modified and unstaged.
+
+Files:
+- docs/research/2026-11-masks/notes/points-decode-judgement-first.md
+- docs/research/2026-11-masks/notes/points-decode-judgement-second.md
+- docs/research/2026-11-masks/notes/points-decode-how-to-run.md
+- docs/research/2026-11-masks/reports/points-decode-step-1-report.txt
+- docs/research/2026-11-masks/reports/points-decode-step-2-report.txt
+- docs/research/2026-11-masks/reports/points-decode-step-3-first-report.txt
+- docs/research/2026-11-masks/reports/points-decode-step-3-second-report.txt
+- docs/research/2026-11-masks/reports/points-decode-step-4-report.txt
+- docs/research/2026-11-masks/scripts/points-decode-inputs.mjs
+- docs/research/2026-11-masks/scripts/points-decode-models.mjs
+- docs/research/2026-11-masks/scripts/points-decode-compose.mjs
+- docs/research/2026-11-masks/scripts/points-decode-index.mjs
+- docs/research/2026-11-masks/HANDOFF.md
+- docs/decisions/111-a-mask-is-judged-over-the-whole-photograph.md
+- NOTES.md
+
+A second send of this step made three corrections and amended the one commit. The edge distances on tree lines and crowns in HANDOFF.md and in record 111 now carry the two places outside the ranges, the MobileSAM place at 60 or more on NIR_1827 Sky and the recipe place at about 40 in open sky on NIR_3705 Sky. The notes' line for SlimSAM gains a clause giving the outputs read from the two decoder files. The notes' line for the NIR_3742 bands now says what was seen in the opened frame and in the colour picture from the decode.

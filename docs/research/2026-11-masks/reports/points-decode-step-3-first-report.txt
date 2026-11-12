@@ -1,0 +1,35 @@
+DONE
+
+What was done: 20 pictures opened (whole and edges for each of the 10 frame-subjects), none opened twice. Read only the plan, the short page, the first 10 lines of the decode-judgement note and the index. No script run, no other file changed.
+
+Counts (10 frame-subjects):
+Recipe: region met 6, edge met 3, both 2.
+MobileSAM colour: region met 9, edge met 2, both 2.
+MobileSAM grey: region met 9, edge met 1, both 1.
+SlimSAM colour: region met 4, edge met 0, both 0.
+SlimSAM grey: region met 4, edge met 0, both 0.
+Against recipe: MobileSAM colour 4 better, 1 same, 5 worse, 0 broken; MobileSAM grey 4/1/5/0; SlimSAM colour 3/0/7/0; SlimSAM grey 3/0/7/0.
+
+Words per model mask (order: MobileSAM colour, MobileSAM grey, SlimSAM colour, SlimSAM grey):
+NIR_3461 Sky: worse, worse, worse, worse
+NIR_3461 Foliage: same, same, worse, worse
+NIR_3461 Built things: better, better, better, better
+NIR_3466 Sky: better, better, better, better
+NIR_3466 Built things: better, better, better, better
+NIR_3466 Foliage: better, better, worse, worse
+NIR_1827 Sky: worse, worse, worse, worse
+NIR_1827 Foliage: worse, worse, worse, worse
+NIR_1651 Foliage: worse, worse, worse, worse
+NIR_1651 Sky: worse, worse, worse, worse
+
+Files written:
+/tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/judgement/judgement-first.md
+/tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/reports/step-3-first-report.txt
+
+Uncertain: NIR_3461 Foliage, whether the hills band is foliage (about 6 hundredths); the model "same" marks rest on it and on a notch near one hundredth.
+Uncertain: NIR_3466 road: whether it is a built thing (recipe region clause on Built things fails on the cloud patch either way; on Foliage the road strip is 1 to 3 hundredths).
+Uncertain: NIR_3466 Built things, edge marks within 3 to 6 pixels (recipe C, MobileSAM colour C); the words better for MobileSAM grey and SlimSAM there pull partly both ways.
+Uncertain: NIR_3461 Built things, a faint distant pylon near one hundredth under the MobileSAM region marks.
+Uncertain: NIR_1651 Sky, the strip size at the bottom of the MobileSAM masks (panel and crop scales did not square, under one hundredth by the crop); SlimSAM top-left hole 2 to 7 hundredths.
+Found: lattice pylons are cut out as solid shapes by the models; whether sky seen through a lattice counts is not settled by the bar and bears on NIR_3461 Sky.
+Found: both SlimSAM masks on the sky and foliage show a stipple of islands in open sky or cloud in four frame-subjects.

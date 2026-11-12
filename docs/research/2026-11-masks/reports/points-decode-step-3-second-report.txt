@@ -1,0 +1,36 @@
+DONE
+
+What was done: read the plan, the first 10 lines of decode-judgement-454.md and the index; opened 24 pictures (the whole and edges picture of each of 12 frame-subjects: NIR_3742 sky, water, built things, foliage; NIR_3705 sky, foliage, built things; NIR_3710 sky, foliage, built things; NIR_1873 foliage, water), none opened twice; wrote the judgement.
+
+Counts (plain marks; Uncertain separate):
+Recipe: region met 4 (Uncertain 1), edge met 0 (Uncertain 2), both 0.
+MobileSAM colour: region met 9 (Uncertain 1), edge met 0 (Uncertain 1), both 0.
+MobileSAM grey: region met 7 (Uncertain 3), edge met 0 (Uncertain 1), both 0.
+SlimSAM colour: region met 4 (Uncertain 0), edge met 0, both 0.
+SlimSAM grey: region met 6 (Uncertain 0), edge met 0 (Uncertain 1), both 0.
+Against the recipe: MobileSAM colour better 6, same 4, worse 2, broken 0; MobileSAM grey better 5, same 5, worse 2, broken 0; SlimSAM colour better 3, same 1, worse 8, broken 0; SlimSAM grey better 4, same 2, worse 6, broken 0.
+
+Words (MobileSAM colour / MobileSAM grey / SlimSAM colour / SlimSAM grey):
+3742 sky: worse / worse / worse / same
+3742 water: same / same / worse / worse
+3742 built things: better / better / worse / worse
+3742 foliage: same / same / better / better
+3705 sky: worse / worse / worse / worse
+3705 foliage: same / same / worse / worse
+3705 built things: better / better / worse / better
+3710 sky: same / same / same / same
+3710 foliage: better / same / worse / worse
+3710 built things: better / better / better / better
+1873 foliage: better / better / better / better
+1873 water: better / better / worse / worse
+
+Files written:
+/tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/judgement/judgement-second.md
+/tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/reports/step-3-second-report.txt
+
+Found: no edge clause was met plainly by any entry on my 12; the recipe's edges at 3742 sky and 3705 foliage are Uncertain only.
+Found: SlimSAM colour and grey take the whole forest on 3742 water and built things, the whole sky on 3710 foliage, and a block of forest on 1873 water.
+Uncertain: the near blurred pine boughs on 1873 (foliage and water) and the water between them; whether they count as foliage or water moved several marks.
+Uncertain: SlimSAM rim lines at the frame border (3742 sky, 3705 sky, 3710 sky) read against the border as the edge.
+Uncertain: the recipe's 3742 foliage water blobs (about 1.3 and 0.9) and 3705 foliage dark patch (about 0.8) lie near one hundredth.
+Uncertain: the words marked same or better on 3742 water, 3742 foliage, 3705 foliage, 3710 sky and 3710 foliage pull both ways, as marked in the file.
