@@ -477,6 +477,13 @@ cannot avoid looking. (Hub LESSONS §329.)
 
 These are answered in the plan before it is written and are put in front of the session here because the hub's lesson 329 says exposure where the task is, and not a gate, is what holds a requirement a parser cannot judge.
 
+## A MASK AND EVERY SELECTION READ THE PHOTOGRAPH'S OWN DATA (11 November 2026)
+**A mask, and every selection a person can fit or set, reads the photograph's own decode and never a picture an edit has changed.** The picture on the screen carries the balance, the exposure, the channel swap, the denoise and the develop; a key counted from it moves each time one of them moves, and the mask changes under the person's hands. Record 032 is where the rule stands: a key computed from the decode can be taken at any point in the work, and a key computed from the graded pixel cannot. The sky guide (`buildSkyGuide` in `src/skyfine.ts`) is the model, and the test page's cues are counted through `placeDecode` in `src/placedecode.ts`, which takes no edit and reads none.
+
+**Anything that reads or changes pixels is placed in the app's order before it is built.** Its plan says, from the record (the session brief's pipeline order and `docs/ARCHITECTURE.md`), what comes before it, what comes after it, and which of those it reads. A function that reads pixels is given the decode, or a step of the order named in the plan, and not whatever picture happens to be in hand.
+
+**What the lack of it cost, measured.** Three releases of the test page, 2.77 to 2.79, counted their cues on the thinned drawn picture, so every cue, every place's cue and the lightness a mask's edge follows moved with the balance, the exposure and the swap. A day of measurement on 11 November 2026 judged masks over whole photographs on that drawn picture and on re-mappings of it, so its figures describe methods fed an edited picture and none was fed the decode. Records 110 and 111 now say so.
+
 ## THIS IS A VISUAL APP, NOT A MATH APP (owner, 2026-09-19)
 **OPEN WHAT YOU RENDERED. A number is a pointer to where to look; it is never a
 substitute for looking and never evidence about appearance.**

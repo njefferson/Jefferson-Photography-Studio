@@ -1,13 +1,19 @@
 # Written by plan-scope-check.mjs --record. Not hand-edited.
 plan=/root/.claude/plans/read-noahjefferson-handoff-md-and-noahje-purring-raven.md
-planhash=a6d07598519d55cd
-diffhash=e54f82db3137012c
-difflines=484
-linesread=504
-verdict=IN-SCOPE: five documents changed, all named in the plan's Files for steps 444, 445 and 446, no file of the app's source, no hook and no doctrine marker staged, and the Found queue gains lines and loses none.
-# IN-SCOPE: five documents changed, all named in the plan's Files for steps 444, 445 and 446, no file of the app's source, no hook and no doctrine marker staged, and the Found queue gains lines and loses none.
-# IR-SCIENCE.md: covered by the Files line for step 445 and step 446; adds the dated section of 11 November 2026 (step 445's six parts, no table, no chosen method) and, by step 446, the one sentence on the rule the comparison used with the paragraph rewrapped from there to its end.
-# NOTES.md: covered by the Files lines for steps 444 and 446; adds the roadmap bullet of key 111 directly under 110's (step 444, internal, no other bullet touched) and Q-JPS-306 to Q-JPS-338 after Q-JPS-305 (step 446, one line each, none removed).
-# docs/decisions/111-a-mask-is-judged-over-the-whole-photograph.md: covered by the Files line for step 444 (new); the record that settles how a mask is judged and chooses no method, with Looked at, Depends and Rank.
-# docs/decisions/110-a-mask-is-made-from-samples-placed-on-the-photograph.md: covered by the Files line for step 444; adds the dated paragraph on whole photographs at the end of its Built section.
-# docs/decisions/006-mask-by-subject.md: covered by the Files line for step 444; replaces the paragraph that read Owed with the reading of 11 November 2026 under Looked up only.
+planhash=c96e12fe16903331
+diffhash=62cf052dda3d6773
+difflines=360
+linesread=726
+verdict=IN-SCOPE: every staged file is one the plan's Files give to step 451, 456 or 457, and each change does what that step's text asks and nothing more; the two hooks stay modified in the working tree and are not staged.
+# IN-SCOPE: every staged file is one the plan's Files give to step 451, 456 or 457, and each change does what that step's text asks and nothing more; the two hooks stay modified in the working tree and are not staged.
+# src/placedecode.ts (new): step 451, the one new module with one exported function placeDecode and its contract, calling the sky guide and the decode's own functions and taking no edit.
+# src/debug.ts: step 451 and its second send, the page counts its cues and the edge lightness from placeDecode, records the data a recipe and a kept selection were fitted on, lists a recipe or selection kept before as not applied with no Try, and passes no balance to the places part.
+# src/placecues.ts: step 451, only the contract text of placeCueValues changed to say what the page now gives it.
+# debug.html: step 451, the page's note on masks says a mask is made from the photograph itself and stays the same under the balance, the exposure and the swap.
+# docs/ARCHITECTURE.md: step 451, the module map made again by the tool (95 modules, new row, moved line count).
+# docs/decisions/110-a-mask-is-made-from-samples-placed-on-the-photograph.md: step 456, one dated paragraph under Built, no Depends line.
+# docs/decisions/111-a-mask-is-judged-over-the-whole-photograph.md: step 456, one dated paragraph at the foot of Context, no Depends line.
+# IR-SCIENCE.md: step 456, one paragraph at the head of the 11 November passage.
+# CLAUDE.md: step 456, one new section after BEFORE A PLAN GOES UP, ten lines, no person named or quoted.
+# NOTES.md: step 457, the entry at the head of the On staging section and queue lines Q-JPS-339 to Q-JPS-352 after Q-JPS-338; no roadmap bullet changed and no line removed.
+# Read: the staged diff of 670 lines and the unstaged diff of 56 lines, each to its last line, and the plan's Goals, Asked, Design and the steps file's rules and steps 451, 456 and 457.

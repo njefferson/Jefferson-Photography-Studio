@@ -19,6 +19,8 @@ What was measured, on 11 November 2026, in the container and not on the device:
 
 What it found. **No entry met the result on any of the twenty-two frame-subjects.** On the planted pictures, after the edge stage, the recipe met the bar on 1 of 16 regions and every learned entry on none. The planted figure did not foretell the frames: the recipe's mean planted overlap in coarse form was the highest of all, 0.9752, and on the frames it took wrong regions as large as a fifth of the frame. Each fault is set out under Rejected.
 
+**What the masks were made from (written 11 November 2026).** Every mask this record reports, the recipe's, the learned kinds' and the scene-class model's alike, was made from the picture as the editor opens it, or from one of two re-mappings of its hue laid on that picture. That picture is the decode after the opening balance, the automatic exposure, the channel swap and the measured denoise, developed and written as 8-bit display values. None was made from the photograph's own decode. So the figures here measure each method fed an edited picture, and the recipe's cues were counted on that picture, as the test page counted them, so they moved with the balance, the exposure and the swap. A mask keyed on the decode, as record 032 requires, was not measured by this record. The notes' entry for the build that counts the cues from the decode holds what the app's own recipe did from the decode.
+
 ## Looked up
 
 Fetched on 11 November 2026 by the measurement's own fetchers, each address asked once, to disk, and read there; the science file's passage of 11 November 2026 names each page with how it was read.

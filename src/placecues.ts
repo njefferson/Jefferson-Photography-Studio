@@ -143,14 +143,14 @@ export function placeThreshold(a: ArrayLike<number>, b: ArrayLike<number>): { ed
 
 /**
  * Reads the eight cues off the counted pixels.
- * @param drawn the counted pixels' drawn bytes, four to a pixel (red, green, blue, alpha).
- * @param lin the counted pixels' linear channels at the opening gains, three floats to a pixel.
- * @param light the drawn lightness of the whole frame as one byte to a pixel, row by row, width times height long.
+ * @param drawn the counted pixels' bytes, four to a pixel (red, green, blue, alpha); the test page gives the photograph's own data here (placeDecode's pixels), never the drawn picture.
+ * @param lin the counted pixels' linear channels at one balance, three floats to a pixel, any common scale (each difference is over the sum); the test page gives placeDecode's shares.
+ * @param light the lightness of the whole frame as one byte to a pixel, row by row, width times height long; the test page gives placeDecode's light.
  * @param width the frame's width in pixels.
  * @param height the frame's height in pixels.
  * @param cols each counted pixel's column in the full frame.
  * @param rows each counted pixel's row in the full frame.
- * @returns eight Float32Arrays in the order of PLACE_CUES, one value for each counted pixel: lightness (the largest drawn channel over 255), saturation (largest less smallest over largest, 0 where the largest is 0), the three differences of linear channels over their sum (0 where the sum is 0), the standard deviation of the frame's drawn lightness in a square window of 5 and of 15 pixels centred on the pixel and clipped at the frame's edge, over 255, and the row over the last row. Their scales are those placeBinOf reads.
+ * @returns eight Float32Arrays in the order of PLACE_CUES, one value for each counted pixel: lightness (the largest of the pixel's bytes over 255), saturation (largest less smallest over largest, 0 where the largest is 0), the three differences of linear channels over their sum (0 where the sum is 0), the standard deviation of the frame's lightness in a square window of 5 and of 15 pixels centred on the pixel and clipped at the frame's edge, over 255, and the row over the last row. Their scales are those placeBinOf reads.
  */
 export function placeCueValues(drawn: ArrayLike<number>, lin: ArrayLike<number>, light: ArrayLike<number>, width: number, height: number, cols: ArrayLike<number>, rows: ArrayLike<number>): Float32Array[] {
   const n = Math.min(cols.length, rows.length);

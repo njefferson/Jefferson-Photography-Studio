@@ -57,6 +57,7 @@ import { PLACE_NAMES, PLACE_TARGETS, placesPicture, placeLabels, type PlaceTarge
 import { PLACE_CUES, placeCueValues, placeReport } from "./placecues";
 import { placeSampleNames, placeSampleLabels, placeSampleTargets, placeSampleShrink, placeSamplesToText, placeSamplesFromText, type PlaceSample } from "./placesamples";
 import { PLACE_STRUCTURE_CUES, placeStructureValues } from "./placestructure";
+import { placeDecode } from "./placedecode";
 import { placeSurface } from "./placesurface";
 import * as sampleMaskModule from "./samplemask";
 
@@ -3853,13 +3854,40 @@ function keptRead(): { ok: boolean; all: Record<string, unknown> } {
 }
 
 /** Keeps one photograph's selections. Takes the set read by `keptRead`, the photograph's name and its fitted selections. Returns whether the
- *  write was accepted. What it must satisfy: the write is inside a try, and the page works whether or not it is accepted. */
-function keptWrite(all: Record<string, unknown>, name: string, fits: unknown): boolean {
+ *  write was accepted. What it must satisfy: the write is inside a try, and the page works whether or not it is accepted; the selections are
+ *  kept with `data` set to `MASK_DATA`, since every selection fitted from this build on is fitted on cues counted from the photograph's own
+ *  data, and `keptSplit` reads only selections that carry it. */
+function keptWrite(all: Record<string, unknown>, name: string, fits: object): boolean {
   try {
-    window.localStorage.setItem(PLACE_KEPT_KEY, JSON.stringify({ ...all, [name]: fits }));
+    window.localStorage.setItem(PLACE_KEPT_KEY, JSON.stringify({ ...all, [name]: { ...fits, data: MASK_DATA } }));
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Splits the kept selections into those read here and those only listed. Takes the set read by `keptRead` and the names to leave out, this
+ *  photograph's own. Returns `read`, each kept set whose `data` is `MASK_DATA`, in storage order, and `drawn`, the name of each kept set
+ *  that is an object without it. What it must satisfy: a set kept before the cues were counted from the decode carries no `data`, was
+ *  fitted on cues counted from the drawn picture, and is never in `read`, because read on the cues counted now it would take the wrong
+ *  pixels with nothing to show for it, the rule `maskTriable` holds for a mask recipe; an entry that is not an object was never a kept set
+ *  and is in neither. Consumers: `placesPart` and `sampleCount`, which give `read` to `placeReport` and `drawn` to `keptDrawnRows`. */
+function keptSplit(all: Record<string, unknown>, leaveOut: readonly string[]): { read: unknown[]; drawn: string[] } {
+  const read: unknown[] = [], drawn: string[] = [];
+  for (const [k, v] of Object.entries(all)) {
+    if (leaveOut.includes(k) || !v || typeof v !== "object") continue;
+    if ((v as { data?: unknown }).data === MASK_DATA) read.push(v);
+    else drawn.push(k);
+  }
+  return { read, drawn };
+}
+
+/** Lists the kept selections that are not applied. Takes the names `keptSplit` gave as `drawn`. Returns nothing; writes one row for each,
+ *  naming it and saying it was made from the drawn picture and is not applied, so no selection kept before is read here unseen. */
+function keptDrawnRows(drawn: readonly string[]): void {
+  for (const k of drawn) {
+    row(`Selections kept from ${k}`, "not applied: made from the drawn picture",
+      "These selections were fitted before the cues were counted from the photograph itself, on cues counted from the picture as it was drawn, with its white balance, exposure and red and blue swap. Read on the cues counted now they would take the wrong pixels with nothing to show for it, so they are listed and not applied. Fitting them again on that photograph, by step 1 or by counting its samples, keeps them on its own data.");
   }
 }
 
@@ -3900,12 +3928,15 @@ function placePicture(host: HTMLElement, title: string, t: ReturnType<typeof thi
 }
 
 /** The places and the cues of the first press. Takes the press's tally, the subject, the drawn frame at the opening balance, its thinned
- *  picture, the check's own labels, the app's sky selection or null, and the opening gains. Returns nothing; writes rows into the report, the
- *  pictures into `#dPlacePics` (replacing the last press's), and this photograph's fitted selections into storage under its name. What it
- *  must satisfy: a fault inside it writes one row saying the places part did not run and lets the press go on, so the rows the check printed
- *  before it stand as they were; the counted pixels are the thinned picture's, the columns and rows being their places in the whole frame;
+ *  picture, the check's own labels and the app's sky selection or null. Returns nothing; writes rows into the report, the pictures into
+ *  `#dPlacePics` (replacing the last press's), and this photograph's fitted selections into storage under its name. What it must satisfy:
+ *  a fault inside it writes one row saying the places part did not run and lets the press go on, so the rows the check printed before it
+ *  stand as they were; the counted pixels are the thinned picture's places, the columns and rows being their places in the whole frame;
+ *  every cue and the lightness kept for a mask's edge are counted from the photograph's own decode through `placeDecode`, which takes no
+ *  edit, and never from the drawn frame, which is only the picture shown and drawn over; a selection kept from another photograph is read
+ *  only where it carries the photograph's own data (`keptSplit`), and one kept before is listed in a row of its own and not applied;
  *  storage is read and written inside a try. Consumer: the first press. */
-async function placesPart(tally: PressTally, subject: Subject, frame: { data: Uint8ClampedArray; width: number; height: number }, t: ReturnType<typeof thin>, labels: SepLabels, mask: BrushMask | null, gains: [number, number, number]): Promise<void> {
+async function placesPart(tally: PressTally, subject: Subject, frame: { data: Uint8ClampedArray; width: number; height: number }, t: ReturnType<typeof thin>, labels: SepLabels, mask: BrushMask | null): Promise<void> {
   const host = $("dPlacePics");
   host.replaceChildren();
   try {
@@ -3932,34 +3963,29 @@ async function placesPart(tally: PressTally, subject: Subject, frame: { data: Ui
     }
     lap(tally, "separation: the places, the labelling");
 
+    progress("Reading the photograph's own data for the cues");
+    await pause(tally);
+    books(tally);
+    // THE CUES ARE COUNTED FROM THE DECODE, NOT FROM THE DRAWN FRAME (record 032). The drawn frame has been through the balance, the
+    // exposure, the swap and the develop, so a cue counted on it moved whenever any of them moved, and a recipe fitted on one photograph
+    // met a different balance on the next. `placeDecode` reads the photograph's own data at the counted pixels' places and takes no edit.
+    const own = placeDecode(subject.img, t);
+    const light = own.light;
+    lap(tally, "separation: the photograph's own data for the cues");
     progress("Counting the eight cues");
     await pause(tally);
     books(tally);
-    const light = new Uint8Array(frame.width * frame.height);
-    for (let p = 0, q = 0; p < light.length; p++, q += 4) {
-      const r = frame.data[q], g = frame.data[q + 1], b = frame.data[q + 2];
-      light[p] = r > g ? (r > b ? r : b) : (g > b ? g : b);
-    }
-    const img = subject.img;
-    const lin = img.isRaw && img.linear && img.width === t.fromW && img.height === t.fromH ? img.linear : null;
-    const linear = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) {
-      if (lin) {
-        const q = (rows[i] * t.fromW + cols[i]) * 4;
-        linear[3 * i] = lin[q] * gains[0]; linear[3 * i + 1] = lin[q + 1] * gains[1]; linear[3 * i + 2] = lin[q + 2] * gains[2];
-      } else {
-        linear[3 * i] = t.data[4 * i] / 255; linear[3 * i + 1] = t.data[4 * i + 1] / 255; linear[3 * i + 2] = t.data[4 * i + 2] / 255;
-      }
-    }
     const sky = new Uint8Array(n);
     if (mask) for (let i = 0; i < n; i++) sky[i] = sampleBrush(mask, (cols[i] + 0.5) / t.fromW, (rows[i] + 0.5) / t.fromH) >= SEP_SKY_WEIGHT ? 1 : 0;
-    const cues = placeCueValues(t.data, linear, light, t.fromW, t.fromH, cols, rows);
+    const cues = placeCueValues(own.pixels, own.shares, light, t.fromW, t.fromH, cols, rows);
     lap(tally, "separation: the eight cues");
     // The structure cues are counted once for the photograph and kept beside the eight, with what the count of the samples needs.
     books(tally);
     const structure = placeStructureValues(light, frame.width, frame.height, cols, rows);
     lap(tally, "separation: the structure cues");
     placeHeld = { name: subject.name, t, cols, rows, cues: [...cues, ...structure], cueNames: [...PLACE_CUES, ...PLACE_STRUCTURE_CUES], sky, light, frameW: frame.width, frameH: frame.height };
+    row("The eight cues counted", `${PLACE_CUES.join(" · ")} · from the photograph's own data, not from the drawn picture`,
+      `Each is one value for each counted pixel, counted from the photograph's own data and never from the picture drawn above, so no cue moves with the white balance, the exposure, the red and blue swap or a look. The data is the decode at the gray-world balance the file itself gives (gains ${own.gains.map((g) => g.toFixed(4)).join(", ")}), read through the guide the editor's Sky mask reads, which is ${own.guideW} by ${own.guideH} pixels and is read between its pixels at each place. Lightness is the guide's lightness: the gamma luma of the balanced decode over the frame's own bright end. Saturation is the largest of the balanced channels less the smallest over the largest. Red against green, red against blue and green against blue are each the difference of two balanced channels over their sum. Texture at 5 and at 15 is the standard deviation of that lightness in a square window of that many pixels of the ${frame.width} by ${frame.height} frame centred on the pixel's place, over 255; detail finer than the guide's own pixels is not in it. Height is the pixel's row over the last row. The same lightness is what a mask's Refined to edges follows.`);
     if (!picture) {
       const kept = samplesRead(subject.name).length;
       row("The places and the regions", kept
@@ -3968,14 +3994,12 @@ async function placesPart(tally: PressTally, subject: Subject, frame: { data: Ui
       "Places are held for three photographs only. On any other photograph a region is named by a sample placed on the picture and confirmed, and the check measures what tells the named regions apart when the samples are counted. Nothing is labelled until then.");
       return;
     }
-    row("The eight cues counted", PLACE_CUES.join(" · "),
-      `Each is one value for each counted pixel. Lightness is the largest of the drawn pixel's three channels over 255. Saturation is the largest less the smallest over the largest. Red against green, red against blue and green against blue are each the difference of two linear channels over their sum, taken ${lin ? "on the photograph's linear copy at the opening gains" : "on the drawn pixel's own channels over 255, because this photograph has no linear camera copy at the drawn size"}. Texture at 5 and at 15 is the standard deviation of the drawn lightness in a square window of that many pixels centred on the pixel's place in the whole frame, over 255. Height is the pixel's row over the last row.`);
 
     progress("Fitting and reading the selections");
     await pause(tally);
     books(tally);
     const store = keptRead();
-    const kept = Object.entries(store.all).filter(([k]) => k !== subject.name).map(([, v]) => v);
+    const { read: kept, drawn } = keptSplit(store.all, [subject.name]);
     const rep = placeReport(cues, lab, names, targets, sky, subject.name, kept as Parameters<typeof placeReport>[6]);
     lap(tally, "separation: the places report");
     for (const text of rep.rows) {
@@ -3983,9 +4007,10 @@ async function placesPart(tally: PressTally, subject: Subject, frame: { data: Ui
       row(at > 0 ? text.slice(0, at) : "The places", at > 0 ? text.slice(at + 2) : text,
         "Counted by the cue module on this photograph's counted pixels. A selection fitted here is printed as fitted here and is no result; a selection kept from another photograph is read on this one as it was fitted.");
     }
+    keptDrawnRows(drawn);
     const stored = keptWrite(store.all, subject.name, rep.fits);
     row("Selections kept on this device", store.ok && stored
-      ? `${kept.length} kept from other photographs · this photograph's ${rep.masks.length} masks' selections are kept under its name`
+      ? `${kept.length} kept from other photographs and read here${drawn.length ? ` · ${drawn.length} made from the drawn picture and not applied` : ""} · this photograph's ${rep.masks.length} masks' selections are kept under its name`
       : "cannot be kept on this device",
     store.ok && stored
       ? "The fitted selections of each photograph are kept in this browser's local storage, as text, under the photograph's name, and the next photograph opened here is read through them."
@@ -4025,7 +4050,9 @@ const SAMPLE_MIN_PIXELS = 50;
 const SAMPLE_HINT_NONE = "Not available yet: the count needs a photograph drawn by step 1 above. Press step 1, then place and confirm samples on the picture.";
 
 /** What a press keeps for the count of the samples. `cues` are the eight cues and then the structure cues, one array for each, a value for
- *  each counted pixel, named in `cueNames` in the same order. */
+ *  each counted pixel, named in `cueNames` in the same order, all counted from the photograph's own decode (`placeDecode`); `light` is that
+ *  decode's lightness for every pixel of the frame, which a mask's Refined to edges follows; `t` is the thinned drawn picture, shown and
+ *  drawn over and never counted. */
 interface PlaceHeld { name: string; t: ReturnType<typeof thin>; cols: Int32Array; rows: Int32Array; cues: Float32Array[]; cueNames: string[]; sky: Uint8Array; light: Uint8Array; frameW: number; frameH: number }
 let placeHeld: PlaceHeld | null = null;
 let sampleSurface: { set(samples: PlaceSample[]): void; destroy(): void } | null = null;
@@ -4079,7 +4106,7 @@ function dropSampler(): void {
 
 /** Shows the drawn photograph with the sample surface on it, starting from the samples kept for it. Takes nothing; reads `placeHeld`.
  *  Returns nothing; where the surface cannot be built it writes one row saying so and leaves the count off. What it must satisfy: the
- *  picture is the thinned drawn picture the press counted; every change of the samples is kept under the photograph's name at once, inside
+ *  picture is the thinned drawn picture whose pixels' places the press counted; every change of the samples is kept under the photograph's name at once, inside
  *  a try; the count control is enabled once the picture stands. */
 function showSampler(): void {
   const h = placeHeld;
@@ -4120,7 +4147,8 @@ const samplePct = (v: number): string => `${(v * 100).toFixed(1)} percent`;
 /** Counts the samples. Takes the press's tally. Returns nothing; writes rows into the report and pictures into `#dSamplePics` (replacing the
  *  last count's). What it must satisfy: nothing is decoded or drawn again, since the arrays are the ones the press kept; the samples' names
  *  and places are in the rows and so in the copy; height is left out of the pair rows and the fits; the pair figures are read again with
- *  every sample at half and at a quarter of its radius; the selections kept from other photographs are read here, and this count's are kept
+ *  every sample at half and at a quarter of its radius; the selections kept from other photographs are read here where they carry the
+ *  photograph's own data, and those kept before are listed in rows of their own and not applied (`keptSplit`), and this count's are kept
  *  under the photograph's name followed by "(samples)", inside a try. Consumer: the count control. */
 async function sampleCount(tally: PressTally): Promise<void> {
   const h = placeHeld;
@@ -4150,14 +4178,14 @@ async function sampleCount(tally: PressTally): Promise<void> {
     "A name's pixels are those in any of its samples, each counted once. A pixel that samples of two different names both hold takes no name: it is left with rest and counted as overlap. Rest is every counted pixel in no sample.");
   row("Height", "left out of the pair rows and the fits", "With samples, a name's pixels are where its samples were put, so a figure of height between two names would measure the placing. The drawn places of the three marina photographs keep it.");
   row("The structure cues counted", PLACE_STRUCTURE_CUES.join(" · "),
-    "Each is the coherence of the lightness gradient: the centred differences of the drawn lightness over a square window of 15 pixels or of 45 pixels centred on the pixel's place in the whole frame, the squared difference of the two squared-derivative sums plus four times the square of their product sum, over the square of the sum, from 0 where the window holds no gradient or gradients in every direction to 1 where every gradient lies along one line. They count how aligned the edges are, not how straight one edge is.");
+    "Each is the coherence of the lightness gradient: the centred differences of the photograph's own lightness, the same the eight cues read and never the drawn picture's, over a square window of 15 pixels or of 45 pixels centred on the pixel's place in the whole frame, the squared difference of the two squared-derivative sums plus four times the square of their product sum, over the square of the sum, from 0 where the window holds no gradient or gradients in every direction to 1 where every gradient lies along one line. They count how aligned the edges are, not how straight one edge is.");
 
   progress("Fitting and reading the selections");
   await pause(tally);
   books(tally);
   const store = keptRead();
   const key = `${h.name} (samples)`;
-  const kept = Object.entries(store.all).filter(([k]) => k !== key && k !== h.name).map(([, v]) => v);
+  const { read: kept, drawn } = keptSplit(store.all, [key, h.name]);
   const rep = placeReport(h.cues, got.labels, names, targets, h.sky, key, kept as Parameters<typeof placeReport>[6], h.cueNames, ["height"]);
   lap(tally, "samples: the report");
   for (const text of rep.rows) {
@@ -4165,9 +4193,10 @@ async function sampleCount(tally: PressTally): Promise<void> {
     row(at > 0 ? text.slice(0, at) : "The samples' report", at > 0 ? text.slice(at + 2) : text,
       "Counted by the cue module on this photograph's counted pixels, labelled by the samples. A selection fitted here is printed as fitted here and is no result; a selection kept from another photograph is read on this one as it was fitted.");
   }
+  keptDrawnRows(drawn);
   const stored = keptWrite(store.all, key, rep.fits);
   row("Selections kept on this device", store.ok && stored
-    ? `${kept.length} kept from other photographs · this count's ${rep.masks.length} selections are kept under ${key}`
+    ? `${kept.length} kept from other photographs and read here${drawn.length ? ` · ${drawn.length} made from the drawn picture and not applied` : ""} · this count's ${rep.masks.length} selections are kept under ${key}`
     : "cannot be kept on this device",
   store.ok && stored
     ? "The fitted selections are kept in this browser's local storage, as text, under the photograph's name with (samples) after it, and the next photograph opened here is read through them."
@@ -4229,8 +4258,15 @@ const maskApi = sampleMaskModule as unknown as MaskApi;
 const MASKS_KEY = "ips-debug-separation-recipes";
 /** The cues a mask is told to leave out while the labels come from samples, as the pair rows and the fits leave it out. */
 const MASK_LEAVE_OUT = ["height"];
-/** A recipe as kept: the subject's name, the photograph it was fitted on, and the module's text form of it. */
-interface MaskKept { subject: string; from: string; text: string }
+/** A recipe as kept: the subject's name, the photograph it was fitted on, the module's text form of it, and which data it was fitted on,
+ *  `MASK_DATA` for the photograph's own data. A recipe kept before the cues were counted from the decode carries no `data`: it was fitted on
+ *  cues counted from the drawn picture, so it is listed as such and is never tried, because read on the cues counted now it would take
+ *  the wrong pixels with nothing to show for it. */
+interface MaskKept { subject: string; from: string; text: string; data?: string }
+/** The data a recipe, or a kept selection, fitted from this build on was fitted on: the photograph's own data, through `placeDecode`. */
+const MASK_DATA = "decode";
+/** Whether a kept recipe was fitted on the data the cues are counted on now. Takes the kept recipe. Returns true only for `MASK_DATA`. */
+const maskTriable = (e: MaskKept): boolean => e.data === MASK_DATA;
 
 /** The renderings the mask module lists. Takes nothing. Returns their names in the module's order, an empty list where the module gives none. */
 function maskRenderingNames(): string[] {
@@ -4243,7 +4279,8 @@ function maskRenderingNames(): string[] {
 }
 
 /** Reads the kept recipes. Takes nothing. Returns whether storage answered and every photograph's kept recipes by name. What it must satisfy:
- *  every access to storage is inside a try; text that is not an object, and entries lacking a subject, a source or a text, are left out. */
+ *  every access to storage is inside a try; text that is not an object, and entries lacking a subject, a source or a text, are left out;
+ *  an entry's `data` is kept where it is text and left absent otherwise, so a recipe kept before it existed reads as made from the drawn picture. */
 function masksRead(): { ok: boolean; all: Record<string, MaskKept[]> } {
   try {
     const raw = window.localStorage.getItem(MASKS_KEY);
@@ -4256,7 +4293,7 @@ function masksRead(): { ok: boolean; all: Record<string, MaskKept[]> } {
         for (const e of v) {
           if (!e || typeof e !== "object") continue;
           const x = e as Record<string, unknown>;
-          if (typeof x.subject === "string" && typeof x.from === "string" && typeof x.text === "string") list.push({ subject: x.subject, from: x.from, text: x.text });
+          if (typeof x.subject === "string" && typeof x.from === "string" && typeof x.text === "string") list.push(typeof x.data === "string" ? { subject: x.subject, from: x.from, text: x.text, data: x.data } : { subject: x.subject, from: x.from, text: x.text });
         }
         all[k] = list;
       }
@@ -4277,14 +4314,19 @@ function masksWrite(all: Record<string, MaskKept[]>): boolean {
   }
 }
 
+/** The key a kept recipe is told apart by. Takes the kept recipe. Returns the photograph it was fitted on, its subject and the data it was
+ *  fitted on, joined, so a recipe made from the drawn picture and one made again from the photograph's own data are two recipes. */
+const maskKey = (e: MaskKept): string => `${e.from}\u0000${e.subject}\u0000${e.data ?? ""}`;
+
 /** The recipes to list on a photograph. Takes the set read and the photograph's name. Returns each distinct recipe once, by the photograph
- *  it was fitted on and its subject: first those kept for this photograph, then those fitted on other photographs, each with where it is kept. */
+ *  it was fitted on, its subject and the data it was fitted on (`maskKey`): first those kept for this photograph, then those fitted on other
+ *  photographs, each with where it is kept. */
 function maskEntries(all: Record<string, MaskKept[]>, here: string): { entry: MaskKept; kept: boolean }[] {
   const seen = new Map<string, { entry: MaskKept; kept: boolean }>();
-  for (const e of all[here] ?? []) if (e.from !== here) seen.set(`${e.from}\u0000${e.subject}`, { entry: e, kept: true });
+  for (const e of all[here] ?? []) if (e.from !== here) seen.set(maskKey(e), { entry: e, kept: true });
   for (const [k, list] of Object.entries(all)) {
     if (k === here) continue;
-    for (const e of list) if (e.from === k && !seen.has(`${e.from}\u0000${e.subject}`)) seen.set(`${e.from}\u0000${e.subject}`, { entry: e, kept: false });
+    for (const e of list) if (e.from === k && !seen.has(maskKey(e))) seen.set(maskKey(e), { entry: e, kept: false });
   }
   return [...seen.values()];
 }
@@ -4371,7 +4413,8 @@ function maskShow(host: HTMLElement, title: string, h: PlaceHeld, names: string[
 }
 
 /** The fits, weights and pictures of a count. Takes the count's tally, what the press kept, the names the samples gave (rest last) and the
- *  labels. Returns nothing; writes rows, pictures into `#dMaskPics`, and the recipes fitted here into storage under the photograph's name. What
+ *  labels. Returns nothing; writes rows, pictures into `#dMaskPics`, and the recipes fitted here into storage under the photograph's name,
+ *  each with `data` set to `MASK_DATA`, since the cues it was fitted on are counted from the photograph's own data. What
  *  it must satisfy: for every name but rest a recipe is fitted against the other names, the weights are made from it and each rendering is
  *  drawn; a name the module cannot fit says why in one row; recipes kept for this photograph from another are kept as they were; each stage
  *  is timed under its own name; a fault writes one row and lets the count go on; storage is inside a try. Consumer: the count. */
@@ -4396,8 +4439,8 @@ async function maskStages(tally: PressTally, h: PlaceHeld, names: string[], labe
       }
       const text = maskApi.sampleMaskToText(r);
       fresh.push({ subject, recipe: r, text });
-      row(`Mask recipe: ${subject}`, `fitted on ${h.name} · weighed against ${against.length ? against.join(", ") : "no other name"} · cues ${h.cueNames.filter((c) => !MASK_LEAVE_OUT.includes(c)).join(", ")} · kept as ${text.length.toLocaleString("en-US")} characters`,
-        "The subject's counts on each cue, held against the counts of the other placed names pooled, each side balanced to the same total, with the weight of a counted pixel the sum over the cues of the log of the subject's share over the other's, through a logistic. Only the subject, the photograph, the names weighed against and the cues are in the copy; the counts are kept in this browser.");
+      row(`Mask recipe: ${subject}`, `fitted on ${h.name} · from the photograph's own data · weighed against ${against.length ? against.join(", ") : "no other name"} · cues ${h.cueNames.filter((c) => !MASK_LEAVE_OUT.includes(c)).join(", ")} · kept as ${text.length.toLocaleString("en-US")} characters`,
+        "The subject's counts on each cue, held against the counts of the other placed names pooled, each side balanced to the same total, with the weight of a counted pixel the sum over the cues of the log of the subject's share over the other's, through a logistic. The cues are counted from the photograph's own data and not from the drawn picture, and the recipe is kept saying so. Only the subject, the photograph, the names weighed against and the cues are in the copy; the counts are kept in this browser.");
     }
     lap(tally, "masks: the fits");
 
@@ -4420,7 +4463,7 @@ async function maskStages(tally: PressTally, h: PlaceHeld, names: string[], labe
     books(tally);
     const store = masksRead();
     const mine = (store.all[h.name] ?? []).filter((e) => e.from !== h.name);
-    const next: Record<string, MaskKept[]> = { ...store.all, [h.name]: [...fresh.map((f) => ({ subject: f.subject, from: h.name, text: f.text })), ...mine] };
+    const next: Record<string, MaskKept[]> = { ...store.all, [h.name]: [...fresh.map((f) => ({ subject: f.subject, from: h.name, text: f.text, data: MASK_DATA })), ...mine] };
     const stored = masksWrite(next);
     row("Masks kept on this device", store.ok && stored
       ? `${fresh.length} ${fresh.length === 1 ? "recipe" : "recipes"} fitted here are kept under ${h.name} · ${mine.length} kept for this photograph from other photographs`
@@ -4449,7 +4492,9 @@ async function maskStages(tally: PressTally, h: PlaceHeld, names: string[], labe
 
 /** Lists the recipes kept from other photographs, each with a button that tries it here. Takes nothing; reads `placeHeld` and storage. Returns
  *  nothing; replaces `#dMaskList`. What it must satisfy: every recipe fitted on another photograph is listed whether or not its name is placed
- *  here; each button is a real button with a label naming the subject and the photograph; storage is read inside a try. */
+ *  here; each button is a real button with a label naming the subject and the photograph; a recipe kept before the cues were counted from
+ *  the decode (no `data`, see `MaskKept`) is listed with words saying it was made from the drawn picture and cannot be tried here, and has
+ *  no button; storage is read inside a try. */
 function maskListShow(): void {
   const host = $("dMaskList");
   host.replaceChildren();
@@ -4457,12 +4502,13 @@ function maskListShow(): void {
   if (!h) return;
   const store = masksRead();
   const entries = maskEntries(store.all, h.name);
+  const old = entries.filter(({ entry }) => !maskTriable(entry)).length;
   const note = document.createElement("p");
   note.className = "dbg-note";
   note.textContent = !store.ok
     ? "This browser refused local storage, so no recipe kept from another photograph is listed."
     : entries.length
-      ? `${entries.length} ${entries.length === 1 ? "recipe is" : "recipes are"} kept from other photographs or for this one. Trying one draws what it would take here and prints its shares against the names placed here; it changes nothing until it is kept.`
+      ? `${entries.length} ${entries.length === 1 ? "recipe is" : "recipes are"} kept from other photographs or for this one. Trying one draws what it would take here and prints its shares against the names placed here; it changes nothing until it is kept.${old ? ` ${old} of them ${old === 1 ? "was" : "were"} made from the drawn picture, before masks were made from the photograph itself, and cannot be tried here: count the samples again on the photograph ${old === 1 ? "it" : "each"} came from to make ${old === 1 ? "it" : "them"} again.` : ""}`
       : "No recipe is kept from another photograph yet. Count the samples on a photograph and its recipes are kept; open another photograph and they are listed here.";
   host.appendChild(note);
   for (const { entry, kept } of entries) {
@@ -4470,6 +4516,12 @@ function maskListShow(): void {
     box.style.cssText = "margin:8px 0";
     const p = document.createElement("p");
     p.className = "dbg-note";
+    if (!maskTriable(entry)) {
+      p.textContent = `${entry.subject}, fitted on ${entry.from}${kept ? ", kept for this photograph" : ""}: made from the drawn picture, with its white balance, exposure and swap, before masks were made from the photograph itself, so it cannot be tried here.`;
+      box.append(p);
+      host.appendChild(box);
+      continue;
+    }
     p.textContent = `${entry.subject}, fitted on ${entry.from}${kept ? ", kept for this photograph" : ""}.`;
     const acts = document.createElement("div");
     acts.className = "dbg-actions";
@@ -4500,13 +4552,19 @@ function maskListShow(): void {
  *  `#dMaskTry` (replacing the last try's) and offers the button that keeps it. What it must satisfy: the recipe is read here against the
  *  cues the press kept, with nothing decoded or drawn again; a recipe that cannot be read, or reads a cue this page does not count, says so
  *  in one row and draws nothing; the shares are against the names the samples placed now give; where the recipe's name is placed here the mask
- *  fitted afresh from those samples alone is drawn beside it, never in place of it; nothing is kept until the keep button is pressed. */
+ *  fitted afresh from those samples alone is drawn beside it, never in place of it; a recipe made from the drawn picture (no `data`) is
+ *  refused in one row and draws nothing; nothing is kept until the keep button is pressed, and what is kept carries the recipe's `data`. */
 async function maskTry(tally: PressTally, entry: MaskKept): Promise<void> {
   const h = placeHeld;
   const host = $("dMaskTry");
   host.replaceChildren();
   if (!h) { row("Mask tried here", "not run", "No photograph is drawn, so there is nothing to try a mask on."); return; }
   const what = `${entry.subject} from ${entry.from}`;
+  if (!maskTriable(entry)) {
+    row(`Mask tried here: ${what}`, "not tried: made from the drawn picture", "This recipe was fitted on cues counted from the drawn picture, before masks were made from the photograph itself, so read on the cues counted now it would take the wrong pixels. Nothing is drawn.");
+    sampleHint.textContent = `${what} was made from the drawn picture and cannot be tried here. Nothing is drawn.`;
+    return;
+  }
   progress(`Trying ${what} on this photograph`);
   await pause(tally);
   books(tally);
@@ -4571,13 +4629,13 @@ async function maskTry(tally: PressTally, entry: MaskKept): Promise<void> {
   keep.className = "dbg-btn primary";
   keep.style.minHeight = "44px";
   const store = masksRead();
-  const already = (store.all[h.name] ?? []).some((e) => e.from === entry.from && e.subject === entry.subject);
+  const already = (store.all[h.name] ?? []).some((e) => maskKey(e) === maskKey(entry));
   keep.textContent = already ? `${what} is kept for this photograph` : `Keep ${what} for this photograph`;
   keep.disabled = already;
   keep.addEventListener("click", () => {
     const s = masksRead();
     const list = s.all[h.name] ?? [];
-    if (!list.some((e) => e.from === entry.from && e.subject === entry.subject)) list.push({ subject: entry.subject, from: entry.from, text: entry.text });
+    if (!list.some((e) => maskKey(e) === maskKey(entry))) list.push({ subject: entry.subject, from: entry.from, text: entry.text, data: entry.data });
     const ok = s.ok && masksWrite({ ...s.all, [h.name]: list });
     const said = ok ? `${what} is kept for this photograph, unchanged, still naming ${entry.from} as the photograph it was fitted on.` : `${what} could not be kept: this browser refused local storage.`;
     keep.textContent = ok ? `${what} is kept for this photograph` : keep.textContent;
@@ -4764,7 +4822,7 @@ async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: Pr
       const rd = spec ? readBalance(base.wb, spec) : null;
       row("The opening balance, the first white point", `gains ${base.wb.map((g) => g.toFixed(4)).join(", ")} · exposure ${base.exposure.toFixed(4)} · ${rd ? `reads as ${Math.round(rd.kelvin)} K, tint ${Math.round(rd.tint)}` : "no temperature read: the file has no matrix to read it through"}`,
         `What the editor opens this photograph at, by the app's one copy of the at-open ruling (freshBaseline): for a raw opened from its sensor data, the balance found from the data (gray-world) and the automatic exposure. The drawn picture has the red and blue swap on and no look, every control at its neutral${subject.img.isRaw ? "" : "; this file opened as an 8-bit picture (a camera-rendered file, or a raw shown by its embedded preview, as the row above says), so it opens with no balance and exposure 1, and the swap is switched on here all the same for the check"}.`);
-      await placesPart(tally, subject, frame, t, labels, skyBuilt.mask, base.wb);
+      await placesPart(tally, subject, frame, t, labels, skyBuilt.mask);
       books(tally);
       showSampler();
       lap(tally, "samples: the surface on the photograph");

@@ -5900,6 +5900,16 @@ being one that built any of the maps. This passage describes no photograph's loo
 what a mask takes and leaves, holds no table, names no chosen method and proposes
 nothing. Times are the container's processor, never a tablet's.
 
+What every mask of this passage was made from. Each was made from the photograph as the
+editor opens it, that is the decode after the opening balance, the automatic exposure, the
+channel swap and the measured denoise, developed and written as 8-bit display values, or
+from one of two re-mappings of its hue laid on that picture. None was made from the
+photograph's own decode, and the recipe's cues were counted on that edited picture, so
+they moved with the balance, the exposure and the swap. The masks, the planted pictures'
+scores and the judges' words below therefore describe each method fed an edited picture,
+and say nothing of any method fed the decode. The test page counts its cues from the decode
+from the build that follows 2.79.
+
 Part one, what was read for the reading record 006 owed and for the fitted classifier.
 - The runtime's own pages (onnxruntime.ai, eight pages, read whole). It is MIT licensed
   and its latest version on the registry is 1.31.1. Its two support tables, the web
