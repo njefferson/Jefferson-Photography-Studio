@@ -58,6 +58,8 @@ HANDOFF.md is this page.
 - `notes/judgement-442.md`: Judgement of step 442 over NIR_1651, NIR_3742 and NIR_3705, by the same method.
 - `notes/judgement-443.md`: Judgement of step 443 over NIR_3710 and NIR_1873, the planted scores and the carried masks.
 - `notes/maps-classes-notes.md`: Notes on the scene-labelling model and its class maps.
+- `notes/maps-classes-scores-natural.txt`: Scores of the scene-labelling model's class maps for the natural input (the picture as it opens), one line per subject and class, model size then guided.
+- `notes/maps-classes-scores-open.txt`: Scores of the same class maps for the open input, one line per subject and class, model size then guided.
 - `notes/maps-features-notes.md`: Notes on the classifier fitted on learned features (DINOv2 small).
 - `notes/maps-features-scores.md`: Scores of that classifier.
 - `notes/maps-points-notes.md`: Notes on the click-prompted models (MobileSAM, SlimSAM).
