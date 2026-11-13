@@ -1,6 +1,6 @@
 # Handoff, 12 November 2026: the mask made from samples
 
-Read this first. It says where the work stands, what was learned, and what comes next. The notes, reports and scripts beside it are the evidence.
+Read this first. It says where the work stands, what was learned, and what comes next. The notes, reports and scripts beside it are the evidence. Brought up to date on 13 November 2026, after four pieces of measurement on 12 November. The sections from What the four pieces of 12 November showed to What the pieces of 12 November cost were written then. The entries under What was measured are as each piece wrote them.
 
 ## Where the app stands
 - Staging is at 2.79.1, the commit whose subject opens "Fixed: on the test page a mask from your samples is made from the photograph itself". Main is at 2.71. The builds 2.72.1 to 2.79.1 wait on a device pass and the go for promotion.
@@ -8,6 +8,7 @@ Read this first. It says where the work stands, what was learned, and what comes
 - Since 2.79.1 those cues, and the lightness a mask's edge follows, are counted from the photograph's own decode through the function placeDecode in `src/placedecode.ts`, which calls the Sky mask's own guide (buildSkyGuide in `src/skyfine.ts`) and takes no edit. A mask or a Separation selection kept before 2.79.1 is listed as made from the drawn picture and is not applied.
 - The rule this follows is in the app's CLAUDE.md under the heading A MASK AND EVERY SELECTION READ THE PHOTOGRAPH'S OWN DATA, and in decision record 032.
 - The notes' section On staging, waiting on a device pass has no entry for 2.76 to 2.79 (queue key Q-JPS-339).
+- On 12 and 13 November five documents commits were added to staging: the four pieces under What was measured, and this page. None changes the app's code, pages or tools.
 
 ## The result the work serves
 Samples placed on a photograph make a mask from what they hold. The mask copies to other photographs, showing what it would take before it is applied. Where it is wrong, it is put right by placing samples there.
@@ -56,17 +57,54 @@ No connected region wrongly taken, and none wrongly left, larger than one hundre
   - NIR_3742 Built things has no way two mask after. The stage's fixed rule needs 50 or more counted pixels on each side of its fit, and the subject holds 2 counted pixels (21 sure pixels), so the stage made neither way one nor way two. Nothing was changed to give it one.
   - What this shows, without choosing. The route mended parts of what it was placed on, mostly by shrinking the wrong regions and not by removing them, and moved other things in the same frames, some better and some worse. No method is chosen by it.
 
+## What the four pieces of 12 November showed, taken together
+
+- Fed the decode, MobileSAM gets regions right far more often than the recipe, and its edges are loose. The recipe's cues, fitted near the edge, pull those edges in on tree lines and spoil them on hard-edged built things. No mask meets the bar on most of the 22 frame-subjects by either judge. The most is MobileSAM with the cue stage fitted near the edge, on 7 by both judges and 10 by at least one. A sample placed on a missing part mostly brings it in, and a sample on a wrongly taken part mostly does not take it out.
+- The cause is in this folder's own reading, notes/notes-editors.md. The one shipped editor read uses a model of this kind for one visually distinct thing at a time. Its manual says a click on a separate area starts a new selection, and says to start over and not to repair. The model's own paper says it does not produce boundaries as crisply as heavier methods. All four pieces gave one prompt a whole kind, every pylon or all the foliage, with every other name's samples as outside points. Separate parts left out, and a whole mask shifting when a far sample is added, are what that predicts. Those notes were not read before the four pieces were scoped.
+- Two figures of scale. The model's map is about 11 frame pixels to a cell: its picture is 1,024 pixels across a frame of 2,800, and its map has 256 cells across those 1,024. The guide the cues read is 2.7 frame pixels to a sample (Q-JPS-341). An edge within four pixels needs the band read from the decode at full size.
+- The instrument. In the fine read two judges gave the same mark on 147 of 176 marks, and on 69 of 88 edge marks. The model's paper puts people's own agreement at 85 to 91 percent overlap. A count such as 7 against 10 is within what two readings differ by.
+
 ## What comes next, in order
-1. The click-prompted models run on the photograph's own data. This was measured on 12 November; the entry under What was measured, and what it showed says what was fed, the counts and what they show (queue key Q-JPS-352). The design it followed: the model's picture is placeDecode called with a grid the size of the guide itself (w and h the guide's width and height, k of 1, fromW and fromH the same), whose pixels give a colour picture and whose light gives a grey one, each at most 1,024 pixels on its longer side, which is the size these models take. Prompts as on 11 November. The masks are set beside the recipe's masks from the decode on the same 22 frame-subjects and judged by two agents that built nothing, as on the evening of 11 November. About an hour.
-2. The model that does best goes onto the test page, with the page's layout put right. notes/build-ground.md and notes/build-brief.md say what that build meets: every file the build emits goes into the service worker's install list with no test of size, so a model file needs a route of its own; the host's limit is 25 MiB for one file; MobileSAM's encoder, at 28,157,093 bytes, is over it and SlimSAM's files fit; nothing in the app loads WebAssembly or a model today. The layout's faults are in part five of build-ground.md: the results print above the work, and the three presses of the repeated loop sit far apart. The device's speed and memory for a model are unknown and are measured on the test page. Record 111's chosen option holds a method off the test page until its masks meet the bar on most subjects, no entry measured does, and whether this item goes ahead is not decided in this folder.
-3. Edges, once regions are right. The cue stage in a narrow band beside the edge is the lead; notes/edge-notes.md has the figures. The cue stage was measured on MobileSAM's masks on 12 November: it brought the line nearer on most tree lines and met the edge clause plainly on none of the 22 frame-subjects; the entry above has the figures.
-4. Carrying a mask to another photograph. Matched features that give points on the second photograph are the lead; notes/notes-features.md has the reading.
-5. Then the editor's own mask.
+
+1. The tablet's measure. Whether the tablet's browser loads and runs an encoder, how fast and in how much memory, decides whether any learned route exists, and nothing in this folder measures it.
+   - What it is: one press on the test page that loads the runtime and runs an encoder and a decoder on a planted picture. It prints whether the runtime loaded, each time as three runs and a median, what the browser offers (threads, WebGPU), and the device facts.
+   - It draws no mask and offers no selection. It is a measure of the device and not a method on the page, which record 111 holds back until a method meets the bar.
+   - What the build meets is in notes/build-ground.md and notes/build-brief.md, which are read whole before the piece is scoped. A model file needs a route of its own outside the service worker's install list. The host's limit is 25 MiB for one file. SlimSAM's files fit. MobileSAM's encoder is 1,942,693 bytes over; whether a file served in two parts and joined in the page gets round that is to be tried.
+   - From notes/notes-device.md: threads need cross-origin isolation headers, which the app does not send, and the sources disagree on WebGPU in the tablet's browser.
+2. Reading, before any more method work. Each page is fetched to disk and read whole, and nothing is taken from memory.
+   - How these models are prompted for several things, and how a correcting click is given. From memory and not read: the previous mask goes in with each correcting click.
+   - What is put on top of such a model for crisp edges. From memory and not read: there are published ways.
+   - How a click is carried to a second photograph by matched features. From memory and not read: there are published ways. notes/notes-features.md has the first reading.
+3. Regions: one thing for each click, joined by name. Untested on a frame. On 11 November each sample prompted apart, with every other name's centres as outside points, scored 0.8786 on the planted pictures against the joint prompt's 0.9746, and its frame masks were never opened. With the ground of 12 November made again, only the decoder runs for this.
+4. Edges: the cue stage reading the decode at full size in the band, and a band narrower than 48 pixels for thin things. At 48, NIR_3742 Built things was left with 2 counted pixels and no mask.
+5. Carrying a mask to another photograph, after the reading of item 2.
+6. Then the editor's own mask.
+
+Set aside: a second round of placed samples on the same four frames. It would be a fifth measurement inside the same eight photographs.
+
+## How the next session is started
+
+- With the app alone. The hub is not picked beside it; the hub's plans/native/running.md says so.
+- The app's move to the hub's new way comes first, by the hub's plans/native/skills/app-move/SKILL.md. The reason is in two files of this app: `.claude/hooks/session-start.sh` and `tools/plan-scope-check.mjs` look for the hub in a folder beside the app, and the commit hooks are installed from there. With the app alone and no move, a commit runs no gate.
+- The line that starts it:
+
+```
+Move this app to the hub's new way: follow plans/native/skills/app-move/SKILL.md in njefferson/noahjefferson. Then read docs/research/2026-11-masks/HANDOFF.md on the staging branch and take up the first item under What comes next.
+```
+
+## What the pieces of 12 November cost
+
+Each ran on the cheapest tier the worker and checker roles name. Tokens are as the harness reported them for the agents.
+- The models on the decode: six agents, about 36 minutes from approval to push, about 826 thousand tokens.
+- The cue stage: five agents, about 17 minutes, about 629 thousand tokens.
+- The fine read: five agents, about 28 minutes, about 870 thousand tokens.
+- The correction route: five agents in seven sends, about 27 minutes, about 760 thousand tokens.
+- Making the ground again in a new container took about ten minutes on 12 November.
 
 ## What is not in this folder, and how to get it again
 - The models. SlimSAM's ONNX files from Xenova/slimsam-77-uniform on Hugging Face, in its folder named onnx. MobileSAM's ONNX encoder and single-mask decoder from the copy kept by Acly. DINOv2 small from Xenova/dinov2-small, the file onnx/model_q4f16.onnx, 12,917,198 bytes, which runs at 224 by 224 only. They ran in node through onnxruntime-node 1.31.1, installed with no install script. The model files come from the host us.aws.cdn.hf.co, which the session's network must allow. reports/ holds the addresses and the handling.
 - The eight photographs: NIR_3461, NIR_3466, NIR_1827, NIR_1651, NIR_3742, NIR_3705, NIR_3710 and NIR_1873, reached only through `tools/owner-images.mjs`. notes/inputs.md says how each frame was made and notes/samples.json holds the samples.
-- The masks and pictures. The scripts remake them.
+- The scratch folder of 12 November: the eight frames as they open, 22 recipe masks, 88 model masks, 44 masks of the cue stage, 35 masks of the correction run, 134 judged pictures, the runtime and the four model files. It went with that session's container. The four how-to-run notes remake it, in this order: points-decode, cue-edge, fine-read, correction.
 - The scripts carry the old session's scratch paths. Point them at the new session's scratch folder before running them.
 
 ## What is in this folder
