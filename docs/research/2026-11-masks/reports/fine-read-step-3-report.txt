@@ -1,0 +1,101 @@
+DONE
+
+Step 3 of the fine read, the record and the commit. All counts below are made from the MARK and PLACE lines of notes/fine-judgement-one.md and notes/fine-judgement-two.md and from no other line. The mask names in those lines are recipe, mobilesam, way one and way two. Each file holds 176 MARK lines and 264 PLACE lines (88 masks, 22 frame-subjects, 4 masks each, 3 places each). The counts were made by a script that reads those lines, and each judge's own count lines at the foot of the file were set beside them and agree.
+
+1. Each judge, each mask
+Judge one:
+- Recipe: region clause met 9, not met 10, uncertain 3; edge clause met 5, not met 13, uncertain 4; places in 35, out 25, uncertain 6. Both clauses met on 4: NIR_1827 Sky, NIR_3742 Sky, NIR_1651 Foliage, NIR_1651 Sky.
+- MobileSAM as it is: region met 17, not met 5, uncertain 0; edge met 5, not met 17, uncertain 0; places in 38, out 27, uncertain 1. Both met on 5: NIR_3466 Built things, NIR_3466 Foliage, NIR_1651 Foliage, NIR_3705 Built things, NIR_3710 Built things.
+- Way one: region met 16, not met 5, uncertain 1; edge met 5, not met 14, uncertain 3; places in 33, out 26, uncertain 7. Both met on 5: NIR_1827 Sky, NIR_3742 Sky, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky.
+- Way two: region met 16, not met 5, uncertain 1; edge met 7, not met 13, uncertain 2; places in 42, out 18, uncertain 6. Both met on 7: NIR_1827 Sky, NIR_3742 Sky, NIR_3466 Foliage, NIR_1651 Sky, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky.
+Judge two:
+- Recipe: region met 9, not met 10, uncertain 3; edge met 7, not met 15, uncertain 0; places in 34, out 31, uncertain 1. Both met on 6: NIR_1827 Sky, NIR_1827 Foliage, NIR_3742 Sky, NIR_3461 Sky, NIR_1651 Foliage, NIR_1651 Sky.
+- MobileSAM as it is: region met 15, not met 5, uncertain 2; edge met 4, not met 17, uncertain 1; places in 41, out 24, uncertain 1. Both met on 3: NIR_3466 Foliage, NIR_1651 Foliage, NIR_3705 Built things.
+- Way one: region met 15, not met 6, uncertain 1; edge met 5, not met 16, uncertain 1; places in 36, out 28, uncertain 2. Both met on 5: NIR_1827 Sky, NIR_3742 Sky, NIR_1651 Foliage, NIR_3705 Sky, NIR_3710 Sky.
+- Way two: region met 14, not met 5, uncertain 3; edge met 11, not met 10, uncertain 1; places in 43, out 20, uncertain 3. Both met on 10: NIR_1827 Sky, NIR_1827 Foliage, NIR_3742 Sky, NIR_3461 Foliage, NIR_3466 Sky, NIR_3466 Foliage, NIR_1651 Sky, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky.
+Sums: each region line and each edge line adds to 22 (checked for all 16), and each places line adds to 66 (checked for all 8).
+
+2. Agreement of the two judges
+Over the 176 marks the two gave the same word on 147, and differ on 29.
+- Recipe: region 19 of 22, edge 17 of 22, both clauses 36 of 44.
+- MobileSAM as it is: region 19, edge 20, both clauses 39 of 44.
+- Way one: region 21, edge 16, both clauses 37 of 44.
+- Way two: region 19, edge 16, both clauses 35 of 44.
+- By clause over the four masks: region clause 78 of 88, edge clause 69 of 88. The sum of the eight lines is 19 + 17 + 19 + 20 + 21 + 16 + 19 + 16, which is 147.
+- The two judges agree least on the edge clause of way one and of way two, 16 of 22 each, and next on the recipe's edge clause, 17 of 22.
+Over the 264 places the two gave the same word on 201.
+- Recipe 51 of 66, MobileSAM as it is 51 of 66, way one 49 of 66, way two 50 of 66. The sum is 51 + 51 + 49 + 50, which is 201.
+The 29 marks on which they differ, one line each: frame, subject, mask, clause, judge one's word, judge two's word.
+- NIR_3742 Water, recipe, region: met, uncertain.
+- NIR_3461 Sky, recipe, region: not met, met.
+- NIR_3705 Foliage, recipe, region: uncertain, not met.
+- NIR_1827 Foliage, recipe, edge: not met, met.
+- NIR_3466 Built things, recipe, edge: uncertain, met.
+- NIR_3705 Foliage, recipe, edge: uncertain, not met.
+- NIR_3705 Built things, recipe, edge: uncertain, not met.
+- NIR_3710 Foliage, recipe, edge: uncertain, not met.
+- NIR_3466 Built things, MobileSAM as it is, region: met, uncertain.
+- NIR_3710 Foliage, MobileSAM as it is, region: not met, uncertain.
+- NIR_1873 Water, MobileSAM as it is, region: met, not met.
+- NIR_3742 Foliage, MobileSAM as it is, edge: not met, uncertain.
+- NIR_3710 Built things, MobileSAM as it is, edge: met, not met.
+- NIR_1873 Water, way one, region: met, not met.
+- NIR_1827 Foliage, way one, edge: uncertain, not met.
+- NIR_3742 Foliage, way one, edge: not met, uncertain.
+- NIR_1651 Foliage, way one, edge: not met, met.
+- NIR_1651 Sky, way one, edge: uncertain, not met.
+- NIR_3705 Foliage, way one, edge: met, not met.
+- NIR_3705 Built things, way one, edge: uncertain, not met.
+- NIR_3466 Built things, way two, region: met, uncertain.
+- NIR_3710 Foliage, way two, region: not met, uncertain.
+- NIR_1873 Water, way two, region: met, not met.
+- NIR_1827 Foliage, way two, edge: not met, met.
+- NIR_3461 Sky, way two, edge: not met, met.
+- NIR_3461 Foliage, way two, edge: uncertain, met.
+- NIR_3466 Sky, way two, edge: not met, met.
+- NIR_3705 Built things, way two, edge: uncertain, not met.
+- NIR_3710 Foliage, way two, edge: not met, uncertain.
+Of the 29, 18 have an Uncertain word on one side and 11 are a plain met against a plain not met (4 on the region clause: NIR_3461 Sky recipe and NIR_1873 Water for MobileSAM as it is, way one and way two; 7 on the edge clause). Region clause 10 differ, edge clause 19.
+
+3. The bar, for each mask
+On how many frame-subjects both judges mark both clauses met, and on how many at least one judge does:
+- Recipe: both judges on 4 (NIR_1827 Sky, NIR_3742 Sky, NIR_1651 Foliage, NIR_1651 Sky); at least one on 6 (those four, NIR_1827 Foliage and NIR_3461 Sky).
+- MobileSAM as it is: both judges on 3 (NIR_3466 Foliage, NIR_1651 Foliage, NIR_3705 Built things); at least one on 5 (those three, NIR_3466 Built things and NIR_3710 Built things).
+- Way one: both judges on 4 (NIR_1827 Sky, NIR_3742 Sky, NIR_3705 Sky, NIR_3710 Sky); at least one on 6 (those four, NIR_1651 Foliage and NIR_3705 Foliage).
+- Way two: both judges on 7 (NIR_1827 Sky, NIR_3742 Sky, NIR_3466 Foliage, NIR_1651 Sky, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky); at least one on 10 (those seven, NIR_1827 Foliage, NIR_3461 Foliage and NIR_3466 Sky).
+No mask meets both clauses on most of the 22 (12 or more) by either judge or by both; the most is judge two's 10 for way two.
+
+4. Way two's tree lines
+The ten frame-subjects are NIR_1827 Sky, NIR_1827 Foliage, NIR_3742 Sky, NIR_3742 Foliage, NIR_1651 Sky, NIR_1651 Foliage, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky and NIR_3710 Foliage. This grouping is made here for the report and is not a reading of the pictures. Way two's edge marks, judge one then judge two:
+- NIR_1827 Sky: met, met.
+- NIR_1827 Foliage: not met, met.
+- NIR_3742 Sky: met, met.
+- NIR_3742 Foliage: not met, not met.
+- NIR_1651 Sky: met, met.
+- NIR_1651 Foliage: not met, not met.
+- NIR_3705 Sky: met, met.
+- NIR_3705 Foliage: met, met.
+- NIR_3710 Sky: met, met.
+- NIR_3710 Foliage: not met, uncertain.
+Edge clause met by judge one on 6 of the ten, by judge two on 7, and by both on 6 (NIR_1827 Sky, NIR_3742 Sky, NIR_1651 Sky, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky).
+
+5. The evening's uncertain edge marks
+The evening's two files (notes/cue-edge-judgement-first.md and notes/cue-edge-judgement-second.md) mark the edge clause Uncertain on 13 masks: the recipe 4, MobileSAM as it is 3, way one 2, way two 4 (3 + 1, 2 + 1, 2 + 0, 2 + 2 by file). For each, judge one's and judge two's edge mark now:
+- NIR_3466 Built things, recipe: uncertain, met.
+- NIR_3466 Built things, MobileSAM as it is: met, met.
+- NIR_3466 Foliage, MobileSAM as it is: met, met.
+- NIR_3466 Foliage, way one: not met, not met.
+- NIR_3466 Foliage, way two: met, met.
+- NIR_1827 Foliage, way one: uncertain, not met.
+- NIR_1651 Foliage, recipe: met, met.
+- NIR_1651 Sky, recipe: met, met.
+- NIR_1651 Sky, way two: met, met.
+- NIR_3742 Sky, recipe: met, met.
+- NIR_3742 Sky, way two: met, met.
+- NIR_3742 Built things, MobileSAM as it is: not met, not met.
+- NIR_3705 Foliage, way two: met, met.
+Judge one: became met 9, became not met 2, stayed uncertain 2 (total 13). Judge two: became met 10, became not met 3, stayed uncertain 0 (total 13).
+
+What the counts leave open. The judgement files hold the two judges' marks of the same masks and the same places; the counts of agreement are of word against word and say nothing of which word is right. Three places along an edge are a sample of it.
+
+Files changed: the files of the commit named in the commit's list, and the scratch counts file S/progress/step3-counts.txt. Nothing was pushed.

@@ -1,0 +1,41 @@
+DONE
+
+Step 1, the magnified pictures (fine read).
+
+What was done
+- Confirmed S stands: 8 frames (-open.png), 22 decode masks, 22 mobilesam-colour masks, 22 cue-all and 22 cue-near, 44 pictures3 pictures with index.json and index.txt, png.mjs, draw.mjs, edt.mjs, step3-compose.mjs. Nothing missing.
+- Read whole: step3-compose.mjs, edt.mjs, draw.mjs, png.mjs, the runner, and the shape of pictures3/index.json.
+- Wrote S/scratch/step4-fine.mjs (one frame per run) and S/scratch/step4-index.mjs. Ran them under the runner in S/scratch/step452-runner.mjs, labels fine1 to fine5, at most three children side by side.
+- Made 22 pictures, one for each frame-subject, in S/pictures4. Wrote S/pictures4/index.txt and index-<frame>.json for the eight frames.
+- Opened three with Read: NIR_1827 Sky (tree line), NIR_3742 Sky (tree line), NIR_3710 Built things.
+
+What was seen
+Plant lines as printed (identical in all eight frame runs; the first run, label fine1, printed them correctly and then stopped on a head-text height check, see Found):
+- plant 1: planted 200 by 150 mask, edge column 100, window x 60..139; line columns read 121 (known 121); band border columns read 108,109,110,132,133,134; the borders lie 12 and 12 display pixels from the line (known figures 12 and 12)
+- plant 2: planted place centre 100,75, window top left 60,35; known value 100,75,139; read in the bare crop at display 121,121: 100,75,139; at 120,120 and 122,122 of the magnified window: 100,75,139 and 100,75,139
+- plant 3 (layout before any picture): single picture 1484 by 1599, longer side 1599 (limit 1600)
+- plant 3 per picture: every one of the 22 pictures is 1484 by 1599, longer side 1599 <= 1600: true.
+Pictures: 22, each 1484 by 1599. No frame-subject was split in two; none is named -part1 or -part2.
+Masks and places drawn for each picture are printed in S/progress/step-452-fine2-*, fine3-* and fine4-* (four masks, places A, B, C each, 264 places in all). No mask lacked an edge or a file.
+Index run: plant built-in entry 7 lines and 12 places; real 22 frame-subjects, 88 mask lines, 264 places, 0 files missing.
+Layout: two columns, each two masks (left: the recipe then MobileSAM as it is; right: way one then way two), three place rows down each; each row three crops of 240 by 240.
+Line and band: the line (innermost edge at a half) is yellow, 1 display pixel, solid; the two borders of the band (every frame pixel within Euclidean distance 4 of the line by edt.mjs, border = band pixel with a 4-neighbour outside the band) are dark blue, dashed, a stroke 3 display pixels wide centred on the 12-pixel position. Context crop: line red 1 pixel, central 80 by 80 outlined white with black rim, 4-pixel mark. Bare and banded: 12-pixel mark (arms 12 wide, 36 long, black rim).
+Opened pictures, each shown at its full size (1484 by 1599, not shrunk), every crop drawn, titled and marked, the band visible on every banded crop:
+- NIR_1827 Sky: the recipe, way one and way two lines follow the tree crowns against cloud; MobileSAM as it is at place A runs through open pale sky above a small tree top, with the band wide of the tree; others lie along the tree edges with the band straddling them.
+- NIR_3742 Sky: the lines run along the pale tree tops against the grey-teal sky; the recipe and MobileSAM at place C run as a nearly straight line along the roof line of a distant building and trees; at several places the band's borders sit close to the visible tree edge, so the picture shows what is inside and outside the band.
+- NIR_3710 Built things: the lines wander through foliage and a dark tower or pole; way one and way two at place A run as a straight vertical line beside the dark structure; the recipe and way-one lines at place B and C break into small loops in the foliage.
+No judgement of the masks against the bar is made here.
+
+Paths
+- Index: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/pictures4/index.txt
+- Pictures folder: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/pictures4 (fine-<frame>-<slug>.png, index-<frame>.json)
+- Script: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/scratch/step4-fine.mjs (and step4-index.mjs beside it)
+- Run outputs: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/progress/step-452-fine1 to fine5 files
+
+Files changed
+Only under S: new scratch/step4-fine.mjs, scratch/step4-index.mjs, the 22 pictures and index files in pictures4, progress files, this report; scratch/step452-job.json overwritten (it held the earlier step3-index job). No tracked file in APP and nothing under R changed; nothing committed, staged or pushed.
+
+Found: the first run (fine1) stopped in each frame after the plants read right, because the head text needed 7 lines (66 pixels) and the head had been set to 58. I raised the head height to 66 and reran; only the head's height changed, so the single picture is 1599 pixels high, one under the limit. The rows, crops, band, plants and every instrument figure are as fixed.
+Found: dashed band borders are drawn as a 3 display pixels wide stroke (the plan fixed only the 12-pixel distance and dashed style); the line is 1 display pixel. A reader should know the border's centre, not its edge, lies 12 display pixels from the line.
+Found: the runner masks any run of 7 or more hex characters in its saved logs, so the saved logs show paths with "masked" in place of the session folders; the real files stand at the full paths above.
+Found: where a mask has small stray loops (the recipe and way one and two in foliage, for example NIR_3710 Built things), the line and band draw each loop; the picture shows them as they are.

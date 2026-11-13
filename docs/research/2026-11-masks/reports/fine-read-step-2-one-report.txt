@@ -1,0 +1,29 @@
+DONE
+
+Pictures opened: 44 (22 whole pictures in pictures3 and 22 magnified pictures in pictures4), each once. None was opened twice.
+
+Judgement file: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/judgement/fine-judgement-one.md (440 MARK and PLACE lines, 88 masks, counted by Grep).
+
+Counts from the foot (region met/not met/uncertain; places in/out/uncertain; edge met/not met/uncertain; both met):
+Recipe: region 9/10/3; places 35/25/6; edge 5/13/4; both met 4.
+MobileSAM as it is: region 17/5/0; places 38/27/1; edge 5/17/0; both met 5.
+Way one: region 16/5/1; places 33/26/7; edge 5/14/3; both met 5.
+Way two: region 16/5/1; places 42/18/6; edge 7/13/2; both met 7.
+
+Frame-subjects where a mask met both clauses:
+Recipe: NIR_1827 Sky, NIR_3742 Sky, NIR_1651 Foliage, NIR_1651 Sky.
+MobileSAM as it is: NIR_3466 Built things, NIR_3466 Foliage, NIR_1651 Foliage, NIR_3705 Built things, NIR_3710 Built things.
+Way one: NIR_1827 Sky, NIR_3742 Sky, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky.
+Way two: NIR_1827 Sky, NIR_3742 Sky, NIR_3466 Foliage, NIR_1651 Sky, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky.
+
+Found: way two's tree-line places (NIR_1827 Sky, NIR_3742 Sky, NIR_1651 Sky, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky, NIR_3466 Foliage) read in at all three places on those seven; way two has the most both-met subjects and the fewest outs of the four masks.
+Found: the edge clause fails mostly where a mask's line runs in open sky, open water or open field with no edge of the thing (cloud boundaries, uniform water, the frame's bottom border), and on built things and pylons where a silhouette is taken solid and the sky between members is wrongly taken.
+Found: the recipe wrongly takes large regions on the built-things subjects of NIR_3742, NIR_3461, NIR_3466 and NIR_3710 (shore, cloud, road, scrub; several hundredths to tens of hundredths).
+Found: on NIR_3461 Sky and Built things, and NIR_3466 Sky, MobileSAM and both cue ways cut the pylons or buildings as solid silhouettes, so the sky inside the lattice is counted wrongly left or taken (up to about 10 hundredths for the big pylon).
+Found: on NIR_1873 Foliage and Water, and NIR_3742 Foliage, the foreground pine at the lower right and the island tree are wrongly left by MobileSAM and the cue ways (about 8 to 12 hundredths on NIR_1873 Foliage).
+Uncertain: whether a road, fence post, boat, vehicle or the disguised cell towers (NIR_3705, NIR_3710) count as built things or as foliage; places depending on that are marked uncertain or called on the plainest reading.
+Uncertain: a line lying on the frame's own bottom border in open field, water or foliage (NIR_1827 Foliage MobileSAM C, NIR_3461 Foliage MobileSAM C, NIR_1651 Sky MobileSAM C, NIR_3705 Foliage MobileSAM C, NIR_1873 Water MobileSAM C) was called out as running where the thing has no edge; it could be called the other way.
+Uncertain: calls within about one band-width of the border (a few display pixels) are the ones most likely to differ from a second judge, for example NIR_3705 Sky MobileSAM A, NIR_3710 Sky MobileSAM A, NIR_1873 Foliage way two C, NIR_1873 Water MobileSAM B.
+Uncertain: region clause marks near one hundredth (NIR_3742 Foliage recipe and way two, NIR_3705 Foliage recipe, NIR_3705 Built things recipe, NIR_3466 Built things way one) are marked uncertain where the square could not settle the size.
+
+No file other than the judgement file and this report was changed. Nothing was committed, staged or pushed. No hook or harness refusal occurred.

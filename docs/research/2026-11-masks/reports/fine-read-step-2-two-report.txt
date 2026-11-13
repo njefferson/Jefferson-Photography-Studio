@@ -1,0 +1,24 @@
+DONE. Judge two, step 2 of the fine read, all 22 frame-subjects, four masks each.
+
+Pictures opened: 44 (22 whole, 22 magnified), each once, none twice, opened last frame-subject first. Judgement file: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/judgement/fine-judgement-two.md
+
+Counts (region met/not met/uncertain; places in/out/uncertain; edge met/not met/uncertain; both met):
+Recipe: 9/10/3; 34/31/1; 7/15/0; both 6.
+MobileSAM: 15/5/2; 41/24/1; 4/17/1; both 3.
+Way one: 15/6/1; 36/28/2; 5/16/1; both 5.
+Way two: 14/5/3; 43/20/3; 11/10/1; both 10.
+(Place and edge counts for way two, in-places for the other masks, and way-two edge met were re-counted by search of the file's lines and match.)
+
+Both clauses met:
+Recipe: NIR_1827 Sky, NIR_1827 Foliage, NIR_3742 Sky, NIR_3461 Sky, NIR_1651 Foliage, NIR_1651 Sky.
+MobileSAM: NIR_3466 Foliage, NIR_1651 Foliage, NIR_3705 Built things.
+Way one: NIR_1827 Sky, NIR_3742 Sky, NIR_1651 Foliage, NIR_3705 Sky, NIR_3710 Sky.
+Way two: NIR_1827 Sky, NIR_1827 Foliage, NIR_3742 Sky, NIR_3461 Foliage, NIR_3466 Sky, NIR_3466 Foliage, NIR_1651 Sky, NIR_3705 Sky, NIR_3705 Foliage, NIR_3710 Sky.
+
+Found: way two's tree lines lie inside the band at all three places on 1827 Sky, 1827 Foliage, 3742 Sky, 1651 Sky, 3705 Sky, 3705 Foliage and 3710 Sky; they fail on 1651 Foliage (place B, loop inside a sky gap about 3 frame pixels short), on 3742 Foliage (place C round a boat canopy, B untellable in dark forest) and on 3710 Foliage (uncertain at B and C, dark masses).
+Found: for the recipe and the cues, the edge failures on sky subjects are mostly lines in open sky well away from the thing (3710 Sky A, 3705 Sky B, 1651 Sky B and C) rather than small offsets.
+Found: pylon masks (3461 Sky and Built things) are filled silhouettes in MobileSAM and way one and way two, so the lattice sky is wrongly taken or left (several hundredths); this fails the region clause even where the edge is met.
+Uncertain: whether the road, the fence posts and the dark side of the dock belong to built things; the 3466 Built things regions (three masks) and the 3742 Built things edge calls at B and C rest on reading them as built things.
+Uncertain: dark forest and ground crops on 3742 Foliage and 3710 Foliage, where forest cannot be told from meadow or tree; marked uncertain at those places.
+Uncertain: several calls at the band's limit (1 to 3 frame pixels) were made by eye on 240-pixel crops and could be read the other way.
+Found: no hook or harness refusal; every file read with the Read tool; nothing run, no file changed other than the judgement file and this report.
