@@ -231,15 +231,6 @@ fi
 "./tools/mask-turn-check.mjs" || exit 1
 
 branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo '')
-if [ -z "$branch" ]; then
-  for d in rebase-merge rebase-apply; do
-    f=$(git rev-parse --git-path "$d/head-name" 2>/dev/null)
-    if [ -n "$f" ] && [ -f "$f" ]; then
-      branch=$(sed -n '1s#^refs/heads/##p' "$f")
-      break
-    fi
-  done
-fi
 
 if [ "$branch" = "staging" ]; then exit 0; fi
 if [ "$branch" = "main" ] && [ -n "$JPS_PROMOTE" ]; then exit 0; fi
