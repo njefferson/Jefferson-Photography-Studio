@@ -1,0 +1,32 @@
+DONE. Judgement one written to /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/judgement/correction-judgement-one.md
+
+Pictures opened: 24 (12 whole, 12 magnified), none twice. The four sample pictures were not opened.
+
+Counts, mobilesam after (12): region clause 9 met, 3 not met, 0 uncertain; places 19 in, 17 out, 0 uncertain; edge clause 2 met, 10 not met; both clauses met on NIR_3710 Sky and NIR_3710 Built things; words 4 better, 7 same, 1 worse, 0 broken.
+Counts, way two after (11 masks, 1 no mask): region clause 7 met, 3 not met, 1 uncertain, 1 no mask; places 18 in, 13 out, 2 uncertain, 3 no mask; edge clause 4 met, 7 not met, 1 no mask; both clauses met on NIR_3742 Sky, NIR_1873 Water, NIR_3710 Sky; words 2 better, 6 same, 3 worse, 0 broken, 1 no mask.
+
+REGION 1 | NIR_3742 | Built things | mobilesam after | shrank
+REGION 1 | NIR_3742 | Built things | way two after | no mask
+REGION 2 | NIR_3461 | Sky | mobilesam after | shrank
+REGION 2 | NIR_3461 | Sky | way two after | shrank
+REGION 2 | NIR_3461 | Built things | mobilesam after | shrank
+REGION 2 | NIR_3461 | Built things | way two after | shrank
+REGION 3 | NIR_3461 | Built things | mobilesam after | gone
+REGION 3 | NIR_3461 | Built things | way two after | grew
+REGION 4 | NIR_1873 | Foliage | mobilesam after | shrank
+REGION 4 | NIR_1873 | Foliage | way two after | shrank
+REGION 5 | NIR_3710 | Foliage | mobilesam after | grew
+REGION 5 | NIR_3710 | Foliage | way two after | stayed
+
+New wrong regions the added samples seem to bring in:
+- NIR_1873 Foliage, MobileSAM after: water between the pine's branches taken, about 1 to 2 hundredths.
+- NIR_3710 Foliage, MobileSAM after: faint specks on the stony ground, under 1 hundredth together (clean before).
+- NIR_3710 Foliage, way two after: a solid blob on the stones at the lower left, about 1 hundredth.
+- NIR_3461 Built things, way two after: cloud around the right pylon's top taken, about 2 hundredths; and the left pylon largely left out, about 3 hundredths.
+- NIR_3461 Built things, MobileSAM after: the left pylon's right half and base now left out, about 2 hundredths.
+
+Found: no mask for way two on NIR_3742 Built things, as the plan expects; the 3 places, 2 clauses and word there read "no mask".
+Found: region 2 is only partly mended; the lattice sky of the left pylon is still mostly left out of Sky in both masks (about 2 hundredths) and the Built things mask lost pylon in exchange.
+Uncertain: region 3 was not visible in the MobileSAM before panel, so "gone" is only that no flap is seen after.
+Uncertain: NIR_1873 Foliage way two region clause is about one hundredth, which the square does not settle; marked uncertain.
+Uncertain: NIR_3461 Foliage way two place B, what the line follows among the tufts at the pylon base cannot be told.

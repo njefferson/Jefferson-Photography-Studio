@@ -1,0 +1,129 @@
+Report of step 3 of the correction route (12 November 2026, night): the counts from the fixed lines of the two judgement files, notes/correction-judgement-one.md and notes/correction-judgement-two.md, and the before marks from notes/fine-judgement-one.md and notes/fine-judgement-two.md. Every count was made by reading the MARK, PLACE, WORD and REGION lines, not by a script. The 12 frame-subjects, in the order of the files: NIR_3742 Sky, Water, Built things, Foliage; NIR_3461 Sky, Foliage, Built things; NIR_1873 Foliage, Water; NIR_3710 Sky, Foliage, Built things. "Judge one" and "judge two" are the two files.
+
+1. EACH JUDGE, EACH AFTER MASK (each sum checked: 12 for each clause and for the words, 36 places)
+
+Judge one, mobilesam after
+- Region clause: 9 met, 3 not met, 0 uncertain, 0 no mask (12).
+- Edge clause: 2 met, 10 not met, 0 uncertain, 0 no mask (12).
+- Places: 19 in, 17 out, 0 uncertain, 0 no mask (36).
+- Words: 4 better, 7 same, 1 worse, 0 broken, 0 no mask (12).
+- Both clauses met: NIR_3710 Sky and NIR_3710 Built things.
+
+Judge one, way two after
+- Region clause: 7 met, 3 not met, 1 uncertain, 1 no mask (12).
+- Edge clause: 4 met, 7 not met, 0 uncertain, 1 no mask (12).
+- Places: 18 in, 13 out, 2 uncertain, 3 no mask (36).
+- Words: 2 better, 6 same, 3 worse, 0 broken, 1 no mask (12).
+- Both clauses met: NIR_3742 Sky, NIR_1873 Water and NIR_3710 Sky.
+
+Judge two, mobilesam after
+- Region clause: 8 met, 1 not met, 3 uncertain, 0 no mask (12).
+- Edge clause: 3 met, 8 not met, 1 uncertain, 0 no mask (12).
+- Places: 22 in, 12 out, 2 uncertain, 0 no mask (36).
+- Words: 5 better, 6 same, 1 worse, 0 broken, 0 no mask (12).
+- Both clauses met: NIR_3710 Built things.
+
+Judge two, way two after
+- Region clause: 6 met, 3 not met, 2 uncertain, 1 no mask (12).
+- Edge clause: 3 met, 8 not met, 0 uncertain, 1 no mask (12).
+- Places: 18 in, 15 out, 0 uncertain, 3 no mask (36).
+- Words: 2 better, 8 same, 1 worse, 0 broken, 1 no mask (12).
+- Both clauses met: NIR_3742 Sky.
+
+Each judge's own count lines at the foot of the file read the same as these.
+
+2. AGREEMENT OF THE TWO JUDGES
+A pair where both judges wrote no mask counts as the same word.
+
+Marks (96 marks, 48 pairs of each file):
+- mobilesam after, region clause: 8 of 12 pairs the same.
+- mobilesam after, edge clause: 8 of 12.
+- way two after, region clause: 11 of 12.
+- way two after, edge clause: 11 of 12.
+- In all 38 of 48 pairs the same, 10 differ.
+
+Places (144 places, 72 pairs):
+- mobilesam after: 27 of 36 pairs the same.
+- way two after: 33 of 36.
+- In all 60 of 72 the same, 12 differ.
+
+Words: mobilesam after 11 of 12 the same, way two after 10 of 12; in all 21 of 24, 3 differ.
+
+REGION lines: mobilesam after 3 of 6 the same, way two after 5 of 6; in all 8 of 12, 4 differ.
+
+Every differing pair, judge one then judge two:
+- Mark, mobilesam after, region clause: NIR_3742 Built things (met, uncertain).
+- Mark, mobilesam after, region clause: NIR_3461 Sky (not met, uncertain).
+- Mark, mobilesam after, region clause: NIR_1873 Foliage (not met, met).
+- Mark, mobilesam after, region clause: NIR_1873 Water (met, uncertain).
+- Mark, mobilesam after, edge clause: NIR_3742 Sky (not met, uncertain).
+- Mark, mobilesam after, edge clause: NIR_3461 Sky (not met, met).
+- Mark, mobilesam after, edge clause: NIR_1873 Water (not met, met).
+- Mark, mobilesam after, edge clause: NIR_3710 Sky (met, not met).
+- Mark, way two after, region clause: NIR_1873 Water (met, uncertain).
+- Mark, way two after, edge clause: NIR_3710 Sky (met, not met).
+- Place, mobilesam after: NIR_3742 Sky C (out, uncertain).
+- Place, mobilesam after: NIR_3742 Water A (out, uncertain).
+- Place, mobilesam after: NIR_3742 Built things C (out, in).
+- Place, mobilesam after: NIR_3461 Sky C (out, in).
+- Place, mobilesam after: NIR_3461 Foliage C (out, in).
+- Place, mobilesam after: NIR_3461 Built things B (in, out).
+- Place, mobilesam after: NIR_1873 Foliage C (out, in).
+- Place, mobilesam after: NIR_1873 Water C (out, in).
+- Place, mobilesam after: NIR_3710 Sky A (in, out).
+- Place, way two after: NIR_3461 Foliage B (uncertain, out).
+- Place, way two after: NIR_1873 Foliage C (uncertain, in).
+- Place, way two after: NIR_3710 Sky B (in, out).
+- Word, mobilesam after: NIR_3461 Built things (same, better).
+- Word, way two after: NIR_3461 Built things (worse, same).
+- Word, way two after: NIR_3710 Foliage (worse, same).
+- Region line, mobilesam after: REGION 2 NIR_3461 Sky (shrank, gone).
+- Region line, mobilesam after: REGION 3 NIR_3461 Built things (gone, grew).
+- Region line, mobilesam after: REGION 4 NIR_1873 Foliage (shrank, gone).
+- Region line, way two after: REGION 3 NIR_3461 Built things (grew, stayed).
+
+3. THE FIVE REGIONS (six lines for each mask, since region 2 is read on Sky and on Built things)
+Words are judge one then judge two.
+- Region 1, NIR_3742 Built things (the bright tree on the island): mobilesam after shrank, shrank, agree. Way two after no mask, no mask, agree.
+- Region 2, NIR_3461 Sky (sky inside the big left pylon's lattice): mobilesam after shrank, gone, differ. Way two after shrank, shrank, agree.
+- Region 2, NIR_3461 Built things: mobilesam after shrank, shrank, agree. Way two after shrank, shrank, agree.
+- Region 3, NIR_3461 Built things (the flap of cloud by the right pylon): mobilesam after gone, grew, differ. Way two after grew, stayed, differ.
+- Region 4, NIR_1873 Foliage (the foreground pine): mobilesam after shrank, gone, differ. Way two after shrank, shrank, agree.
+- Region 5, NIR_3710 Foliage (the stony ground): mobilesam after grew, grew, agree. Way two after stayed, stayed, agree.
+
+4. THE BAR, BEFORE AND AFTER, ON THE 12 FRAME-SUBJECTS
+Before is the fine read's marks for "mobilesam" and "way two"; after is the marks for "mobilesam after" and "way two after". The count is of frame-subjects on which both clauses are marked met, by both judges and by at least one.
+
+mobilesam
+- Before: judge one NIR_3710 Built things (1); judge two none (0). Both judges: 0. At least one: 1 (NIR_3710 Built things).
+- After: judge one NIR_3710 Sky and NIR_3710 Built things (2); judge two NIR_3710 Built things (1). Both judges: 1 (NIR_3710 Built things). At least one: 2 (NIR_3710 Sky, NIR_3710 Built things).
+
+way two
+- Before: judge one NIR_3742 Sky and NIR_3710 Sky (2); judge two NIR_3742 Sky, NIR_3461 Foliage and NIR_3710 Sky (3). Both judges: 2 (NIR_3742 Sky, NIR_3710 Sky). At least one: 3 (NIR_3742 Sky, NIR_3461 Foliage, NIR_3710 Sky).
+- After: judge one NIR_3742 Sky, NIR_1873 Water and NIR_3710 Sky (3); judge two NIR_3742 Sky (1). Both judges: 1 (NIR_3742 Sky). At least one: 3 (NIR_3742 Sky, NIR_1873 Water, NIR_3710 Sky).
+
+The before judges and the after judges are different agents, so a change in a count mixes the masks' change with the reading's.
+
+5. THE FRAME'S BOTTOM EDGE
+Judge two marked two places in where the line runs along the frame's bottom edge in open water or field: NIR_1873 Water mobilesam after C, and NIR_3461 Foliage mobilesam after C. Judge two said itself that the rule as written would mark them out.
+
+As written: the counts of section 1 and section 2 above.
+
+With those two places read out by the rule, and NIR_1873 Water mobilesam after's edge clause changed to not met (NIR_3461 Foliage mobilesam after's edge clause is already not met):
+- Judge two, mobilesam after: places 20 in, 14 out, 2 uncertain (36); edge clause 2 met, 9 not met, 1 uncertain (12); region clause, words and both-clauses list unchanged (NIR_3710 Built things).
+- Judge one and judge two's way two after: unchanged.
+- The bar: unchanged. Mobilesam after both judges 1, at least one 2; way two after both judges 1, at least one 3.
+- Agreement, mobilesam after: places 29 of 36 (the two places now agree with judge one's out), edge clause 9 of 12 (NIR_1873 Water now agrees, not met and not met), region clause 8 of 12. All marks 39 of 48, all places 62 of 72. The differing pairs of section 2 lose the Place lines NIR_3461 Foliage C and NIR_1873 Water C and the Mark line NIR_1873 Water edge clause, leaving 9 marks and 10 places that differ.
+
+NEW WRONG REGIONS BOTH JUDGES NAMED (from the files' text and not from the fixed lines)
+- NIR_3710 Foliage, mobilesam after: faint specks of the stony ground along the bottom taken, together under one hundredth; clean before. Both judges.
+- NIR_3710 Foliage, way two after: the stony ground along the bottom still taken in patches, a patch at the lower left of about one to one and a half hundredths. Both judges.
+- NIR_3461 Built things, mobilesam after: the left pylon only partly taken, its lower right half left out (judge one about two hundredths); a few streaks of cloud by the right pylon taken (judge one about a fifth of a hundredth, judge two together under one hundredth).
+- NIR_3461 Built things, way two after: cloud around the top of the right pylon taken, about two hundredths (judge one) and about two to three hundredths (judge two); the left pylon largely left out (judge one about three hundredths).
+- NIR_1873 Foliage, mobilesam after: judge one reads water between the pine's branches taken, about one to two hundredths; judge two does not name it.
+
+NIR_3742 BUILT THINGS, WAY TWO AFTER
+No mask. The stage's fixed rule needs 50 or more counted pixels on each side of the fit. The step 1 report gives the subject 2 counted pixels (21 sure pixels), so the stage made neither way one nor way two. Both judges wrote no mask on its three places, two clauses and word.
+
+FINDINGS WITHOUT SUPPORT, NOT WRITTEN
+The two files do not say whether the Ground mask of NIR_3710 took the stony ground; it was not drawn or judged. The finding written is only that the stony ground stayed in or grew in Foliage by both judges.

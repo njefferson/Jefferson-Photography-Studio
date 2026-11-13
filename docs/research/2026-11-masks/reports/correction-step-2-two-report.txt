@@ -1,0 +1,29 @@
+DONE
+Pictures opened: 24 (12 whole, 12 magnified), in reverse index order, none twice. Judgement file: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/judgement/correction-judgement-two.md
+
+Counts
+mobilesam after (12): region 8 met, 1 not met, 3 uncertain; places 22 in, 12 out, 2 uncertain; edge 3 met, 8 not met, 1 uncertain; both clauses met: NIR_3710 Built things; words 5 better, 6 same, 1 worse, 0 broken.
+way two after (11, plus NIR_3742 Built things as no mask): region 6 met, 3 not met, 2 uncertain; places 18 in, 15 out, 0 uncertain; edge 3 met, 8 not met; both clauses met: NIR_3742 Sky; words 2 better, 8 same, 1 worse, 0 broken.
+
+REGION lines
+REGION 1 | NIR_3742 | Built things | mobilesam after | shrank
+REGION 1 | NIR_3742 | Built things | way two after | no mask
+REGION 2 | NIR_3461 | Sky | mobilesam after | gone
+REGION 2 | NIR_3461 | Sky | way two after | shrank
+REGION 2 | NIR_3461 | Built things | mobilesam after | shrank
+REGION 2 | NIR_3461 | Built things | way two after | shrank
+REGION 3 | NIR_3461 | Built things | mobilesam after | grew
+REGION 3 | NIR_3461 | Built things | way two after | stayed
+REGION 4 | NIR_1873 | Foliage | mobilesam after | gone
+REGION 4 | NIR_1873 | Foliage | way two after | shrank
+REGION 5 | NIR_3710 | Foliage | mobilesam after | grew
+REGION 5 | NIR_3710 | Foliage | way two after | stayed
+
+New wrong regions brought in by the added samples: NIR_3710 Foliage MobileSAM after takes small specks of stony ground along the bottom (under one hundredth together) and NIR_3710 Built things way two after adds three small specks on bright foliage; NIR_3461 Built things MobileSAM after takes three small cloud streaks by the right pylon, and NIR_3742 Water MobileSAM after adds specks on the island beach.
+
+Found: NIR_3461 Sky both masks leave out grey blobs around the faint distant pylons; way two after also leaves a rectangular dark-cloud block of about 3 hundredths between the left and middle pylons.
+Found: NIR_3461 Built things way two after still takes a fan of cloud patches by the right pylon top (about 2 to 3 hundredths) and haze blobs left of that pylon.
+Found: NIR_3742 Built things way two after has no mask (too few counted pixels: subject holds 2).
+Uncertain: NIR_1873 Water and Foliage, whether the hazy region under the pine at the lower right is water or pine, and whether the rocky shore at the left is stone or foliage.
+Uncertain: two places lie along the frame's bottom limit (NIR_1873 Water C, NIR_3461 Foliage C) and were marked in; a strict open-water or open-field reading would mark them out.
+Uncertain: NIR_3742 Sky C, NIR_3742 Water A and NIR_3742 Built things region could not be settled from the crops.

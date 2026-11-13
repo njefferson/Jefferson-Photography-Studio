@@ -1,0 +1,66 @@
+DONE. Step 1 of the correction route (second send, after the first send stopped on a plant).
+
+WHAT WAS DONE
+- The first send stopped because a plant in the look-aid crop script read wrong. In this send I fixed that plant as told, ran the script again under the runner with a new label (corr2-crops-a), and all plant lines read right. The old plant read crop pixel 50,25, which a grid line covers, so it could not test the mapping. The new plant is two: (a) crop pixel 51,26, off every grid line, must hold frame pixel 202,102; (b) crop pixel 50,26, on the grid column of frame x 200, must hold the grid colour 0,255,255, with the grid column 50. The step 1 plant (130,70) is kept. The three crops made before were made again by the fixed script (labels corr2-crops-a and corr2-crops-b, five crops in all: NIR_3742 island, NIR_3461 left pylon, NIR_3461 right pylon, NIR_1873 pine, NIR_3710 ground), and only those were used to place the samples.
+- Placed 9 samples, drew and opened the four sample pictures and a full-size zoom of each added sample, moved one sample before any mask was made (below).
+- Ran MobileSAM on the colour picture and the stage for the four frames, with at most two model children at once.
+- Composed the 12 whole pictures and the 12 magnified pictures, wrote the index, opened three of the composed pictures.
+
+ADDED SAMPLES (name, x, y as fractions, r 0.04, centre pixel on a 2800 by 1864 frame, on what). Each carries placedBy "session, 12 November 2026, on regions both fine-read judges named wrong".
+- NIR_3742 Foliage 0.454, 0.461 (1271,859): region 1, the body of the tall bright tree on the island.
+- NIR_3742 Foliage 0.371, 0.536 (1039,999): region 1, the bright tree-shrub on the island at the left of the tall tree.
+- NIR_3461 Sky 0.076, 0.16 (213,298): region 2, a cell of sky between members high in the big left pylon (moved, see below).
+- NIR_3461 Sky 0.096, 0.496 (269,925): region 2, open sky between members low in the big left pylon (clear in its zoom).
+- NIR_3461 Sky 0.929, 0.453 (2601,844): region 3, the upper of the two horizontal taken blobs by the right pylon, which is the flap by the right pylon. In its zoom it lies on grey sky just under a lighter band and a little below a wire.
+- NIR_1873 Foliage 0.768, 0.896 (2150,1670): region 4, a needle tuft of the foreground pine at the lower right.
+- NIR_1873 Foliage 0.618, 0.907 (1730,1691): region 4, a needle tuft of the foreground pine, lower middle.
+- NIR_3710 Ground 0.5, 0.94 (1400,1752): region 5, the stony ground along the bottom, middle.
+- NIR_3710 Ground 0.79, 0.95 (2212,1771): region 5, the stony ground along the bottom, right.
+Counts: originals NIR_3742 22, NIR_3461 12, NIR_1873 9, NIR_3710 14; added 2, 3, 2, 2.
+
+SAMPLE MOVED BEFORE ANY MASK WAS MADE
+- NIR_3461 Sky, region 2, high in the pylon. First placed at 0.088, 0.155 (246,289). Its zoom showed the centre on a faint vertical ladder member inside the lattice. Moved to 0.1, 0.175, where the centre lay on a bright diagonal bar, so moved again to 0.076, 0.16 (213,298). There its zoom shows the centre in a narrow cell of sky between bars, a few pixels from a diagonal. That cell is narrow, as the plan's wall on thin regions expects; the sample is at the widest place found, and it was not moved after a mask was seen. No other sample was moved.
+
+PLANT LINES AS PRINTED
+- runner: plant exit code: 7 (every run).
+- step5-crop.mjs (corr2): plant (a): step 2, crop pixel 51,26 (off every grid line) known frame pixel 202,102; read 202,102. plant (b): step 2, crop pixel 50,26 (on the grid column of frame x 200) known grid colour 0,255,255; read 0,255,255; the grid column of frame x 200 is 50 (known 50). plant: step 1, crop pixel 30,20 holds frame pixel 130,70.
+- step5-samples.mjs: plant: one added: unchanged true, added 1; one original moved: unchanged false; one original removed: unchanged false. Check of the file written: original samples unchanged true; originals NIR_3742 22, NIR_3461 12, NIR_1873 9, NIR_3710 14; added 2, 3, 2, 2.
+- step5-models.mjs (each of the four runs): plant: height 682, byte 128, bilinear 0 30; plant: mismatches 1 and 0; contract check holds (0 mismatches) on all four frames.
+- step5-stage.mjs (each of the four runs): plant step: 0.00 1.00; plant weights one: largest difference 0.0000; PLANT: expected (known wrong) the cut at a half at column 110; read column 100; reported as failing (as it must); plant stage way one: known column 200 ... column read 200 ... within 3; plant stage way two: column read 200 ... within 3.
+- step5-shares.mjs: plant: share 0.2500 and 1.0000.
+- step5-compose.mjs (each run): plant: layout whole 1576 by 790, edges 1576 by 1232; plant: innerEdge counts 8; places 2,1 3,2 2,3; plant: square side 42, area over the panel 0.0101; on 2800 by 1864 the side is 228.5; plant: no edge: all 255 true, all 0 true; the block mask false; plant: wrap gives 3 lines, the longest 79.
+- step5-fine.mjs (each run): plant 1: edge column 100 ... the borders lie 12 and 12 display pixels from the line (known figures 12 and 12); plant 2: known 100,75,139, read 100,75,139 at 121,121 and at 120,120 and 122,122; plant 3: layout single picture 1484 by 834, limit 1600; every picture written is 1484 by 834, longer side 1484 <= 1600: true (12 of 12).
+- step5-index.mjs: plant: frame-subjects 12, added samples 9, regions 5.
+
+THE MASKS (MobileSAM on the colour picture with the added samples, then the stage's way one and way two). Every mask is 2800 by 1864, one byte a pixel. Share at a half, after (before in brackets).
+NIR_3742: MobileSAM Sky 10.64 (10.64), Water 23.23 (22.93), Built things 7.14 (7.55), Foliage 38.62 (39.90). Way two (cue-near) Sky 11.24 (11.24), Water 21.40 (21.75), Foliage 45.04 (46.04). Way one (cue-all) Sky 11.10, Water 20.55, Foliage 42.83.
+NIR_3461: MobileSAM Sky 58.08 (57.53), Foliage 22.08 (22.32), Built things 7.03 (13.57). Way two Sky 61.66 (59.44), Foliage 24.54 (24.58), Built things 6.26 (15.56). Way one Sky 64.22, Foliage 24.23, Built things 6.97.
+NIR_1873: MobileSAM Foliage 69.95 (46.08), Water 13.99 (14.16). Way two Foliage 75.21 (60.24), Water 15.10 (15.06). Way one Foliage 74.71, Water 14.40.
+NIR_3710: MobileSAM Sky 47.47 (47.52), Foliage 28.10 (27.61), Built things 3.27 (3.33), Ground 10.16 (new). Way two Sky 48.24 (48.24), Foliage 36.85 (32.98), Built things 3.68 (3.61). Way one Sky 48.11, Foliage 42.19, Built things 3.77.
+Not made by the stage, as its fixed rule gives (each side of the fit needs 50 or more counted pixels):
+- NIR_3742 Built things, way one and way two: the subject holds 2 counted pixels (21 sure pixels). So the way two after mask of this frame-subject does not exist, and its whole picture panel 5 and its magnified column say NO MASK. MobileSAM after exists for it. It is one of the 12 judged frame-subjects.
+- NIR_3710 Ground, way one and way two: the subject holds 5 counted pixels. Ground is not judged. Its MobileSAM mask exists (10.16 percent).
+So 11 of 12 way two after masks exist, and 12 of 12 MobileSAM after masks. Nothing was tuned.
+
+FILES (all new, in the scratchpad)
+- samples-added.json: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/research/whole/samples-added.json
+- masks folder: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/masks5 (mobilesam-colour-*, cue-all-*, cue-near-*, index-<frame>.json)
+- pictures folder: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/pictures5 (12 whole-*, 12 fine-*, 4 samples-<frame>.png, 9 samples-<frame>-zoom-<n>.png, 5 crop-*.png, index-<frame>.json)
+- index: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/pictures5/index.txt
+- scripts, all in /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/scratch: step5-crop.mjs, step5-samples.mjs, step5-models.mjs (copy of step2-models.mjs), step5-stage.mjs (copy of step3-stage.mjs), step5-shares.mjs, step5-compose.mjs (copy of step3-compose.mjs), step5-fine.mjs (copy of step4-fine.mjs), step5-index.mjs
+- progress files (runner output) in /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/progress, labels corr1 to corr8
+- this report: /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/reports/correction-step-1-report.txt
+- Overwritten as the runner needs: scratch/step452-job.json. Changed nothing else: no tracked file in APP, nothing under R, samples.json untouched, no earlier masks or pictures touched. Nothing committed, staged or pushed.
+- Changes in the copies: step5-models.mjs reads samples-added.json, runs the colour picture only, writes masks5. step5-stage.mjs reads samples-added.json and masks5/mobilesam-colour-*, writes masks5. step5-compose.mjs reads samples-added.json, leaves Ground out of the subjects, draws the five panels, makes no edges picture, writes pictures5 and its index with the three places of each after mask. step5-fine.mjs reads pictures5/index and draws the two after masks in two columns (1484 by 834).
+
+THREE PICTURES OPENED (no judging against the bar)
+- whole-NIR_3461-sky.png: all five panels drawn and titled, each mask panel with the yellow line and the white square. Panel 1 shows the 12 circles and the 3 added squares with a plus (two on the big left pylon, one in the sky by the right pylon). MobileSAM before and after both paint the sky as one mass with the pylons cut out as grey silhouettes; in the after panel a small triangle of sky near the base of the big pylon is marked inside the outline. Way two before and after paint the sky with the pylons partly inside the outline; in the after panel the big pylon's outline holds many small holes along its height.
+- whole-NIR_3742-built-things.png: all panels drawn. Panel 1 shows the two added squares on the island trees. MobileSAM before and after both tint the dock and boats and a patch on the island tree (smaller in the after panel). Way two before tints the dock and the island tree and tree tips; panel 5 says NO MASK with the stage's reason (the subject holds 2 counted pixels).
+- fine-NIR_1873-foliage.png (1484 by 834): titled in two columns, MobileSAM after at A (359,459), B (656,947), C (1585,1415) and way two after at A (2746,726), B (1019,1275), C (681,1716). Each row has the context crop with the outlined centre, the bare 3-times crop and the banded crop with the yellow line, the blue dashed band borders and the 12-pixel mark. MobileSAM after: A and B are loops inside foliage; C follows the edge of a needle mass against the bank. Way two after: A runs along a dark trunk, B and C are loops over lake water.
+
+FOUND (not fixed)
+Found: the stage gave no mask for NIR_3742 Built things (way one and way two) because only 21 sure pixels stand, so the subject has 2 counted pixels in the fit; the way two after mask of this judged frame-subject does not exist. The plan fixes the stage and says to change none of it, so it was left. The judges and the count will meet NO MASK for it.
+Found: NIR_3710 Ground has no stage mask for the same reason (5 counted pixels); not judged.
+Found: the cloud flap by the right pylon (region 3) is a long thin pair of taken blobs near wires in the way two before mask; the sample sits on the upper one, in the widest place. Whether it is cloud is a judge's matter; in its zoom the centre lies on grey sky just below a lighter band.
+Found: the look-aid crop script's first plant was badly placed (it read a pixel the grid covers); fixed as told in this send, and the old plant line is in the first send's report.
+Found: /root/.claude/hub/agent-rules.md, which the app's CLAUDE.md says an agent reads first, does not exist in this container.
