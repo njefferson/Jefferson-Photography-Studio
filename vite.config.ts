@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, defaultClientConditions, type Plugin } from "vite";
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
@@ -452,6 +452,11 @@ function precacheManifest(): Plugin {
         // The host serves 404.html itself, for an address it does not have; the
         // app never asks for it, so it is no part of the offline copy (071).
         .filter((p) => p !== "404.html")
+        // The runtime and the model files are fetched on a press of the test
+        // page, never by the app's own start, and the install is all-or-nothing,
+        // so sixty megabytes in the list would be sixty megabytes of ways for an
+        // install to fail. The run-time route keeps them once fetched.
+        .filter((p) => !p.startsWith("ort/") && !p.startsWith("models/"))
         .filter((p) => !isStickerPng(p)) // their own list, above
         .filter((p) => statSync(resolve(dist, p)).isFile()) // drop directory entries
         .map((p) => "./" + p);
@@ -491,6 +496,16 @@ function precacheManifest(): Plugin {
 export default defineConfig({
   base: "./",
   plugins: [notesPage(), precacheManifest()],
+  resolve: {
+    // The learned-selection worker imports the runtime, and by default that
+    // import resolves to the package's bundle build, which names its
+    // WebAssembly file by `new URL` and so makes Vite emit a second 14.8 MB
+    // copy into the asset folder and into the install list. The runtime loads
+    // the copy under /ort/ either way (wasmPaths), so the second copy is dead
+    // weight. This condition is the package's own, and it resolves the import
+    // to the build that loads its WebAssembly from wasmPaths at run time.
+    conditions: [...defaultClientConditions, "onnxruntime-web-use-extern-wasm"],
+  },
   build: {
     target: "es2020",
     sourcemap: true,

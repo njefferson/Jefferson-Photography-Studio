@@ -60,6 +60,7 @@ import { PLACE_STRUCTURE_CUES, placeStructureValues } from "./placestructure";
 import { placeDecode } from "./placedecode";
 import { placeSurface } from "./placesurface";
 import * as sampleMaskModule from "./samplemask";
+import type { LearnedReport } from "./learned.worker";
 
 declare const __APP_VERSION__: string;
 
@@ -4670,7 +4671,7 @@ sampleBtn.addEventListener("click", (e) => {
 async function sepPress(btn: HTMLButtonElement, clear: boolean, body: (tally: PressTally) => Promise<void>): Promise<void> {
   const list = $("dPicResults");
   if (running) { $("dSepHint").textContent = "Another test on this page is still running. Press this again when it has finished."; return; }
-  const others = ["dRun", "dBigRead", "dSlowBuild", "dPictures", "dSepStart", "dSepGo", "dSepSweep", "dSampleCount"].map((id) => $(id) as HTMLButtonElement);
+  const others = ["dRun", "dBigRead", "dSlowBuild", "dLearned", "dPictures", "dSepStart", "dSepGo", "dSepSweep", "dSampleCount"].map((id) => $(id) as HTMLButtonElement);
   const was = others.map((b) => b.disabled);
   others.forEach((b) => { b.disabled = true; });
   const label = btn.textContent;
@@ -5106,7 +5107,7 @@ const picOut: string[] = [];
   const btn = e.currentTarget as HTMLButtonElement;
   const list = $("dPicResults");
   if (running) { list.replaceChildren(); const m = document.createElement("p"); m.className = "dbg-progress"; m.textContent = "Another test on this page is still running. Press this again when it has finished."; list.appendChild(m); return; }
-  const others = ["dRun", "dBigRead", "dSlowBuild"].map((id) => $(id) as HTMLButtonElement);
+  const others = ["dRun", "dBigRead", "dSlowBuild", "dLearned"].map((id) => $(id) as HTMLButtonElement);
   btn.disabled = true;
   others.forEach((b) => { b.disabled = true; });
   const was = btn.textContent;
@@ -5170,6 +5171,124 @@ picCopy.addEventListener("click", () => copy(textArea.value + "\nPicture checks\
   const copyBtn = $("dCopyAll") as HTMLButtonElement;
   copyBtn.hidden = false;
   copyBtn.onclick = () => copy(textArea.value + "\nSpeed\n" + out.join("\n") + "\n", copyBtn, "Copy the results");
+});
+
+/** The planted picture for the learned-selection press. Takes nothing; fetches and decodes the bundled practice photograph
+ *  and draws it with the app's own compiled edit, nearest-pixel, to a long side of 1,024. Returns its width, its height and its
+ *  RGBA bytes. What it must satisfy: the long side is exactly 1,024 (the size the encoder takes), no picture of the reader's is
+ *  used, and the decode is the same `decodeOffThread` the picture checks use. The picture is the DRAWN one on purpose: the press
+ *  measures the device and cuts no selection, so any picture of that size gives the same times. */
+async function learnedInput(): Promise<{ width: number; height: number; data: Uint8ClampedArray }> {
+  const res = await fetch("./examples/NIR_0063.dng");
+  if (!res.ok) throw new Error("practice photo not available offline");
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const img = await decodeOffThread({ name: "practice.dng", kind: sniff(bytes), bytes, looksTranscoded: false });
+  const s = 1024 / Math.max(img.width, img.height);
+  const w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+  const params = pictureParams({ wb: [1.6, 1, 0.7], exposure: 1.2, swapRB: true, sat: 1.1, contrast: 1.05 });
+  const edit = compileEdit(params, img.camMatrix, img.width / img.height, undefined, null);
+  const px = new Float32Array(3);
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const sx = Math.min(img.width - 1, Math.floor(x / s));
+      const sy = Math.min(img.height - 1, Math.floor(y / s));
+      const [rr, gg, bb] = linearAt(img, sx, sy);
+      edit(rr, gg, bb, px, 0, undefined, undefined);
+      const i = (y * w + x) * 4;
+      data[i] = 255 * Math.min(1, Math.max(0, px[0]));
+      data[i + 1] = 255 * Math.min(1, Math.max(0, px[1]));
+      data[i + 2] = 255 * Math.min(1, Math.max(0, px[2]));
+      data[i + 3] = 255;
+    }
+  }
+  return { width: w, height: h, data };
+}
+
+/** Writes the rows of the learned-selection press. Takes the worker's report. Returns nothing; every row is written, and a stage
+ *  that failed or did not run is written in the not-measured words (`failed`, `not run`) with its reason, so a refusal is an
+ *  answer about the device and never a missing row. What it must satisfy: a time is only printed for a stage that ran, and the
+ *  last row says in one sentence whether the encoder and the decoder both ran. */
+function learnedRows(r: LearnedReport): void {
+  const mb = (n: number) => `${(n / 1048576).toFixed(1)} MB`;
+  const mid = (xs: number[]) => { const a = [...xs].sort((x, y) => x - y); return (a[(a.length - 1) >> 1] + a[a.length >> 1]) / 2; };
+  const spread = (xs: number[]) => xs.map((x) => Math.round(x) + " ms").join(", ");
+  const o = r.offers;
+  row("Threads and WebAssembly features",
+    `${o.cores || "an unknown number of"} cores · ${o.isolated ? "cross-origin isolated" : "not cross-origin isolated"} · shared memory ${o.sharedMemory ? "yes" : "no"} · SIMD ${o.simd ? "yes" : "no"}`,
+    "What this browser gives a learned model to run with. This app sends no isolation headers, so the runtime is set to one thread here whatever the core count says; SIMD is what makes the WebAssembly route quick.");
+  row("WebGPU", o.gpu, "Whether this browser offers a graphics chip to a learned model. It is only asked here, not used: the runtime's WebGPU file is over this site's size limit for one file.");
+  const w = r.wasmFile;
+  row("The runtime's WebAssembly file", w.state === "ok" ? `${mb(w.bytes)} in ${ms(w.ms)}` : w.state === "failed" ? "failed" : "not run",
+    w.state === "ok" ? "The file the runtime runs on, fetched from this site; after the first press it comes from what the device kept." : `${w.detail}.`);
+  for (const f of r.files) row(`Fetched: ${f.name}`, `${mb(f.bytes)} in ${ms(f.ms)}`, "A file of the model, fetched from this site. The time is the network and the device's storage; after the first press it comes from what the device kept.");
+  if (r.filesProblem) row("The model files", "failed", `${r.filesProblem}.`);
+  const j = r.join;
+  row("Joining the encoder's parts", j.state === "ok" ? `${ms(j.ms)}` : j.state === "failed" ? "failed" : "not run", `${j.detail}.`);
+  const stage = (name: string, s: { state: string; ms: number; detail: string }, ok: string) =>
+    row(name, s.state === "ok" ? ms(s.ms) : s.state, s.state === "ok" ? ok : `${s.detail}.`);
+  stage("Loading the runtime and the decoder", r.decoderSession, "The runtime's start-up and the decoder's first session together: there is no way to load the runtime alone, so this carries both.");
+  stage("Loading the encoder", r.encoderSession, "Building the encoder's session from its bytes, with the runtime already running.");
+  const e = r.encoder, d = r.decoder;
+  row("The encoder, one run", e.times.length ? ms(mid(e.times)) : e.state === "failed" ? "failed" : "not run",
+    e.state === "ok" ? `The median of the runs, on a ${e.detail}, on this device's one thread. It reads the picture once and gives the embeddings a selection is then cut from; this is the time a learned selection would make a person wait for each photograph.` : `${e.detail}.`,
+    e.times.length ? spread(e.times) : undefined);
+  row("The decoder, one run", d.times.length ? ms(mid(d.times)) : d.state === "failed" ? "failed" : "not run",
+    d.state === "ok" ? `The median of the runs, with ${d.detail}. It cuts a mask from the embeddings, so this is the time each further touch of the picture would cost once the encoder has run.` : `${d.detail}.`,
+    d.times.length ? spread(d.times) : undefined);
+  if (r.outputs) row("What the runs gave", r.outputs, "The shapes the encoder and the decoder gave back, which shows they ran on the picture rather than on nothing.");
+  row("Memory", r.memory, "What the browser reports to a page. Safari reports none, so \"not reported\" is expected on an iPad; the device report above has its memory hint.");
+  const both = e.state === "ok" && d.state === "ok";
+  row("Can this device run a learned selection",
+    both ? `yes: the encoder ran in ${ms(mid(e.times))} and the decoder in ${ms(mid(d.times))}` : "not run to the end",
+    both ? "Both ran here on one thread with the WebAssembly runtime. This is the device's answer; it draws no mask and says nothing of whether a mask is good enough." : "A stage above failed or did not run, and that stage's row says why. That is the device's answer for this route.");
+}
+
+($("dLearned") as HTMLButtonElement).addEventListener("click", async (e) => {
+  const btn = e.currentTarget as HTMLButtonElement;
+  if (running) { note("Another test on this page is still running. Press this again when it has finished."); return; }
+  const others = ["dRun", "dBigRead", "dSlowBuild", "dPictures", "dSepStart", "dSepGo", "dSepSweep", "dSampleCount"].map((id) => $(id) as HTMLButtonElement);
+  const was = others.map((b) => b.disabled);
+  others.forEach((b) => { b.disabled = true; });
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = "Running…";
+  running++;
+  let worker: Worker | null = null;
+  const p = note("Starting. The first press fetches about 60 MB from this site.");
+  try {
+    await refreshReport();
+    p.textContent = "Drawing the practice photograph to 1,024 pixels";
+    const pic = await learnedInput();
+    worker = new Worker(new URL("./learned.worker.ts", import.meta.url), { type: "module" });
+    const w = worker;
+    const report = await new Promise<LearnedReport>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("no answer in fifteen minutes")), 15 * 60 * 1000);
+      w.onmessage = (m: MessageEvent) => {
+        const d = m.data as { kind: string; text?: string; report?: LearnedReport; message?: string };
+        if (d.kind === "stage") p.textContent = `${d.text} (${Math.round((performance.now() - t0) / 1000)} s so far)`;
+        else if (d.kind === "done") { clearTimeout(timer); resolve(d.report as LearnedReport); }
+        else if (d.kind === "error") { clearTimeout(timer); reject(new Error(d.message)); }
+      };
+      w.onerror = () => { clearTimeout(timer); reject(new Error("the background thread would not start or stopped")); };
+      const t0 = performance.now();
+      w.postMessage(pic, [pic.data.buffer]);
+    });
+    p.remove();
+    learnedRows(report);
+  } catch (err) {
+    p.remove();
+    row("Can this device run a learned selection", "not run", `${(err as Error).message}.`);
+  } finally {
+    worker?.terminate();
+    running--;
+    btn.textContent = label;
+    btn.disabled = false;
+    others.forEach((b, i) => { b.disabled = was[i]; });
+    const copyBtn = $("dCopyAll") as HTMLButtonElement;
+    copyBtn.hidden = false;
+    copyBtn.onclick = () => copy(textArea.value + "\nSpeed\n" + out.join("\n") + "\n", copyBtn, "Copy the results");
+  }
 });
 
 ($("dRun") as HTMLButtonElement).addEventListener("click", async (e) => {

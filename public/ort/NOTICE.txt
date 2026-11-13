@@ -1,0 +1,3 @@
+ONNX Runtime Web 1.31.1, WebAssembly build only
+Files: ort-wasm-simd-threaded.wasm and ort-wasm-simd-threaded.mjs, copied unchanged from the npm package onnxruntime-web 1.31.1 (dist/).
+Licence: the package's package.json states "license": "MIT". The published package carries no LICENSE file of its own, so the licence text beside this notice, LICENSE.txt (MIT, Copyright (c) Microsoft Corporation), was fetched on 13 November 2026 from https://raw.githubusercontent.com/microsoft/onnxruntime/main/LICENSE and is kept unchanged, because the licence asks that its notice travel with copies.

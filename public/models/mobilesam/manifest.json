@@ -1,0 +1,17 @@
+{
+  "model": "MobileSAM (ONNX export by Acly)",
+  "encoder": {
+    "file": "mobile_sam_image_encoder.onnx",
+    "bytes": 28157093,
+    "sha256": "580f5fb648ea1062c0aabc26217aed56921985f03f0cbbd852bba81d760cc749",
+    "parts": [
+      { "file": "mobile_sam_image_encoder.00.part", "bytes": 14080000, "sha256": "1d14b5d0cd28651ab836daada7a29d98b8460ea3a0bbc66271d432f704dc0df0" },
+      { "file": "mobile_sam_image_encoder.01.part", "bytes": 14077093, "sha256": "b666a9188515bc1e335d4ca9fc9d432f6f45d8273137bea219778a7a1d08e340" }
+    ]
+  },
+  "decoder": {
+    "file": "sam_mask_decoder_single.onnx",
+    "bytes": 16501323,
+    "sha256": "93915fc7c993ab9d59ab8c9ccd3bce37f7509c81ab4150a74abd4d2abbd8570d"
+  }
+}

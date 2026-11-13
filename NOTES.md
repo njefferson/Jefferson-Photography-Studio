@@ -54,6 +54,12 @@ because they floor temperature at ~2000K.
 
 ## On staging, waiting on a device pass
 
+**New: the test page has a button that says whether this device runs a learned selection and how fast: built on staging by the plan of 13 November as 2.80 and verified headless there, not yet on a device (records 112, 111 and 006).** On staging at staging.jefferson-photo-studio.pages.dev.
+- **New: "Can this device run a learned selection" in the Speed section.** One press loads the runtime and a learned model from this app's own site (about 60 MB the first time, kept on the device after), runs the model's encoder three times and its decoder after each on the test page's practice photograph, and prints each time with its median, whether the runtime loaded, what the browser offers (cores, threads, WebAssembly SIMD, WebGPU) and the memory figure where the browser gives one. It draws no mask and offers no selection.
+- **Internal, nothing a reader sees:** the runtime's and the model's files and their licence texts under `public/ort/` and `public/models/mobilesam/`, kept out of the install list; the build resolves the runtime under its own condition so that no second copy of its binary is built; record 112; the handoff's first item is marked built; the module map is made again; `VERSION` reads 2.80.
+- **What is still wrong.** Nothing has run on a device. WebGPU is reported as offered or not and is not run. The runtime runs on one thread, because the app sends no isolation headers. Safari reports no memory figure to a page.
+- **For the device pass on staging.** Press the button on the tablet, on the staging site, then "Copy the results" and paste the report back; the figures go into record 112 and the handoff.
+
 **Fixed: on the test page a mask from your samples is made from the photograph itself, so it no longer changes with white balance, exposure or the red and blue swap: built on staging by the plan of 11 November as 2.79.1 and verified headless there, not yet on a device (records 110 and 111).** On staging at staging.jefferson-photo-studio.pages.dev. Builds 2.76 to 2.79 stand on staging with no entry in this section; those four entries are not written here and are filed in the Found queue.
 - **Fixed: the cues and the lightness a mask's edge follows are counted from the photograph's own data.** Before this build the test page counted them on the thinned picture it had drawn, so they moved with the balance, the exposure, the red and blue swap and the develop, and a mask made from them changed when any of those were set. They are now counted through one function that takes no edit and reads none, `placeDecode` in `src/placedecode.ts`, which uses the sky selection's own handling of the decode. The picture you tap and the pictures a mask is drawn over are still the drawn photograph, and samples are positions and are unchanged.
 - **Changed: a mask or a Separation selection kept before this build is listed and not applied.** It was fitted on the drawn picture, so its row says that and it has no Try button; fitting it again on the photograph, by step 1 or by counting its samples, keeps it on the photograph's own data. Each recipe and each selection now records which data it was fitted on. The page's note on masks says in plain words that a mask is made from the photograph itself and stays the same whatever the white balance, the exposure or the swap are set to.
@@ -2606,6 +2612,8 @@ Q-JPS-382: new wrong regions both judges named after the samples were added: on 
 Q-JPS-383: NIR_3742 Built things has no way two mask after the samples were added, because the stage's fixed rule needs 50 or more counted pixels on each side of its fit and the subject holds 2 counted pixels (21 sure pixels), so neither way one nor way two was made; its MobileSAM mask exists. Both judges wrote no mask on its places, clauses and word. The same rule gave no mask for the Ground subject of NIR_3710, which holds 5 counted pixels (12 November 2026).
 Q-JPS-384: the two judges gave the same word on 38 of the 48 marks (MobileSAM after 8 of 12 on the region clause and 8 of 12 on the edge clause, way two after 11 and 11), on 60 of the 72 places (MobileSAM after 27 of 36, way two after 33 of 36), on 21 of the 24 words and on 8 of the 12 region lines. A pair where both wrote no mask counts as the same. Of the 10 marks on which they differ, 5 have an Uncertain word on one side and 5 are a plain met against a plain not met (12 November 2026).
 Q-JPS-385: the frame's bottom edge read two ways. Judge two marked two places in where the line runs along the frame's bottom edge in open water or field (NIR_1873 Water C and NIR_3461 Foliage C, MobileSAM after) and said the rule as written would mark them out. As written, judge two's MobileSAM after has 22 places in, 12 out and 2 uncertain and the edge clause met on 3; read out, 20 in, 14 out and 2 uncertain and the edge clause met on 2, since NIR_1873 Water's edge clause becomes not met. The bar counts do not move either way, and the agreement of the two judges on MobileSAM after rises from 27 to 29 of 36 places and from 8 to 9 of 12 on the edge clause (12 November 2026).
+Q-JPS-386: queue key Q-JPS-363 asked which stands, the handoff's second item or record 111's hold; the tablet's press draws no mask and offers no selection, so it is inside 111's hold, and 111's hold stands (13 November 2026).
+Q-JPS-387: the runtime's default import for the learned-selection worker resolved to the package's bundle build, which made Vite emit a second copy of the 14.8 MB WebAssembly file into the asset folder and the install list; the build now resolves the import under the package's condition `onnxruntime-web-use-extern-wasm`, and the second copy is gone from `dist/assets` and from `dist/sw.js`. Whether the press loads the runtime under that condition in a browser is read by the checker (13 November 2026).
 ## Confirmed
 
 - Camera: **Nikon Z50, internal infrared conversion, no lens filter**
@@ -3367,6 +3375,16 @@ user-scalable=no.
   stand-in, each learned kind, SlimSAM, the nearest entry taken anyway, judging by sampled pixels or by planted
   pictures alone, and an edge stage chosen after the frames were seen. See
   `docs/decisions/111-a-mask-is-judged-over-the-whole-photograph.md`.
+
+- [ ] **The test page measures whether this device runs a learned selection** <!-- decision: 112 -->
+  **Shown as:** The test page gets a button that says whether your device can run a learned selection and how fast it does; it draws no mask.
+  Built on staging as 2.80 and waiting on the tablet's press. One press loads the runtime's WebAssembly build and
+  MobileSAM's encoder (in two parts, joined in the page) and decoder, all served from the app's own site and kept
+  after the first fetch, runs the encoder three times and the decoder after each on the test page's practice
+  photograph, and prints the times, the browser's offers (threads, WebGPU) and its memory figure where it gives one.
+  It draws no mask and offers no selection, which keeps it inside record 111's hold. Rejected: fetching the model from
+  its host, running WebGPU in this piece, isolation headers for threads, SlimSAM, and measuring in the container.
+  See `docs/decisions/112-the-test-page-measures-whether-this-device-runs-a-learned-selection.md`.
 
 - [ ] **The look's sky adjustments tint and darken what has no colour** <!-- decision: 069 -->
   **Shown as:** Clouds inside Aerochrome's sky stay white or grey under its sky sliders instead of turning blue-grey.

@@ -1,0 +1,18 @@
+MobileSAM, ONNX export: image encoder and one-mask decoder
+
+Files
+- mobile_sam_image_encoder.00.part and .01.part: the image encoder mobile_sam_image_encoder.onnx (28,157,093 bytes, sha256 580f5fb648ea1062c0aabc26217aed56921985f03f0cbbd852bba81d760cc749) split in two so each part is under the host's 25 MiB limit for one file; joined in the page in the order manifest.json gives.
+- sam_mask_decoder_single.onnx: the mask decoder that returns one mask (16,501,323 bytes, sha256 93915fc7c993ab9d59ab8c9ccd3bce37f7509c81ab4150a74abd4d2abbd8570d).
+- manifest.json names the parts, their sizes and digests.
+- CARD.txt is the model card as published; LICENSE.txt is MobileSAM's own licence as published.
+
+Where they came from
+- https://huggingface.co/Acly/MobileSAM/resolve/main/mobile_sam_image_encoder.onnx
+- https://huggingface.co/Acly/MobileSAM/resolve/main/sam_mask_decoder_single.onnx
+- Card: https://huggingface.co/Acly/MobileSAM/raw/main/README.md
+- Licence: https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/master/LICENSE
+
+Licences as the two sources state them
+- The ONNX copy's card (CARD.txt) states: license: mit.
+- MobileSAM's own repository licence (LICENSE.txt) is the Apache License, Version 2.0.
+- The card names the original weights as https://huggingface.co/dhkim2810/MobileSAM and the original repository as https://github.com/ChaoningZhang/MobileSAM.

@@ -6,6 +6,7 @@ Read this first. It says where the work stands, what was learned, and what comes
 - Staging is at 2.79.1, the commit whose subject opens "Fixed: on the test page a mask from your samples is made from the photograph itself". Main is at 2.71. The builds 2.72.1 to 2.79.1 wait on a device pass and the go for promotion.
 - On the test page (`debug.html`, `src/debug.ts`) a person places named samples on a photograph and a mask is made for each name by the app's own recipe (`src/samplemask.ts`), a fit on ten cues.
 - Since 2.79.1 those cues, and the lightness a mask's edge follows, are counted from the photograph's own decode through the function placeDecode in `src/placedecode.ts`, which calls the Sky mask's own guide (buildSkyGuide in `src/skyfine.ts`) and takes no edit. A mask or a Separation selection kept before 2.79.1 is listed as made from the drawn picture and is not applied.
+- Staging is at 2.80 with the tablet's measure built (decision record 112) and waiting on the tablet's press.
 - The rule this follows is in the app's CLAUDE.md under the heading A MASK AND EVERY SELECTION READ THE PHOTOGRAPH'S OWN DATA, and in decision record 032.
 - The notes' section On staging, waiting on a device pass has no entry for 2.76 to 2.79 (queue key Q-JPS-339).
 - On 12 and 13 November five documents commits were added to staging: the four pieces under What was measured, and this page. None changes the app's code, pages or tools.
@@ -66,7 +67,7 @@ No connected region wrongly taken, and none wrongly left, larger than one hundre
 
 ## What comes next, in order
 
-1. The tablet's measure. Whether the tablet's browser loads and runs an encoder, how fast and in how much memory, decides whether any learned route exists, and nothing in this folder measures it.
+1. The tablet's measure. Built on staging on 13 November 2026 as 2.80 (decision record 112) and waiting on the tablet's press; the figures are to be written into record 112 and here when they come. Whether the tablet's browser loads and runs an encoder, how fast and in how much memory, decides whether any learned route exists, and nothing in this folder measures it.
    - What it is: one press on the test page that loads the runtime and runs an encoder and a decoder on a planted picture. It prints whether the runtime loaded, each time as three runs and a median, what the browser offers (threads, WebGPU), and the device facts.
    - It draws no mask and offers no selection. It is a measure of the device and not a method on the page, which record 111 holds back until a method meets the bar.
    - What the build meets is in notes/build-ground.md and notes/build-brief.md, which are read whole before the piece is scoped. A model file needs a route of its own outside the service worker's install list. The host's limit is 25 MiB for one file. SlimSAM's files fit. MobileSAM's encoder is 1,942,693 bytes over; whether a file served in two parts and joined in the page gets round that is to be tried.

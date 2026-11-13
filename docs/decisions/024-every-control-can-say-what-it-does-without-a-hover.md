@@ -57,7 +57,7 @@ what is missing is a rule rather than a mechanism.**
   where it is held — and its reverse direction (a control with nothing to say
   for itself anywhere) is the piece it does not have.
 - **The permanent note beside a control is the app's existing answer**, and it
-  is the majority answer: **112 `class="note"` elements against 71 labelled
+  is the majority answer: **the 112 `class="note"` elements against 71 labelled
   sliders** in `ir.html`. This item must not replace them. Progressive
   disclosure is for what would clutter; a short sentence that fits is better
   visible, and most of them are.

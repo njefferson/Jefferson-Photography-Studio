@@ -59,8 +59,14 @@
           <button id="dRun" type="button" class="dbg-btn primary">Run the speed tests</button>
           <button id="dBigRead" type="button" class="dbg-btn">Reading one photo out of a big session</button>
           <button id="dSlowBuild" type="button" class="dbg-btn">What makes the picture code slow to build</button>
+          <button id="dLearned" type="button" class="dbg-btn">Can this device run a learned selection</button>
           <button id="dCopyAll" type="button" class="dbg-btn" hidden>Copy the results</button>
         </div>
+        <p class="dbg-note" id="dLearnedNote">
+          The button that asks whether this device can run a learned selection fetches about 60 MB
+          from this site the first time and keeps it on the device. It draws no mask and offers no
+          selection: it measures this device, for a selection the app may one day make.
+        </p>
         <div id="dResults" class="dbg-results" role="status" aria-live="polite"></div>
       </section>
 
