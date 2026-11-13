@@ -22,11 +22,11 @@
 // corrected is a plan that stopped being read.
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
-const hub = resolve(repo, "..", "noahjefferson");
+const hub = "/root/.claude/hub";
 const gate = join(hub, "plan-scope-check.mjs");
 
 // A MISSING HUB IS A FAILURE, NOT A SKIP — the escalation this whole commit
@@ -34,9 +34,9 @@ const gate = join(hub, "plan-scope-check.mjs");
 // fail-open every gate here exists to close.
 if (!existsSync(gate)) {
   console.error("\n=== plan scope ===\n");
-  console.error("  plan-scope-check.mjs is not in the hub beside this repo, so nothing can");
+  console.error("  plan-scope-check.mjs is not in the hub at /root/.claude/hub, so nothing can");
   console.error("  hold this commit to the approved plan. That is a failure, not a skip.\n");
-  console.error("      git clone https://github.com/njefferson/noahjefferson ../noahjefferson\n");
+  console.error("      git clone https://github.com/njefferson/noahjefferson.git /root/.claude/hub\n");
   process.exit(1);
 }
 

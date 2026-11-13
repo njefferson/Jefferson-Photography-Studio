@@ -15,7 +15,7 @@
       "Bash(npm --prefix /home/user/Jefferson-Photography-Studio run build:*)",
       "Bash(npm --prefix /tmp/claude-0/*/scratchpad/hubwt ci)",
       "Bash(node /home/user/Jefferson-Photography-Studio/tools/:*)",
-      "Bash(node /home/user/noahjefferson/plan-scope-check.mjs:*)",
+      "Bash(node /root/.claude/hub/plan-scope-check.mjs:*)",
       "Bash(node /root/.claude/hub/reply-guard.mjs --read:*)",
       "Bash(node /tmp/claude-0/:*)",
       "Bash(node --check:*)",

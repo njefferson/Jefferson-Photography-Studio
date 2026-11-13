@@ -17,11 +17,11 @@
 // Wired into .branch-guard's `also=` list, so it runs on every commit.
 import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
-const hub = resolve(repo, "..", "noahjefferson");
+const hub = "/root/.claude/hub";
 
 // A MISSING HUB IS A FAILURE, NOT A SKIP. The same escalation the commit hook
 // itself is built on: a declared check that quietly stops running is the
@@ -29,9 +29,9 @@ const hub = resolve(repo, "..", "noahjefferson");
 // this hook, so its absence is a broken checkout rather than a legitimate one.
 if (!existsSync(hub)) {
   console.error("\n=== hub surface gates ===\n");
-  console.error("  The hub is not checked out beside this repo, so the gates that read");
+  console.error("  The hub is not installed at /root/.claude/hub, so the gates that read");
   console.error("  this app's published copy cannot run. That is a failure, not a skip.\n");
-  console.error("      git clone https://github.com/njefferson/noahjefferson ../noahjefferson\n");
+  console.error("      git clone https://github.com/njefferson/noahjefferson.git /root/.claude/hub\n");
   process.exit(1);
 }
 

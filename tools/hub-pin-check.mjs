@@ -60,7 +60,7 @@
  *
  * Wired as a `.branch-guard also=` entry, so it runs on every commit rather
  * than when somebody remembers — and for the same reason: a commit must not
- * depend on the hub being checked out beside this repository.
+ * depend on the hub being installed at /root/.claude/hub.
  *
  * ## Two files agreeing is not the same as the commit existing on a branch
  *
@@ -84,7 +84,7 @@
  *
  * So the ancestry check below is the second question — is this commit on the
  * hub's `main` at all — and it needs the hub, which this file may not have. It
- * SKIPS rather than fails when the hub is not beside this repository, and it
+ * SKIPS rather than fails when the hub is not at /root/.claude/hub, and it
  * PRINTS the skip: a declared check that quietly stops running is the fail-open
  * this whole family of hooks exists because of, and `branch-guard --artefact`
  * prints the checks it skips for the same reason.
@@ -110,20 +110,20 @@ const read = (relative) => {
 /** Whether a pinned hub commit is reachable from the hub's `main`. Takes the
  *  40-character pin; gives back `{ ok, skipped, why }`. What it must satisfy:
  *  it never fails on a question it could not ask — a hub that is not checked
- *  out beside this repository, or a clone that has never seen the commit,
+ *  installed at /root/.claude/hub, or a clone that has never seen the commit,
  *  comes back `skipped` with the reason printed, because a pin the hub pushed
  *  five minutes ago is legitimately absent from a stale clone and refusing the
  *  commit for that would teach everyone to bypass this hook. */
 function onTheHubsBranch(pin) {
-  const hub = join(dirname(REPO), 'noahjefferson');
+  const hub = '/root/.claude/hub';
   if (!existsSync(join(hub, '.git')))
-    return { skipped: true, why: `not checked: the hub is not beside this repository, so nothing here can say whether ${pin.slice(0, 7)} is on its main` };
+    return { skipped: true, why: `not checked: the hub is not at /root/.claude/hub, so nothing here can say whether ${pin.slice(0, 7)} is on its main` };
   const git = (...args) => execFileSync('git', ['-C', hub, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   try {
     if (git('cat-file', '-t', pin) !== 'commit')
-      return { skipped: true, why: `not checked: the hub clone beside this repository does not have ${pin.slice(0, 7)}` };
+      return { skipped: true, why: `not checked: the hub clone at /root/.claude/hub does not have ${pin.slice(0, 7)}` };
   } catch {
-    return { skipped: true, why: `not checked: the hub clone beside this repository does not have ${pin.slice(0, 7)}` };
+    return { skipped: true, why: `not checked: the hub clone at /root/.claude/hub does not have ${pin.slice(0, 7)}` };
   }
   for (const ref of ['origin/main', 'main']) {
     try {
@@ -215,7 +215,7 @@ console.error(
     'means those gates go\n' +
     'green while running checks that never heard of the rules this repository has\n' +
     'already adopted. Move them together:\n\n' +
-    '  node ../noahjefferson/doctrine-sync.mjs --repo . --adopt\n' +
+    '  node /root/.claude/hub/doctrine-sync.mjs --repo . --adopt\n' +
     '  then move the hub-gates.yml pin in the calling workflow to the same commit\n',
 );
 process.exit(1);

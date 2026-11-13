@@ -9,5 +9,5 @@
 # loudly when the hub is absent.
 set -uo pipefail
 cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}" || exit 0
-[ -f ../noahjefferson/stop-guard.mjs ] || exit 0
-exec node ../noahjefferson/stop-guard.mjs
+[ -f /root/.claude/hub/stop-guard.mjs ] || exit 0
+exec node /root/.claude/hub/stop-guard.mjs

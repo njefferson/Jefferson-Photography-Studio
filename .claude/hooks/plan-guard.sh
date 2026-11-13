@@ -25,7 +25,7 @@ PAYLOAD="$(cat)"
 cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}" || true
 GATE=""
 [ -f ./plan-guard.mjs ] && GATE=./plan-guard.mjs
-[ -z "$GATE" ] && [ -f ../noahjefferson/plan-guard.mjs ] && GATE=../noahjefferson/plan-guard.mjs
+[ -z "$GATE" ] && [ -f /root/.claude/hub/plan-guard.mjs ] && GATE=/root/.claude/hub/plan-guard.mjs
 
 if [ -n "$GATE" ]; then
   # Not "| exec": inside a pipe, exec replaces only a subshell, so the script

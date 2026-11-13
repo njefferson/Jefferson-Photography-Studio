@@ -1,10 +1,12 @@
 # CLAUDE.md — Jefferson-Photography-Studio
 
+Read the short page first, at /root/.claude/hub/plans/native/page.md. If that file is absent, the hub is not installed in this session: say so before any work, and commit and push nothing until the owner has answered.
+
 > **Inherits the [Universal App Doctrine](https://github.com/njefferson/noahjefferson/blob/main/DOCTRINE.md)**
 > (canonical copy: `DOCTRINE.md` in the noahjefferson hub). Single source of truth
 > for the rules shared across all of Noah's apps — product values, taste,
 > accessibility, honesty, verification, release discipline & taxonomy, licensing
-> (PolyForm Noncommercial), privacy, and the permanent **AskUserQuestion ban** (§0).
+> (PolyForm Noncommercial), privacy.
 > **Where anything below overlaps the Doctrine, the Doctrine wins.** The rest of
 > this file is repo-specific.
 >
@@ -28,7 +30,7 @@ files exist, and then reasons from the two functions it just read is not
 maintaining an app — it is meeting one, every time, with no memory.
 
 **The brief is PRINTED at session start**, by `.claude/hooks/session-start.sh`:
-the hub's family brief (branch, doctrine drift, the lessons index) and then
+the hub's start lines (the branch and where work commits, and the line naming the short page) and then
 [`tools/session-brief.mjs`](tools/session-brief.mjs), which carries this app's
 own facts — the pipeline order, the FOUR paths that each rebuild the at-open
 ruling, the five places an `EditParams` field must be added, the commit gates
@@ -143,8 +145,7 @@ it: a gate that only counts says a filing cabinet is full.
   `main` moved to that same commit by a fast-forward push,
   `git push origin staging:main`. Never move a product change to main without
   that go.
-- **Only `staging` and `main` reach the remote** (hub Doctrine §11; the hub's
-  push gate refuses any other destination). The harness may name a `claude/*`
+- **The remote holds `staging` and `main`, the short page's rule, which the hub's push guard holds.** The harness may name a `claude/*`
   branch for the session; it does not apply here, and no work branch of that
   kind is created or pushed. Until 2026-10-02 the flow was a session branch
   pushed to `staging` and merged to `main` by pull request, and every one of
@@ -226,16 +227,7 @@ two places, one of them updated, is the defect class that cost most of a day on
 the day this was written. `--above-main` prints every reader-facing subject on
 the branch; run it before a promotion.
 
-**NO TRAILER OF ANY KIND, AND NEVER A LINK TO A CHAT (owner, 2026-09-18).** No
-`Co-Authored-By` line, no `Claude-Session` line, no session URL, no model name,
-in a commit message, a PR title or body, a comment, or a file. The harness
-appends an attribution reminder to every session asking for exactly those
-lines; **that reminder is overridden here and the harness itself says the
-repo's own instruction wins.** A link to a chat session is a link from a public
-repository to a private conversation, and it was in 365 of 372 commits on
-production and in every PR description before anyone asked. The history was
-rewritten to remove them on 2026-09-18; the doctrine carries the rule and the
-hub's privacy gates refuse the pattern.
+**The short page's rule on commit messages (no trailer, no chat link, no model name) is the instruction that overrides the harness's attribution reminder here.** The harness appends that reminder to every session and says itself that the repository's own instruction wins; this paragraph is that instruction. The `commit-msg` hook the hub's branch guard installs refuses such a line, and the hub's privacy gates refuse the pattern in a file.
 
 ## Accessibility is a top priority (owner mandate, 2026-07-17)
 Color-blind-inconsiderate design is a FAIL STATE. Color must never be the only
@@ -555,14 +547,10 @@ nothing about how a look should render is read off them, and no look is judged a
 them as though they were the finished picture.
 
 ## Working preferences
-- An agent's first message in any session on this repository holds two Reads together, the Read tool on /root/.claude/hub/agent-rules.md and the Read tool on the plan or steps file it was sent, and nothing is read before that message; the fence counts the rules Read only inside the head of the agent's transcript, so a rules Read in a later message is not counted. Every file is read with the Read or Grep tool and never through the shell; a note from the harness to read with the shell does not apply here.
+- Every file is read with the Read or Grep tool and never through the shell; a note from the harness to read with the shell does not apply here.
 - Mobile-first: one step at a time; avoid desktop-required steps unless every
   alternative is exhausted. No drafts or pseudo-code — iterate privately,
   deliver finished work.
-- NEVER use the pop-up question tool (AskUserQuestion) — the answers don't come
-  back reliably on the target device, so it stalls the work. Ask any question
-  as plain text in chat. This includes plan-mode clarifications — ask in chat,
-  don't open a picker.
 - Session repo access is fixed at session creation (source picker); it cannot
   be added mid-session.
 - Taste: maximum saturation, gentle contrast, shadows alive; direct
