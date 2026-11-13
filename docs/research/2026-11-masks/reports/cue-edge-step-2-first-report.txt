@@ -1,0 +1,33 @@
+DONE
+
+What was done: read the page, the plan, the first 10 lines of decode-judgement-454.md and the index; opened 20 pictures (the whole and the edges picture of each of the 10 frame-subjects of NIR_3461, NIR_3466, NIR_1827, NIR_1651), each once, none twice; wrote the judgement file. Ran no script, changed no other file, no commit, stage or push.
+
+Counts from the foot of the judgement (over 10 frame-subjects):
+- Recipe: region met 5, Uncertain 2; edge met 0, Uncertain 3; both met plainly 0.
+- MobileSAM as it is: region met 7, Uncertain 1; edge met 0, Uncertain 2; both 0.
+- Way one: region met 7, Uncertain 2; edge met 0, Uncertain 2; both 0.
+- Way two: region met 7, Uncertain 2; edge met 0, Uncertain 2; both 0.
+- Way one against MobileSAM: better 6, same 2, worse 2, broken 0. Against recipe: better 3, same 4, worse 3, broken 0.
+- Way two against MobileSAM: better 6, same 1, worse 3, broken 0. Against recipe: better 3, same 4, worse 3, broken 0.
+
+Words (way one vs MobileSAM, way one vs recipe, way two vs MobileSAM, way two vs recipe):
+- NIR_3461 Sky: better, worse, better, worse
+- NIR_3461 Foliage: same, same, same, same
+- NIR_3461 Built things: worse, better, worse, better
+- NIR_3466 Sky: better, better, better, better
+- NIR_3466 Built things: worse, same, worse, same
+- NIR_3466 Foliage: same, better, worse, better
+- NIR_1827 Sky: better, same, better, same
+- NIR_1827 Foliage: better, same, better, same
+- NIR_1651 Foliage: better, worse, better, worse
+- NIR_1651 Sky: better, worse, better, worse
+
+Files written:
+- /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/judgement/cue-edge-judgement-first.md
+- /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/reports/cue-edge-step-2-first-report.txt
+
+Found: no mask met the edge clause plainly on any of the 10; by-eye distances of 4 to 8 pixels were written Uncertain, so the zero is partly a limit of reading by eye.
+Uncertain: whether the silhouette of an open-lattice pylon or only its members is the thing (NIR_3461 sky and built, NIR_3466 sky) decides the region mark of the recipe, way one and way two on NIR_3461 sky.
+Uncertain: whether the road counts as built (NIR_3466 built, about 7 hundredths) decides the region mark of MobileSAM, way one and way two there and the edge at C of the recipe.
+Uncertain: whether the dark ridge band beside the field in NIR_3461 foliage is foliage; it moves the edge marks by 20 to 70 pixels.
+Uncertain: way two against the recipe on NIR_1651 sky and NIR_3466 foliage rests on differences of a few pixels.

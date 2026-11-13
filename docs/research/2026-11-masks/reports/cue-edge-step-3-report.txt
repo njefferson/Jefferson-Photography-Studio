@@ -1,0 +1,23 @@
+DONE (cue edge, step 3: the record and the commit)
+
+Done:
+- Fetched origin staging; the remote's staging and the local staging branch name the same commit, 3c7b4c84a0b67811ddaeef8bb26ff3441e755f43, and staging is the branch checked out.
+- Copied into the research folder, content unchanged: the two judgement files into notes, the three step reports into reports, and the three scripts as cue-edge-stage.mjs, cue-edge-compose.mjs and cue-edge-index.mjs.
+- Wrote notes/cue-edge-how-to-run.md.
+- HANDOFF.md: one new entry under What was measured, and what it showed, dated 12 November, evening; item 3 of What comes next gained two sentences; one line for each new file in What is in this folder.
+- Record 111: one dated paragraph at the foot of its Context.
+- NOTES.md: Q-JPS-364 to Q-JPS-372 after Q-JPS-363.
+- Ran the privacy check and the third-person check.
+
+Counts written, over the 22 frame-subjects, first file plus second file:
+- Recipe: region met 5 plus 3 is 8, Uncertain 2 plus 4 is 6; edge met 0, Uncertain 3 plus 1 is 4; both 0.
+- MobileSAM as it is: region met 7 plus 7 is 14, Uncertain 1 plus 3 is 4; edge met 0, Uncertain 2 plus 1 is 3; both 0.
+- Way one: region met 7 plus 9 is 16, Uncertain 2 plus 1 is 3; edge met 0, Uncertain 2 plus 0 is 2; both 0.
+- Way two: region met 7 plus 7 is 14, Uncertain 2 plus 2 is 4; edge met 0, Uncertain 2 plus 2 is 4; both 0.
+- Way one against MobileSAM as it is: better 10, same 6, worse 6, broken 0. Against the recipe: 11, 6, 5, 0.
+- Way two against MobileSAM as it is: better 12, same 4, worse 6, broken 0. Against the recipe: 10, 9, 3, 0.
+
+Seen:
+- The remote's checks read tracked files; they were run once before the files were staged and again after.
+
+Files changed: the files of the commit, listed by git show --stat in the final report of this step.

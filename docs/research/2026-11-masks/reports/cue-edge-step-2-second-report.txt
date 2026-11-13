@@ -1,0 +1,35 @@
+DONE
+
+Did: opened the plan, the first 10 lines of the bar note, and the index; then opened all 24 pictures (a whole and an edges for each of 12 frame-subjects), each once, none twice. Judged NIR_3742 (sky, water, built things, foliage), NIR_3705 (sky, foliage, built things), NIR_3710 (sky, foliage, built things) and NIR_1873 (foliage, water). Wrote the judgement file. Ran no script, changed no other file, no git.
+
+Counts (over 12; Uncertain counted apart):
+Recipe: region met 3, Uncertain 4; edge met 0, Uncertain 1; both met plainly 0.
+MobileSAM as it is: region met 7, Uncertain 3; edge met 0, Uncertain 1; both 0.
+Way one: region met 9, Uncertain 1; edge met 0, Uncertain 0; both 0.
+Way two: region met 7, Uncertain 2; edge met 0, Uncertain 2; both 0.
+Way one against MobileSAM: better 4, same 4, worse 4, broken 0. Against the recipe: better 8, same 2, worse 2, broken 0.
+Way two against MobileSAM: better 6, same 3, worse 3, broken 0. Against the recipe: better 7, same 5, worse 0, broken 0.
+
+Words (way one vs MobileSAM, way one vs recipe, way two vs MobileSAM, way two vs recipe):
+NIR_3742 sky: better, same, better, same
+NIR_3742 water: same, worse, same, same
+NIR_3742 built things: worse, better, worse, better
+NIR_3742 foliage: better, better, better, same
+NIR_3705 sky: same, worse, better, same
+NIR_3705 foliage: worse, better, better, better
+NIR_3705 built things: same, better, same, better
+NIR_3710 sky: better, same, better, same
+NIR_3710 foliage: worse, better, worse, better
+NIR_3710 built things: better, better, better, better
+NIR_1873 foliage: same, better, same, better
+NIR_1873 water: worse, better, worse, better
+
+Files written:
+/tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/judgement/cue-edge-judgement-second.md
+/tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode/reports/cue-edge-step-2-second-report.txt
+
+Found: no mask of any kind met the edge clause plainly on any of the 12; in these frames the stage did not bring the edges to within 4 pixels at all three places on any frame-subject, though in several (NIR_3742 sky, NIR_3710 sky and built things, NIR_3705 foliage) the distances moved nearer than MobileSAM's.
+Found: the stage does not mend wrong regions, as the plan expected: the conifer base on NIR_3742 foliage was repaired by way one, but the foreground pine on NIR_1873 and the rock patches on NIR_3710 foliage stayed or came in.
+Uncertain: whether the dark trunks on NIR_1873 are foliage, and how much of the lower right on NIR_1873 water is water behind needles; marks on those rest on the reading stated in the judgement file.
+Uncertain: several sizes lie near one hundredth (NIR_3742 sky MobileSAM strip, NIR_3742 water recipe blur, NIR_3742 built MobileSAM tree patch, NIR_3742 foliage water loops, NIR_3705 foliage and built recipe pieces) and several distances lie at 4 to 8 pixels; each is marked Uncertain in the file.
+Uncertain: the words NIR_3742 water (way one and way two against MobileSAM), NIR_3705 sky (way two against recipe), NIR_3705 built things and NIR_1873 foliage against MobileSAM pull both ways.

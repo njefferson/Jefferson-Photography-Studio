@@ -1,0 +1,45 @@
+DONE (cue edge, step 1: the stage and the pictures)
+
+S = /tmp/claude-0/-home-user/b3f240d3-0ca6-5704-9020-a2a0578bf6ab/scratchpad/masks-decode
+
+Done:
+- Confirmed the ground by listing: eight -open.png and -open.json frames, 22 decode-*.png, 22 mobilesam-colour-*.png in masks2, the bundle, harness, step2-compose, step2-index, png.mjs, draw.mjs, edt.mjs. All stood.
+- Read whole: refine-lib.mjs, refine.mjs, step452-harness.mjs, step2-compose.mjs, step2-index.mjs, the step 2 report, the runner, and the contract comments of sampleMaskFit and sampleMaskWeights.
+- Wrote S/scratch/step3-stage.mjs and ran it for the eight frames as children of the runner, at most three side by side (labels stage1, stage2, stage3). Settings as fixed by the plan: draw-in 48, band by sureOf, height left out, guided filter radius 8 regularisation 0.001, guide = placeDecode light over 255, way two near = 144 pixels of the map's edge (a pixel whose side of a half differs from a 4-neighbour's). None changed.
+- Wrote step3-compose.mjs (a copy of step2-compose with four masks) and step3-index.mjs; ran compose (labels compose3a, 3b, 3c) and the index (label index3).
+- Opened three composed pictures.
+- Changed no tracked file in APP. Nothing staged, committed, pushed. Nothing under R touched.
+
+Seen:
+- Plant lines, printed first by every stage child (all eight identical):
+  plant step: 0.00 1.00
+  plant weights one: largest difference 0.0000
+  PLANT: expected (known wrong) the cut at a half at column 110; read column 100; reported as failing (as it must)
+  plant stage way one: known column 200; map misplaced to 220; column read 200; counted pixels in the fit 8960 and 6600; within 3
+  plant stage way two: known column 200; map misplaced to 220; column read 200; counted pixels in the fit 3560 and 3600; within 3
+- Compose plants (all three runs): layout whole 1576 by 790, edges 1576 by 1232; innerEdge counts 8, places 2,1 3,2 2,3; square side 42, area 0.0101, 228.5 on the frame; no edge true true false; wrap 3 lines, longest 79. In the compose script's own wrap plant I first wrote the known longest line as 85; arithmetic gives 79 (8 words of 9 letters and 7 spaces), so I corrected the stated figure in the script before any run; the plant was not tuned to a read.
+- Index plant: 5 and 1 missing.
+- Masks: 44 written, every one 2,800 by 1,864, one byte a pixel (the compose script read every one and drew none as wrong-sized). 22 cue-all, 22 cue-near. No subject lacks a mask: the fit never gave a reason in words, so no reason was written; the index files carry the field and it is empty for all 44.
+- Smallest fit side: NIR_3742 built things, 153 subject pixels (both ways), over 50.
+- Sure and fitted counts in short (sure taken / sure left at the frame; counted pixels in the fit, subject and other): way one reads every sure pixel, e.g. NIR_3461 sky 2,275,806 / 1,569,585, fit 252,907 and 173,760; way two the same sure sets, fit 60,629 and 49,366. Way two's subject side runs 153 to 60,629 and its other side 14,983 to 102,869; way one's other side runs 85,749 to 537,955. All 44 lines are in S/masks3/index.txt.
+- Times: decode and count 2.9 to 3.7 s a frame; sure pixels and edge distance about 0.65 to 0.8 s a subject; each mask (fit, weights, filter, write) 0.78 to 1.07 s; a frame in all 8.5 to 13.5 s. (The runner's progress files replace digit runs of seven or more with the word masked, so in those files some sure counts read masked; the exact counts are in the index files.)
+- Three pictures opened with Read:
+  whole-NIR_3461-sky.png (1576 by 790): five panels, all drawn and titled (1 the frame with its samples, 2 the recipe, 3 to 5 the three MobileSAM masks), each mask panel with tint, yellow outline at a half and the white square. The recipe takes the sky down to the horizon; MobileSAM as it is cuts around the left pylon and the far pylons as smooth blobs; both stage masks follow the pylon lattice and the horizon closely but add small stray lines and holes in the sky, way two with more at the right edge.
+  edges-NIR_3742-built-things.png (1576 by 1232): four rows, each titled with its mask's name and edge pixel count, each with places A, B, C and the x,y of the crops' top left, each a pair of crops (bare and with the red line one pixel wide), every crop carrying the white L with black rim. All 24 crops drawn. The recipe's line wanders through trees and a boat canopy; MobileSAM as it is hugs the dock edges and the boat; the two stage rows show lines along the dock and boat edges and also through foliage, more ragged than MobileSAM's.
+  whole-NIR_1873-water.png (1576 by 790): five panels, all drawn, titled, squared. The recipe takes the pool and some forest; MobileSAM takes the pool with a straight-cut edge; the stage masks take the pool with a ragged line along the bank and into the pine branches. Not judged against the bar.
+- Panel titles for MobileSAM panels are drawn at scale 1 (small) because the long titles do not fit a 512 pixel panel at scale 2; all are legible.
+
+Paths:
+- Index of pictures: S/pictures3/index.txt and S/pictures3/index.json (22 frame-subjects, each with the full paths of both pictures and each crop's place for each of the four masks; 0 files missing).
+- Index of masks (sure counts, fit counts, times, reasons): S/masks3/index.txt and S/masks3/index.json, plus per-frame S/masks3/index-<frame>.json.
+- Pictures folder (44 pictures): S/pictures3
+- Masks folder (44 masks): S/masks3 (cue-all-<frame>-<slug>.png, cue-near-<frame>-<slug>.png)
+- New scripts: S/scratch/step3-stage.mjs, S/scratch/step3-compose.mjs, S/scratch/step3-index.mjs
+- Run outputs: S/progress/step-452-stage1-*, stage2-*, stage3-*, compose3a-*, compose3b-*, compose3c-*, index3-*
+
+Files changed: none tracked in APP. Everything made is under S (masks3, pictures3, the three scripts, the job file S/scratch/step452-job.json rewritten for each run, progress files, this report).
+
+Found: the first message of my transcript did not hold the Read of /root/.claude/hub/agent-rules.md that APP's CLAUDE.md asks of an agent's first message; I read the page and the plan first as the task said. I did not read agent-rules.md.
+Found: sureOf's "sure left" counts the pixels sure on the other side as well as the rest of the frame beyond; for way two "sure left" is unchanged (the band and the kept values are as in way one); only the fit's labels differ.
+Found: the three subjects with a small sure region (NIR_3742 built things, 1,360 sure pixels; NIR_3710 built things, 39,587; NIR_3705 built things, 119,966) leave a small band, so the stage can only move edges inside 48 pixels of the map's line.
+Found: step3-stage.mjs copies boxMean, guided, weightedGuided, sureOf and the cue stage's pattern from refine-lib.mjs instead of importing it, because refine-lib.mjs imports a bundle path in another session's scratchpad that may not stand.
