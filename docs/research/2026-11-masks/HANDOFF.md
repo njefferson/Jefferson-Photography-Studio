@@ -6,7 +6,7 @@ Read this first. It says where the work stands, what was learned, and what comes
 - Staging is at 2.79.1, the commit whose subject opens "Fixed: on the test page a mask from your samples is made from the photograph itself". Main is at 2.71. The builds 2.72.1 to 2.79.1 wait on a device pass and the go for promotion.
 - On the test page (`debug.html`, `src/debug.ts`) a person places named samples on a photograph and a mask is made for each name by the app's own recipe (`src/samplemask.ts`), a fit on ten cues.
 - Since 2.79.1 those cues, and the lightness a mask's edge follows, are counted from the photograph's own decode through the function placeDecode in `src/placedecode.ts`, which calls the Sky mask's own guide (buildSkyGuide in `src/skyfine.ts`) and takes no edit. A mask or a Separation selection kept before 2.79.1 is listed as made from the drawn picture and is not applied.
-- Staging is at 2.80 with the tablet's measure built (decision record 112) and waiting on the tablet's press.
+- Staging is at 2.80 with the tablet's measure built (decision record 112). The press was run on the tablet on 13 November 2026 at 20:16 California time; its figures are in record 112 under Measured on the tablet, and in short under item 1 below.
 - The rule this follows is in the app's CLAUDE.md under the heading A MASK AND EVERY SELECTION READ THE PHOTOGRAPH'S OWN DATA, and in decision record 032.
 - The notes' section On staging, waiting on a device pass has no entry for 2.76 to 2.79 (queue key Q-JPS-339).
 - On 12 and 13 November five documents commits were added to staging: the four pieces under What was measured, and this page. None changes the app's code, pages or tools.
@@ -67,7 +67,10 @@ No connected region wrongly taken, and none wrongly left, larger than one hundre
 
 ## What comes next, in order
 
-1. The tablet's measure. Built on staging on 13 November 2026 as 2.80 (decision record 112) and waiting on the tablet's press; the figures are to be written into record 112 and here when they come. Whether the tablet's browser loads and runs an encoder, how fast and in how much memory, decides whether any learned route exists, and nothing in this folder measures it.
+1. Done: the tablet's measure. Built on staging on 13 November 2026 as 2.80 (decision record 112) and pressed on the tablet the same evening; the full figures are in record 112 under Measured on the tablet.
+   - The figures: an iPad, Safari 27.2, installed app, 4 cores. The runtime loads and runs MobileSAM's encoder and decoder on one WebAssembly thread. The encoder, on the 1,024 by 682 practice picture, three runs 2,387, 2,400 and 2,445 ms, median 2,400 ms; the decoder 129, 119 and 123 ms, median 123 ms. The container gave 4,731 ms and 230 ms. The files, about 60 MB, took about 6.3 s to fetch the first time and are kept by the device.
+   - What it shows: an encode once per photograph with a decode per click is within reach on this device, as the one editor read (darktable) does it. It chooses no method and no next step.
+   - Left open: WebGPU is offered with an adapter and running the model on it is unmeasured (its runtime binary is 29.5 MB, over the host's limit, and a binary joined from parts is unread); threads are absent because the app sends no cross-origin isolation headers, and four cores are there. Memory is not reported by this browser, so that part of the question is unanswered.
    - What it is: one press on the test page that loads the runtime and runs an encoder and a decoder on a planted picture. It prints whether the runtime loaded, each time as three runs and a median, what the browser offers (threads, WebGPU), and the device facts.
    - It draws no mask and offers no selection. It is a measure of the device and not a method on the page, which record 111 holds back until a method meets the bar.
    - What the build meets is in notes/build-ground.md and notes/build-brief.md, which are read whole before the piece is scoped. A model file needs a route of its own outside the service worker's install list. The host's limit is 25 MiB for one file. SlimSAM's files fit. MobileSAM's encoder is 1,942,693 bytes over; whether a file served in two parts and joined in the page gets round that is to be tried.
@@ -101,6 +104,11 @@ Each ran on the cheapest tier the worker and checker roles name. Tokens are as t
 - The fine read: five agents, about 28 minutes, about 870 thousand tokens.
 - The correction route: five agents in seven sends, about 27 minutes, about 760 thousand tokens.
 - Making the ground again in a new container took about ten minutes on 12 November.
+
+## What the piece of 13 November cost
+
+Each ran on the cheapest tier the worker and checker roles name. Tokens are as the harness reported them for the agents.
+- The tablet's measure: five worker sends and one checker, plus one landing send, about one hour from approval to the push, about 860 thousand tokens. One surprise: the build emitted a duplicate copy of the runtime's WebAssembly binary into the asset folder and the install list; it was fixed before the commit by resolving the runtime under the package's own condition (queue key Q-JPS-387).
 
 ## What is not in this folder, and how to get it again
 - The models. SlimSAM's ONNX files from Xenova/slimsam-77-uniform on Hugging Face, in its folder named onnx. MobileSAM's ONNX encoder and single-mask decoder from the copy kept by Acly. DINOv2 small from Xenova/dinov2-small, the file onnx/model_q4f16.onnx, 12,917,198 bytes, which runs at 224 by 224 only. They ran in node through onnxruntime-node 1.31.1, installed with no install script. The model files come from the host us.aws.cdn.hf.co, which the session's network must allow. reports/ holds the addresses and the handling.
