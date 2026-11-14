@@ -9,6 +9,11 @@
 // the renderer is a chip; a skipped walk prints no verdict. A server already answering
 // on the port is used as it is and left running.
 //
+// BEFORE IT RUNS: `npm install --no-save esbuild playwright-core axe-core` (four walks load
+// axe-core and fail with ENOENT without it). A run over the structural walks took 5942 seconds
+// in the container on 14 November 2026 and a foreground command is stopped at 30 minutes, so
+// start it in the background with a two-hour timeout (7200000 ms), or split it with --only=.
+//
 // WHY IT EXISTS. The pre-release sweep was a session typing ten commands from
 // memory, which means the sweep was whatever that session remembered — and the
 // walks it forgot were indistinguishable from walks that passed. This runs

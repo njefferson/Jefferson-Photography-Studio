@@ -87,7 +87,7 @@ say(`\nEVERY COMMIT RUNS ${gates.length} GATES: ${gates.map((g) => g.replace("to
 // 6. THE WALKS. Browser runs, not in the commit hook — a release sweep.
 const tools = existsSync(join(repo, "tools")) ? readdirSync(join(repo, "tools")) : [];
 const walks = tools.filter((f) => f.endsWith("-walk.mjs")).sort();
-say(`\n${walks.length} WALKS (browser; not on commit). One command: node tools/walk-all.mjs`);
+say(`\n${walks.length} WALKS (browser; not on commit). One command: node tools/walk-all.mjs (install first: npm install --no-save esbuild playwright-core axe-core; the container run over the structural walks took 5942 s, so start it in the background with a 7200000 ms timeout, or split it with --only=)`);
 for (const w of walks) {
   const first = read(`tools/${w}`).split("\n").find((l) => /^\/\/ ?[A-Z]/.test(l)) || "";
   say(`  ${w.replace("-walk.mjs", "").padEnd(22)} ${first.replace(/^\/\/ ?/, "").slice(0, 78)}`);
