@@ -867,6 +867,17 @@ try {
           await page.setInputFiles("#quickFiles", KEEP);
           await page.waitForFunction(() => (document.getElementById("qlGrid")?.children.length ?? 0) >= 2 && !document.getElementById("qlKeep").disabled && !document.getElementById("qlGrid").dataset.busy, null, { timeout: 120000 });
           await page.click("#qlKeep");
+          // THE WAIT ON ENDING THE LAST SESSION IS SAID (decision 075). The index
+          // clear queues behind the held delete in this browser context, so for
+          // most of nine seconds the card has nothing to count; after one second
+          // it has to say what it is finishing, with the count of old photos
+          // cleared. Read before the report button is looked for, so a build that
+          // shows the button at the end of the wait and never says anything fails
+          // here with what the card did say.
+          const finishing = await page.waitForFunction(() => document.getElementById("busyText")?.textContent === "Finishing the last session…" && /^\d+ of \d+ old photos cleared$/.test(document.getElementById("busyCount")?.textContent ?? "") && !document.getElementById("busyCount").hidden, null, { timeout: 6000, polling: 100 }).then(() => true).catch(() => false);
+          const finishCard = await page.evaluate(() => ({ text: document.getElementById("busyText").textContent, count: document.getElementById("busyCount").textContent, countShown: !document.getElementById("busyCount").hidden }));
+          if (finishing) ok(`${where} while the last session finishes the card says "${finishCard.text}" with "${finishCard.count}"`);
+          else fail(`${where} while the last session finishes the card did not say "Finishing the last session…" with a count of old photos cleared: it said "${finishCard.text}" with "${finishCard.count}" ${finishCard.countShown ? "shown" : "hidden"}`);
           const up = await page.waitForFunction(() => document.getElementById("busyReport")?.hidden === false, null, { timeout: 8000 }).then(() => true).catch(() => false);
           if (!up) { fail(`${where} the keep's wait never showed the card's report button`); continue; }
           const card = await page.evaluate(() => { const r = document.getElementById("busyReport").getBoundingClientRect(); return { text: document.getElementById("busyText").textContent, count: document.getElementById("busyCount").textContent, w: Math.round(r.width), h: Math.round(r.height) }; });

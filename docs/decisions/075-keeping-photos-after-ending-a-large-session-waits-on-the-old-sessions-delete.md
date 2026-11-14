@@ -134,3 +134,30 @@ measures anything it changes, so it declares no edge to them.
 Shipped. The commit whose subject reads "Fixed: keeping photos straight after Done says what it is waiting for, and never waits in silence" (1b1ea0a) is on main, read from the log of origin/main on 24 October. It was staged in v2.63.26 on 27 September and reached production on 28 September as v2.63.36. Keep right after ending a session puts a card up at once; the wait happens only when the browser says the set will not fit, and says so with a count; a photo refused for room meanwhile is stored again; a slow file is offered to be skipped; and a second open is refused in words. A saved photo dropped together with photos deleted an open session without asking, which was found and fixed with it. The source carries it in `src/main.ts`, where the card and the wait are marked with this record's number.
 
 Still owed: the device pass the v2.63.33 staging entry asks for, in Firefox on the PC, with no result recorded, and the reason the old session's delete runs for minutes on that PC, which is not established.
+
+**14 November 2026: what turned out wrong, and what was done.**
+- **What turned out wrong.** The card rose before any wait, as written, but with
+  nothing on it. In a browser that runs one write at a time per database, the
+  clear of the ended session's index (`resetSessionState`, called first in
+  `addToSession`) queues behind the one photo delete that is running, and the
+  card stood saying "Adding 2 photos…" with no count and no Report button for
+  as long as that one delete takes. The sources read for it name Firefox and
+  Safari with a stored site, and Chrome's in-memory context was measured. It
+  was 8.7 s behind the accessibility walk's held delete, and 4 to 39 ms behind a
+  real, unslowed delete of 44 to 88 practice raws in the container, with the
+  Report button 52 to 102 ms after Keep. The wait is one photo's delete, not the
+  sweep, so it does not grow with the number of photos. Chrome 153 with a
+  profile on disk did not wait (1 to 2 ms). Section 8 of the accessibility walk
+  failed in the container because its browser context is in memory.
+- **What was done.** The storage order was left alone: `resetSessionState`,
+  `forgetSession`, the sweep and the room check are as they were. The card a
+  keep or an open of a set raises now carries the Report button from the moment
+  it rises, through every phase, until the card goes; no other card does. When
+  ending the last session has lasted more than one second, the card says
+  "Finishing the last session…" with "N of M old photos cleared", read from the
+  sweep's progress; under a second nothing changes. When it returns the keep
+  goes on as before. Section 8 gained a check for the words and the count, and
+  was made to fail once on the unchanged build before it was trusted.
+- **Still owed.** The same wait with no card at all, in three places: a session
+  ended while an earlier delete runs, a lone photo opened over a session, and a
+  practice photo opened over a session. None raises a card, so none can say it.

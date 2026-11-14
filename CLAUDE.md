@@ -163,7 +163,10 @@ it: a gate that only counts says a filing cabinet is full.
   and deploy runs for that SHA, and the live offline copy (read off the live
   site, as NOTES.md records for earlier promotions: the offline copy it serves
   is the `ips-` version stamped in its `sw.js`, and the live site names the
-  commit it was built from). Otherwise they ride
+  commit it was built from: the live `sw.js` carries both, as `const CACHE`
+  (the offline copy's name) and `const BUILD` (the commit), read on the live
+  site as `const CACHE = "ips-2.80.1";` and `const BUILD =
+  "5f98ff3e678ee1e30ed04735b8d6dfb8a1b1e580";`). Otherwise they ride
   to main with the next promotion.
 - Push to `staging` UNPROMPTED whenever work reaches a point the owner needs
   to test — being asked for it is the signal this rule was broken (owner rule,

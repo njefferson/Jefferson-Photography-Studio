@@ -16208,12 +16208,25 @@ let openCardEpoch = -1;
  *  order they began — and the card said it was freeing space after the space
  *  was free. Written only through `showOpenCard` and `sayOpen`. */
 let openSays = "";
-/** Raise (or rewrite) the busy card as the running open's own. */
-function showOpenCard(text: string): void {
+/** The epoch of the open's card when that card was raised carrying the report
+ *  button (`showOpenCard`'s `report`), else -1. A keep's card carries the way
+ *  into the report from its first moment to the moment it goes (decision 075),
+ *  so no wait on it takes the button down; only `hideBusy` or another flow's
+ *  `showBusy` does, and either one changes the epoch or closes the card. */
+let openReportEpoch = -1;
+/** Raise (or rewrite) the busy card as the running open's own. Takes `text`, the
+ *  open's sentence, and `report`, true for the keep's and a set's open: the
+ *  card then shows `#busyReport` from the moment it rises, until the card goes.
+ *  Every other card keeps the button hidden, as before. */
+function showOpenCard(text: string, report = false): void {
   showBusy(text);
   openCardEpoch = busyEpoch;
   openSays = text;
+  openReportEpoch = report ? busyEpoch : -1;
+  if (report) busyReport.hidden = false;
 }
+/** Whether the card up now is the open's own and carries the report button. */
+const openCarriesReport = (): boolean => busy.open && busyEpoch === openReportEpoch;
 /** Whether the card up now is the running open's own. */
 const openOwnsCard = (): boolean => busy.open && busyEpoch === openCardEpoch;
 /** A new sentence for the open, written on its card when the card is its own
@@ -16304,8 +16317,62 @@ async function waitSayingFreeing(adopt: boolean): Promise<void> {
     await Session.sweepSettled();
   } finally {
     clearInterval(timer);
-    if (card.owns()) { busyCount.hidden = true; busyCount.textContent = ""; focusOffBeforeHiding(busyReport); busyReport.hidden = true; }
+    if (card.owns()) {
+      busyCount.hidden = true; busyCount.textContent = "";
+      // THE OPEN'S OWN CARD KEEPS ITS REPORT BUTTON to the end of the keep.
+      if (!openCarriesReport()) { focusOffBeforeHiding(busyReport); busyReport.hidden = true; }
+    }
     card.release();
+  }
+}
+
+/** The words for the wait on ending the last session, spoken once the wait has
+ *  lasted `FINISHING_AFTER_MS`. */
+const FINISHING_WORDS = "Finishing the last session…";
+/** How long the end of the last session may take before the card says so. Under
+ *  it nothing on the card changes, so a keep that ends a session in a few
+ *  milliseconds never flashes words. */
+const FINISHING_AFTER_MS = 1000;
+
+/** Wait for `work`, the end of the last session (`resetSessionState`), SAYING so
+ *  when it takes long (decision 075).
+ *
+ *  Takes `work`, the promise being waited on, and returns what it returns. If
+ *  it has not settled within `FINISHING_AFTER_MS`, claims the card
+ *  (`claimCard`, adopting it when it is the open's own) and says
+ *  FINISHING_WORDS in its live region once, then writes `N of M old photos
+ *  cleared` from `Session.sweepProgress()` into `#busyCount` every 250 ms, the
+ *  way `waitSayingFreeing` writes its count; with no sweep running there is no
+ *  count to write and the line stays hidden. When `work` settles, by value or
+ *  by throwing, the count comes off and the card gets its words back
+ *  (`claimCard`'s release). What callers rely on: nothing at all is written
+ *  to the card when `work` settles in time, and the claim, if made, is released
+ *  exactly once. */
+async function waitSayingFinishing<T>(work: Promise<T>): Promise<T> {
+  const held: { card: ReturnType<typeof claimCard> | null } = { card: null };
+  let ticker = 0;
+  const count = () => {
+    if (!held.card || !held.card.tick()) return;
+    const p = Session.sweepProgress();
+    if (!p) return;
+    const n = `${p.done} of ${p.total} old photos cleared`;
+    if (busyCount.textContent !== n) busyCount.textContent = n;
+    busyCount.hidden = false;
+  };
+  const start = window.setTimeout(() => {
+    held.card = claimCard(FINISHING_WORDS, openOwnsCard());
+    count();
+    ticker = window.setInterval(count, 250);
+  }, FINISHING_AFTER_MS);
+  try {
+    return await work;
+  } finally {
+    clearTimeout(start);
+    clearInterval(ticker);
+    if (held.card) {
+      if (held.card.owns()) { busyCount.hidden = true; busyCount.textContent = ""; }
+      held.card.release();
+    }
   }
 }
 
@@ -16519,7 +16586,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   // alone ran for minutes on a reader's PC. The card rises here and each wait
   // below writes what it is waiting for into it.
   const addingWords = (n: number) => `Adding ${n} photo${n === 1 ? "" : "s"}…`;
-  showOpenCard(addingWords(files.length));
+  showOpenCard(addingWords(files.length), true);
   const notRead = (on: string) => `${files.length} photo${files.length === 1 ? "" : "s"} not read yet — ${on}`;
   const waiting = { says: notRead("waiting for the editor"), since: performance.now() };
   addWaiting = waiting;
@@ -16583,7 +16650,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
     // written now, it went into the old session's index and came back mixed
     // with it on the next resume.
     if (!append) {
-      const reset = await resetSessionState(true);
+      const reset = await waitSayingFinishing(resetSessionState(true));
       if (!reset.ok) { cleared = false; clearError = reset.err; }
     }
     msReset = performance.now() - tReset;
@@ -16714,7 +16781,7 @@ async function addToSession(files: File[], append: boolean, ready?: Map<File, Re
   // still the open's own: raising it again starts a new use of the card, and a
   // skip offer speaking on it for a read still running lost its claim with it.
   if (openOwnsCard()) sayOpen(addingWords(files.length));
-  else showOpenCard(addingWords(files.length));
+  else showOpenCard(addingWords(files.length), true);
 
   /** Drop a planned tile that never became a photo. */
   const dropPlanned = (id: string) => {
@@ -20461,8 +20528,15 @@ function showBusy(text: string) {
 }
 
 function hideBusy() {
+  // THE KEEP'S CARD CARRIES ITS REPORT BUTTON TO THE LAST (decision 075), so a
+  // reader resting on the card when it goes was resting on a control that goes
+  // with it, where before the wait's end took the button down while the card
+  // stood. The focus then goes where the report's own close sends it, and only
+  // for that card; every other card closes as it always did.
+  const heldOnKeepCard = openCarriesReport() && busy.contains(document.activeElement);
   hideBusyExtras();
   if (busy.open) busy.close();
+  if (heldOnKeepCard && focusLost()) focusLive([busyOpener, sessionDone, sessionReject, sessionPick, sessionThumbs.querySelector(".session-thumb:not([disabled])")]);
   pendingSave = null;
   pendingSaveIsBatch = false;
   busyStop.hidden = true;
