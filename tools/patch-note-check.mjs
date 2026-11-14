@@ -3,6 +3,7 @@
 //
 //   node tools/patch-note-check.mjs              (pre-commit: the gate is installed)
 //   node tools/patch-note-check.mjs --msg=FILE   (commit-msg: this subject)
+//   node tools/patch-note-check.mjs FILE         (commit-msg, as the hub's generated hook calls it)
 //   node tools/patch-note-check.mjs --above-main (every user-facing subject above main)
 //
 // WHY IT EXISTS, reported from the device 2026-09-20. Five notes were in the ⓘ
@@ -29,6 +30,10 @@
 // AND IT CHECKS ITS OWN INSTALLATION, because the refusal lives in a
 // `commit-msg` hook and `.git/hooks` is empty in a fresh container and after
 // every clone. A gate that is absent looks exactly like a gate that passed.
+// That hook is no longer this repository's own: the hub's branch guard generates
+// `.githooks/commit-msg` from the `msg-also=` line in `.branch-guard`, runs the
+// hub's refusals first, and then calls this file with the message file's path as
+// its one argument.
 import { readFileSync, existsSync } from "node:fs";
 import { internalWords } from "./reader-words.mjs";
 import { execSync } from "node:child_process";
@@ -85,7 +90,8 @@ export function readerFacing(subject, paths, f) {
 }
 
 const filters = readFilters(repo);
-const msgArg = process.argv.find((a) => a.startsWith("--msg="))?.split("=")[1];
+const msgArg = process.argv.find((a) => a.startsWith("--msg="))?.split("=")[1]
+  ?? process.argv.slice(2).find((a) => !a.startsWith("--"));
 
 if (msgArg) {
   // COMMIT-MSG: the subject about to be written, against the files staged for it.

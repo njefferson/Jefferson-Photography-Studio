@@ -271,3 +271,10 @@ also=tools/keepfile-check.mjs
 also=tools/openable-check.mjs
 
 also=tools/mask-turn-check.mjs
+
+# Run in the commit-msg hook, after the hub's own refusals (no trailer, no chat
+# link, no model name): the four-word patch-note rule. The subject of a commit
+# does not exist when pre-commit runs, so the check above can only assert the
+# hook is installed; this line has the hub's generated hook call the check
+# itself, with the message file's path as its one argument.
+msg-also=tools/patch-note-check.mjs
