@@ -81,3 +81,4 @@ ir.html#tatBanner — An armed-tool banner over the photograph; appears only whi
 ir.html#healReviewBanner — Shown only after an automatic spot sweep has found something to review, so it needs a frame with real dust in it.
 ir.html#exportRetry — In the export strip, and only after an export has FAILED. Reachable by planting a failure, which is its own piece of work.
 ir.html#exportStop — In the export strip while an export is running.
+ir.html#profLoadHere — Beside the Profile switch, shown only for a raw whose file names a camera while no profile is held for that camera. Every practice DNG names no camera, so the sweep's open never shows it. What would put it on screen is a raw that names its camera, such as a Z 50 raw, opened with no profile for that camera held.

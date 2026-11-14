@@ -160,7 +160,10 @@ it: a gate that only counts says a filing cabinet is full.
   fast-forward, when `staging` holds nothing else `main` lacks: check that main
   is an ancestor of `staging` and that nothing outside docs differs,
   `git push origin staging:main`, then read the remote's main head, the Gates
-  and deploy runs for that SHA, and the live offline copy. Otherwise they ride
+  and deploy runs for that SHA, and the live offline copy (read off the live
+  site, as NOTES.md records for earlier promotions: the offline copy it serves
+  is the `ips-` version stamped in its `sw.js`, and the live site names the
+  commit it was built from). Otherwise they ride
   to main with the next promotion.
 - Push to `staging` UNPROMPTED whenever work reaches a point the owner needs
   to test — being asked for it is the signal this rule was broken (owner rule,

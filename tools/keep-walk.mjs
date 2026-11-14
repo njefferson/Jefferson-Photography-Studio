@@ -5,6 +5,8 @@
 //   python3 -m http.server 8131 --directory dist   (in another shell)
 //   node tools/keep-walk.mjs [--port=8131] [--file=/path/to.NEF]
 //
+//   npm install --no-save esbuild playwright-core axe-core
+//
 // WHAT THIS PROVES THAT keepfile-check DOES NOT (decision 043). That one holds
 // the CONTAINER to its promise in isolation: write bytes, read them back,
 // byte-identical, damage refused. This holds the JOIN — that the app writes
