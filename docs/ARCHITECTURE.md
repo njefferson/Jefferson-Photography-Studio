@@ -848,7 +848,7 @@ cannot describe something the code does not say about itself.
 - **`src/straighten.ts`** (279 lines) — FINDING THE ANGLE A FRAME IS OFF BY.
 - **`src/swupdate.ts`** (458 lines) — THE STANDING "A NEW VERSION IS WAITING" STRIP, for all three PWAs (Doctrine §7h).
 - **`src/theme.ts`** (115 lines) — Day/night mode, shared across every page.
-- **`src/tile.ts`** (904 lines) — A strip tile drawn from plain inputs, so the page and the decode worker draw the same picture.
+- **`src/tile.ts`** (909 lines) — A strip tile drawn from plain inputs, so the page and the decode worker draw the same picture.
 - **`src/toggletip.ts`** (134 lines) — A CONTROL'S OWN SENTENCE, REACHED BY A FINGER — the toggletip of decision 024.
 - **`src/verdlg.ts`** (135 lines) — THE "THIS BUILD" PANEL — what changed, and the report to send (Doctrine §7d, §7f).
 - **`src/verstamp.ts`** (41 lines) — THE BUILD STAMP, WRITTEN AT BOOT (Doctrine §7b) — the version visible on every page, so a reader reporting a problem can say which build they are on without being asked to go looking for it.

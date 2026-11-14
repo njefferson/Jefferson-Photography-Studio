@@ -434,7 +434,10 @@ function flatTone(k: number): [number, number, number, number, number] {
  *  @param skyMask  the sky bitmap at the turn the picture is shown at, or null.
  *  @param base0  the look's own amounts the lift tops up.
  *  @param lens  the curve the grade carries for `img` (`lensForSource`).
- *  @returns the tone curve, bands, sky amount and pull to apply, or null. */
+ *  @returns the tone curve, bands, sky amount and pull to apply, or null.
+ *  Invariant: the lift it returns does not depend on `params.panelCentres`, so the
+ *  screen, the tile, the batch and the export reach one lift for one photograph
+ *  and one look. */
 export function solveLift(withColour: boolean, img: DecodedImage, params: EditParams, skyMask: BrushMask | null, base0: LiftBase, lens: LensCurve | null): { tone: [number, number, number, number, number]; foliage: [number, number, number]; sky: [number, number, number]; skySat: number; pull: number } | null {
   // Measure the frame WITHOUT a lift on it. The creative grade — tone included
   // — carries across opens by design, so `params.tone` on a fresh open is
@@ -445,6 +448,8 @@ export function solveLift(withColour: boolean, img: DecodedImage, params: EditPa
   // time makes it idempotent: the same frame gives the same answer however many
   // times this runs, and pressing the toggle twice is a round trip.
   const base = cloneParams(params);
+  // The lift is solved without the panel's keyed Sky and Foliage centres on every route, as renderTile and batchParamsFor already solve it: the centres on the caller's params were keyed for an earlier edit state (the last draw, or the previous photograph), so reading them made the screen's lift differ from the tile's and from the one the photograph opened with.
+  base.panelCentres = null;
   base.tone = [...TONE_DEFAULT] as typeof base.tone;
   // THE SAME ARGUMENT, FOR THE OTHER TWO. The paragraph above was written about
   // tone and the fix was applied to tone alone, while sky and foliage carry
